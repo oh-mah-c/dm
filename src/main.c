@@ -18,6 +18,7 @@
 #include "algorithms/nafcp.h"
 #include "algorithms/fcfia.h"
 #include "algorithms/prepost.h"
+#include "algorithms/mafia.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -74,6 +75,7 @@ int main(int argc, char **argv) {
     DM_NAFCP_Params nafcp_params;
     DM_FCFIA_Params fcfia_params;
     DM_PrePost_Params prepost_params;
+    DM_MAFIA_Params mafia_params;
     if (strcmp(algo_id, "ais") == 0) {
         ais_params.min_support = min_support;
         params = &ais_params;
@@ -128,6 +130,9 @@ int main(int argc, char **argv) {
     } else if (strcmp(algo_id, "prepost") == 0) {
         prepost_params.min_support = min_support;
         params = &prepost_params;
+    } else if (strcmp(algo_id, "mafia") == 0) {
+        mafia_params.min_support = min_support;
+        params = &mafia_params;
     }
 
     printf("Executing %s...\n", algo->name);

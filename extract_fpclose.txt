@@ -1,0 +1,1153 @@
+Fast Algorithms for Frequent
+Itemset Mining Using FP-Trees
+Go¨sta Grahne, Member ,IEEE , and Jianfei Zhu, Student Member ,IEEE
+Abstract —Efficient algorithms for mining frequent itemsets are crucial for mining association rules as well as for many other data
+mining tasks. Methods for mining frequent itemsets have been implemented using a prefix-tree structure, known as an FP-tree, forstoring compressed information about frequent itemsets. Numerous experimental results have demonstrated that these algorithms
+perform extremely well. In this paper, we present a novel FP-array technique that greatly reduces the need to traverse FP-trees, thus
+obtaining significantly improved performance for FP-tree-based algorithms. Our technique works especially well for sparse data sets.
+Furthermore, we present new algorithms for mining all, maximal, and closed frequent itemsets. Our algorithms use the FP-tree data
+structure in combination with the FP-array technique efficiently and incorporate various optimization techniques. We also present
+experimental results comparing our methods with existing algorithms. The results show that our methods are the fastest for many
+cases. Even though the algorithms consume much memory when the data sets are sparse, they are still the fastest ones when the
+minimum support is low. Moreover, they are always among the fastest algorithms and consume less memory than other methods when
+the data sets are dense.
+Index Terms —Data mining, association rules.
+/C230
+1I NTRODUCTION
+EFFICIENT mining of frequent itemsets (FIs) is a funda-
+mental problem for mining association rules [5], [6], [21],
+[32]. It also plays an important role in other data miningtasks such as sequential patterns, episodes, multidimen-sional patterns, etc. [7], [22], [17]. The description of the
+problem is as follows: Let I¼fi
+1;i2;...;ingbe a set of items
+andDbe a multiset of transactions, where each transaction /C28
+is a set of items such that /C28/C18I. For any X/C18I, we say that a
+transaction /C28contains XifX/C18/C28. The set Xis called an
+itemset . The set of all X/C18I(the powerset of I) naturally
+forms a lattice, called the itemset lattice . The count of an
+itemset Xis the number of transactions in Dthat contain X.
+Thesupport of an itemset Xis the proportion of transactions
+inDthat contain X. Thus, if the total number of transactions
+inDisn, then the support of Xis the count of Xdivided by
+n/C1100percent. An itemset Xis called frequent if its support
+is greater than or equal to some given percentage s, where s
+is called the minimum support .
+When a transaction database is very dense and the
+minimum support is very low, i.e., when the database
+contains a significant number of large frequent itemsets,mining allfrequent itemsets might not be a good idea. For
+example, if there is a frequent itemset with size l, then all
+2
+lnonempty subsets of the itemset have to be generated.
+However, since frequent itemsets are downward closed in the
+itemset lattice, meaning that any subset of a frequent
+itemset is frequent, it is sufficient to discover only all the
+maximal frequent itemsets (MFIs). A frequent itemset Xis
+called maximal if there does not exist frequent itemset Ysuch that X/C26Y. Mining frequent itemsets can thus be
+reduced to mining a “border” in the itemset lattice. Allitemsets above the border are infrequent and those that arebelow the border are all frequent. Therefore, some existing
+algorithms only mine maximal frequent itemsets.
+However, mining only MFIs has the following deficiency:
+From an MFI and its support s, we know that all its subsets
+are frequent and the support of any of its subset is not lessthan s, but we do not know the exact value of the support.
+For generating association rules, we do need the support of
+all frequent itemsets. To solve this problem, another type of
+a frequent itemset, called closed frequent itemset (CFI), was
+proposed in [24]. A frequent itemset Xisclosed if none of its
+proper supersets have the same support. Any frequent
+itemset has the support of its smallest closed superset. The
+set of all closed frequent itemsets thus contains completeinformation for generating association rules. In most cases,the number of CFIs is greater than the number of MFIs,
+although still far less than the number of FIs.
+1.1 Mining FIs
+The problem of mining frequent itemsets was firstintroduced by Agrawal et al. [5], who proposed algorithm
+Apriori. Apriori is a bottom -up, breadth-first search
+algorithm. It uses hash-trees to store frequent itemsets andcandidate frequent itemsets. Because of the downward
+closure property of the frequency pattern, only candidate
+frequent itemsets, whose subsets are all frequent, aregenerated in each database scan. Candidate frequent item-set generation and subset testing are all based on the hash-
+trees. In the algorithm, transactions are not stored in the
+memory and, thus, Apriori needs ldatabase scans if the size
+of the largest frequent itemset is l. Many algorithms, such as
+[28], [29], [23], are variants of Apriori. In [23], the kDCI
+method applies a novel counting strategy to efficiently
+determine the itemset supports without necessarily per-forming all the lscans.IEEE TRANSACTIONS ON KNOWLEDGE AND DATA ENGINEERING, VOL. 17, NO. 10, OCTOBER 2005 1347
+.The authors are with the Department of Computer Science, Concordia
+University, 1455 De Maisonneuve Blvd. West, Montreal, Quebec, H3G1M8, Canada. E-mail: {grahne, j_zhu}@cs.concordia.ca.
+Manuscript received 28 Apr. 2004; revised 27 Nov. 2004; accepted 11 Mar.
+2005; published online 18 Aug. 2005.For information on obtaining reprints of this article, please send e-mail to:tkde@computer.org, and reference IEEECS Log Number TKDE-0123-0404.
+1041-4347/05/$20.00 /C2232005 IEEE Published by the IEEE Computer Society
+
+
+
+In [14], Han et al. introduced a novel algorithm, known as
+the FP-growth method, for mining frequent itemsets. The
+FP-growth method is a depth-first search algorithm. In the
+method, a data structure called the FP-tree is used forstoring frequency information of the original database in a
+compressed form. Only two database scans are needed for
+the algorithm and no candidate generation is required. Thismakes the FP-growth method much faster than Apriori. In[27], PatriciaMine stores the FP-trees as Patricia Tries [18]. A
+number of optimizations are used for reducing time and
+space of the algorithm. In [33], Zaki also proposed a depth-first search algorithm, Eclat, in which database is “verti-
+cally” represented. Eclat uses a linked list to organize
+frequent patterns, however, each itemset now correspondsto an array of transaction IDs (the “TID-array”). Each
+element in the array corresponds to a transaction that
+contains the itemset. Frequent itemset mining and candidatefrequent itemset generation are done by TID-array intersec-
+tions. Later, Zaki and Gouda [35] introduced a technique,
+called diffset , for reducing the memory requirement of TID-
+arrays. The diffset technique only keeps track of differences
+in the TID’s of candidate itemsets when it is generating
+frequent itemsets. The Eclat algorithm incorporating thediffset technique is called dEclat [35].
+1.2 Mining MFIs
+Maximal frequent itemsets were inherent in the border
+notion introduced by Mannila and Toivonen in [20].
+Bayardo [8] introduced MaxMiner which extends Apriori
+to mine only “long” patterns (maximal frequent itemsets).Since MaxMiner only looks for the maximal FIs, the search
+space can be reduced. MaxMiner performs not only subset
+infrequency pruning, where a candidate itemset with aninfrequent subset will no t be considered, but also a
+“lookahead” to do superset frequency pruning. MaxMiner
+still needs several passes of the database to find themaximal frequent itemsets.
+In [10], Burdick et al. gave an algorithm called MAFIA to
+mine maximal frequent itemsets. MAFIA uses a linked list
+to organize all frequent itemsets. Each itemset Icorre-
+sponds to a bitvector; the length of the bitvector is thenumber of transactions in the database and a bit is set if itscorresponding transaction contains I, otherwise, the bit is
+not set. Since all information contained in the database is
+compressed into the bitvectors, mining frequent itemsetsand candidate frequent itemset generation can be done by
+bitvector and-operations. Pruning techniques are also used
+in the MAFIA algorithm.
+GenMax, another depth-first algorithm, proposed by
+Gouda and Zaki [11], takes an approach called progressive
+focusing to do maximality testing. This technique, instead of
+comparing a newly found frequent itemset with all
+maximal frequent itemsets found so far, maintains a set oflocal maximal frequent itemsets. The newly found FI is only
+compared with itemsets in the small set of local maximal
+frequent itemsets, which reduces the number of subset tests.
+In our earlier paper [12], we presented the FPmax
+algorithm for mining MFIs using the FP-tree structure.FPmax is also a depth-first algorithm. It takes advantage of
+the FP-tree structure so that only two database scans are
+needed. In FPmax, a tree structure similar to the FP-tree isused for maximality testing. The experimental results in [12]showed that FPmax outperforms GenMax and MAFIA for
+many, although not all, cases.
+Another method that uses the FP-tree structure is AFOPT
+[19]. In the algorithm, item search order, intermediate result
+representation, and construction strategy, as well as tree
+traversal strategy, are considered dynamically; this makesthe algorithm adaptive to general situations. SmartMiner
+[36], also a depth-first algorithm, uses a technique to
+quickly prune candidate frequent itemsets in the itemsetlattice. The technique gathers “tail” information for a node
+in the lattice. The tail information is used to determine the
+next node to explore during the depth-first mining. Itemsare dynamically reordered based on the tail information.The algorithm was compared with MAFIA and GenMax on
+two data sets and the experiments showed that SmartMiner
+is about 10 times faster than MAFIA and GenMax.
+1.3 Mining CFIs
+In [24], Pasquier et al. introduced closed frequent itemsets.The algorithm proposed in the paper, A-close, extends
+Apriori to mine all CFIs. Zaki and Hsiao [34] proposed a
+depth-first algorithm, CHARM, for CFI mining. As in theirearlier work in [11], in CHARM, each itemset corresponds
+to a TID-array, and the main operation of the mining is
+again TID-array intersections. CHARM also uses the diffsettechnique to reduce the memory requirement for TID-array
+intersections.
+The algorithm AFOPT [19] described in Section 1.2 has
+an option for mining CFIs in a manner similar to the way
+AFOPT mines MFIs.
+In [26], Pei et al. extended the FP-growth method to a
+method called CLOSET for mining CFIs. The FP-treestructure was used and some optimizations for reducing
+the search space were proposed. The experimental results
+reported in [26] showed that CLOSET is faster than CHARMand A-close. CLOSET was extended to CLOSET+ by Wang
+et al. in [30] to find the best strategies for mining frequent
+closed itemsets. CLOSET+ uses data structures and datatraversal strategies that depend on the characteristics of thedata set to be mined. Experimental results in [30] showed
+that CLOSET+outperformed all previous algorithms.
+1.4 Contributions
+In this work, we use the FP-tree, the data structure that was
+first introduced in [14]. The FP-tree has been shown to be avery efficient data structure for mining frequent patterns
+[14], [30], [26], [16] and its variation has been used for
+“iceberg” data cube computation [31].
+One of the important contributions of our work is a novel
+technique that uses a special data structure, called an FP-array, to greatly improve the performance of the algorithms
+operating on FP-trees. We first demonstrate that the FP-
+array technique drastically speeds up the FP-growth methodon sparse data sets, since it now needs to scan each FP-tree
+only once for each recursive call emanating from it. This
+technique is then applied to our previous algorithm FPmaxfor mining maximal frequent itemsets. We call the new
+method FPmax*. In FPmax*, we also introduce our
+technique for checking if a frequent itemset is maximal, forwhich a variant of the FP-tree structure, called an MFI-tree,
+is used. For mining closed frequent itemsets, we have
+designed an algorithm FPclose which uses yet anothervariant of the FP-tree structure, called a CFI-tree, for1348 IEEE TRANSACTIONS ON KNOWLEDGE AND DATA ENGINEERING, VOL. 17, NO. 10, OCTOBER 2005
+
+
+
+checking the closedness of frequent itemsets. The closedness
+checking is quite different from CLOSET+. Experimentalresults in this paper show that our closedness checkingapproach is more efficient than the approach of CLOSET+.
+Both the experimental results in this paper and the
+independent experimental results from the first IEEE ICDM
+Workshop on frequent itemset mining (FIMI ’03) [3], [32]
+demonstrate the fact that all of our FP-algorithms have verycompetitive and robust performance. As a matter of fact, inFIMI ’03, our algorithms were considered to be the algo-rithms of choice for mining maximal and closed frequentitemsets [32].
+1.5 Organization of the Paper
+In Section 2, we briefly review the FP-growth method andintroduce our FP-array technique that results in the greatlyimproved method FPgrowth*. Section 3 gives algorithmFPmax*, which is an extension of our previous algorithmFPmax, for mining MFIs. Here, we also introduce our
+approach of maximality checking. In Section 4, we give
+algorithm FPclose for mining CFIs. Experimental results arepresented in Section 5. Section 6 concludes and outlinesdirections for future research.
+2D ISCOVERING FI’S
+2.1 The FP-Tree and FP-Growth Method
+The FP-growth method [14], [15] is a depth-first algorithm. Inthe method, Han et al. proposed a data structure called theFP-tree (frequent pattern tree). The FP-tree is a compact repre-sentation of all relevant frequency information in a database.Every branch of the FP-tree represents a frequent itemset and
+the nodes along the branches are stored in decreasing order of
+frequency of the corresponding items with leaves represent-ing the least frequent items. Compression is achieved bybuilding the tree in such a way that overlapping itemsetsshare prefixes of the corresponding branches.
+An FP-tree Thas a header table, T:header , associated
+with it. Single items and their counts are stored in theheader table in decreasing order of their frequency. The
+entry for an item also contains the head of a list that links all
+the corresponding nodes of the FP-tree.Compared with breadth-first algorithms such as Apriori
+and its variants, which may need as many database scans as
+the length of the longest pattern, the FP-growth method
+only needs two database scans when mining all frequent
+itemsets. The first scan is to find all frequent items. These
+items are inserted into the header table in decreasing order
+of their count. In the second scan, as each transaction is
+scanned, the set of frequent items in it is inserted into the
+FP-tree as a branch. If an itemset shares a prefix with an
+itemset already in the tree, this part of the branch will be
+shared. In addition, a counter is associated with each nodein the tree. The counter stores the number of transactions
+containing the itemset represented by the path from the root
+to the node in question. This counter is updated during the
+second scan, when a transaction causes the insertion of a
+new branch. Fig. 1a shows an example of a data set and
+Fig. 1b the FP-tree for that data set.
+Now, the constructed FP-tree contains all frequency
+information of the database. Mining the database becomes
+mining the FP-tree. The FP-growth method relies on the
+following principle: If XandYare two itemsets, the count
+of itemset X[Yin the database is exactly that of Yin the
+restriction of the database to those transactions containing
+X. This restriction of the database is called the conditional
+pattern base ofXand the FP-tree constructed from the
+conditional pattern base is called X
+0sconditional FP-tree ,
+w h i c hw ed e n o t eb y TX.W ec a nv i e wt h eF P - t r e e
+constructed from the initial database as T;, the conditional
+FP-tree for the empty itemset. Note that, for any itemset Y
+that is frequent in the conditional pattern base of X, the set
+X[Yis a frequent itemset in the original database.
+Given an item iinTX:header , by following the linked list
+starting at iinTX:header , all branches that contain item iare
+visited. The portion of these branches from ito the root forms
+the conditional pattern base of X[fig, so the traversal
+obtains all frequent items in this conditional pattern base. The
+FP-growth method then constructs the conditional FP-tree
+TX[figby first initializing its header table based on the
+frequent items found, then revisiting the branches of TX
+along the linked list of iand inserting the corresponding
+itemsets in TX[fig. Note that the order of items can be
+different in TXand TX[fig. As an example, the conditional
+pattern base of ffgand the conditional FP-tree Tffgfor theGRAHNE AND ZHU: FAST ALGORITHMS FOR FREQUENT ITEMSET MINING USING FP-TREES 1349
+Fig. 1. An FP-tree example. (a) A database. (b) The FP-tree for the database ( minimum support = 20 percent ).
+
+
+
+database in Fig. 1a is shown in Fig. 1c. The above procedure is
+applied recursively, and it stops when the resulting new FP-
+tree contains only one branch. The complete set of frequent
+itemsets can be generated from all single-branch FP-trees.
+2.2 The FP-Array Technique
+The main work done in the FP-growth method is traversingFP-trees and constructing new conditional FP-trees after the
+first FP-tree is constructed from the original database. From
+numerous experiments, we found out that about 80 percentof the CPU time was used for traversing FP-trees. Thus, the
+question is, can we reduce the traversal time so that the
+method can be sped up? The answer is yes, by using a simpleadditional data structure. Recall that, for each item iin the
+header of a conditional FP-tree T
+X, two traversals of TXare
+needed for constructing the new conditional FP-tree TX[fig.
+The first traversal finds all frequent items in the conditional
+pattern base of X[figand initializes the FP-tree TX[figby
+constructing its header table. The second traversal constructs
+the new tree TX[fig. We can omit the first scan of TXby
+constructing a frequent pairs array AXwhile building TX.
+We initialize TXwith an attribute AX.
+Definition. LetTbe a conditional FP-tree and I¼fi1;i2;...;img
+be the set of items in T:header . A frequent pairs array (FP-
+array) of Tis aðm/C01Þ/C2ðm/C01Þmatrix, where each element
+of the matrix corresponds to the counter of an ordered pair ofitems in I.
+Obviously, there is no need to set a counter for both item
+pairs ði
+j;ikÞand ðik;ijÞ. Therefore, we only store the
+counters for all pairs ðik;ijÞsuch that k<j .
+We use an example to explain the construction of the FP-
+array. In Fig. 1a, supposing that the minimum support is
+20 percent, after the first scan of the original database, we
+sort the frequent items as b:5,a:5,d:5,g:4,f:2,e:2,c:2. This
+order is also the order of items in the header table of T;.
+During the second scan of the database, we will construct T;
+and an FP-array A;, as shown in Fig. 2a. All cells in the FP-
+array are initialized to 0.
+According to the definition of an FP-array, in A;, each
+cell is a counter of a pair of items. Cell A;½c; b/C138is the counter
+for itemset fc; bg, cell A;½c; a/C138is the counter for itemset fc; ag,
+and so forth. During the second scan for constructing T;, for
+each transaction, all frequent items in the transaction are
+extracted. Suppose these items form itemset J. To insert J
+into T;, the items in Jare sorted according to the order in
+T;:header . When we insert JintoT;, at the same time A;½i; j/C138
+is incremented by 1 if fi; jgis contained in J. For instance,
+for the second transaction, fb; a; f; g gis extracted (item his
+infrequent) and sorted as b; a; g; f . This itemset is inserted
+into T;as usual and, at the same time, A;½f;b/C138;A;½f;a/C138,A;½f;g/C138;A;½g; b/C138,A;½g; a/C138;A;½a; b/C138are all incremented by 1.
+After the second scan, the FP-array A;contains the counts
+of all pairs of frequent items, as shown in Fig. 2a.
+Next, the FP-growth method is recursively called to mine
+frequent itemsets for each item in T;:header . However, now
+for each item i, instead of traversing T;along the linked list
+starting at ito get all frequent items in i0sconditional
+pattern base, A;gives all frequent items for i. For example,
+by checking the third line in the table for A;, frequent
+items b; a; d for the conditional pattern base of gcan be
+obtained. Sorting them according to their counts, we getb; d; a . Therefore, for each item iinT
+;, the FP-array A;
+makes the first traversal of T;unnecessary and each Tfigcan
+be initialized directly from A;.
+For the same reason, from a conditional FP-tree TX, when
+we construct a new conditional FP-tree for X[fig, for an
+item i, a new FP-array AX[figis calculated. During the
+construction of the new FP-tree TX[fig, the FP-array AX[figis
+filled. As an example, from the FP-tree in Fig. 1b, if theconditional FP-tree T
+fggis constructed, the FP-array Afggwill
+be in Fig. 2b. This FP-array is constructed as follows: Fromthe FP-array A
+;, we know that the frequent items in the
+conditional pattern base of fggare, in descending order of
+their support, b; d; a . By following the linked list of g, from
+the first node, we get fb; dg:2, so it is inserted as ðb:2;d:2Þ
+into the new FP-tree Tfgg. At the same time, Afgg½b; d/C138is
+incremented by 1. From the second node in the linked list,fb; ag:1is extracted and it is inserted as ðb:1;a:1Þinto
+T
+fgg. At the same time, Afgg½b; a/C138is incremented by 1. From
+the third node in the linked list, fa; dg:1is extracted and it is
+inserted as ðd:1;a:1ÞintoTfgg. At the same time, Afgg½d; a/C138
+is incremented by 1. Since there are no other nodes in thelinked list, the construction of T
+fggis finished and FP-array
+Afggis ready to be used for construction of FP-trees at the
+next level of recursion. The construction of FP-arrays andFP-trees continues until the FP-growth method terminates.
+Based on the foregoing discussion, we define a variant of
+the FP-tree structure in which, besides all attributes given in[14], an FP-tree also has an attribute, FP-array , which
+contains the corresponding FP-array.
+2.3 Discussion
+Let us analyze the size of an FP-array first. Suppose thenumber of frequent items in the first FP-tree T
+;isn. Then,
+the size of the associated FP-array is proportional toPn/C01
+i¼1i¼nðn/C01Þ=2, which is the same as the number of
+candidate large 2-itemsets in Apriori in [6]. The FP-treesconstructed from the first FP-tree have fewer frequentitems, so the sizes of the associated FP-arrays decrease. Atany time when the space for an FP-tree is freed, so is thespace for its FP-array.
+There are some limitations for using the FP-array
+technique. One potential problem is the size of the FP-array.When the number of items in T
+;is small, the size of the FP-
+array is not very big. For example, if there are 5,000 frequent
+items in the original database and the size of an integer is4 bytes, the FP-array takes only 50 megabytes or so.However, when nis large, nðn/C01Þ=2becomes an extremely
+large number. At this case, the FP-array technique will
+reduce the significance of the FP-growth method, since themethod mines frequent itemsets without generating anycandidate frequent itemsets. Thus, one solution is to simply
+give up the FP-array technique until the number of items in
+an FP-tree is small enough. Another possible solution is to1350 IEEE TRANSACTIONS ON KNOWLEDGE AND DATA ENGINEERING, VOL. 17, NO. 10, OCTOBER 2005
+Fig. 2. Two FP-array examples. (a) A;. (b) Afgg.
+
+
+
+reduce the size of the FP-array. This can be done by
+generating a much smaller set of candidate large two-
+itemsets as in [25] and only store in memory cells of the FP-
+array corresponding to a two-itemset in the smaller set.
+However, in this paper, we suppose the main memory is big
+enough for all FP-arrays.
+The FP-array technique works very well, especially when
+the data set is sparse and very large. The FP-tree for a sparse
+data set and the recursively constructed FP-trees will be big
+and bushy because there are not many shared common
+prefixes among the FIs in the transactions. The FP-arrays
+save traversal time for all items and the next level FP-trees
+can be initialized directly. In this case, the time saved by
+omitting the first traversals is far greater than the time
+needed for accumulating counts in the associated FP-arrays.
+However, when a data set is dense, the FP-trees become
+more compact. For each item in a compact FP-tree, the
+traversal is fairly rapid, while accumulating counts in the
+associated FP-array could take more time. In this case,
+accumulating counts may not be a good idea.
+Even for the FP-trees of sparse data sets, the first levels of
+recursively constructed FP-trees for the first items in a
+header table are always conditional FP-trees for the most
+common prefixes . We can therefore expect the traversal times
+for the first items in a header table to be fairly short, so the
+cells for these items are unnecessary in the FP-array. As anexample, in Fig. 2a, since b,a, and dare the first three items
+in the header table, the first two lines do not have to be
+calculated, thus saving counting time.
+Note that the data sets (the conditional pattern bases)
+change during the different depths of the recursion. In
+order to estimate whether a data set is sparse or dense,
+during the construction of each FP-tree, we count the
+number of nodes in each level of the tree. Based on
+experiments, we found that if the upper quarter of the tree
+contains less than 15 percent of the total number of nodes,we are most likely dealing with a dense data set. Otherwise,
+the data set is likely to be sparse.
+If the data set appears to be dense, we do not calculate
+the FP-array for the next level of the FP-tree. Otherwise, we
+calculate the FP-array of each FP-tree in the next level, but
+the cells for the first several (we use 15 based on our
+experience) items in its header table are not calculated.
+2.4 FPgrowth*: An Improved FP-Growth Method
+Fig. 3 contains the pseudo code for our new method
+FPgrowth*. The procedure has an FP-tree Tas parameter. T
+has attributes: base,header , and FP-array .T:base contains
+the itemset Xfor which Tis a conditional FP-tree, the
+attribute header contains the header table, and T:FP -array
+contains the FP-array AX.
+InFPgrowth* , line 6 tests if the FP-array of the current FP-
+tree exists. If the FP-tree corresponds to a sparse data set, its
+FP-array exists, and line 7 constructs the header table of the
+new conditional FP-tree from the FP-array directly. One FP-
+tree traversal is saved for this item compared with the FP-
+growth method in [14]. In line 9, during the construction,
+we also count the nodes in the different levels of the tree in
+order to estimate whether we shall really calculate the FP-array or just set T
+Y:FP -array as undefined.
+3F P MAX*: M INING MFI’ S
+In [12], we developed FPmax, another method that mines
+maximal frequent itemsets using the FP-tree structure. Sincethe FP-array technique speeds up the FP-growth method for
+sparse data sets, we can expect that it will be useful in
+FPmax too. This gives us an improved method, FPmax*.Compared to FPmax, in addition to the FP-array technique,
+the improved method FPmax* also has a more efficient
+maximality checking approach, as well as several other
+optimizations. It turns out that FPmax* outperforms FPmax
+for all cases we discussed in [12].
+3.1 The MFI-Tree
+Obviously, compared with FPgrowth*, the extra work that
+needs to be done by FPmax* is to check if a frequent itemset is
+maximal. The naive way to do this is during a postprocessings t e p .I n s t e a d ,i nF P m a x ,w ei n t r o d u c e dag l o b a ld a t a
+structure, the maximal frequent itemsets tree (MFI-tree), to
+keep the track of MFIs. Since FPmax* is a depth-first
+algorithm, a newly discovered frequent itemset can only be
+a subset of an already discovered MFI. We therefore need tokeep track of all already discovered MFIs. For this, we use the
+MFI-tree. A newly discovered frequent itemset is inserted
+into the MFI-tree, unless it is a subset of an itemset already in
+the tree. From experience, we learned that a further
+consideration for large data sets is that the MFI-tree will bequite large, and sometimes one itemset needs thousands of
+comparisons for maximality checking. Inspired by the way
+maximality checking is done in [11], in FPmax*, we still usethe MFI-tree structure, but for each conditional FP-tree T
+X,a
+small local MFI-tree MXis created. The tree MXwill contain
+all maximal itemsets in the conditional pattern base of X.T o
+see if a local MFI Ygenerated from a conditional FP-tree TXis
+globally maximal, we only need to compare Ywith the
+itemsets in MX. This speeds up FPmax significantly.
+Each MFI-tree is associated with a particular FP-tree. An
+MFI-tree resembles an FP-tree. There are two main differ-
+ences between MFI-trees and FP-trees. In an FP-tree, each
+node in the subtree has three fields: item-name, count, andnode-link. In an MFI-tree, the count is replaced by the level of
+the node. The level field is used for maximality checking in a
+way to be explained later. Another difference is that theheader table in an FP-tree is constructed from traversing the
+previous FP-tree or using the associated FP-array, while theGRAHNE AND ZHU: FAST ALGORITHMS FOR FREQUENT ITEMSET MINING USING FP-TREES 1351
+Fig. 3. Algorithm FPgrowth*.
+
+
+
+header table of an MFI-tree is constructed based on the item
+order in the table of the FP-tree it is associated with.
+The insertion of an MFI into an MFI-tree is similar to the
+insertion of a frequent set into an FP-tree. Fig. 4 shows theinsertions of all MFIs into an MFI-tree associated with the
+FP-tree in Fig. 1b. In Fig. 4, a node x:lmeans that the node is
+for item xand its level is l. Fig. 4a shows the tree after
+inserting ðb; cÞ,ðd; eÞ, and ðb; a; f Þ. Since ðb; a; f Þshares prefix
+bwith ðb; cÞ, only two new nodes for aand fare inserted.
+Fig. 4b is the tree after all MFIs have been inserted.
+3.2 FPmax*
+Fig. 5 gives algorithm FPmax*. In the figure, three attributesofT,T:base ,T:header , and T:FP -array , are the same as the
+attributes we used in FPgrowth*. The first call of FPmax*will be for the FP-tree const ructed from the original
+database, and it has an empty MFI-tree. Before a recursive
+callFPmax
+/C3ðT;M Þ, we already know from line 10 that theset containing T:base and all items in Tis not a subset of any
+existing MFI. During the recursion, if there is only
+one branch in T, the path in the branch together with
+T:base is an MFI of the database. In line 2, the MFI is inserted
+into M. If the FP-tree is not a single-branch tree, then for
+each item iinT:header , we start preparing for the recursive
+callFPmax/C3ðTY;MYÞ, forY¼T:base [fig. The items in the
+header table of Tare processed in increasing order of
+frequency, so that maximal frequent itemsets will be found
+before any of their frequent subsets. Lines 5 to 8 use the FP-
+array if it is defined or traverse TX. Line 10 calls function
+maximality_checking to check if Ytogether with all frequent
+items in Y0sconditional pattern base is a subset of any
+existing MFI in M(thus, we do superset pruning here). If
+maximality_checking returns false, FPmax* will be called
+recursively, with ðTY;MYÞ. The implementation of function
+maximality_checking will be explained shortly.
+Note that, before and after calling maximality_checking ,i f
+Y[tailis not a subset of any MFI, we still do not know
+whether Y[tail is frequent. If, by constructing Y0s
+conditional FP-tree TY, we find out that TYonly has a
+single branch, we can conclude that Y[tailis frequent.
+Since Y[tailwas not a subset of any previously discovered
+MFI, it is maximal and will be inserted into MY.
+The function maximality_checking works as follows:
+Suppose tail¼i1i2;...ik, in decreasing order of frequency
+according to M:header . By following the linked list of ik, for
+each node nin the list, we test if tailis a subset of the
+ancestors of n. Here, the level of ncan be used for saving
+comparison time. First, we test if the level of nis smaller
+than k. If it is, the comparison stops because there are not
+enough ancestors of nfor matching the rest of tail. This
+pruning technique is also applied as we move up the branch
+and toward the front of tail. The function maximality_
+checking returns trueiftailis a subset of an existing MFI,
+otherwise, false is returned.
+Unlike an FP-tree, which is not changed during the
+execution of the algorithm, an MFI-tree is dynamic. Atline 12, for each Y, a new MFI-tree M
+Yis initialized from the
+preceding MFI-tree M. Then, after the recursive call, Mis
+updated on line 14 to contain all newly found frequentitemsets. In the actual implementation, we however foundthat it was more efficient to update all MFI-trees along the
+recursive path, instead of merging only at the current level.
+In other words, we omitted line 14, and instead on line 2, B1352 IEEE TRANSACTIONS ON KNOWLEDGE AND DATA ENGINEERING, VOL. 17, NO. 10, OCTOBER 2005
+Fig. 4. Construction of maximal frequent itemset tree.
+Fig. 5. Algorithm FPmax*.
+
+
+
+is inserted into the current M, and also into all preceding
+MFI-trees that the implementation of the recursion needs tostore in memory in any case.
+In details, at line 12, when an MFI-tree M
+YjforYj¼
+i1i2...ijis created for the next call of FPmax*, we know
+that conditional FP-trees and conditional MFI-trees forY
+j/C01¼i1i2...ij/C01,Yj/C02¼i1i2...ij/C02,...;Y1¼i1, and Y0¼;
+are all in memory. To make MYjstore all already found
+MFIs that contain Yj,MYjis initialized by extracting MFIs
+from MYj/C01. The initialization can be done by following the
+linked list for ijfrom the header table of MYj/C01and
+extracting the maximal frequent itemsets containing ij.
+Each such found itemset Iis sorted according to the order
+of items in MYj:header (the same item order as in
+TYj:header ) and then inserted into MYj. On line 2, we
+have found a new MFI BinTYj,s oBis inserted into MYj.
+Since Yj[Balso contains Yj/C01;...;Y1,Y0and the trees
+MYj/C01;...;MY1;MY0are all in memory, to make these MFI-
+trees consistently store all already discovered MFIs that
+contain their corresponding itemset, for each k¼0;1;...;j,
+the MFI B[ðYj/C0YkÞis inserted into the corresponding
+MFI-tree MYk. At the end of the execution of FPmax*, the
+MFI-tree MY0(i.e., M;) contains all MFIs mined from the
+original database. Since FPmax* is a depth-first algorithm,
+it is straightforward to show that the maximality checking
+is correct. Based on the correctness of the FPmax method,we can conclude that FPmax* returns all and only themaximal frequent itemsets in a given data set.
+In FPmax*, we also used an optimization for reducing
+the number of recursive calls. Suppose that, at some level of
+the recursion, the item order in T:header isi
+1;i2;...;ik.
+Then, starting from ik, for each item in the header table, we
+may need to do the work from line 4 to line 14. If for anyitem, say i
+mwhere m/C20k, its maximal frequent itemset
+contains items i1;i2;...;im/C01, i.e., all the items that have not
+yet called FPmax* recursively, these recursive calls can beomitted. This is because any frequent itemset found by sucha recursive call must be a subset of fi
+1;i2;...;im/C01g, thus, it
+could not be maximal.
+3.3 Discussion
+One may wonder if the space required for all the MFI-trees ofa recursive branch is too large. Actually, before the first callof FPmax*, the first FP-tree has to fit in memory. This is alsorequired by the FP-growth method. The corresponding MFI-
+tree is initialized as empty. During recursive calls of FPmax*,
+new conditional FP-trees are constructed from the first FP-tree or its descendant FP-trees. From the experience of [14],we know the recursively constructed FP-trees are relativelysmall. If we store all the MFIs in memory, we can expect thatthe total size of those FP-trees is not greater than the final size
+of the MFI-tree for ;. For the same reason, we can expect that
+the MFI-trees constructed from their parents are also small.During the mining, the MFI-tree for ;grows gradually, other
+small descendant MFI-trees will be constructed for recursivecalls and then discarded after the call. Thus, we can conclude
+that the total memory requirement for running FPmax* on a
+data set is proportional to the sum of the size of the FP-treeand the MFI-tree for ;.
+The foregoing discussion is relevant for the case when we
+store all MFIs in memory throughout the mining process.
+Actually, storing all MFIs in memory is not necessary.
+Suppose the current FP-tree is T
+X, the items in TX:header arej1;j2;...;jmand the current MFI-tree is MX. During the
+current call of FPmax/C3ðTX;MXÞ, for each item jk,b ya
+recursive call of FPmax/C3ðTX[fjkg;MX[fjkgÞ,m a n yM F I s
+could be mined. For each MFI X[fjkg[Z, the branch
+fjkg[Zwill be inserted into MX. However, recall that since
+none of the candidate MFIs X[Z0generated from the rest of
+the current call contain jk, it is sufficient to compare Z0with
+Z, instead of comparing Z0with fjkg[Z. Therefore, in our
+implementation, when an MFI is inserted, we used analternative approach where only the Z-part of the MFI is
+inserted into the MFI-trees. This leads to a reduction in the
+sizes of the MFI-trees. As an example, Fig. 6 shows the size-
+reduced MFI-tree for ;associated with the data set in Fig. 1.
+Shown in Fig. 4b is the complete MFI-tree for ;which has
+12 nodes, while the size-reduced MFI-tree has only six nodes.
+Our initial experimental results showed that the memory
+requirement of the size-reduced approach is drasticallylowered compared to storing complete maximal frequentitemsets. Consequently, FPmax* in the experiments of
+Section 5 is implemented with the size-reduced approach.
+4F P CLOSE :MINING CFI’ S
+Recall that an itemset Xis closed if none of the proper
+supersets of Xhave the same support. For mining frequent
+closed itemsets, FPclose works similarly to FPmax*. They
+both mine frequent patterns from FP-trees. WhereasFPmax* needs to check that a newly found frequent itemsetis maximal, FPclose needs to verify that the new frequent
+itemset is closed. For this, we use a closed frequent itemsets
+tree (CFI-tree), which is another variation on the FP-tree.
+4.1 The CFI-Tree and Algorithm FPclose
+As in algorithm FPmax*, a newly discovered frequent itemsetcan be a subset only of a previously discovered CFI. Like an
+MFI-tree, a CFI-tree depends on an FP-tree T
+Xand is denoted
+asCX. The itemset Xis represented as an attribute of T,
+T:base . The CFI-tree CXalways stores all already found CFIs
+containing itemset Xand their counts. A newly found
+frequent itemset Ythat contains Xonly needs to be
+compared with the CFIs in CX. If there is no proper superset
+ofYinCXwith the same count as Y, the set Yis closed.
+In a CFI-tree, each node in the subtree has four fields:
+item-name, count, node-link, and level. Here, level is still
+used for subset testing, as in MFI-trees. The count field isneeded because when comparing Ywith a set Zin the tree,
+we are trying to verify that it is not the case that Y/C26Zand
+Yand Zhave the same count. The order of the items in a
+CFI-tree’s header table is the same as the order of items in
+header table of its corresponding FP-tree.GRAHNE AND ZHU: FAST ALGORITHMS FOR FREQUENT ITEMSET MINING USING FP-TREES 1353
+Fig. 6. Size-reduced maximal frequent itemset tree.
+
+
+
+The insertion of a CFI into a CFI-tree is similar to the
+insertion of a transaction into an FP-tree, except now thecount of a node is not incremented, but replaced by the
+maximal count up-to-date. Fig. 7 shows some snapshots of
+the construction of a CFI-tree with respect to the FP-tree inFig. 1b. The item order in the two trees are the same becausethey are both for base ;. Note that insertions of CFIs into the
+top level CFI-tree will occur only after recursive calls havebeen made. In the following example, the insertions wouldbe performed during various stages of the execution, not in
+bulk as the example might suggest. In Fig. 7, a node x:l:c
+means that the node is for item x, that its level is land that its
+count is c. In Fig. 7a, after inserting the first six CFIs into the
+CFI-tree, we insert ðd; gÞwith count 3. Since ðd; gÞshares the
+prefix dwith ðd; eÞ, only node gis appended and, at the same
+time, the count for node dis changed from 2 to 3. The tree in
+Fig. 7b contains all CFIs for the data set in Fig. 1a.
+Fig. 8 gives algorithm FPclose. Before calling FPclose
+with some ðT;CÞ, we already know from line 8 that there is
+no existing CFI Xsuch that 1) T:base /C26Xand 2) T:base and
+Xhave the same count (this corresponds to optimization 4
+in [30]). If there is only one single branch in T, the nodes
+and their counts in this single branch can be easily used to
+list the T:base -local closed frequent itemsets. These itemsets
+will be compared with the CFIs in C. If an itemset is closed,
+it is inserted into C. If the FP-tree Tis not a single-branch
+tree, we execute line 6. Lines 9 to 12 use the FP-array if it isdefined, otherwise, Tis traversed. Lines 4 and 8 call
+function closed
+checking ðY;CÞto check whether a frequent
+itemset Yis closed. Lines 14 and 15 construct Y0s
+conditional FP-tree TYand CFI-tree CY. Then, FPclose is
+called recursively for TYandCY.
+Note that line 17 is not implemented as such. As in
+algorithm FPmax*, we found it more efficient to do theinsertion of lines 3-5 into all CFI-trees currently in memory.
+To list all candidate closed frequent itemsets from an FP-
+tree with only a single branch, suppose the branch withcounts is ði
+1:c1;i2:c2;...;ip:cpÞ, where ij:cjmeans item
+ijhas the count cj. Starting from i1, comparing the counts of
+every two adjacent items ij:cjandijþ1:cjþ1, in the branch,
+ifcj6¼cjþ1, we list i1;i2;...;ijas a candidate closed frequent
+itemset with count cj.
+CFI-trees are initialized similarly to MFI-trees, described
+in Section 3.2. The implementation of function closed_checkingis almost the same as the implementation of function
+maximality_checking , except now we also consider the count
+of an itemset. Given an itemset Y¼fi1;i2;...;ikgwith count
+c, suppose the order of the items in header table of the current
+CFI-tree is i1;i2;...;ik. Following the linked list of ik, for each
+node in the list, we first check if its count is equal to or greaterthan c. If it is, we then test if Yis a subset of the ancestors of
+that node. Here, the level of a node can also be used for saving
+comparison time, as in Section 3.2. The function closed_check-
+ingreturns trueonly when there is no existing CFI Zin the
+CFI-tree such that Zis a superset of Yand the count of Yis
+equal to or greater than the count of Z. At the end of the
+execution of FPclose, the CFI-tree C
+;contains all CFIs mined1354 IEEE TRANSACTIONS ON KNOWLEDGE AND DATA ENGINEERING, VOL. 17, NO. 10, OCTOBER 2005
+Fig. 7. Construction of closed frequent itemset tree.
+Fig. 8. Algorithm FPclose.
+
+
+
+from the original database. The proof of correctness of FPclose
+is straightforward.
+When implementing FPclose, we also used an optimi-
+zation which was not used in CLOSET+. Suppose an FP-tree for itemset Yhas multiple branches, the count of Yis
+cand the order of items in its header table is i
+1;i2;...;ik.
+Starting from ik, for each item in the header table, we may
+need to do the work from line 7 to line 17. If for any item,sayi
+m, where m/C20k,Y[fi1;i2;...;imgis a closed itemset
+with count c, FPclose can terminate the current call. This is
+because closed_checking would always return true for the
+remaining items.
+By a similar analysis as in Secion 3.3, we can estimate the
+total memory requirement for running FPclose on a dataset. If the tree that contains all CFIs needs to be stored inmemory, the algorithm needs space approximately equal tothe sum of the size of the first FP-tree and its CFI-tree. Inaddition, as we did in Section 3.3 for mining MFIs, for eachCFI, by inserting only part of the CFI into CFI-trees, lessmemory is used and the implementation is faster than theone that stores all complete CFIs. Fig. 9 shows the size-reduced CFI-tree for ;corresponding to the data set in Fig. 1.
+In this CFI-tree, only 6 nodes are inserted, instead of15 nodes in the complete CFI-tree in Fig. 7b.
+5E XPERIMENTAL EVALUATION AND
+PERFORMANCE STUDY
+In 2003, the first IEEE ICDM Workshop on Frequent Itemset
+Mining (FIMI ’03) [3] was organized. The goal of the
+workshop was to find the most efficient algorithms formining frequent itemsets. The independent experimentsconducted by the organizers compared the performance ofthree categories of algorithms for mining frequent itemsets.From the experimental results [3], [32], we can see that thealgorithms described in this paper outperformed all theother algorithms submitted to the workshop for many cases.FPmax* and FPclose were recommended by the organizersas the best algorithms for mining maximal frequent itemsetsand closed frequent itemsets, respectively.
+In this paper, we report three sets of experiments in
+which the runtime, memory consumption, and scalability ofFPgrowth*, FPmax*, and FPclose were compared withmany well-known algorithms. These algorithms includedSmartMiner, CLOSET+, an optimized version of Apriori,MAFIA, FP-growth, and GenMax.
+Due to the lack of space, we only show part of our
+experimental results here. In the data sets, T100I20D200K is
+a synthetic and sparse data set. It was generated from theapplication of [1]. It has 200,000 transactions and 1,000 items.The average transaction length was 100 and the average
+pattern length was 20. Another two data sets, connect and
+accidents , are real data sets taken from [3]. The data set
+connect is compiled from game state information. It has
+129 items and its average transaction length is 43. Data set
+accidents contains (anonymous) traffic accident data. It has
+468 items and its average transaction length is 33.8. These
+two real data sets are both quite dense, so a large number offrequent itemsets will be mined even for very high values of
+minimum support.
+When measuring running time and memory consump-
+tion, in each data set, we kept the number of transactions
+constant and varied the minimum support. We do not report
+experiments on the synthetic data sets where we varied the
+number of items or the avarage length of transactions. We
+found that when the number of items was changed, thenumber of frequent items was still determined by the
+minimum support. Similarly, we observed that the mini-
+mum support determined the average transaction length
+(once infrequent items were removed). Thus, the level of
+minimum support was found to be the principal influenceon running time and memory consumption.
+For scalability testing, we used the synthetic data sets and
+varied the number of transactions between 2/C210
+5and 106.
+The experiments were performed on a DELL Inspiron
+8,600 laptop with a 1.6 GHz Pentium M and 1GB of RAM.
+The operating system was RedHat version 9, using
+Linux 2.4.20 and a gcc 3.2.2 C++ compiler. Both time and
+memory consumption of each algorithm running on eachdata set were recorded. Runtime was recorded by the
+“time” command and memory consumption was recorded
+by “memusage.”
+5.1 FI Mining
+In the first set of experiments, we studied the performance ofFPgrowth* by comparing it with the original FP-growthmethod [14], [15], kDCI [23], dEclat [35], Apriori [5], [6], and
+PatriciaMine [27]. To see the performance of the FP-array
+technique, we implemented the original FP-growth method
+on the basis of the paper [14]. The Apriori algorithm was
+implemented by Borgelt in [9] for FIMI ’03. The source codesof the other algorithms were provided by their authors.
+5.1.1 The Runtime
+Fig. 10 shows the time of all algorithms running onT100I20D200K . In the figure, FPgrowth* is slower than
+kDCI, Apriori, and dEclat for high minimum support. For
+low minimum support, FPgrowth* becomes the fastest. The
+algorithm which was the fastest, dEclat, now becomes the
+slowest. The FP-array technique also shows its greatGRAHNE AND ZHU: FAST ALGORITHMS FOR FREQUENT ITEMSET MINING USING FP-TREES 1355
+Fig. 9. Size-reduced closed frequent itemset tree.
+Fig. 10. Runtime of mining all FIs on T100I20D200K .
+
+
+
+improvement on the FP-growth method. FPgrowth* is
+always faster than the FP-growth method and it is almosttwo times faster than the FP-growth method for lowminimum support. When the minimum support is low, it
+means that the FP-tree is bushy and wide and the FP-array
+technique saves much time for traversing the FP-trees.
+The results shown in Fig. 10 can be explained as follows:
+With sparse data sets, such as the synthetic ones, FPgrowth*
+constructs bushy and wide FP-trees. However, when theminimum support is high, not many frequent itemsets willbe mined from the FP-trees. On the contrary, when theminimum support is low, the data set could have many
+frequent itemsets. Then, the time used for constructing FP-
+trees pays off. For Apriori, kDCI, and dEclat, when theminimum support is high, there are fewer frequent itemsetsand candidate frequent itemsets to be produced. Thus, theyonly need to build small data structures for storing frequentitemsets and candidate frequent itemsets, which does not
+take much time. But, for low minimum support, consider-
+able time is spent on storing and pruning candidatefrequent itemsets. These operations take more time thanmining frequent itemsets from the FP-trees. This is why inthe experiments in Fig. 10, FPgrowth* is relatively slow for
+high minimum support and relatively fast for low mini-
+mum support when compared with the other methods.
+Fig. 11 and Fig. 12 show the performance of all algorithms
+on two dense real data sets, connect and accidents . In Fig. 12,
+FPgrowth* is the fastest algorithm for low values ofminimum support, and the curves for FP-growth andPatriciaMine almost totally overlap the curve for FPgrowth*.
+In the two figures, one observation is that FPgrowth*
+does not outperform FP-growth method for dense data sets.This is consistent with our discussion in Section 2. Wementioned that when the FP-trees constructed from the data
+sets are compact, the time spent on constructing FP-arrays
+will be more than the time for traversing FP-trees, therefore,the FP-array technique is not applied on dense data sets.Another observation is that PatriciaMine has perfor-
+mance similar to the FPgrowth* method. This is because
+both algorithms are based on a prefix tree data structure. InFig. 11, when the minimum support is low, FPgrowth* is
+even slower than PatriciaMine. This means the Patricia Trie
+data structure used in PatriciaMine saves not only the space
+but also the time for traversing FP-trees.
+These three figures show that no algorithm is always the
+fastest. As discussed before, the sparsity/density of the data
+set has a significant well understood influence on the
+performance of the algorithms. The reasons for the
+difference in performance between Figs. 11 and 12 are lesswell understood. We believe that the data distributions in
+the data sets have a big influence on the performances of the
+algorithms. Unfortunately, the exact influence of the data
+distribution for each algorithm is still unknown. We also
+found that it is time-consuming to determine the datadistribution before mining the frequent itemsets. Thus, it
+would be wise to choose a stable algorithm such as
+FPgrowth* to mine frequent itemsets. Note that FPgrowth*
+also is fairly stable with regard to the minimum support.
+5.1.2 Memory Consumption
+Fig. 13 shows the peak memory consumption of thealgorithms on the synthetic data set. The FPgrowth* and
+the FP-growth method consume almost the same memory,their curves overlap again. In the figure, kDCI uses the
+lowest amount of memory when the minimum support is
+high. The algorithm dEclat also consumes far less memory
+than the other algorithms except kDCI.
+We can see that FPgrowth* and the FP-growth method
+unfortunately use the maximum amount of memory. Their
+memory consumption is almost four times greater than the
+data set size. Since the FPgrowth* and FP-growth methods
+consume almost the same amount of memory, it means thatthe memory spent on the FP-array technique is negligible. The
+memory is mainly used by FP-trees constructed in the FP-
+growth method. The question of why the FP-growth method
+consumes so much memory when running on a synthetic data
+set can be answered as follows: In both figures, the minimumsupport is fairly low, so there are many frequent single items
+in the data sets. Therefore, wide and bushy trees have to be
+constructed for mining all frequent itemsets. Since the
+number of frequent single items stays almost the same when
+the minimum support changes, the sizes of the FP-trees
+remain almost the same, as we can see from the figure.
+Comparing Fig. 10 with Fig. 13, we also can see that
+FPgrowth* and the FP-growth method still have good speed
+even when they have to construct big FP-trees.1356 IEEE TRANSACTIONS ON KNOWLEDGE AND DATA ENGINEERING, VOL. 17, NO. 10, OCTOBER 2005
+Fig. 11. Runtime of mining all FIs on connect .
+Fig. 12. Runtime of mining all FIs on accidents .
+Fig. 13. Memory consumption of mining all FIs on T100I20D200K .
+
+
+
+We also can see from the figures that PatriciaMine
+consumes less memory than FPgrowth*. This is because we
+implemented FPgrowth* by a standard trie. On the otherhand, in PatriciaMine, the FP-tree structure was implemen-
+ted as a Patricia trie, which will save some memory. In Figs. 14
+and 15, the FP-tree structure shows great compactness. Now,
+the memory consumption of FPgrowth* is almost the same as
+that of the PatriciaMine and the FP-growth method. In thefigures, we almost cannot see the curves for the PatriciaMine
+and the FP-growth method because they overlap the curves
+for FPgrowth*. Although not clearly visible in the figures, the
+experimental data show that, for high minimum support, the
+memory consumed by FPgrowth* is even smaller than thememory consumption of PatriciaMine, which means the
+Patricia trie needs more memory than the standard trie when
+the FP-trees are very compact.
+From the figures, we also notice that when minimum
+support is low, the memory used by algorithms such asApriori and kDCI increases rapidly, while the memory used
+by FPgrowth* and PatriciaMine does not change much. This
+is because algorithms such as Apriori and kDCI have to
+store a large number of frequent itemsets and candidate
+frequent itemsets. The number of itemsets that needs to bestored increases exponentially when the minimum support
+becomes lower. For FPgrowth*, FP-growth, and Patricia-
+Mine, if the number of frequent single items does not
+change much when minimum support becomes lower, the
+sizes of FP-trees do not change much, either.
+5.1.3 Scalability
+Though a synthetic data set is not the most favorable for
+FPgrowth*, its parameters are easily adjustable. We there-
+fore tested the scalability of all algorithms by running them
+on data sets generated from T20I10 .T h en u m b e ro f
+transactions in the data sets for Fig. 16 and Fig. 17 rangesfrom 200K to 1 million. In all data sets, the number of items
+is 1,000, the average transaction length is 20, the number ofpatterns used as generation seeds is 5,000, and the average
+pattern length is 10.
+All algorithms ran on all data sets for minimum support
+0.1 percent. Both runtime and memory consumption were
+recorded. Fig. 16 shows the speed scalability of all
+algorithms. In the figure, the curves for PatriciaMine,
+FPgrowth*, and FPgrowth overlap each other, which means
+that the three algorithms have almost the same scalability,
+which is also the best scalability. Runtime increases about
+four times when the size of data set increases five times,
+while runtime of algorithms such as kDCI increases about
+10 times when the number of transactions increases from200K to 1 million. Fig. 17 gives the memory scalability of all
+algorithms. In the figure, the curve for the FP-growth
+method overlaps the curve for FPgrowth* and the curve for
+dEclat overlaps the curve for PatriciaMine. The figure
+shows that memory consumption of FPgrowth* and FP-
+growth increases linearly when size of data sets changes. It
+also shows that the growth rates of FPgrowth* and FP-
+growth are not as good as other algorithms.
+From the figures of runtime, memory consumption, and
+scalability of all algorithms, we can draw the conclusion
+that FP-growth* is one of the best algorithms for mining all
+frequent itemsets especially when the data sets are dense.For very sparse data sets, since FPgrowth* is an extension ofthe FP-growth method, its memory consumption is un-
+fortunately very high. However, when the minimum
+support is low, FP-growth* is still one of the fastestalgorithms, thanks to the FP-array technique. We also noteas FIMI ’03 [32] did that PatriciaMine is a good algorithm
+for mining all frequent itemsets.
+5.2 MFI Mining
+In our paper [12], we analyzed and tested the performance
+of algorithm FPmax. We learned that FPmax outperformed
+GenMax and MAFIA in some, but not all cases. To see theimpact of the new FP-array technique and the new
+maximality_checking function that we are using in FPmax*,GRAHNE AND ZHU: FAST ALGORITHMS FOR FREQUENT ITEMSET MINING USING FP-TREES 1357
+Fig. 14. Memory consumption of mining all FIs on connect .
+Fig. 15. Memory consumption of mining all FIs on accidents .
+Fig. 16. Scalability of runtime of mining all FIs.
+Fig. 17. Scalability of memory consumption of mining all FIs.
+
+
+
+in the second set of experiments, we compared FPmax*
+with MAFIA [10], AFOPT [19], GenMax [11], and Smart-Miner [36]. FPmax* was implemented by storing reducedMFIs in MFI-trees, as explained in 3.3, to save memory andCPU time. Since the authors of SmartMiner implementedtheir algorithm in Java, we implemented SmartMinerourselves in C++. The source codes of other algorithmswere provided by their authors.
+5.2.1 The Runtime
+Fig. 18 gives the result for running the five algorithms onthe data set T100I20D200K . In the figure, MAFIA is the
+fastest algorithm. SmartMiner is as fast as FPmax* for high
+minimum support, but slower than FPmax* for low
+minimum support. In T100I20D200K , since the average
+transaction length and average pattern length are fairlylarge, FPmax* has to construct bushy FP-trees from the dataset, which can be seen from Fig. 21. The time forconstructing and traversing the FP-trees dominates thewhole mining time, especially for high minimum support.On the contrary, if MAFIA does not have much workload
+for high minimum support, few maximal frequent itemsets
+and candidate maximal frequent itemsets will be generated.However, as shown in Fig. 18, when the minimum supportis low, FPmax* outperforms all other algorithms exceptMAFIA because now the construction of the large FP-treeoffers a big gain as there will be a large number of maximal
+frequent itemsets.
+Fig. 19 and Fig. 20 show the experimental results of
+running the five algorithms on real data sets. In the figures,
+FPmax* shows the best performance on both data sets, forboth high and low minimum support, benefiting from the
+great compactness of the FP-tree structure on dense data
+sets. SmartMiner has performance similar to FPmax* when
+minimum support is high, and is slower than FPmax* when
+minimum support is low.
+All experiments on both synthetic and real data sets show
+that our maximality_checking function is indeed very effective.
+5.2.2 Memory Consumption
+Similar to the memory consumption for mining all frequent
+itemsets on synthetic data sets, FPmax* in Fig. 21 still usesmuch memory for mining maximal frequent itemsets.
+However, by comparing Fig. 21 with Fig. 13, we also can
+see that the amounts of memory consumed by FPmax* andFPgrowth* are very close. This means the MFI-treesconstructed from the sparse data sets are fairly small, and
+the memory is still mainly used for constructing FP-trees.
+This is consistent with the explanation of why FPmax* isslower than MAFIA in Fig. 18.
+Figs. 22 and 23 show the memory consumption of all
+algorithms running on data sets Connect and Accidents .
+Because of the compactness of FP-tree data structure for
+dense data sets, FPmax* consumes far less memory than forsparse data sets. In the two figures, the curves forSmartMiner overlap the curves for FPmax* for high mini-
+mum support. However, when the minimum support is low,
+SmartMiner consumes much more memory than FPmax*.The curve of AFOPT in Fig. 22 totally overlaps the curve forFPmax* and, in Fig. 23, FPMAX* and AFOPT consume
+similar amounts of memory. MAFIA uses a large amount of
+memory in Fig. 22 and it consumes the least memory in1358 IEEE TRANSACTIONS ON KNOWLEDGE AND DATA ENGINEERING, VOL. 17, NO. 10, OCTOBER 2005
+Fig. 18. Runtime of mining MFIs on T100I20D200K .
+Fig. 19. Runtime of mining MFIs on Connect .
+Fig. 20. Runtime of mining MFIs on Accidents .
+Fig. 21. Memory consumption of mining MFIs on T100I20D200K .
+Fig. 22. Memory consumption of mining MFIs on Connect .
+
+
+
+Fig. 23 when the minimum support is very low. For most
+cases, GenMax consumes more memory than FPmax*.
+One observation from the two figures is that the memory
+consumption of FPmax* and GenMax increases exponen-tially when the minimum support becomes very low. This
+can be observed, for example, in Fig. 23. The increase
+happens because the algorithms have to store a largenumber of maximal frequent itemsets in memory, and the
+data structures such as MFI-trees become very large. We can
+also see that when the memory needed by the algorithmsincreases rapidly, their runtime also increases very fast. Thepair of Fig. 19 and Fig. 22. is a typical example.
+5.2.3 Scalability
+Fig. 24 shows the speed scalability of all algorithms onsynthetic data sets. The same data sets were used inSection 5.1 for testing the scalability of all algorithms formining all frequent itemsets. Fig. 24 shows that FPmax* is
+also a scalable algorithm. Runtime increases almost
+five times when the data size increases five times. Thefigures also demonstrate that other algorithms have goodscalability. No algorithms have exponential runtime increase
+when the data set size increases.
+Fig. 25 shows that FPmax* possesses good scalability of
+memory consumption as well. Memory consumption grows
+from 76 megabytes to 332 megabytes when data size grows
+from 16 megabytes to 80 megabytes. All algorithms have
+similar scalability on synthetic data sets.
+In conclusion, the experimental results of runtime and
+memory consumption of all algorithms show that our MFI-
+tree data structure and maximality-checking technique
+work extremely well. Though FPmax* is not the fastest
+algorithm for some cases and it sometimes consumes much
+more memory than other algorithms, overall, it still has
+very competitive performance when compared with four
+other excellent algorithms. This result is consistent with the
+results of FIMI ’03 which showed FPmax* as one of the best
+algorithms for mining maximal frequent itemsets.5.3 CFI Mining
+In the third set of experiments, we compared the perfor-
+mances of FPclose, Charm [34], AFOPT [19], Apriori [5], [6],and CLOSET+ [30]. FPclose is implemented by storingreduced CFIs in CFI-trees, as explained in the end ofSection 4. The executable code of CLOSET+ was downloadedfrom [4]. The algorithm Apriori for mining closed frequentitemsets was implemented by Borgelt in [9] for FIMI ’03. InBorgelt’s implementation, CFIs are computed by generatingall FIs first, then removing nonclosed ones. The source codesof Charm and AFOPT were provided by their authors.
+In order to show a clear distinction between FPclose and
+CLOSET+, in this set of experiments, we report the resultsof running the algorithms on five data sets. In thetwo previous sets of experiments, the two additional datasets did not expose any further trends, and the results weretherefore not included there. Besides the runtime andmemory consumption of all algorithms running on data setsT100I20D200K ,Connect , and Accidents , we now also com-
+pare the performance of the algorithms running ontwo additional real data sets, Kosarak and Pumsb* . Both
+data sets were taken from [3]. Kosarak contains (anonymous)
+click-stream data of a Hungarian online news portal. It has41,270 items and its average transaction length is 8.1. Datasetpumsb* is produced from census data of Public Use
+Microdata Sample (PUMS). There are 2,088 items in the dataset and the average transaction length of the data set is 50.5.
+5.3.1 The Runtime
+Fig. 26 shows the runtime of all algorithms on the synthetic
+data set. FPclose is slower than Apriori and CHARM only
+for high minimum support. When the minimum support islow, FPclose becomes the fastest algorithm. CLOSET+ isalways the slowest one. FPclose is slower than Apriori andCHARM for high minimum support because FPclosespends much time constructing a bushy and wide FP-treewhile the FP-tree yields only small number of closedfrequent itemsets. On the contrary, Apriori and CHARMGRAHNE AND ZHU: FAST ALGORITHMS FOR FREQUENT ITEMSET MINING USING FP-TREES 1359
+Fig. 23. Memory consumption of mining MFIs on Accidents .
+Fig. 24. Scalability of runtime of mining MFIs.
+Fig. 25. Scalability of memory consumption of mining MFIs.
+Fig. 26. Runtime of mining CFIs on T100I20D200K .
+
+
+
+only need small sized data structures to store and generate
+candidate frequent itemsets and closed frequent itemsets.When the minimum support is low, FPclose is fast becauseits work on the first stage pays off, as many closed frequent
+itemsets will be generated. In this case, Apriori and other
+algorithms have to do a considerable amount of work todeal with a large number of candidate frequent itemsets.
+When running the algorithms on real data sets, FPclose
+and CLOSET+ both show great speed. In Fig. 27, CLOSET+ is
+the fastest algorithm, which means that the strategiesintroduced in [30] work especially well for data set connect .
+FPclose is faster than CLOSET+ when running on all otherdata sets, as indicated in Figs. 28, 29, and 30. In Fig. 29,CLOSET+ even demonstrates the overall worst performance.
+One of the reasons why FPclose is usually faster than
+CLOSET+ is that CLOSET+ uses a global tree to storealready found closed frequent itemsets. When there is alarge amount of frequent itemsets, each candidate closedfrequent itemset has to be compared with many existingitemsets. In FPclose, on the contrary, multiple smaller CFI-trees are constructed. Consequently, a candidate closedfrequent itemset only needs to be compared with small set of
+itemsets, saving a lot of time.
+In Figs. 27, 28, 29, and 30, Apriori, which now has to
+construct big hash-trees for storing frequent itemsets andcandidate frequent itemsets, always has bad performance.
+AFOPT and CHARM have similar performance, but they
+are both slower than FPclose.
+5.3.2 Memory Consumption
+Fig. 31 shows the peak memory consumption of the
+algorithms when running them on the synthetic data set.
+In Section 5.1 and Section 5.2, the memory consumption of
+FPgrowth* and FPmax* for synthetic data was high. Here,
+FPclose consumes much memory as well. By comparing
+Fig. 31 with Fig. 13, we can see that the amounts of memory
+consumed by FPclose and FPgrowth* are very close. This
+means the CFI-trees constructed from the sparse data sets
+are fairly small, and the memory is still mainly used for
+constructing FP-trees.
+CLOSET+ uses the maximum amount of memory in
+Fig. 31. This is not surprising. Besides the memory
+consumed for the bushy and wide FP-trees for the synthetic
+data sets, it has to store a big tree for closedness testing as
+well. At the same time in FPclose, only reduced closedfrequent itemsets were stored in small CFI-trees, as
+explained in Section 3.3.
+The FP-tree and CFI-tree structure once again show great
+compactness on dense data sets. In Figs. 32, 33, 34, and 35,
+FPclose uses the least amount of memory. The only
+exception is in Fig. 33 where FPclose uses more memorythan CHARM does. This happens when the minimum
+support is very low, although, FPclose still uses less
+memory than CLOSET+. In Fig. 32, for the minimum
+support 10 percent, CLOSET+ consumes eight times more
+memory than FPclose. The memory consumption of
+CLOSET+ is only less than that of Apriori.
+5.3.3 Scalability
+Figs. 36 and 37 show the scalability of all algorithms whenrunning them on synthetic data sets. These data sets are the
+same that were used in Section 5.1 and Section 5.2.1360 IEEE TRANSACTIONS ON KNOWLEDGE AND DATA ENGINEERING, VOL. 17, NO. 10, OCTOBER 2005
+Fig. 27. Runtime of mining CFIs on Connect .
+Fig. 28. Runtime of mining CFIs on Accidents .
+Fig. 29. Runtime of mining CFIs on Kosarak .
+Fig. 30. Runtime of mining CFIs on Pumsb* .
+Fig. 31. Memory consumption of mining CFIs on T100I20D200K .
+
+
+
+All the algorithms are scalable algorithms for runtime,
+according to Fig. 36. The difference is their growth rates. Inthe figure, we can see that FPclose has the smallest rate.
+In Fig. 37, CLOSET+ shows the worst scalability with
+respect to main memory consumption, while FPclose has a
+reasonable scalability compared with the other algorithms.Main memory size increases four times when the size ofsynthetic data sets increases five times. AFOPT shows the
+best memory scalability.
+In summary, though FPclose consumes a large amount of
+memory for very sparse data sets, it is still the fastest
+algorithm when the minimum support is low. For dense data
+sets, FPclose has a performance usually better than CLO-SET+ for speed, and its memory consumption is far lowerthan the memory consumption of CLOSET+. Our CFI-tree
+data structure and the closedness testing technique are very
+efficient. The results of FIMI ’03 that did not includeCLOSET+ showed that FPclose is “an overall best algorithm”
+[32]. Our results in this paper also allow us to conclude that
+overall FPclose is one of the best algorithms for miningclosed frequent itemsets, even when compared to CLOSET+.
+6C ONCLUSIONS
+We have introduced a novel FP-array technique that allows
+using FP-trees more efficiently when mining frequentitemsets. Our technique greatly reduces the time spent on
+traversing FP-trees, and works especially well for sparsedata sets.
+By incorporating the FP-array technique into the FP-
+growth method, the FPgrowth* algorithm for mining all
+frequent itemsets was introduced. Then we presented newalgorithms for mining maximal and closed frequent
+itemsets. For mining maximal frequent itemsets, we ex-
+tended our earlier algorithm FPmax to FPmax*. FPmax* not
+only uses the FP-array technique, but also an effective
+maximality checking approach. For the maximality testing, a
+variation on the FP-tree, called an MFI-tree was introduced
+for keeping track of all MFIs. In FPmax*, a newly found FI is
+always compared with a small set of MFIs that are stored in
+a local MFI-tree, thus making maximality-checking veryefficient. For mining closed frequent itemsets we gave the
+FPclose algorithm. In this algorithm, a CFI-tree, another
+variation of the FP-tree, is used for testing the closedness of
+frequent itemsets. For all of our algorithms we have
+introduced several optimizations for further reducing their
+running time and memory consumption.
+Both our experimental results and the results of the
+independent experiments conducted by the organizers of
+FIMI ’03 show that FPgrowth*, FPmax*, and FPclose are
+among the best algorithms for mining frequent itemsets.GRAHNE AND ZHU: FAST ALGORITHMS FOR FREQUENT ITEMSET MINING USING FP-TREES 1361
+Fig. 32. Memory consumption of mining CFIs on Connect .
+Fig. 33. Memory consumption of mining CFIs on Accidents .
+Fig. 34. Memory consumption of mining CFIs on Kosarak .
+Fig. 35. Memory consumption of mining CFIs on Pumsb* .
+Fig. 36. Scalability of runtime of mining CFIs.
+Fig. 37. Scalability of memory consumption of mining CFIs.
+
+
+
+The algorithms are the fastest algorithms for many cases.
+For sparse data sets, the algorithms need more memory
+than other algorithms because the FP-tree structure needs a
+large amount of memory in these cases. However, thealgorithms need less memory for dense data sets because ofthe compact FP-trees, MFI-trees, and CFI-trees.
+Though the experimental results given in this paper show
+the success of our algorithms, the problem that FPgrowth*,FPmax* and FPclose consume lots of memory when the data
+sets are very sparse still needs to be solved. Consuming too
+much memory reduces the scalability of the algorithms. Wenotice from the experimental result in Section 5.1 that usinga Patricia Trie to implement the FP-tree data structure couldbe a good solution for the problem. Furthermore, when theFP-tree is too large to fit in memory, the current solutionsneed a very large number of disk I/Os for reading and
+writing FP-trees onto secondary memory or generating
+many intermediate databases [15], which makes miningfrequent itemsets too time-consuming. We are currentlyinvestigating techniques to reduce the number of disk I/Osand make frequent itemset mining scale to extremely largedatabases. Preliminary results are reported in [13].
+REFERENCES
+[1] http://www.almaden. ibm.com/cs/quest/syndata.html, 2003.
+[2] http://www.almaden.ibm.com/c s/people/bayardo/resources.
+html, 2003.
+[3] http://fimi.cs.helsinki.fi, 2003.
+[4] http://www-sal.cs.uiuc.edu/~hanj/pubs/software.htm, 2004.
+[5] R. Agrawal, T. Imielinski, and A. Swami, “Mining Association
+Rules between Sets of Items in Large Databases,” Proc. ACM-
+SIGMOD Int’l Conf. Management of Data, pp. 207-216, May 1993.
+[6] R. Agrawal and R. Srikant, “Fast Algorithms for Mining
+Association Rules,” Proc. Int’l Conf. Very Large Data Bases,
+pp. 487-499, Sept. 1994.
+[7] R. Agrawal and R. Srikant, “Mining Sequential Patterns,” Proc.
+Int’l Conf. Data Eng., pp. 3-14, Mar. 1995.
+[8] R.J. Bayardo, “Efficiently Mining Long Patterns from Databases,”
+Proc. ACM-SIGMOD Int’l Conf. Management of Data, pp. 85-93, 1998.
+[9] C. Borgelt, “Efficient Implementations of Apriori and Eclat,” Proc.
+IEEE ICDM Workshop Frequent Itemset Mining Implementations,CEUR Workshop Proc., vol. 80, Nov. 2003.
+[10] D. Burdick, M. Calimlim, and J. Gehrke, “MAFIA: A Maximal
+Frequent Itemset Algorithm for Transactional Databases,” Proc.
+Int’l Conf. Data Eng., pp. 443-452, Apr. 2001.
+[11] K. Gouda and M.J. Zaki, “Efficiently Mining Maximal Frequent
+Itemsets,” Proc. IEEE Int’l Conf. Data Mining, pp. 163-170, 2001.
+[12] G. Grahne and J. Zhu, “High Performance Mining of Maximal
+Frequent Itemsets,” Proc. SIAM Workshop High Performance Data
+Mining: Pervasive and Data Stream Mining, May 2003.
+[13] G. Grahne and J. Zhu, “Mining Frequent Itemsets from Secondary
+Memory,” Proc. IEEE Int’l Conf. Data Mining, pp. 91-98, Nov. 2004.
+[14] J. Han, J. Pei, and Y. Yin, “Mining Frequent Patterns without
+Candidate Generation,” Proc. ACM-SIGMOD Int’l Conf. Manage-
+ment of Data, pp. 1-12, May 2000.
+[15] J. Han, J. Pei, Y. Yin, and R. Mao, “Mining Frequent Patterns
+without Candidate Generation: A Frequent-Pattern Tree Ap-proach,” Data Mining and Knowledge Discovery, vol. 8, no. 1,
+pp. 53-87, 2004.
+[16] J. Han, J. Wang, Y. Lu, and P. Tzvetkov, “Mining Top-K Frequent
+Closed Patterns without Minimum Support,” Proc. Int’l Conf. Data
+Mining, pp. 211-218, Dec. 2002.
+[17] M. Kamber, J. Han, and J. Chiang, “Metarule-Guided Mining of
+Multi-Dimensional Association Rules Using Data Cubes,” Proc.
+ACM SIGKDD Int’l Conf. Knowledge Discovery and Data Mining,pp. 207-210, Aug. 1997.
+[18] D. Knuth, Sorting and Searching. Reading, Mass.: Addison Wesley,
+1973.
+[19] G. Liu, H. Lu, J.X. Yu, W. Wei, and X. Xiao, “AFOPT: An Efficient
+Implementation of Pattern Growth Approach,” Proc. IEEE ICDM
+Workshop Frequent Itemset Mining Implementations, CEUR Work-
+shop Proc., vol. 80, Nov. 2003.[20] H. Mannila and H. Toivonen, “Levelwise Search and Borders of
+Theories in Knowledge Discovery,” Data Mining and Knowledge
+Discovery, vol. 1, no. 3, pp. 241-258, 1997.
+[21] H. Mannila, H. Toivonen, and I. Verkamo, “Efficient Algorithms
+for Discovering Association Rules,” Proc. ACM SIGKDD Int’l Conf.
+Knowledge Discovery and Data Mining, pp. 181-192, July 1994.
+[22] H. Mannila, H. Toivonen, and I. Verkamo, “Discovery of Frequent
+Episodes in Event Sequences,” Data Mining and Knowledge
+Discovery, vol. 1, no. 3, pp. 259-289, 1997.
+[23] S. Orlando, C. Lucchese, P. Palmerini, R. Perego, and F. Silvestri,
+“kDCI: A Multi-Strategy Algorithm for Mining Frequent Sets,”
+Proc. IEEE ICDM Workshop Frequent Itemset Mining Implementa-
+tions, CEUR Workshop Proc., vol. 80, Nov. 2003.
+[24] N. Pasquier, Y. Bastide, R. Taouil, and L. Lakhal, “Discovering
+Frequent Closed Itemsets for Association Rules,” Proc. Int’l Conf.
+Database Theory, pp. 398-416, Jan. 1999.
+[25] J. Park, M. Chen, and P. Yu, “Using a Hash-Based Method with
+Transaction Trimming for Mining Association Rules,” IEEE Trans.
+Knowledge and Data Eng. vol. 9, no. 5, pp. 813-825, 1997.
+[26] J. Pei, J. Han, and R. Mao, “CLOSET: An Efficient Algorithm for
+Mining Frequent Closed Itemsets,” Proc. ACM SIGMOD Workshop
+Research Issues in Data Mining and Knowledge Discovery, pp. 21-30,
+May 2000.
+[27] A. Pietracaprina and D. Zandolin, “Mining Frequent Itemsets
+Using Patricia Tries,” Proc. IEEE ICDM Workshop Frequent Itemset
+Mining Implementations, CEUR Workshop Proc., vol. 80, Nov. 2003.
+[28] A. Savasere, E. Omiecinski, and S. Navathe, “An Efficient
+Algorithm for Mining Association Rules in Large Databases,”Proc. Int’l Conf. Very Large Data Bases, pp. 432-443, Sept. 1995.
+[29] H. Toivonen, “Sampling Large Databases for Association Rules,”
+Proc. Int’l Conf. Very Large Data Bases, pp. 134-145, Sept. 1996.
+[30] J. Wang, J. Han, and J. Pei, “CLOSET+: Searching for the Best
+Strategies for Mining Frequent Closed Itemsets,” Proc. Int’l Conf.
+Knowledge Discovery and Data Mining, pp. 236-245, Aug. 2003.
+[31] D. Xin, J. Han, X. Li, and B.W. Wah, “Star-Cubing: Computing
+Iceberg Cubes by Top-Down and Bottom-Up Integration,” Proc.
+Int’l Conf. Very Large Data Bases, pp. 476-487, Sept. 2003.
+[32] Proc. IEEE ICDM Workshop Frequent Itemset Mining Implementa-
+tions, B. Goethals and M.J. Zaki, eds., CEUR Workshop Proc.,
+vol. 80, Nov. 2003, http://CEUR-WS.org/Vol-90.
+[33] M.J. Zaki, “Scalable Algorithms for Association Mining,” IEEE
+Trans. Knowledge and Data Mining, vol. 12, no. 3, pp. 372-390, 2000.
+[34] M.J. Zaki and C. Hsiao, “CHARM: An Efficient Algorithm for
+Closed Itemset Mining,” Proc. SIAM Int’l Conf. Data Mining,
+pp. 457-473, Apr. 2002.
+[35] M.J. Zaki and K. Gouda, “Fast Vertical Mining Using Diffsets,”
+Proc. ACM SIGKDD Int’l Conf. Knowledge Discovery and DataMining, pp. 326-335, Aug. 2003.
+[36] Q. Zou, W.W. Chu, and B. Lu, “SmartMiner: A Depth First
+Algorithm Guided by Tail Information for Mining Maximal
+Frequent Itemsets,” Proc. IEEE Int’l Conf. Data Mining, Dec. 2002.
+Go¨sta Grahne recieved the PhD degree from
+the University of Helsinki and was a postdoctoral
+fellow at the University of Toronto. He is currentlyan associate professor in the Department ofComputer Science, Concordia University. Hisresearch interests include database theory, datamining, database engineering, semistructured
+databases, and emerging database environ-
+ments. He is the author of more than 50 papersin various areas of database technology. He is a
+member of the IEEE and ACM.
+Jianfei Zhu r e c e i v e dt h eM E n gd e g r e ei n
+computer science from Zhejiang University,China, in 1995 and the PhD degree in computer
+science from Concordia University, Canada, in
+2004. He is currently a software engineer atGoogle Inc. He was a senior lecturer at ZhejiangUniversity, China, and has taught many compu-ter science courses at Zhejiang University andConcordia University. His research interests
+include data mining, data warehousing, online
+analytical processing, and information retrieval. He is a member of theACM and a student member of the IEEE.1362 IEEE TRANSACTIONS ON KNOWLEDGE AND DATA ENGINEERING, VOL. 17, NO. 10, OCTOBER 2005

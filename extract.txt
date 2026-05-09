@@ -1,6 +1,3 @@
-Number of pages: 4
-
---- Page 1 ---
 An Efﬁcient Algorithm for Frequent Closed Itemsets Mining
 Lisheng Ma
 Department of Computer Science and Technology
@@ -93,7 +90,8 @@ datasets connect, it outperforms algorithms FPclose.
 DOI 10.1109/CSSE.2008.1042259
 
 
---- Page 2 ---
+
+
 1.2. Overview
 The rest of the paper is organized as follows. Section 2 gives a
 brief introduction of the FP-tree and the FP-growth method of [3],
@@ -202,7 +200,8 @@ count. According the deﬁne of the frequent closed itemset, it is not
 necessary to count itemsets containing head and not i, Therefore,
 260
 
---- Page 3 ---
+
+
 we can move item itohead . At the same time, We can also remove
 item ifrom the head ’s conditional pattern base which contain item
 i.
@@ -330,7 +329,8 @@ according to the order of items in header table of CFI-tree. Sup-
 pose the sorted Sis{i1,i2,...,i m}. From the header table, we
 261
 
---- Page 4 ---
+
+
 ﬁnd the node list for im. For each node in the list,we check if its
 count is equal to or greater than S. If it is, we then test if Sis a
 subset of the ancestors of that node.
@@ -407,4 +407,3 @@ the 2nd SIAM Intl. Conf. on Data Mining. Arlington: SIAM,
 ing Using FP-Trees[J]. IEEE Trans.on Knowledge and Data
 Engineering, 2005, 17(10): 1347-1362.
 262
-

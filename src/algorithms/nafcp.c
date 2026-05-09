@@ -7,6 +7,8 @@
 #include <math.h>
 #include <stdbool.h>
 
+#define ROOT_ITEM 0xFFFFFFFF
+
 typedef struct {
     uint32_t pre;
     uint32_t post;
@@ -16,7 +18,6 @@ typedef struct {
 typedef struct {
     NNode *nodes;
     size_t size;
-    size_t capacity;
     uint32_t support;
 } NList;
 
@@ -51,117 +52,105 @@ typedef struct PPCNode {
 } PPCNode;
 
 static PPCNode* create_ppc_node(uint32_t item) {
-    PPCNode *node = calloc(1, sizeof(PPCNode));
-    node->item = item;
-    return node;
+    PPCNode *n = calloc(1, sizeof(PPCNode));
+    n->item = item; return n;
 }
 
-static void free_ppc_tree(PPCNode *node) {
-    if (!node) return;
-    PPCNode *child = node->children;
-    while (child) {
-        PPCNode *next = child->next_sibling;
-        free_ppc_tree(child);
-        child = next;
-    }
-    free(node);
+static void free_ppc_tree(PPCNode *n) {
+    if (!n) return;
+    PPCNode *c = n->children;
+    while (c) { PPCNode *next = c->next_sibling; free_ppc_tree(c); c = next; }
+    free(n);
 }
 
-static uint32_t g_pre_counter = 1;
-static uint32_t g_post_counter = 1;
-static void traverse_ppc(PPCNode *node) {
-    node->pre = g_pre_counter++;
-    for (PPCNode *child = node->children; child; child = child->next_sibling) {
-        traverse_ppc(child);
-    }
-    node->post = g_post_counter++;
+static uint32_t g_pre = 1, g_post = 1;
+static void traverse(PPCNode *n) {
+    n->pre = g_pre++;
+    for (PPCNode *c = n->children; c; c = c->next_sibling) traverse(c);
+    n->post = g_post++;
 }
 
-static void build_n_lists(PPCNode *node, NList *n_lists, uint32_t *item_map) {
-    if (node->item != (uint32_t)-1) {
-        uint32_t mapped = item_map[node->item];
-        if (mapped != (uint32_t)-1) {
-            NList *nl = &n_lists[mapped];
-            if (nl->size == nl->capacity) {
-                nl->capacity = nl->capacity == 0 ? 4 : nl->capacity * 2;
-                nl->nodes = realloc(nl->nodes, nl->capacity * sizeof(NNode));
-            }
-            nl->nodes[nl->size].pre = node->pre;
-            nl->nodes[nl->size].post = node->post;
-            nl->nodes[nl->size].count = node->count;
-            nl->size++;
-            nl->support += node->count;
+static void build_nl(PPCNode *n, NList *lists, uint32_t *map) {
+    if (n->item != ROOT_ITEM) {
+        uint32_t idx = map[n->item];
+        if (idx != ROOT_ITEM) {
+            NList *nl = &lists[idx];
+            nl->nodes[nl->size].pre = n->pre;
+            nl->nodes[nl->size].post = n->post;
+            nl->nodes[nl->size].count = n->count;
+            nl->size++; nl->support += n->count;
         }
     }
-    for (PPCNode *child = node->children; child; child = child->next_sibling) {
-        build_n_lists(child, n_lists, item_map);
-    }
+    for (PPCNode *c = n->children; c; c = c->next_sibling) build_nl(c, lists, map);
 }
 
-static bool N_list_subset(NList *N1, NList *N2) {
-    if (N1->support > N2->support) return false;
+static bool is_subset_nl(NList *n1, NList *n2) {
+    if (n1->support > n2->support) return false;
     size_t i = 0, j = 0;
-    while (i < N1->size && j < N2->size) {
-        if (N2->nodes[j].pre <= N1->nodes[i].pre && N2->nodes[j].post >= N1->nodes[i].post) {
-            i++;
-        } else if (N2->nodes[j].post < N1->nodes[i].post) {
+    while (j < n1->size && i < n2->size) {
+        if (n2->nodes[i].pre < n1->nodes[j].pre && n2->nodes[i].post > n1->nodes[j].post) {
             j++;
         } else {
-            return false;
+            i++;
         }
     }
-    return i == N1->size;
+    return j == n1->size;
 }
 
-static NList N_list_intersection(NList *N1, NList *N2) {
-    NList res = {0};
+static NList intersect_nl(NList *ps1, NList *ps2, uint32_t threshold) {
+    NList res = {NULL, 0, 0};
+    uint32_t rem_sup1 = ps1->support;
+    uint32_t rem_sup2 = ps2->support;
+    
     size_t i = 0, j = 0;
-    while (i < N1->size && j < N2->size) {
-        if (N1->nodes[i].pre <= N2->nodes[j].pre && N1->nodes[i].post >= N2->nodes[j].post) {
-            if (res.size > 0 && res.nodes[res.size-1].pre == N1->nodes[i].pre) {
-                res.nodes[res.size-1].count += N2->nodes[j].count;
-            } else {
-                if (res.size == res.capacity) {
-                    res.capacity = res.capacity ? res.capacity * 2 : 4;
-                    res.nodes = realloc(res.nodes, res.capacity * sizeof(NNode));
+    size_t cap = ps2->size;
+    res.nodes = malloc(cap * sizeof(NNode));
+    
+    while (i < ps1->size && j < ps2->size) {
+        if (res.support + (rem_sup1 < rem_sup2 ? rem_sup1 : rem_sup2) < threshold) {
+            free(res.nodes); res.nodes = NULL; res.size = 0; res.support = 0; return res;
+        }
+        
+        if (ps1->nodes[i].pre < ps2->nodes[j].pre) {
+            if (ps1->nodes[i].post > ps2->nodes[j].post) {
+                if (res.size > 0 && res.nodes[res.size - 1].pre == ps1->nodes[i].pre) {
+                    res.nodes[res.size - 1].count += ps2->nodes[j].count;
+                } else {
+                    res.nodes[res.size] = ps1->nodes[i];
+                    res.nodes[res.size].count = ps2->nodes[j].count;
+                    res.size++;
                 }
-                res.nodes[res.size].pre = N1->nodes[i].pre;
-                res.nodes[res.size].post = N1->nodes[i].post;
-                res.nodes[res.size].count = N2->nodes[j].count;
-                res.size++;
+                res.support += ps2->nodes[j].count;
+                rem_sup2 -= ps2->nodes[j].count;
+                j++;
+            } else {
+                rem_sup1 -= ps1->nodes[i].count;
+                i++;
             }
-            res.support += N2->nodes[j].count;
-            j++;
-        } else if (N1->nodes[i].pre < N2->nodes[j].pre) {
-            i++;
         } else {
+            rem_sup2 -= ps2->nodes[j].count;
             j++;
         }
     }
     return res;
 }
 
-static int cmp_uint32(const void *a, const void *b) {
-    uint32_t ia = *(const uint32_t *)a;
-    uint32_t ib = *(const uint32_t *)b;
-    return (ia < ib) ? -1 : (ia > ib);
-}
-
-static bool is_subset(uint32_t *sub, size_t sub_len, uint32_t *sup, size_t sup_len) {
+static bool is_subset_items(uint32_t *sub, size_t sl, uint32_t *sup, size_t spl) {
     size_t i = 0, j = 0;
-    while (i < sub_len && j < sup_len) {
+    while (i < sl && j < spl) {
         if (sub[i] == sup[j]) i++;
         else if (sub[i] < sup[j]) return false;
         j++;
     }
-    return i == sub_len;
+    return i == sl;
 }
 
-static void add_to_FCIs(uint32_t *itemset, size_t length, uint32_t support, NAFCP_Context *ctx) {
-    size_t h = support % ctx->hash_size;
+static void add_fci(uint32_t *items, size_t len, uint32_t sup, NAFCP_Context *ctx) {
+    size_t h = sup % ctx->hash_size;
+    
     FCINode *curr = ctx->hash_table[h];
     while (curr) {
-        if (curr->support == support && curr->length >= length && is_subset(itemset, length, curr->itemset, curr->length)) {
+        if (curr->support == sup && curr->length >= len && is_subset_items(items, len, curr->itemset, curr->length)) {
             return;
         }
         curr = curr->next;
@@ -170,194 +159,228 @@ static void add_to_FCIs(uint32_t *itemset, size_t length, uint32_t support, NAFC
     FCINode **prev = &ctx->hash_table[h];
     curr = *prev;
     while (curr) {
-        if (curr->support == support && length >= curr->length && is_subset(curr->itemset, curr->length, itemset, length)) {
-            FCINode *to_free = curr;
-            *prev = curr->next;
-            curr = curr->next;
-            ctx->total_closed--;
-            ctx->total_footprint -= to_free->length;
-            free(to_free->itemset);
-            free(to_free);
-            continue;
+        if (curr->support == sup && len >= curr->length && is_subset_items(curr->itemset, curr->length, items, len)) {
+            FCINode *tmp = curr; *prev = curr->next; curr = curr->next;
+            ctx->total_closed--; ctx->total_footprint -= tmp->length;
+            free(tmp->itemset); free(tmp); continue;
         }
-        prev = &curr->next;
-        curr = curr->next;
+        prev = &curr->next; curr = curr->next;
     }
-
-    FCINode *node = malloc(sizeof(FCINode));
-    node->itemset = malloc(length * sizeof(uint32_t));
-    memcpy(node->itemset, itemset, length * sizeof(uint32_t));
-    qsort(node->itemset, length, sizeof(uint32_t), cmp_uint32);
-    node->length = length;
-    node->support = support;
-    node->next = ctx->hash_table[h];
-    ctx->hash_table[h] = node;
-    ctx->total_closed++;
-    ctx->total_footprint += length;
+    
+    FCINode *n = malloc(sizeof(FCINode));
+    n->itemset = malloc(len * sizeof(uint32_t));
+    memcpy(n->itemset, items, len * sizeof(uint32_t));
+    n->length = len; n->support = sup;
+    n->next = ctx->hash_table[h]; ctx->hash_table[h] = n;
+    ctx->total_closed++; ctx->total_footprint += len;
 }
 
-static void Find_FCIs(Element *Is, size_t num_Is, NAFCP_Context *ctx) {
-    bool *removed = calloc(num_Is, sizeof(bool));
-    for (size_t i = 0; i < num_Is; i++) {
-        if (removed[i]) continue;
-        
-        size_t next_cap = num_Is; // Safe initial capacity
-        Element *next_Is = malloc(next_cap * sizeof(Element));
-        size_t next_count = 0;
-        
-        uint32_t *current_items = malloc(Is[i].length * sizeof(uint32_t));
-        memcpy(current_items, Is[i].itemset, Is[i].length * sizeof(uint32_t));
-        size_t current_len = Is[i].length;
+static uint32_t* union_items(uint32_t *a, size_t len_a, uint32_t *b, size_t len_b, size_t *len_out) {
+    uint32_t *out = malloc((len_a + len_b) * sizeof(uint32_t));
+    size_t i = 0, j = 0, k = 0;
+    while (i < len_a && j < len_b) {
+        if (a[i] < b[j]) out[k++] = a[i++];
+        else if (a[i] > b[j]) out[k++] = b[j++];
+        else { out[k++] = a[i++]; j++; }
+    }
+    while (i < len_a) out[k++] = a[i++];
+    while (j < len_b) out[k++] = b[j++];
+    *len_out = k;
+    return out;
+}
 
-        for (size_t j = i + 1; j < num_Is; j++) {
-            if (removed[j]) continue;
+static void find_fci_rec(Element *Is, size_t num_Is, NAFCP_Context *ctx) {
+    bool *rem = calloc(num_Is, sizeof(bool));
+    
+    for (int i = (int)num_Is - 1; i >= 0; i--) {
+        if (rem[i]) continue;
+        
+        Element *next_Is = malloc(num_Is * sizeof(Element));
+        size_t next_cnt = 0;
+        
+        for (int j = i - 1; j >= 0; j--) {
+            if (rem[j]) continue;
             
-            bool subset_i_j = N_list_subset(&Is[i].nl, &Is[j].nl);
-            bool subset_j_i = N_list_subset(&Is[j].nl, &Is[i].nl);
-
-            if (subset_i_j && subset_j_i) { // T(i) == T(j)
-                uint32_t *new_items = realloc(current_items, (current_len + Is[j].length) * sizeof(uint32_t));
-                memcpy(new_items + current_len, Is[j].itemset, Is[j].length * sizeof(uint32_t));
-                current_items = new_items;
-                current_len += Is[j].length;
-                removed[j] = true;
-            } else if (subset_i_j) { // T(i) subset T(j)
-                uint32_t *new_items = realloc(current_items, (current_len + Is[j].length) * sizeof(uint32_t));
-                memcpy(new_items + current_len, Is[j].itemset, Is[j].length * sizeof(uint32_t));
-                current_items = new_items;
-                current_len += Is[j].length;
-            } else {
-                NList intersect_nl = N_list_intersection(&Is[i].nl, &Is[j].nl);
-                if (intersect_nl.support >= ctx->min_sup) {
-                    next_Is[next_count].length = Is[i].length + Is[j].length;
-                    next_Is[next_count].itemset = malloc(next_Is[next_count].length * sizeof(uint32_t));
-                    memcpy(next_Is[next_count].itemset, Is[i].itemset, Is[i].length * sizeof(uint32_t));
-                    memcpy(next_Is[next_count].itemset + Is[i].length, Is[j].itemset, Is[j].length * sizeof(uint32_t));
-                    next_Is[next_count].nl = intersect_nl;
-                    next_count++;
+            bool s_ij = is_subset_nl(&Is[i].nl, &Is[j].nl); 
+            
+            if (s_ij) {
+                if (Is[i].nl.support == Is[j].nl.support) {
+                    uint32_t *new_is = union_items(Is[i].itemset, Is[i].length, Is[j].itemset, Is[j].length, &Is[i].length);
+                    free(Is[i].itemset); Is[i].itemset = new_is;
+                    
+                    for (size_t k = 0; k < next_cnt; k++) {
+                        uint32_t *new_next = union_items(next_Is[k].itemset, next_Is[k].length, Is[j].itemset, Is[j].length, &next_Is[k].length);
+                        free(next_Is[k].itemset); next_Is[k].itemset = new_next;
+                    }
+                    
+                    free(Is[j].itemset); Is[j].itemset = NULL;
+                    if (Is[j].nl.nodes) { free(Is[j].nl.nodes); Is[j].nl.nodes = NULL; }
+                    rem[j] = true;
                 } else {
-                    if (intersect_nl.nodes) free(intersect_nl.nodes);
+                    uint32_t *new_is = union_items(Is[i].itemset, Is[i].length, Is[j].itemset, Is[j].length, &Is[i].length);
+                    free(Is[i].itemset); Is[i].itemset = new_is;
+                    
+                    for (size_t k = 0; k < next_cnt; k++) {
+                        uint32_t *new_next = union_items(next_Is[k].itemset, next_Is[k].length, Is[j].itemset, Is[j].length, &next_Is[k].length);
+                        free(next_Is[k].itemset); next_Is[k].itemset = new_next;
+                    }
+                    continue;
+                }
+            } else {
+                NList res = intersect_nl(&Is[j].nl, &Is[i].nl, ctx->min_sup);
+                if (res.support >= ctx->min_sup) {
+                    next_Is[next_cnt].itemset = union_items(Is[i].itemset, Is[i].length, Is[j].itemset, Is[j].length, &next_Is[next_cnt].length);
+                    next_Is[next_cnt].nl = res;
+                    next_cnt++;
+                } else {
+                    if (res.nodes) free(res.nodes);
                 }
             }
         }
         
-        add_to_FCIs(current_items, current_len, Is[i].nl.support, ctx);
+        add_fci(Is[i].itemset, Is[i].length, Is[i].nl.support, ctx);
         
-        if (next_count > 0) {
-            Find_FCIs(next_Is, next_count, ctx);
+        if (next_cnt > 0) {
+            for (size_t l = 0; l < next_cnt / 2; l++) {
+                Element tmp = next_Is[l];
+                next_Is[l] = next_Is[next_cnt - 1 - l];
+                next_Is[next_cnt - 1 - l] = tmp;
+            }
+            find_fci_rec(next_Is, next_cnt, ctx);
         }
         
-        for (size_t k = 0; k < next_count; k++) {
-            free(next_Is[k].itemset);
+        for (size_t k = 0; k < next_cnt; k++) {
+            if (next_Is[k].itemset) free(next_Is[k].itemset);
             if (next_Is[k].nl.nodes) free(next_Is[k].nl.nodes);
         }
         free(next_Is);
-        free(current_items);
     }
-    free(removed);
+    free(rem);
 }
 
-static uint32_t *g_counts = NULL;
-static int cmp_freq_desc(const void *a, const void *b) {
-    uint32_t ia = *(const uint32_t *)a;
-    uint32_t ib = *(const uint32_t *)b;
-    if (g_counts[ia] > g_counts[ib]) return -1;
-    if (g_counts[ia] < g_counts[ib]) return 1;
-    return (ia < ib) ? -1 : 1;
+static uint32_t *g_cnts = NULL;
+static int cmp_freq(const void *a, const void *b) {
+    uint32_t x = *(uint32_t*)a, y = *(uint32_t*)b;
+    if (g_cnts[x] > g_cnts[y]) return -1;
+    if (g_cnts[x] < g_cnts[y]) return 1;
+    return (x < y) ? -1 : 1;
 }
 
 static DM_Status run(DM_Dataset *ds, void *params) {
-    DM_NAFCP_Params *nafcp_params = (DM_NAFCP_Params *)params;
-    double min_sup_param = nafcp_params ? nafcp_params->min_support : 0.01;
-    uint32_t min_sup = (min_sup_param < 1.0) ? (uint32_t)ceil(min_sup_param * ds->count) : (uint32_t)min_sup_param;
-    if (min_sup == 0 && ds->count > 0) min_sup = 1;
-
+    DM_NAFCP_Params *p = params; double ms_p = p ? p->min_support : 0.01;
+    uint32_t min_sup = (ms_p < 1.0) ? (uint32_t)ceil(ms_p * ds->count) : (uint32_t)ms_p;
+    if (min_sup == 0) min_sup = 1;
     printf("[NAFCP] Starting on %zu transactions. Min Support: %u\n", ds->count, min_sup);
-
+    DM_Trans_Simple *data = ds->payload;
+    
     uint32_t *counts = calloc(ds->max_id + 1, sizeof(uint32_t));
-    DM_Trans_Simple *data = (DM_Trans_Simple *)ds->payload;
-    for (size_t i = 0; i < ds->count; i++)
+    for (size_t i = 0; i < ds->count; i++) {
         for (size_t j = 0; j < data[i].count; j++) counts[data[i].items[j]]++;
+    }
+    g_cnts = counts;
     
-    g_counts = counts;
-    uint32_t *freq_items = malloc((ds->max_id + 1) * sizeof(uint32_t));
-    size_t freq_count = 0;
-    for (uint32_t i = 0; i <= ds->max_id; i++) if (counts[i] >= min_sup) freq_items[freq_count++] = i;
-    
-    if (freq_count == 0) {
-        printf("[NAFCP] Complete. Total frequent closed itemsets found: 0\n");
-        dm_bench_record_results(0, 0);
-        free(freq_items); free(counts); return DM_SUCCESS;
+    uint32_t *freq = malloc((ds->max_id + 1) * sizeof(uint32_t));
+    size_t f_cnt = 0;
+    for (uint32_t i = 0; i <= ds->max_id; i++) {
+        if (counts[i] >= min_sup) freq[f_cnt++] = i;
     }
     
-    qsort(freq_items, freq_count, sizeof(uint32_t), cmp_freq_desc);
+    if (f_cnt == 0) { free(counts); free(freq); return DM_SUCCESS; }
     
-    uint32_t *item_map = malloc((ds->max_id + 1) * sizeof(uint32_t));
-    uint32_t *inv_map = malloc(freq_count * sizeof(uint32_t));
-    memset(item_map, 0xFF, (ds->max_id + 1) * sizeof(uint32_t));
-    for (size_t i = 0; i < freq_count; i++) { item_map[freq_items[i]] = (uint32_t)i; inv_map[i] = freq_items[i]; }
+    qsort(freq, f_cnt, sizeof(uint32_t), cmp_freq);
     
-    PPCNode *root = create_ppc_node((uint32_t)-1);
+    uint32_t *map = malloc((ds->max_id + 1) * sizeof(uint32_t));
+    uint32_t *inv = malloc(f_cnt * sizeof(uint32_t));
+    memset(map, 0xFF, (ds->max_id + 1) * sizeof(uint32_t));
+    for (size_t i = 0; i < f_cnt; i++) { 
+        map[freq[i]] = (uint32_t)i; 
+        inv[i] = freq[i]; 
+    }
+    
+    PPCNode *root = create_ppc_node(ROOT_ITEM);
     uint32_t *t_items = malloc((ds->max_id + 1) * sizeof(uint32_t));
+    size_t *nl_sizes = calloc(f_cnt, sizeof(size_t));
+    
     for (size_t i = 0; i < ds->count; i++) {
-        size_t t_len = 0;
+        size_t tl = 0; 
         for (size_t j = 0; j < data[i].count; j++) {
-            uint32_t item = data[i].items[j];
-            if (counts[item] >= min_sup) t_items[t_len++] = item;
+            if (counts[data[i].items[j]] >= min_sup) t_items[tl++] = data[i].items[j];
         }
-        if (t_len > 0) {
-            qsort(t_items, t_len, sizeof(uint32_t), cmp_freq_desc);
+        if (tl > 0) {
+            qsort(t_items, tl, sizeof(uint32_t), cmp_freq);
             PPCNode *curr = root;
-            for (size_t j = 0; j < t_len; j++) {
-                uint32_t item = t_items[j];
-                PPCNode *child = curr->children, *prev = NULL;
-                while (child) { if (child->item == item) break; prev = child; child = child->next_sibling; }
-                if (!child) {
-                    child = create_ppc_node(item);
-                    if (prev) prev->next_sibling = child; else curr->children = child;
+            for (size_t j = 0; j < tl; j++) {
+                uint32_t it = t_items[j]; 
+                PPCNode *ch = curr->children, *pr = NULL;
+                while (ch) { if (ch->item == it) break; pr = ch; ch = ch->next_sibling; }
+                if (!ch) { 
+                    ch = create_ppc_node(it); 
+                    if (pr) pr->next_sibling = ch; else curr->children = ch; 
+                    nl_sizes[map[it]]++; 
                 }
-                child->count++; curr = child;
+                ch->count++; 
+                curr = ch; 
             }
         }
     }
-    free(t_items);
     
-    g_pre_counter = g_post_counter = 1;
-    traverse_ppc(root);
+    g_pre = g_post = 1; 
+    traverse(root);
     
-    NList *n_lists = calloc(freq_count, sizeof(NList));
-    build_n_lists(root, n_lists, item_map);
+    NList *nlists = malloc(f_cnt * sizeof(NList));
+    for (size_t i = 0; i < f_cnt; i++) { 
+        nlists[i].nodes = malloc(nl_sizes[i] * sizeof(NNode)); 
+        nlists[i].size = 0; 
+        nlists[i].support = 0; 
+    }
+    build_nl(root, nlists, map); 
     free_ppc_tree(root);
     
-    Element *Is = malloc(freq_count * sizeof(Element));
-    for (size_t i = 0; i < freq_count; i++) {
-        Is[i].itemset = malloc(sizeof(uint32_t)); Is[i].itemset[0] = inv_map[i];
-        Is[i].length = 1; Is[i].nl = n_lists[i];
+    Element *Is = malloc(f_cnt * sizeof(Element));
+    for (size_t i = 0; i < f_cnt; i++) { 
+        Is[i].length = 1; 
+        Is[i].itemset = malloc(sizeof(uint32_t)); 
+        Is[i].itemset[0] = inv[i]; 
+        Is[i].nl = nlists[i]; 
     }
     
-    NAFCP_Context ctx = {0};
-    ctx.min_sup = min_sup;
-    ctx.hash_size = 10007;
-    ctx.hash_table = calloc(ctx.hash_size, sizeof(FCINode *));
-    
-    Find_FCIs(Is, freq_count, &ctx);
+    NAFCP_Context ctx = {min_sup, calloc(10007, sizeof(FCINode*)), 10007, 0, 0};
+    find_fci_rec(Is, f_cnt, &ctx);
     
     printf("[NAFCP] Complete. Total frequent closed itemsets found: %zu\n", ctx.total_closed);
     dm_bench_record_results(ctx.total_closed, ctx.total_footprint);
     
-    for (size_t i = 0; i < freq_count; i++) { free(Is[i].itemset); if (Is[i].nl.nodes) free(Is[i].nl.nodes); }
-    free(Is); free(n_lists);
-    for (size_t i = 0; i < ctx.hash_size; i++) {
-        FCINode *curr = ctx.hash_table[i];
-        while (curr) { FCINode *next = curr->next; free(curr->itemset); free(curr); curr = next; }
+    for (size_t i = 0; i < f_cnt; i++) { 
+        if (Is[i].itemset) free(Is[i].itemset); 
+        if (Is[i].nl.nodes) free(Is[i].nl.nodes); 
     }
-    free(ctx.hash_table); free(item_map); free(inv_map); free(freq_items); free(counts);
+    
+    for (size_t i = 0; i < ctx.hash_size; i++) {
+        FCINode *c = ctx.hash_table[i]; 
+        while (c) { 
+            FCINode *n = c->next; 
+            free(c->itemset); 
+            free(c); 
+            c = n; 
+        }
+    }
+    free(ctx.hash_table); 
+    free(Is); 
+    free(nlists); 
+    free(nl_sizes); 
+    free(t_items); 
+    free(map); 
+    free(inv); 
+    free(freq); 
+    free(counts);
     return DM_SUCCESS;
 }
 
-static DM_Algorithm algo = {
-    .id = "nafcp", .name = "NAFCP Algorithm",
-    .description = "An N-list-based Algorithm for Mining Frequent Closed Patterns",
-    .supported_types = (1 << DM_TYPE_TRANSACTIONAL), .run = run
+static DM_Algorithm algo = { 
+    .id = "nafcp", 
+    .name = "NAFCP Algorithm", 
+    .description = "N-list-based Frequent Closed Pattern Mining", 
+    .supported_types = (1 << DM_TYPE_TRANSACTIONAL), 
+    .run = run 
 };
 DM_REGISTER_ALGORITHM(algo)
