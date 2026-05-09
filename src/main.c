@@ -17,6 +17,7 @@
 #include "algorithms/lcm.h"
 #include "algorithms/nafcp.h"
 #include "algorithms/fcfia.h"
+#include "algorithms/prepost.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -72,6 +73,7 @@ int main(int argc, char **argv) {
     DM_LCM_Params lcm_params;
     DM_NAFCP_Params nafcp_params;
     DM_FCFIA_Params fcfia_params;
+    DM_PrePost_Params prepost_params;
     if (strcmp(algo_id, "ais") == 0) {
         ais_params.min_support = min_support;
         params = &ais_params;
@@ -123,6 +125,9 @@ int main(int argc, char **argv) {
     } else if (strcmp(algo_id, "fcfia") == 0) {
         fcfia_params.min_support = min_support;
         params = &fcfia_params;
+    } else if (strcmp(algo_id, "prepost") == 0) {
+        prepost_params.min_support = min_support;
+        params = &prepost_params;
     }
 
     printf("Executing %s...\n", algo->name);
