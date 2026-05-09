@@ -1,0 +1,1502 @@
+Total pages: 23
+
+--- Page 1 ---
+SCIENCE CHINA
+Information Sciences
+. .
+RESEARCH PAPER September 2012Vol.55No.9: 2008–2030
+doi: 10.1007/s11432-012-4638-z
+A new algorithm for fast mining frequent itemsets
+using N-lists
+DENG ZhiHong∗, WANG ZhongHui & JIANG JiaJian
+KeyLaboratory of Machine Perception (Ministry of Education), School of Electronics Engineering
+and Computer Science,Peking University,Beijing 100871, China
+ReceivedJanuary18,2012; accepted March7,2012;publishedonlineJuly19,2012
+Abstract Mining frequent itemsets has emerged as a fundamental problem in data mining and plays an es-
+sentialroleinmanyimportantdataminingtasks. Inthispaper,weproposeanovelverticaldatarepresentation
+calledN-list,whichoriginates fromanFP-tree-likecodingprefixtreecalledPPC-treethat stores crucialinfor-
+mation about frequent itemsets. Based on the N-listdata structure, we develop an efficient miningalgorithm,
+PrePost,forminingallfrequentitemsets. EfficiencyofPrePostisachievedbythefollowingthreereasons. First,
+N-listis compact since transactions with commonprefixes sharethe samenodes of the PPC-tree. Second, the
+counting of itemsets’ supports is transformed into the intersection of N-lists and the complexity of intersect-
+ing two N-lists can be reduced to O(m+n) by an efficient strategy, where m and n are the cardinalities of
+the two N-lists respectively. Third, PrePost can directly find frequent itemsets without generating candidate
+itemsets in somecases by making use of the singlepath property of N-list. We have experimentally evaluated
+PrePostagainstfourstate-of-the-artalgorithmsforminingfrequentitemsets onavariety ofrealandsynthetic
+datasets. Theexperimental results show that the PrePostalgorithm isthe fastest inmostcases. Even though
+thealgorithmconsumes morememorywhenthedatasets aresparse,itisstillthefastestone.
+Keywords datamining,frequentitemsetmining,datastructure,N-lists,algorithm
+Citation DengZH,WangZH,JiangJJ.AnewalgorithmforfastminingfrequentitemsetsusingN-lists. Sci
+ChinaInfSci,2012,55: 2008–2030,doi: 10.1007/s11432-012-4638-z
+1 Introduction
+Data mining has attracted tremendous amount of attention in the database research community due to
+its wide applicability in many areas. Frequent itemset mining is a very popular data mining technique
+andplaysanessentialroleinmanyimportantdataminingtaskssuchasminingassociations,correlations,
+causality,sequentialitemsets, episodes,multi-dimensionalitemsets,max-itemsets,partialperiodicityand
+emerging itemsets [1].
+Frequent itemset mining was first proposedby Agrawalet al. [2] for marketbasketanalysis in dealing
+with the problem of mining association rule. The task of mining association rule is to analyse consumer
+behaviors by discovering intrinsic associations between different items that customers have bought from
+stores or supermarkets. A famous example is the discovery that people who buy diapers also frequently
+buy beers. Such information, about what products are frequently purchased jointly, can be used to
+∗Correspondingauthor(email: zhdeng@cis.pku.edu.cn)
+(cid:2)c ScienceChinaPressandSpringer-VerlagBerlinHeidelberg2012 info.scichina.com www.springerlink.com
+
+--- Page 2 ---
+DengZH,etal. SciChina Inf Sci September2012Vol.55No.9 2009
+optimize the marketing of the products by helping retailers arrange the layout of the store and target
+certain groups of customers.
+Sincethefirstproposalofthisnewdataminingtaskanditsassociatedefficientminingalgorithms,there
+have been hundreds of follow-up research publications, on various kinds of extensions and applications,
+ranging from scalable data mining methodologies, to handling a wide diversity of data types, various
+extendedmining tasks,anda varietyofnew applications [3]. Although lotsofpapers onmining frequent
+itemsetshavebeenpublishedinrecentyears,howtodesignefficientminingmethodsisstilloneofseveral
+critical researchproblems yet to be solved [3,4].
+In this paper, we propose a new method, PrePost, for efficiently mining frequent itemsets. PrePost
+employs a novel data structure, N-list, to represent itemsets. N-list stores all crucial information about
+itemsets. Bycombiningthesearchapproachofcandidatesetgeneration-and-testandthesearchapproach
+of mining frequent itemsets directly without candidate generation, PrePost achieves very high efficiency
+in mining frequent itemsets.
+EfficiencyofPrePostisachievedbythefollowingthreereasons. First, N-listhasthesamecompressing
+degree as the FP-tree, andthus is muchmore compactthan previouslyproposedvertical structure (such
+as diffset [5]). Second, the counting of supports is transformed into the intersection of N-lists and the
+complexityofintersectingtwoN-listscanbereducedtoO(m+n)byanefficientstrategy,wheremandn
+are the cardinalities of the two N-lists. For counting supports of itemsets, intersection of N-lists is much
+moreefficient thanintersectionofTid-sets by avoidingunnecessarycomparison. Third, PrePostcanfind
+frequent itemsets without generating candidate itemsets in some cases by using the single path property
+of N-list. The single path property of N-list can efficiently deal with the problem of too many candidate
+itemsets of Apriori-like method in local ranges.
+ForevaluatingtheperformanceofPrePost,weconductacomprehensiveperformancestudytocompare
+the performance of PrePost with four state-of-the-art mining algorithms, which are FP-growth, FP-
+growth*, dEclat and eclat goethals. The experimental results show that PrePost is faster than all these
+four algorithms. In addition, the results also confirm that N-list is a very compact structure, whose
+average length is about several orders of magnitude smaller than that of diffset, which is a kind of
+efficient Tid-set.
+The remainder of the paper is organized as follows. Section 2 presents related work. Section 3 intro-
+duces the detailed problem description, the N-list structure and its basic properties. Section 4 develops
+an N-list-based algorithm called PrePost for efficiently finding frequent itemsets. Section 5 presents ex-
+perimental results and performance study. Section 6 summarizes our study and points out some future
+researchissues.
+2 Related work
+Mostofthepreviouslyproposedalgorithmsforminingfrequentitemsetscanbeclusteredintotwogroups:
+the Apriori-like method and the FP-growth method [6]. The Apriori-like method is based on anti-
+monotone property [7], called Apriori, which states that if any length k itemset is not frequent, its
+length (k + 1) super-itemset also cannot be frequent. The Apriori-like method employ candidate set
+generation-and-teststrategy to discoverfrequent itemsets. That is, it generatescandidate length (k+1)
+itemsets in the (k + 1)th pass using frequent length k itemsets generated in the previous pass, and
+counts the supports of these candidate itemsets in the database. A lot of studies, such as [5,7–10],adopt
+the Apriori-like method. Different from the Apriori-like method, the FP-growth method mines frequent
+itemsets without candidate generation and has proven very efficient. The FP-growth method achieves
+impressiveefficiencybyadoptingahighlycondenseddatastructurecalledFP-tree(frequentitemsettree)
+to store databases and employing a partitioning-based, divide-and-conquer approach to mine frequent
+itemsets. Some studies, such as [1,11–13],adopt the FP-growthmethod.
+The Apriori-like method achieves good performance by reducing the size of candidates. However,
+previousstudiesrevealthatitishighlyexpensiveforApriori-likemethodtorepeatedlyscanthedatabase
+and check a large set of candidates by itemset matching [1]. In order to deal with these problems,
+
+--- Page 3 ---
+2010 DengZH,etal. SciChinaInf Sci September2012Vol.55No.9
+a number of vertical mining algorithms have been proposed [5,9,10]. Unlike the traditional horizontal
+transactional database format, each item in a vertical database is associatedwith its corresponding Tid-
+set, the set of all transaction ids where it appears. The advantage of vertical database format is that
+the counting of supports of itemsets can be obtained via Tid-set intersection, which avoids scanning a
+whole database. Tid-set is much simpler than complex hash or trees used in horizontal algorithms and
+is also more efficient than them in counting supports of itemsets. Vertical mining algorithms have been
+showntobeveryeffectiveandusuallyoutperformhorizontalminingmethods[5]. Despitetheadvantages
+of the vertical database format, the vertical mining algorithms become ineffective since the intersection
+time becomes too long when Tid-set cardinality (such as for very frequent items) is very large or there
+are a very large number of transactions[5]. The FP-growthmethod wins an advantage overthe Apriori-
+like method by reducing search space and generating frequent itemsets without candidate generation.
+However, the FP-growth method only achieves significant speedups at low minimum supports because
+the process of constructing and using the FP-trees is complex [14]. In addition, recurrently building
+conditional itemset bases and trees makes the FP-growthmethod inefficient when datasets are sparse.
+Onthe one hand, the advantageofthe FP-growthmethod is the FP-tree, which is a highly condensed
+data structure for storing the database. On the other hand, the biggest advantage of vertical mining
+algorithmisthatitemsetsarerepresentedbytransactionids(TID).Aquestioniswhetherwecanintegrate
+the advantages of the two kinds of methods and form a new efficient mining algorithm, which may
+overcome the shortcomings of the two kinds of methods.
+Basedontheaboveanalysis,weproposeanewminingalgorithm,PPV,whichcombinesanFP-tree-like
+data structure with an intersection-based approach to discover frequent itemsets [6]. PPV is the first
+workon integrating FP-growthmethod and verticalmethod. However,PPV fully employs candidate set
+generation-and-test strategy to discovery frequent itemsets. Therefore, it has the inherent weakness of
+Apriori-like methods. That is, PPV becomes inefficient when datasets are dense and frequent itemsets
+arelong[6]. Inthispaper,wedevelopanovelalgorithm,PrePost,fromPPV.Thecoredifferencebetween
+PrePost and PPV is that PrePost can directly mining frequent itemsets without generating candidates.
+This makes PrePostovercome the inherent weakness of PPV efficiently.
+PrePostadoptsaprefixtreestructurecalledPPC-treetostorethedatabase. EachnodeinaPPC-tree
+is assigned with a Pre-Post code via traversing the PPC-tree with Pre and Post order. Based on the
+PPC-tree with Pre-Post code, each frequent item can be represented by an N-list, which is the list of
+PP-codes that consists of pre-order code, post-order code, and count of nodes registering the frequent
+item. Like other vertical algorithms, PrePostadopts the Apriori-like approachto find frequent itemsets.
+That is, it gets N-lists of the candidate itemsets of length (k +1) by intersecting N-lists of frequent
+itemsets of length k and thus discovers the frequent itemsets of length (k+1). However, PrePost can
+directly mine frequent itemsets without generating candidates in some cases.
+3 Basic principles
+3.1 Description of the problem
+LetI = {i
+1
+,i
+2
+, ...,im }betheuniversalitemset. LetDB = {T
+1
+,T
+2
+, ...,Tn }beatransactiondatabase,
+where each Tk(1 (cid:2) k (cid:2) n) is a transaction which is a set of items such that Tk ⊆ I. We also call A an
+itemset if A is a set of items. Let A be an itemset. A transaction T is said to contain A if and only if
+A⊆T. LetSPA be thesupportofitemsetA, whichisthenumberoftransactionsinDB thatcontainA.
+Let ξ be the predefined minimum support and |DB| be the number of transactions in DB. An itemset
+A is frequent if SPA is no less than ξ×|DB|. Given a transactiondatabase DB and a ξ, the problem of
+miningfrequentitemsetsishowtodiscoverthesetofallitemsetsthathavesupportnolessthanξ×|DB|,
+which is also called minimum threshold.
+3.2 PPC-tree definition
+BeforeintroducingN-list, wefirstintroduce PPC-tree,whichis the basisofN-list. We define aPPC-tree
+
+--- Page 4 ---
+DengZH,etal. SciChina Inf Sci September2012Vol.55No.9 2011
+Table 1 Atransactiondatabase
+ID Items Orderedfrequentitems
+1 a,c,g,f c,f,a
+2 e,a,c,b b,c,e,a
+3 e,c,b,i b,c,e
+4 b,f,h b,f
+5 b,f,e,c,d b,c,e,f
+as follows.
+Definition 1. PPC-tree is a tree structure:
+1)Itconsistsofonerootlabeledas“null”,andasetofitemprefixsubtreesasthe childrenofthe root.
+2) Each node in the item prefix subtree consists of five fields: item-name, count, children-list, pre-
+order, andpost-order. item-nameregisterswhichitem this node represents. countregistersthe number
+oftransactionspresentedbytheportionofthepathreachingthisnode. children-listregistersallchildren
+of the node. pre-order is the pre-order rank of the node. post-order is the post-order rank of the node.
+According to Definition 1, PPC-tree looks like an FP-tree [1,15]. Note that, FP-tree is called PC-tree
+in [15]. However, there are three important differences between them.
+First,FP-treehasanode-linkfieldineachnodeandaheadertablestructuretomaintaintheconnection
+of nodes whose item-names are equal in the tree, where PPC-tree does not have such structures. So,
+PPC-tree is a simpler prefix tree.
+Second,eachnodeinthePPC-treehaspre-order andpost-order fieldswhilenodesintheFP-treehave
+not. The pre-order of a node is determined by a pre-ordertraversalof the tree. In a pre-ordertraversal,
+a node N is visited and assigned the pre-order rank before all its children are traversedrecursively from
+lefttoright. Inotherword,the pre-order recordsthetime whennodeN isaccessedduringthe pre-order
+traversal. In the same way, the post-order of a node is determined by a post-order traversal of the tree.
+In a post-order traversal, a node N is visited and assigned its post-order rank after all its children have
+been traversedrecursively from left to right.
+Third, after a FP-tree is built, it will be used for frequent itemset mining during the total process
+of FP-growth algorithm, which is a recursive and complex process. However, PPC-tree is only used for
+generating the Pre-Post code of each node. Later, we will find that after collecting the Pre-Postcode of
+each frequent item first, the PPC-tree finishes its entire task and could be deleted.
+Based on Definition 1, we have the following PPC-tree construction algorithm.
+TogetabetterunderstandingoftheconceptandtheconstructionalgorithmofPPC-tree,let’sexamine
+the following example.
+Example 1. Let the transaction database, DB, be represented by the information from the left two
+columns of Table 1 and ξ =0.4. The frequent 1-itemsets set F ={a,b,c,e,f}.
+1
+Figure 1 shows the PPC-tree resulting from Example 1 after Algorithm 1 execution. The node with
+(4, 8) means that its pre-order is 4, post-order is 8, the item-name is b, and count is 4. Note that the
+PPC-treeisconstructedusingtherightmostcolumnofTable1accordingtoAlgorithm1. Obviously,the
+secondcolumnandthelastcolumnareequivalentforminingfrequentitemsetsunderthegivenminimum
+support. In the rightmost columns of Table 1, all infrequent items are eliminated and frequent items
+are listed in support-descending order. This ensures that the DB can be efficiently represented by a
+compressed tree structure.
+3.3 N-list: definitions and properties
+In this section, we will give the definition of N-list and introduce some important properties of N-list,
+which determine the efficiency of our new proposed algorithm for mining frequent itemsets. We first
+define PP-code, which is the basic component of N-list.
+
+--- Page 5 ---
+2012 DengZH,etal. SciChinaInf Sci September2012Vol.55No.9
+(0,9) {}
+b:4 (4,8)
+(1,2) c:1
+(2,1) f:1 (5,6) c:3 f:1 (9,7)
+(3,0) a:1 (6,5) e:3
+(7,3) a:1 f:1 (8,4)
+Figure 1 ThePPC-treeresultingfromExample1afterrunningAlgorithm1.
+Algorithm 1(PPC-treeconstruction)
+Input: AtransactiondatabaseDBandaminimumsupportξ.
+Output: APPC-treeandF1(thesetoffrequent1-itemsets).
+Method: Construct-PPC-tree(DB,ξ)
+1: [Frequent1-itemsetsgeneration]
+2: Accordingtoξ ,scanDBoncetofindF1,thesetoffrequent1-itemsets(frequentitems),andtheirsupports.
+3: SortF1insupportdescendingorderasL1,whichisthelistoforderedfrequentitems. Notethat, ifthesupports
+ofsomefrequentitemsareequal,theorderscanbeassignedarbitrarily.
+4: [PPC-treeconstruction]
+5: CreatetherootofaPPC-tree,Tr ,andlabelitas“null”.
+6: foreachtransactionTransinDBdo
+7: SelectthefrequentitemsinTransandsortoutthem accordingtotheorderofF1. Letthesortedfrequent-item
+listinTransbe[p|P],wherepisthefirstelementandP istheremaininglist.
+8: Callinserttree([p|P],Tr).
+9: end for
+10: [Pre-Postcodegeneration]
+11: ScanPPC-treetogeneratethepre-order andthepost-order ofeachnode.
+12:
+13: [Functioninserttree([p|P],Tr)]
+14: ifTr hasachildN suchthatN.item-name=p.item-namethen
+15: increaseN’scountby1;
+16: else
+17: createanewnodeN,withitscountinitializedto1,andadditto Tr (cid:3)schildren-list;
+18: ifPisnonempty then
+19: callinserttree(P,N)recursively.
+20: end if
+21: end if
+Definition2(PP-code). ForeachnodeN inaPPC-tree,wecall(cid:3)(N.pre−order,N.post-order) :count(cid:4)
+the PP-code of N.
+In fact, the goal of constructing PPC-tree is to generate the PP-codes of frequent items, since the
+PP-codes can reflect the structure of the PPC-tree as follows.
+Property 1. Given any two different nodes N and N , N is an ancestor of N , if and only if
+1 2 1 2
+N .pre-order <N .pre-order and N .post-order >N .post-order.
+1 2 1 2
+For the proof of Property 1, please refer to [16]. Property 1 also shows that nodes and their PP-code
+are1-1mapping. Thatis,anodeuniquelydeterminesaPP-codeandaPP-codealsouniquelydetermines
+a node. Therefore, we have the following definition.
+
+--- Page 6 ---
+DengZH,etal. SciChina Inf Sci September2012Vol.55No.9 2013
+b (cid:31)(4,8): 4(cid:33)
+c (cid:31)(1,2): 1(cid:33) (cid:31)(5,6): 3(cid:33)
+e (cid:31)(6,5): 3(cid:33)
+f (cid:31)(2,1): 1(cid:33) (cid:31)(8,4): 1(cid:33) (cid:31)(9,7): 1(cid:33)
+a (cid:31)(3,0): 1(cid:33) (cid:31)(7,3): 1(cid:33)
+Figure 2 TheN-listsoffrequentitemsinExample1.
+Definition 3 (Ancestor-descendant relationship of PP-codes). Given two PP-codes X and X , X is
+1 2 1
+anancestorofX ifandonlyifthenoderepresentedbyX isanancestorofthe noderepresentedbyX .
+2 1 2
+Let X be (cid:3)(x ,y ) : z (cid:4) and X be (cid:3)(x ,y ) : z (cid:4), Definition 3 is equal to the saying that X is an
+1 1 1 1 2 2 2 2 1
+ancestor of X
+2
+if and only if x
+1
+<x
+2
+and yl >y
+2
+. We also call Y a descendant of X if X is an ancestor
+of Y.
+Definition 4 (N-list of frequent item). Given a PPC-tree, the N-list of a frequent item is a sequence
+of all the PP-codes of nodes registering the item in the PPC-tree. The PP-codes are arranged in an
+ascending order of their pre-order values.
+EachPP-codeintheN-listisdenotedby(cid:3)(x,y):z(cid:4),wherexisitspre-order,yisitspost-orderandz is
+its count. And the N-list of a frequent item is denoted by (cid:3)(x
+1
+,y
+1
+):z
+1
+(cid:4),(cid:3)(x
+2
+,y
+2
+):z
+2
+(cid:4),...,(cid:3)(x
+1
+,yl):zl (cid:4),
+where x
+1
+< x
+2
+< ··· < xl. For example, the N-list of f includes three nodes, which are (cid:3)(2,1) : 1(cid:4),
+(cid:3)(8,4):1(cid:4), and (cid:3)(9,7):1(cid:4). Figure 2 shows the N-lists of all frequent items in Example 1.
+Property2. GivenanytwodifferentnodesN andN ,whichrepresentthesameitem(N .item-name=
+1 2 1
+N .item-name), if N .pre-order <N .pre-order, then N .post-order <N .post-order.
+2 1 2 1 2
+WhenN .pre-order <N .pre-order, itmeansthat N is traveledearlierthan N duringthe pre-order
+1 2 1 2
+traversal. Since N can not be an ancestor of N because they both register the same item, N must be
+1 2 1
+on the left branch of PPC-tree compared with N . During the post-order traversal, the left branch will
+2
+also be traversedearlier than N , so N .post-order <N .post-order.
+2 1 2
+Given the N-list of item i which is denoted by (cid:3)(x
+1
+,y
+1
+):z
+1
+(cid:4),(cid:3)(x
+2
+,y
+2
+):z
+2
+(cid:4),...,(cid:3)(xl,yl):zl (cid:4), since we
+arrange the PP-code in the accessed order during pre-order traversal, we have x
+1
+< x
+2
+< ··· < xl.
+According to Property 2, we also have y
+1
+< y
+2
+<···< yl. For example, in Figure 2 the N-list of item c
+is (cid:3)(1,2):1(cid:4),(cid:3)(5,6):3(cid:4) and the N-list of item f is (cid:3)(2,1):2(cid:4),(cid:3)(8,4):1(cid:4),(cid:3)(9,7):1(cid:4). They both confirm
+this property.
+Property3. GiventheN-listofitemi,whichisdenotedby(cid:3)(x
+1
+,y
+1
+):z
+1
+(cid:4),(cid:3)(x
+2
+,y
+2
+):z
+2
+(cid:4),...,(cid:3)(xm,ym):
+zm (cid:4), the support of item i is z
+1
++z
+2
++···+zm.
+ItisaconsequenceofthedefinitionofPP-code. SinceeachPP-codecorrespondstoanodeinPPC-tree,
+whosecountregistersthe numberoftransactionsincluding itemi,the sumofcountsofnodesregistering
+item i is i(cid:3)s support.
+Note that in this paper we denote by L the set of frequent items, in which frequent items are sorted
+1
+in support descending order. Based on L , we define (cid:5) relation of two items as follows.
+1
+Definition 5 ((cid:5) relation). For any two frequent items i and i (i ,i ∈L ). i (cid:5)i if and only if i is
+1 2 1 2 1 1 2 1
+before i in L .
+2 1
+For simplicity of description, any itemset P in this paper is denoted by i
+1
+i
+2
+···ik, where i
+1
+(cid:5) i
+2
+(cid:5)
+···(cid:5)ik. We define the N-list of a 2-itemset, which only contains two different items, as follows.
+Definition 6 (N-list of 2-itemset). Given any two different frequent items i and i (i is before
+1 2 1
+i 2 in L 1 ), whose N-lists are (cid:3)(x 11 ,y 11 ):z 11 (cid:4),(cid:3)(x 12 ,y 12 ):z 12 (cid:4),...,(cid:3)(x 1m,y 1m):z 1m (cid:4) and {(cid:3)(x 21 ,y 21 ) :
+z 21 (cid:4),(cid:3)(x 22 ,y 22 ) : z 22 (cid:4), ..., (cid:3)(x 2n,y 2n) : z 2n (cid:4)} respectively. The N-list of 2-itemset i 1 i 2 is a sequence of
+PP-codes according to pre-order ascending order and is generated by intersecting the N-lists of i and
+1
+i , which follows the rule below:
+2
+
+--- Page 7 ---
+2014 DengZH,etal. SciChinaInf Sci September2012Vol.55No.9
+b (cid:31)(4,8):4(cid:33)
+4>2 No
+f (cid:31)(2,1):1(cid:33) (cid:31)(8,4):1(cid:33) (cid:31)(9,7):1(cid:33)
+4<8 and 8>4 Ok 4<9 and 8>7 Ok
+bf (cid:31)(4,8):1(cid:33) (cid:31)(4,8):1(cid:33)
+Merge
+bf (cid:31)(4,8):2(cid:33)
+Figure 3 TheN-listofbf inExample1.
+1) for any (cid:3)(x 1p,y 1p) : z 1p (cid:4) ∈ the N-list of i 1 (1 (cid:2) p (cid:2) m) and (cid:3)(x 2q,y 2q) : z 2q (cid:4) ∈ the N-list of
+i 2 (1(cid:2)q (cid:2)n), if (cid:3)(x 1p,y 1p):z 1p (cid:4) is an ancestor of (cid:3)(x 2q,y 2q):z 2q (cid:4), then (cid:3)(x 1p,y 1p):z 2q (cid:4) is added to the
+N-list of i i . After that, we get an initial N-list of i i .
+1 2 1 2
+2) check the initial N-list of i 1 i 2 again. Merge the nodes with the form of (cid:3)(x 1b,y 1b) : z 1b (cid:4)(cid:3)(x 1b,y 1b):
+z 2b (cid:4)···(cid:3)(x 1b,y 1b):zrb (cid:4) to get a new node (cid:3)(x 1b,y 1b):(z 1b+z 2b ···+zrb)(cid:4).
+AsshowninFigure2,theN-listofbis(cid:3)(4,8):4(cid:4)andtheN-listoff is(cid:3)(2,1):1(cid:4),(cid:3)(8,4):1(cid:4),(cid:3)(9,7):1(cid:4).
+Let’s see how to generate the N-list of bf by combining the N-list of b and the N-list of f. According
+to Definition 6, we should check an ancestor-descendant relationship of (cid:3)(4,8):4(cid:4) with each PP-code in
+the N-list of f. Because 4, the pre-order of (cid:3)(4,8) : 4(cid:4), is greater than 2, the pre-order of (cid:3)(2,1) : 1(cid:4),
+(cid:3)(4,8):4(cid:4) cannotbe anancestor of (cid:3)(2,1):1(cid:4) in terms of Definition 3. Let’s go oncomparing (cid:3)(4,8):4(cid:4)
+and (cid:3)(8,4) : 1(cid:4). Since 4, the pre-order of (cid:3)(4,8) : 4(cid:4), i s less than 8, thepre-order of (cid:3)(8,4) : 1(cid:4), and 8,
+the post-order of (cid:3)(4,8) : 4(cid:4), is greater than 4, the post-order of (cid:3)(8,4) : 1(cid:4). According to Definition 3,
+(cid:3)(4,8):4(cid:4)is anancestorof(cid:3)(8,4):1(cid:4). IntermsofDefinition6(firstrule),(cid:3)(4,8):1(cid:4), whichiscomposed
+of the pre-order and post-order of (cid:3)(4,8) : 4(cid:4) and the count of (cid:3)(8,4) : 1(cid:4), is added to the N-list of bf.
+In the same way, we know that (cid:3)(4,8):4(cid:4) is anancestor of(cid:3)(9,7):1(cid:4). So, (cid:3)(4,8):1(cid:4), which is composed
+of the pre-order and post-order of (cid:3)(4,8): 4(cid:4) and the count of (cid:3)(9,7) :1(cid:4), is also added to the N-list of
+bf. By checking the elements in the N-list of bf, we find that the only two elements that have the same
+pre-order and post-order, are 4 and 8 respectively. According to Definition 6 (second rule), we should
+combine (cid:3)(4,8) : 1(cid:4) and (cid:3)(4,8) : 1(cid:4) to form (cid:3)(4,8) : 2(cid:4). So, the N-list of bf is (cid:3)(4,8):2(cid:4). Because there
+are no other elements except (cid:3)(4,8):4(cid:4) in the N-list of b, the processing is stopped. Figure 3 shows the
+whole processing procedure. In the same way, we know that the N-list of cf is (cid:3)(1,2):1(cid:4),(cid:3)(5,6):1(cid:4).
+Based on Definition 6, let us generalize it to the concept of the N-list of a k-itemset(k(cid:3)3).
+Definition 7 (N-list of k-itemset). Let P = ixiyi 1 i 2 ...i (k−2) be a itemset (k (cid:3) 3 and each item
+in P is a frequent item), the N-list of P 1 = ixi 1 i 2 ...i (k−2) be (cid:3)(x 11 ,y 11 ) : z 11 (cid:4),(cid:3)(x 12 ,y 12 ) : z 12 (cid:4),...,
+(cid:3)(x 1m,y 1m) : z 1m (cid:4), and the N-list of P 2 = iyi 1 i 2 i (k−2) be (cid:3)(x 21 ,y 21 ) : z 21 (cid:4),(cid:3)(x 22 ,y 22 ) : z 22 (cid:4),..., (cid:3)(x 2n,
+y 2n) : z 2n (cid:4). The N-list of P is a sequence of PP-codes according to pre-order ascending order and
+generated by intersecting the N-lists of P and P , which follows the rule below:
+1 2
+1) for any (cid:3)(x 1p,y 1p) : z 1p (cid:4) ∈ the N-list of P 1 (1 (cid:2) p (cid:2) m) and (cid:3)(x 2q,y 2q) : z 2q (cid:4) ∈ the N-list of
+P 2 (1(cid:2)q (cid:2)n), if (cid:3)(x 1p,y 1p):z 1p (cid:4) is an ancestor of (cid:3)(x 2q,y 2q):z 2q (cid:4), then (cid:3)(x 1p,y 1p):z 2q (cid:4) is added to the
+N-list of ixiyi 1 i 2 ...i (k−2) . After that, we get an initial N-list of P.
+2)wechecktheinitialN-listofP againandmergethenodeswiththeformof(cid:3)(x 1b,y 1b):z 1b (cid:4)(cid:3)(x 1b,y 1b):
+z 2b (cid:4)···(cid:3)(x 1b,y 1b):zrb (cid:4) to get a new node (cid:3)(x 1b,y 1b):(z 1b+z 2b ···+zrb)(cid:4).
+Forexample,wehaveknowntheN-listofbf andcf are(cid:3)(4,8):2(cid:4)and(cid:3)(1,2):1(cid:4),(cid:3)(5,6):1(cid:4). According
+to Definition7,the N-listofbcf canbe built asfollows. Fist,we compare(cid:3)(4,8):2(cid:4) with (cid:3)(1,2):1(cid:4). We
+find that (cid:3)(4,8):2(cid:4) cannot be an ancestor of (cid:3)(1,2):1(cid:4) because 4, the pre-order of the former, is larger
+than 1, the pre-order of the latter. Then, we go on comparing (cid:3)(4,8) : 2(cid:4) with (cid:3)(5,6) : 1(cid:4). Obviously,
+(cid:3)(4,8):2(cid:4)isanancestorof(cid:3)(5,6):1(cid:4)because4,thepre-order oftheformer,islessthan5,thepre-order
+of the latter, and 8, the post-order of the former, is bigger than 6, the post-order of the latter. So,
+(cid:3)(4,8) : 1(cid:4) are added to the N-list of bcf. Because there are no other elements except (cid:3)(4,8) : 2(cid:4) in the
+N-list of bf, the processing is stopped. Finally, we know that the N-list of bcf is (cid:3)(4,8):1(cid:4). Figure 4
+shows the whole processing procedure.
+
+--- Page 8 ---
+DengZH,etal. SciChina Inf Sci September2012Vol.55No.9 2015
+bf (cid:31)(4,8):2(cid:33)
+4>1 No
+cf (cid:31)(1,2):1(cid:33) (cid:31)(5,6):1(cid:33)
+4<5 and 8>6 Ok
+bcf (cid:31)(4,8):1(cid:33)
+Figure 4 TheN-listofbcf inExample1.
+Based on Definitions 4, 6, and 7, we have property as follow.
+Property 4. Let (cid:3)(x,y) : z(cid:4) be a PP-code in the N-list of k-itemset i
+1
+i
+2
+···ik. We have the following
+conclusions:
+1) There must be a node registering i having the PP-code with the same (x,y);
+1
+2) z is the count of all the k-itemset i
+1
+i
+2
+···ik in the sub-tree with the corresponding node registering
+i as the root.
+1
+Proof. We will prove this property by mathematical induction.
+k = 1. According to Definition 4, we know that each PP-code in the N-list of any frequent item i
+represents a node registering i. Therefore, Property 4 is true for k =1.
+k = 2. On the one hand, according to Definition 6, for any PP-code in the N-list of i i , there must
+1 2
+be a PP-code in the N-list of i with the same (x,y). And according to Definition 4, every PP-code in
+1
+the N-list of i corresponds to a node registering i . So there must be a node registering i having the
+1 1 1
+PP-code with the same (x,y). So Conclusion 1) is right. On the other hand, from the merging process
+of Definition 6, we can clearly find that z of each PP-code in the N-list of i i is the sum of the count
+1 2
+of all the itemsets i i in the sub-tree with the corresponding node registering i as the root. Then, we
+1 2 1
+know that Conclusion 2) is also right. Therefore, Property 4 holds for k =2.
+k = 3. The N-list of 3-itemset i i i is generated by the N-list of i i and i i . As with the case of
+1 2 3 1 3 2 3
+k =2, on the one hand, according to Definition 7, for any PP-code in the N-list of i i i , there must be
+1 2 3
+a PP-code in the N-list of i i with the same (x,y). And according to the case k = 2, for any PP-code
+1 3
+in the N-list of i i , there must be node registering i having the PP-code with the same (x,y). So
+1 3 1
+Conclusion 1) is true. On the other hand, from the merging process of Definition 7, we can clearly find
+that z of each PP-code in the N-list of i i i is the sum of the count of all the itemsets i i i in the
+1 2 3 1 2 3
+sub-tree with the corresponding node registering i as the root. Then, we know that Conclusion 2) also
+1
+holds true. Therefore, Property 4 is true for k=3.
+For k >3, the rationale is the same as k =3. Therefore, we have Property 4.
+Based on Property 4, we can easily conclude the following.
+Property5. GivenanN-listofanyk-itemsetP =i
+1
+i
+2
+···ik,whichisdenotedby{(cid:3)(x
+1
+,y
+1
+):z
+1
+(cid:4),(cid:3)(x
+2
+,y
+2
+):
+z
+2
+(cid:4),..., (cid:3)(xm,ym):zm (cid:4)}, the support of itemset P is z
+1
++z
+2
++···+zm.
+Property 6. Let P =i
+1
+i
+2
+···ik be a k-itemset and the N-list of P be (cid:3)(x
+1
+,y
+1
+):z
+1
+(cid:4),(cid:3)(x
+2
+,y
+2
+):z
+2
+(cid:4),...,
+(cid:3)(xm,ym):zm (cid:4). Then we have x
+1
+<x
+2
+<···<xm and y
+1
+<y
+2
+<···<ym.
+Proof. IntermsofDefinitions4,6and7,TheN-listofP isasequenceofPP-codesaccordingtopre-order
+ascending order. Therefore, we have x
+1
+<x
+2
+<···<xm. In addition, each (cid:3)(xj,yj):zj (cid:4) corresponds to
+a node with item-name=i
+1
+according to Property 4. By Property 2, we have y
+1
+<y
+2
+<···<ym.
+4 Mining frequent itemsets using N-list
+In this section, we briefly describe the main idea and steps of PrePost, which is the algorithm that we
+propose for mining frequent itemsets using N-lists. PrePost adopts Apriori-like approach for mining
+frequent itemsets. According the processing sequence, the main steps involved in the PrePost algorithm
+are: 1) Construct PPC-tree and identify all frequent 1-itemsets; 2) based on PPC-tree, construct the
+N-listof eachfrequent1-itemset; 3)scanPPC-tree to find allfrequent 2-itemsets; 4)mine allfrequent
+
+--- Page 9 ---
+2016 DengZH,etal. SciChinaInf Sci September2012Vol.55No.9
+Algorithm 2N-listsconstruction
+Input: PPC-treeandL1,thesetoffrequent1-itemsets.
+Output: NL1,thesetoftheN-listsoffrequent1-itemsets.
+Procedure N-lists construction(PPC-tree)
+1: CreateNL1,letNL1[k]betheN-listofL1[k].
+2: foreachnodeN ofPPC-treeaccessed bypre-order traversaldo
+3: if(N.item−name=L1[k].item−name)then
+4: insert(cid:3)(N.pre-order,N.post-order):N.count(cid:4)intoNL1[k]
+5: end if
+6: end for
+k(> 2)-itemsets. For step 1), Algorithm 1 in Subsection 3.2 shows its details. For the other steps, we
+will present their details in following sections.
+4.1 Building N-lists of frequent 1-itemsets
+GiventransactiondatabaseDBandminimumsupportξ,oncewebuildthe PPC-tree,itiseasytoobtain
+the N-list of each frequent 1-itemset. By traversing the PPC-tree with pre-order, we can access each
+node in PPC-tree. For each node N, we insert (cid:3)(N.pre-order,N.post-order):N.count(cid:4) into the N-list of
+the item registered by N. Algorithm 2 shows the details of how to construct the N-lists of all frequent
+1-itemsets.
+4.2 Mining frequent 2-itemsets
+Many studies [5,10] reveal that the process of mining frequent 2-itemsets is high-cost for Apriori-based
+algorithms because the number of candidate 2-itemsets is usually huge, so it will be time-consuming to
+findfrequent2-itemsetsbyjoiningfrequent1-itemsets. Ref. [5]proposedatypicalwaytofindallfrequent
+2-itemsets without joining frequent 1-itemsets. The method goes as follows. First, for each transaction,
+we get all its 2-itemsets (subset). Then, we can get the support of each 2-itemset after we deal with all
+transactions. Finally, it’s easy to find frequent 2-itemsets when the support of each 2-itemset is known.
+However, we think out a better method, which can find out all frequent 2-itemsets by traversing the
+PPC-tree. Our method finds frequent 2-itemsets as follows. By traversing the PPC-tree with pre-order,
+we can access every node of the PPC-tree. For each node N, letting Na be one of its ancestors, we
+increasethecountof2-itemsetN.item-name∪Na.item-namebyN.count. AfterscanningthePPC-tree,
+wegetall2-itemsetscontaininginthePPC-treeandtheirsupport(theirfinalcounts). Infindingfrequent
+2-patters, we just need to check whether the supports of these 2-itemsets are not less than ξ ×|DB|.
+Because the PPC-treeis more compressedthan the correspondingtransactiondatabase and our method
+doesnotneedtogenerateall2-itemsetsineachtransaction,ourmethodismoreefficientthanthemethod
+in [5]. Algorithm 3 shows the details of our method. To raise efficiency, we implement Algorithms 2 and
+3 in the same pre-order traversal.
+4.3 A linear-time-complexity method for intersecting N-lists
+PrePostfindsfrequent(k+1)-itemsetsbyintersectingtheN-listsoffrequentk-itemsets. Itisobviousthat
+theefficiencyofintersectingtwoN-listsisvitaltotheefficiencyofPrePost. Beforegivingourintersecting
+method, let’s first examine the following example.
+Let P 1 = iui 1 i 2 ···i (k−2) and P 2 = ivi 1 i 2 ···i (k−2) (iu (cid:5) iv) be two (k −1)-itemsets. The N-list of
+P 1 is {(cid:3)(x 11 ,y 11 ) : z 11 (cid:4),(cid:3)(x 12 ,y 12 ) : z 12 (cid:4),...,(cid:3)(x 1m,y 1m) : z 1m (cid:4)}. The N-list of P 2 is {(cid:3)(x 21 ,y 21 ) : z 21 (cid:4),
+(cid:3)(x 22 ,y 22 ):z 22 (cid:4),...,(cid:3)(x 2n,y 2n):z 2n (cid:4)}. To generate the N-list of P =iuivi 1 ···i (k−2) , a na¨ıve method is
+by comparing each PP-code of the N-list of P with each PP-code of the N-list of P to decide whether
+1 2
+they satisfy an ancestor-descendant relationship. It is obvious that the time complexity of the na¨ıve
+method is O(mn). This time complexity is unsatisfying. After some careful analysis, we find a linear-
+time-complexity method, which is based on the following Lemma.
+
+--- Page 10 ---
+DengZH,etal. SciChina Inf Sci September2012Vol.55No.9 2017
+Algorithm 3miningfrequent2-itemsets
+Input: PPC-treeandL1,thesetofallfrequent1-itemsets.
+Output: L2,thesetofallfrequent2-itemsets.
+ProcedureL2 Construction(PPC-tree)
+1: LetL1[k]bethekthelementinL1,setL1[k].order=k.
+2: CreateTemp2=int[L1.size()][L1.size()].
+3: foreachnodeNofPPC-treeaccessedbypre-order traversaldo
+4: foreachancestor nodeofN,LetitbeNa. do
+5: Temp2[N.item−name.order][Na.item−name.order]+=N.count;
+6: end for
+7: end for
+8: foreachelementTemp2[i,j]inTemp2 do
+9: ifTemp2[i,j](cid:3)ξ×|DB|then
+10: insertL1[i]∪L1[j]intoL2
+11: end if
+12: end for
+Lemma 1. Let P 1 = iui 1 i 2 ···i (k−2) and P 2 = ivi 1 i 2 ···i (k−2) (iu (cid:5) iv) be two (k − 1)-itemsets.
+The N-list of P 1 is {(cid:3)(x 11 ,y 11 ) : z 11 (cid:4),(cid:3)(x 12 ,y 12 ) : z 12 (cid:4), ...,(cid:3)(x 1m,y 1m) : z 1m (cid:4)}. The N-list of P 2 is
+{(cid:3)(x 21 ,y 21 ) : z 21 (cid:4), (cid:3)(x 22 ,y 22 ) : z 22 (cid:4), ...,(cid:3)(x 2n,y 2n) : z 2n (cid:4)}. If ∃(cid:3)(x 1s,y 1s) : z 1s (cid:4) ∈ P 1 and (cid:3)(x 2t,y 2t) :
+z 2t (cid:4) ∈ P 2 ,(cid:3)(x 1s,y 1s) : z 1s (cid:4) is an ancestor of (cid:3)(x 2t,y 2t) : z 2t (cid:4), then any (cid:3)(x 1k,y 1k) : z 1k (cid:4) ∈ P 1 (k (cid:9)= s)
+cannot be an ancestor of (cid:3)(x 2t,y 2t):z 2t (cid:4).
+Proof. Let(cid:3)(x 1s,y 1s):z 1s (cid:4)beanancestorof(cid:3)(x 2t,y 2t):z 2t (cid:4),N 1 bethenoderepresentedby(cid:3)(x 1s,y 1s):
+z 1s (cid:4), N 2 be the node represented by (cid:3)(x 2t,y 2t) : z 2t (cid:4), and N be the node represented by (cid:3)(x 1k,y 1k) :
+z 1k (cid:4)(k (cid:9)= s). If N is an ancestor of N 2 , then N 1 and N must have an ancestor-descendant relationship.
+AccordingtoProperty4,theitem-namesofN
+1
+andN arebothiu. But,bytheconstructionofPPC-tree,
+nodes with the same item-name cannot have an ancestor-descendant relationship. End of proof.
+Based on Property 6 and Lemma 1, the generation of the N-list of P = iuivi 1 i 2 ···i (k−2) can be
+efficiently implemented by a linear-time-complexityMethod called NL intersection. The NL intersection
+methodfirstselectsaPP-codefrom{(cid:3)(x 11 ,y 11 ):z 11 (cid:4),(cid:3)(x 12 ,y 12 ):z 12 (cid:4),...,(cid:3)(x 1m,y 1m):z 1m (cid:4)}according
+to the order from left to right. Then, it checks an ancestor-descendant relationship of the PP-code and
+PP-codes in {(cid:3)(x 21 ,y 21 ):z 21 (cid:4),(cid:3)(x 22 ,y 22 ):z 22 (cid:4),...,(cid:3)(x 2n,y 2n):z 2n (cid:4)}. In a word, our method makes use
+of the characteristic that PP-codes in an N-list are ordinal.
+Let (cid:3)(x 1i,y 1i) : z 1i (cid:4) and (cid:3)(x 2j,y 2j) : z 2j (cid:4) be the current PP-codes to be proceeded. The detailed
+procedures of NL intersection method are as follows:
+1) Check an ancestor-descendantrelationship of (cid:3)(x 1i,y 1i):z 1i (cid:4) and (cid:3)(x 2j,y 2j):z 2j (cid:4).
+2)If(cid:3)(x 1i,y 1i):z 1i (cid:4)isanancestorof(cid:3)(x 2j,y 2j):z 2j (cid:4), thencheckwhetherthereexistsanodewiththe
+formof(cid:3)(x 1i,y 1i):z mj (cid:4)intheN-listofP:ifso,change(cid:3)(x(cid:2)1i,y 1i):z mj (cid:4)to(cid:3) (cid:3)(x 1i,y 1i):z mj+z 2j (cid:4),otherwise
+insert(cid:3)(x 1i,y 1i):z 2j (cid:4) into the N-list ofP.After that, if (cid:3) x 2(j+1) ,y 2(j+1)(cid:2):z 2(j+1) (cid:4) is no(cid:3)null, then go to
+1) to check an ancestor-descendant relationship of (cid:3)(x 1i,y 1i) : z 1i (cid:4) and (cid:3) x 2(j+1) ,y 2(j+1) : z 2(j+1) (cid:4); else
+stop.
+3) If (cid:3)(x 1i,y 1i) : z 1i (cid:4) is not an ancestor of (cid:3)(x 2j,y 2j) : z 2j (cid:4), there would be two cases: x 1i > x 2j or
+x 1i <x 2j ∧y 1i <y 2j. x 1i cannotbe equalto x 2j because they arethe pre-order ranksofdifferent nodes.
+Similarly, y 1i cannot be equ(cid:2)al to y 2j. (cid:3)
+(3.1) For x 1i > x 2j, if (cid:3) x 2(j+1) ,y 2(j+1) : z(cid:2)2(j+1) (cid:4) is no nu(cid:3)ll, then go to 1) to check an ancestor-
+descendant relationship of (cid:3)(x 1i,y 1i):z(cid:2)1i (cid:4) and (cid:3) x 2(j+(cid:3)1) ,y 2(j+1) :z 2(j+1) (cid:4); otherwise stop.
+(3.2) If x 1i < x 2j ∧y 1i < y 2j, if(cid:2) (cid:3) x 1(i+1) ,y 1(i+1(cid:3)) : z 1(i+1) (cid:4) is no null, then go to 1) to check an
+ancestor-descendantrelationship of (cid:3) x 1(i+1) ,y 1(i+1) :z 1(i+1) (cid:4) and (cid:3)(x 2j,y 2j):z 2j (cid:4); otherwise stop.
+The rationale of step (3.1) can be explained as follows. According to Definition 6, for any v(< j), we
+have x 2v <x 2j. Obviously, (cid:3)(x 1i,y 1i):z 1i (cid:4) cannot be the ancestor of (cid:3)(x 2v,y 2v):z 2v (cid:4). So, we need only
+to check those x 2u with u > j to judge whether it is greater than x 1i. The rationale of step (3.2) can
+be explained as follows. According to Property 6, we have y 2j < y 2t for j < t. Because of y 1i < y 2j in
+
+--- Page 11 ---
+2018 DengZH,etal. SciChinaInf Sci September2012Vol.55No.9
+step (3.2), we have y 1i < y 2t. That is, (cid:3)(x 1i,y 1i) : z 1i (cid:4) cannot be an ancestor of (cid:3)(x 2t,y 2t) : z 2t (cid:4). So, we
+do not need to check an ancestor-descendant relationship of(cid:2) (cid:3)(x 1i,y 1i) : z 1i(cid:3) (cid:4) and (cid:3)(x 2t,y 2t) : z 2t (cid:4), which
+means(cid:3)(x 1i,y 1i):z 1i (cid:4)neednotbeprocessedanymore. So,(cid:3) x 1(i+1) ,y 1(i+1) :z 1(i+1) (cid:4),thenextPP-code
+of (cid:3)(x 1i,y 1i) : z 1i (cid:4), should be selected as the next proceeded PP-code to check an ancestor-descendant
+relationship with the PP-codes from the N-list of P 2 . For any (cid:3)(x 2k,y 2k) : z 2k (cid:4)(k < j), there are two
+cases:
+Case 1: there exists (cid:3)(x 1v,y 1v):z 1v (cid:4)(1(cid:2)v (cid:2)i) that is an ancestor of (cid:3)(x 2k,y 2k):z 2k (cid:4);
+Case 2: (cid:3)(x 2k,y 2k):z 2k (cid:4) cannot be a descendant of (cid:3)(x(cid:2)1v,y 1v):z 1v (cid:4) f(cid:3)or any v(1(cid:2)v (cid:2)i).
+Forcase1,(cid:3)(x 2k,y 2k):z 2k (cid:4)cannotbe adescendantof(cid:3) x 1(i+1) ,y 1(i+1) :z 1(i+1) (cid:4)accordingtoLemma1.
+For case 2, suppose x 1i < x 2k. We have y 1i < y 2k because (cid:3)(x 1i,y 1i) : z 1i (cid:4) is not an ancestor of
+(cid:3)(x 2k,y 2k) : z 2k (cid:4). According to the above procedure, an ancestor-descendant relationship of (cid:3)(x 1i,y 1i) :
+z 1i (cid:4) and (cid:3)(x 2u,y 2u) : z 2u (cid:4) has not been checked for any u(u > k), which conflicts with the fact that
+we are checking an ancestor-descendant relationship of (cid:3)(x 1i,y 1i) : z 1i (cid:4) and (cid:3)(x 2j,y 2j) : z 2j (cid:4). So we
+have x 1i > x 2k. According to Property 6, we have x 1(i(cid:2)+1) > x 1i. So(cid:3)we have x 1(i+1) > x 2k, which
+means that (cid:3)(x 2k,y 2k) : z 2k (cid:4) cannot be a descendant of(cid:2) (cid:3) x 1(i+1) ,y 1(i+(cid:3)1) : z 1(i+1) (cid:4). That is, we do not
+need to check an ancestor-descendant relationship of (cid:3) x 1(i+1) ,y 1(i+1) : z 1(i+(cid:2)1) (cid:4) and (cid:3)(x 2k,y (cid:3)2k) : z 2k (cid:4).
+Therefore,we shouldgoto 1)to check anancestor-descendantrelationshipof(cid:3) x 1(i+1) ,y 1(i+1) :z 1(i+1) (cid:4)
+and (cid:3)(x 2j,y 2j):z 2j (cid:4).
+To get a better understanding our method, let’s examine an example. As shown in Figure 2, the
+N-list of f is (cid:3)(2,1):1(cid:4),(cid:3)(8,4):1(cid:4),(cid:3)(9,7):1(cid:4) and the N-list of a is (cid:3)(3,0):1(cid:4),(cid:3)(7,3):1(cid:4). Let’s see the
+procedures that our method generates the N-list of fa.
+We first check an ancestor-descendant relationship of (cid:3)(2,1) : 1(cid:4) and (cid:3)(3,0) : 1(cid:4). Because of 2 < 3
+and 1 > 0, we know that (cid:3)(2,1) : 1(cid:4) is an ancestor of (cid:3)(3,0) : 1(cid:4). So, (cid:3)(2,1) : 1(cid:4) are added to the
+N-list of fa. Then, we check an ancestor-descendant relationship of (cid:3)(2,1) : 1(cid:4) and (cid:3)(7,3) : 1(cid:4), the
+next element of (cid:3)(3,0) : 1(cid:4). We know 2 < 7 and 1 < 3, which satisfy the condition of (3.2). So, we
+go on checking an ancestor-descendant relationship of (cid:3)(8,4) : 1(cid:4), the next element of (cid:3)(2,1) : 1(cid:4), and
+(cid:3)(7,3) : 1(cid:4). Because of 8 > 7, we should check an ancestor-descendant relationship of (cid:3)(8,4) : 1(cid:4) and
+the next element of (cid:3)(7,3) : 1(cid:4) according to (3.1). However, there is no element after (cid:3)(7,3) : 1(cid:4) in the
+N-list of a. So, the processing is stopped. Finally, we conclude that the N-list of fa is (cid:3)(2,1):1(cid:4). Let a
+comparison of two elements in N-lists be a computing unit. For the above example, our method needs 3
+computing units while the na¨ıve method needs 2×3(=6) computing units. In fact, the time complexity
+of NL intersection is linear. For the sake of discussion, we define a computing unit as a comparisonfor
+checkinganancestor-descendantrelationshipoftwoelements inN-listsasthe aboveparagraph. We have
+the following conclusion.
+Lemma 2. Let P and P be two (k−1)-itemsets as mentioned in Lemma 1. The time complexity of
+1 2
+NL intersection for intersecting the N-lists of P and P is O(m+n).
+1 2
+Proof. Let’sregardtheelements inthe N-listofP andP asnodesinagraph. IfE ,anelementinthe
+1 2 1
+N-list of P , and E , anelement in the N-list of P , have been confirmed to have an ancestor-descendant
+1 2 2
+relationship, we add an edge between E and E . Adopting the above method, we generate a graph G
+1 2
+after finishing the intersection of the N-list of P and P according to NL intersection. G consists of a
+1 2
+tree, TG, and some isolatednodes, which haveno edge connecting other nodes. The number ofthe edges
+in TG stands for the number of all comparisons of elements. The number of nodes in G is m+n, which
+is the number of all elements in the N-list of P
+1
+and P
+2
+. It is clear that the number of nodes in TG is
+no more than that in G. As we know, every n-node tree has exactly n−1 edges [17]. So, the number of
+edgesinTG isnomorethanm+n−1. Thatis, thenumberofallcomparisonsisnomorethanm+n−1.
+End of proof.
+Fromtheaboveproof,weknowthatO(m+n)isactuallytheworst-casetimecomplexityofNL intersec-
+tion. For a better understanding of our proof, we illustrate the processing procedure of intersecting the
+N-list of f and a by Figure 5, where steps 1 to 3 stand for the processing sequence of NL intersection.
+Based on the above analysis, we have the following Algorithm 4.
+
+--- Page 12 ---
+DengZH,etal. SciChina Inf Sci September2012Vol.55No.9 2019
+f (cid:31)(2,1): 1(cid:33) (cid:31)(8,4): 1(cid:33) (cid:31)(9,7): 1(cid:33)
+Step 1 Step 2 Step 3
+a (cid:31)(3,0): 1(cid:33) (cid:31)(7,3): 1(cid:33)
+Figure 5 ThegraphcorrespondingtotheprocessingofintersectingtheN-listoff andaaccordingtoNLintersection.
+Algorithm 4NL intersection
+Input: NL1={(cid:3)(x11,y11):z11 (cid:4),(cid:3)(x12,y12):z12 (cid:4),...,(cid:3)(x1m,y1m):z1m (cid:4)}andNL2={(cid:3)(x21,y21):z21 (cid:4),
+(cid:3)(x22,y22):z22 (cid:4),...,(cid:3)(x2n,y2n):z2n (cid:4)},whicharetheN-listofP1=iui1i2 ··· i(k−2) andP2=ivi1i2 ···
+i(k−2)(iu(cid:6)iv)respectively.
+Output: NL3,theN-listP3=iuivi1i2 ···i(k−2).
+ProcedureNL intersection(NL1,NL2)(PPC-tree)
+1: i←1;
+2: j←1;
+3: whilei(cid:2)m&&j(cid:2)ndo
+4: if(x1i<x2j)then
+5: if(y1i>y2j)then
+6: insert(cid:3)(x1i,y1i):z2j (cid:4)intoNL3;
+7: j++;
+8: else
+9: i++;
+10: end if
+11: else
+12: j++;
+13: end if
+14: end while
+15: ptr1 ←NL3.first element;////thefirstelementofNL3
+16: ptr2 ←ptr1.nextelement;////the nextelementofptr1
+17: whileptr1 isnotthelastelementofNL3 do
+18: ifptr1.pre−code=ptr2.pre−codeandptr1.post−code=ptr2.post−codethen
+19: ptr1.count←ptr1.count+ptr2.count;
+20: deleteptr2 fromNL3;
+21: ptr2 ←ptr1.nextelement;
+22: else
+23: ptr1 ←ptr2;
+24: ptr2 ←ptr1.nextelement;
+25: end if
+26: end while
+4.4 Mining frequent k-itemsets
+Before presenting the method for mining frequent k-itemsets, we provide a very import property on
+mining frequent itemsets when some N-lists contain only one element.
+Lemma 3 (Single path property). Let P
+1
+= j
+1
+i
+1
+i
+2
+···iv,P
+2
+= j
+2
+i
+1
+i
+2
+···iv,...,Pn = jni
+1
+i
+2
+···iv,(j
+1
+(cid:5)
+j
+2
+(cid:5) ··· (cid:5) jn (cid:5) i
+1
+(cid:5) i
+2
+(cid:5) ··· (cid:5) iv) be itemsets and denote their intersections by Pa ∪ Pb =
+jajbi
+1
+i
+2
+···iv(1 (cid:2) a < b (cid:2) n). If the N-list of Pn has only one PP-code, and there is a set S =
+{s
+1
+,s
+2
+, ...,st }(1(cid:2)s
+1
+<s
+2
+<···<st <n)suchthatthe N-listofeachPm ∪Pn(m∈S)is notnull,then
+1) For each m∈S, the N-list of Pm ∪Pn has only one PP-codeand the support of Pm ∪Pn is Cn, the
+support of Pn.
+2) Let Ndm be the only node in the PPC-tree that represents Pm ∪ Pn. Then there must be
+Nds1 < (a−d−r) Nds2 (cid:4) (a−d−r) ···< (a−d−r) Ndst, while X< (a−d−r) Y means that X is an ancestor of Y.
+
+--- Page 13 ---
+2020 DengZH,etal. SciChinaInf Sci September2012Vol.55No.9
+b (cid:31)(4,8): 4(cid:33)
+c (cid:31)(1,2): 1(cid:33) (cid:31)(5,6): 3(cid:33)
+e (cid:31)(6,5): 3(cid:33)
+be (cid:31)(4,8): 3(cid:33)
+ce (cid:31)(5,6): 3(cid:33)
+Figure 6 AnExampleillustratingCorollary1.
+Proof. Lemma 3 is easy to be proved by Definition 7. Limited by space, we just give a brief proof.
+For m ∈ S, the N-list of jmjni
+1
+i
+2
+···iv is the result of intersecting the N-lists of Pm(=jmi
+1
+i
+2
+···iv)
+and Pn(=jni
+1
+i
+2
+···iv). According to the precondition of Lemma 3, the N-list of Pm ∪Pn is not null.
+According to Definition 7, the N-list of Pm ∪Pn has only one PP-code and the count of this PP-code is
+Cn. Obviously the support of Pm ∪Pn is Cn. Therefore, we have conclusion 1).
+Let Ndsk(1 (cid:2)k (cid:2) t) be the only node in the PPC-tree that represents Psk ∪Pn and Let Ndn be the
+only node in the PPC-tree that represents Pn. According to Definition 7, Ndxk must be an ancestor
+of Ndn. So, any two nodes of {Nds1 ,Nds2 , ...,Ndst } must have an ancestor-descendant relation. At
+the same time, the registering item (item−name) of Ndsk is jsk in terms of Definition 7. According to
+the precondition of Lemma 3, js1 (cid:5)js2 (cid:5)···(cid:5)jst. According to the PPC-tree construction algorithm,
+Nds1 < (a−d−r) Nds2 < (a−d−r) ···< (a−d−r) Ndst. End of proof.
+In fact, Lemma 3 is similar to Lemma 3.2 (Single FP-tree path itemset generation) of [1]. Therefore,
+Lemma 3 is also called single path property. For a better understanding of Lemma 3, we offer an
+example. As shown in Figure 2, the N-list of b, c, and e are (cid:3)(4,8):4(cid:4), (cid:3)(1,2):1(cid:4),(cid:3)(5,6(cid:4):3(cid:4)), and
+(cid:3)(6,5):3(cid:4) respectively. We know b(cid:5)c(cid:5)e in terms of the definition of L . In addition, e have only one
+1
+PP-code,whichis(cid:3)(6,5):3(cid:4). AccordingtoDefinition6,the N-listofbeis (cid:3)(4,8):3(cid:4), andtheN-listofce
+is (cid:3)(5,6):3(cid:4). Both the support of be and the support of ce are equal to 3, which is the support of e. Let
+Ndbe denoted by (4,8) be the only node in the PPC-tree that represents be, and Ndce denoted by (5,6)
+be the only node in the PPC-tree that represents ce. Ndbe is one ancestor of Ndce because of 4<5 and
+8> 6, as is evident in Figure 1. Based on Lemma 3, we can easily derive an important corollary, which
+is useful for efficiently reducing candidate generation in the mining procedure.
+Corollary1. SupposethatP
+1
+,P
+2
+, ...,andPnsatisfytheconditionsofLemma3. LetS={s
+1
+,s
+2
+,...,st }
+(1(cid:2)s
+1
+<s
+2
+<···<st <n)bethesetsuchthatthe N-listofeachPm ∪Pn(m∈S)isnotnull. Thenthe
+support of any jsx1 jsx2 ...jsxyjni
+1
+i
+2
+···iv(s
+1
+(cid:2) sx1 < sx2 < ···< sxy (cid:2) st, and sxk ∈ S for 1 (cid:2) k (cid:2) y)
+is equal to Cn, the support of Pn.
+Proof. For y = 1. According to conclusion 1) of Lemma 3, for sv ∈ S, we know that Psv ∪Pn =
+jsvjni
+1
+i
+2
+···iv has only one PP-code and the support of Psv ∪Pn is Cn. Without loss of generality, let
+Ndsk ={(cid:3)(Pre sk,Post sk):Cn (cid:4)} be the N-list of Psv ∪Pn. That is, Corollary 1 is correct for y =1.
+For y =2. According to Definition 7, the N-list of jsx1 jsx2 jsx3 jni
+1
+i
+2
+···iv(s
+1
+(cid:2)sx1 <sx2 (cid:2)st) is the
+result of intersecting {(cid:3)(Pre sx1 ,Post sx1 ) : Cn (cid:4)} and {(cid:3)(Pre sx2 ,Post sx2 ) : Cn (cid:4)}. According to con-
+clusion2)ofLemma3,thenode(Pre sx1 ,Post sx1 )mustbeanancestorofthenode(Pre sx2 ,Post sx2 )
+in the PPC-tree. That is, we have Pre sx1 < Pre sx2 and Post sx1 > Post sx2 . So, the N-list of
+jsx1 jsx2 jni
+1
+i
+2
+···iv is {(cid:3)(Pre sx1 ,Post sx1 ):Cn (cid:4)}. That is, Corollary 1 is correct for y =2.
+For y = 3. According to Definition 7, the N-list of jsx1 jsx2 jsx3 jni
+1
+i
+2
+···iv(s
+1
+(cid:2) sx1 < sx2 < sx3 (cid:2)
+st) is the result of intersecting {(cid:3)(Pre sx1 ,Post sx1 ) : Cn (cid:4)}, the N-list of jsx1 jsx3 jni
+1
+i
+2
+···iv, and
+{(cid:3)(Pre sx2 ,Post sx2 ) : Cn (cid:4)}, the N-list of jsx2 jsx3 jni
+1
+i
+2
+···iv. Similarly, we have Pre sx1 < Pre sx2
+and Post sx1 >Post sx2 . So, the N-list of jsx1 jsx2 jsx3 jni
+1
+i
+2
+···iv is {(cid:3)(Pre sx1 ,Post sx1 ):Cn (cid:4)}. That
+is, Corollary 1 is correct for y =3.
+In the same way, we can prove that Corollary1 is correct for y >3 by repeating the above processing
+procedures. Thus, Corollary 1 is confirmed. End of proof.
+IfPnisfrequent,jsx1 jsx2 ···jsxyjni
+1
+i
+2
+···ivmustbealsofrequent. Let’sre-examinetheaboveexample.
+We have the results as shown in Figure 6. Itemset e has only one PP-code, which is (cid:3)(6,5):3(cid:4). Both
+
+--- Page 14 ---
+DengZH,etal. SciChina Inf Sci September2012Vol.55No.9 2021
+Algorithm 5Miningfrequentk-itemsets
+Input: theminimumsupportξ,thefrequent1-itemsetsL1 andtheirN-listsNL1. Notethatfrequent1-itemsets
+inL1 aresortedinsupportdescendingorder.
+Output: ThefrequentitemsetsetF.
+Method: callmining L(L1,NL1)
+Proceduremining L(Lk,NLk)
+1: fori←Lk.size()−1to1do
+2: Lk i +1 ←∅;
+3: NLk i +1 ←∅;
+4: forj←i−1to0do
+5 AssumeLk[i]=x1x2 ···xk andLk[j]=yx2 ···xk(y(cid:6)x1 (cid:6)x2 (cid:6)···(cid:6)xk);//y∈L1,xs(1(cid:2)s(cid:2)k)∈L1
+6: l←yx1x2 ···xk;//Lk[i]∪Lk[j]
+7: l.N−list←NL intersection(NLk[i],NLk[j]);
+8: ifl.count(cid:3)|DB|×ξ then
+9: Lk i +1 ←Lk i +1 ∪ {l};
+10: F ←F ∪ {l};
+11: NLk i +1 ←NLk i +1 ∪ {l.N−list};
+12: end if
+13: end for
+14: ifLk i +1 (cid:10)=∅then
+15: ifNLk[i].length()=1then
+16: AssumeLk i +1={P1,...,Pn}wherePi=yix1x2 ···xk
+17: foranyp=yv1yv2 ···yvux1x2 ···xk(1(cid:2)v1<v2<···<vu(cid:2)n)do
+18: p.count←NLk[i].count;
+19: F ←F ∪ {p};
+20: end for
+21: else
+(cid:2) (cid:3)
+22: Callmining L Lk+1 i,NLk+1 i ;
+23: end if
+24: end if
+25: end for
+itemset be and itemset ce also contain only one PP-code. So, According to Corollary 1, the support of
+bce is 3 without intersecting the N-lists of be and ce.
+Let Lk be the set of frequent k-itemsets, and NLk be the set of N-lists of frequent k-itemsets. Based
+ontheaboveanalysis,wehavethefollowingalgorithmforminingfrequentk(>2)-itemsetsusingN-lists.
+Note that l.count means the support of itemset l. According to Property 5, it can be computed by
+summing value of count attribution of each PP-code in the N-list of l. The Procedure mining L uses
+deep-first strategy to mine frequent itemsets. Lk i
++1
+stands for the set of frequent (k+1)-itemsets that
+end with x
+1
+x
+2
+···xk (that is, Lk[i]). NLk i
++1
+is the set of N-lists of elements in Lk i
++1
+.The code section
+from line 15 to 20 generates all relvenat frequent itemsets without candidate generation by making use
+of Corollary 1.
+Note that we do not generate frequent 2-itemsets in the implementation of mining L. In our im-
+plementation, the frequent 2-itemsets are generated by Algorithm 3 in Subsection 4.2. In fact, our
+implementation of mining L begins by generating frequent k(> 2)-itemsets from frequent 2-itemsets.
+Forthe sakeofintegrityandeasyofillustration, the Proceduremining L beginwithfrequent1-itemsets
+as shown in Algorithm 5.
+To get a better understanding of our method, let’s take Example 1, mentioned in Subsection 3.2,
+as a running example. In Example 1, the minimum support ξ is 0.4 and the frequent 1-itemsets
+set F is {a,b,c,e,f}. By running Algorithm 2, we know that the N-lists of b, c, e, f, and a are
+1
+(cid:3)(4,8):4(cid:4), (cid:3)(1,2):1(cid:4),(cid:3)(5,6):3(cid:4), (cid:3)(6,5):3(cid:4), (cid:3)(2,1):1(cid:4),(cid:3)(8,4):1(cid:4),(cid:3)(9,7):1(cid:4), and (cid:3)(3,0):1(cid:4),(cid:3)(7,3):1(cid:4))
+respectively. By running Algorithm 3, we directly find all frequent 2-itemsets, which are ca, bf, cf, be,
+ce, and bc. Then, by running Algorithm 4, we get the N-lists of these frequent 2-itemsets, which are
+
+--- Page 15 ---
+2022 DengZH,etal. SciChinaInf Sci September2012Vol.55No.9
+(cid:3)(1,2):1(cid:4),(cid:3)(5,6(cid:4):1(cid:4)) (the N-list of ca), (cid:3)(4,8):2(cid:4) (the N-list of bf), (cid:3)(1,2):1(cid:4),(cid:3)(5,6):1(cid:4)) (the N-list
+of cf), (cid:3)(4,8):3(cid:4) (the N-list of be), (cid:3)(5,6):3(cid:4)) (the N-list of ce), (cid:3)(4,8):3(cid:4) (the N-list of bc). With
+Algorithm 5, we obtain two candidate 3-itemsets: bcf and bce. bcf is generated by combining bf and
+cf and bce is generated by combining be and ce. By running Algorithm 4, the N-lists of bcf and bce
+are (cid:3)(4,8):1(cid:4) and (cid:3)(4,8):3(cid:4) respectively. By scanning their N-lists, we know that the supports of bcf
+and bce are 1 and 3 respectively. The minimum threshold is 2(0.4∗5). Therefore, bcf is infrequent and
+bce is frequent. No candidate 4-itemsets have been generated so far because we have only one frequent
+3-itemsets. Therefore, the running of our method is finished. Note that the single path property is not
+used in the example because the example is too simple and has not enough long frequent itemsets.
+5 Experimental evaluation
+In this section, we report three sets of experiments in which the running time, memory consumption,
+and scalability of PrePost are compared with well-known algorithms. Note that, the frequent itemsets
+discoveredby the PrePostalgorithm are the same as those discoveredby the comparedalgorithms in all
+experiments. This confirms that the result generated by the PrePostalgorithm is correct and complete.
+5.1 Experiment setup
+We used three real datasets and two synthetic datasets in our experiments. These datasets were often
+used in previous study of frequent itemset mining. The three real datasets are Pumsb, Retail, and Ac-
+cidents (from http://fimi.cs.helsinki.fi/testdata.html). The PUMS dataset contains census data. The
+Retaildatasetcontainsretailmarketbasketdata fromananonymousretailstore. The Accidentdatasets
+contain a rich source of information on different circumstances in which accidents have occurred. The
+two synthetic datasets are T10I4D100K and T25I10D100K that were generated by the IBM generator
+(http://www.almaden.ibm.com/cs/quest/syndata.html). To generateT10I4D100K,the averagetransac-
+tion size and average maximal potentially frequent itemset size are set to 10 and 4, respectively, while
+thenumberoftransactionsinthe datasetanddifferentitems usedinthe datasetaresetto100Kand1K,
+respectively. To generate T25I10D100K, the average transaction size and average maximal potentially
+frequent itemset size are set to 25 and 10, respectively, while the number of transactions in the dataset
+and different items used in the dataset are set to 100K and 1K, respectively.
+Pumsb and Accidents are both quite dense, so a large number of frequent itemsets will be mined even
+forveryhighvaluesofminimumsupport. Comparedwiththerealdatasets,thesyntheticdatasetismuch
+sparser. Table 2 shows the characteristics of the real and synthetic datasets used in our experiments,
+where shows the average transaction length (denoted by Avg. length), the number of items (denoted by
+#Items)andthenumberoftransactions(denotedby#Trans)ineachdataset. Forthesakeofevaluation,
+we choose dense and sparse datasets with different size to study PrePost performance on different data
+environments.
+We have compared the PrePost algorithm with two FP-growth algorithms, i.e. original FP-growth
+algorithm and FP-growth* algorithm, and two vertical algorithms, i.e. original dEclat algorithm and
+eclat goethals algorithm. Based on the original published papers [1,5], we implemented the original FP-
+growthalgorithmandtheoriginaldEclatalgorithmbyMicrosoft/VisualC++. Forthesakeofsimplicity,
+we denote them by FP-growth and dEclat respectively. FP-growth* [13] is one of the best FP-growth
+algorithms and is the winner of the FIMI03. The implementation of FP-growth* was downloaded from
+http://fimi.cs.helsinki.fi/src/. The eclat goethals algorithm, which optimizes Eclat algorithm [10] by
+usingofdiffsets[5],isoneofthebestverticalminingalgorithmsandshowsitsadvantageoverothervertical
+miningalgorithmsinFIMI03andFIMI04(pleaserefertohttp://fimi.cs.helsinki.fi/). Theimplementation
+ofeclat goethalswasdownloadedfromhttp://www.adrem.ua.ac.be/goethals/software/. FP-growth*and
+eclat goethals were both implemented by C/C++.
+All experiments were performed on a Dell OptiPlex 755DT PC with Intel Core2 Duo 2.66 GHz and
+2GBMemory. TheoperatingsystemwasMicrosoftWindowsXP.Notethatwedidnotdirectlycompare
+
+--- Page 16 ---
+DengZH,etal. SciChina Inf Sci September2012Vol.55No.9 2023
+Table 2 Asummaryofthedatasets
+Database Avg. length #Items #Trans
+Pumsb 74 2113 49046
+Retail 10.3 16470 88162
+Accidents 33.8 468 340183
+T10I4D100K 10.1 870 100000
+T25I10D100K 24.9 990 99822
+1000 (b)
+(a)
+100
+10
+1
+0.1
+70 65 60 55 50 45
+Minimum support (%)
+(c) (d)
+(e)
+)s(
+emit
+nuR
+PrePost
+FP-growth FP-growth*
+dEclat eclat_goethals 1000
+100
+10
+1
+0.10 0.08 0.06 0.04 0.02 0.01
+Minimum support (%)
+)s(
+emit
+nuR
+1000
+100
+10
+1
+40 10 8 6 4 2
+Minimum support (%)
+)s(
+emit
+nuR
+10.6
+8.6
+6.6
+4.6
+2.6
+0.6
+0.5 0.4 0.3 0.2 0.1 0.05
+Minimum support (%)
+)s(
+emit
+nuR
+14.8
+12.8
+10.8
+8.8
+6.8
+4.8
+2.8
+0.8
+5 4 3 2 1
+Minimum support (%)
+)s(
+emit
+nuR
+0.5
+Figure 7 Runningtimefor(a)Pumsb,(b)Retail,(c)Accidents,(d)T10I4D100K and(e)T25I10D100K.
+our results with those in some published papers on different experiment platforms because different
+experiment platforms, such as software and hardware, may differ greatly in the runtime for the same
+algorithms. So, it is very fair that we compare these algorithms in the same running environment.
+5.2 Comparison of running time
+Figure 7 show the running time of the compared algorithms on Pumsb, Retail, Accidents, T10I4D100K,
+and T25I10D100Kwith different minimum supports. Due to the fact that data distributions of different
+datasets are different, we set different ranges of minimum support for different datasets in order to mine
+frequent itemsets in a reasonable time. Note that running time here means the total execution time,
+which is the period between input and output.
+
+--- Page 17 ---
+2024 DengZH,etal. SciChinaInf Sci September2012Vol.55No.9
+The X and Y axes in the five figures stand for running time and minimum support, respectively. In
+addition, Y axis in Figures 7 (a), (b) and (c) is logarithmic for better demonstration.
+Figure7(a)showstherunningtimeofthecomparedalgorithmsonPumsb. PrePostrunsfastestamong
+fivealgorithmsunderallminimumsupports. Underlargeminimumsupports,FP-growthrunsfasterthan
+FP-growth*. However,FP-growth*runs faster than FP-growthwhenminimum supportis no morethan
+50%. Although eclat goethals run faster than dEclat, it is about an order of magnitude slower than
+PrePost, FP-growth, and FP-growth*. When minimum support is not more than 60%, dEclat fails to
+discover all frequent itemsets in 1000 s.
+Figure 7(b) shows the running time of the compared algorithms on Retail. PrePost and FP-growth*
+run fastest among five algorithms under all minimum supports. The differences between PrePost and
+FP-growth* can be neglected. Under small minimum supports, FP-growth is slower than PrePost and
+FP-growth*. eclat goethalsisstillfasterthandEclatandisstillaboutanorderofmagnitudeslowerthan
+PrePost, FP-growth, and FP-growth*. Once again, we find that when minimum support is not more
+than 0.02%, dEclat cannot find all frequent itemsets in 1000 s.
+Figure7(c)showstherunningtime ofthecomparedalgorithmsonAccidents. PrePostismostefficient
+and runs about two times faster than FP-growth, and runs about three times faster than FP-growth*.
+eclat goethalsisstillinferiortoPrePost,FP-growth,andFP-growth*andisaboutanorderofmagnitude
+slower than them. dEclat is still most inefficient and runs more than 1000 s again when the minimum
+support is 10%. In addition, eclat goethals become inefficient and runs more than 1000 s when the
+minimum support is 2%.
+Figure 7(d) shows the performance comparison of the algorithms on T10I4D100K. PrePost is most
+efficient among five algorithms under all minimum supports. FP-growth runs faster than FP-growth*
+under large minimum supports while FP-growth* runs faster than FP-growth under small minimum
+supports. Overall, FP-growth* is a little superior to FP-growth. eclat goethals is slower than PrePost,
+FP-growth,andFP-growth*. However,the differencesinrunningtime arewithinanorderofmagnitude.
+The performance of dEclat is surprising. It is just inferior to PrePost and is superior to other three
+algorithms under high minimum supports.
+Figure 7(e) shows the performance comparison of the algorithms on T25I10D100K. The results on
+T25I10D100K are almost the same as those on T10I4D100K except in one case where dEclat is faster
+than eclat goethals under all minimum supports.
+Figures7(a)and(c)showthatwhendensedatasetsareused,PrePost,FP-growth*,andFP-growthare
+muchfasterthandEclatandeclat goethals. Figure7(b)showsthatwhenthevaluesofminimumsupport
+are very low, PrePost,FP-growth*,and FP-growthare also much faster than dEclat and eclat goethals.
+Thisisbecausebothdensedatasetsandlowminimumsupportsmeanthatthenumberoffrequentitemsets
+will be very large. Although dEclat and eclat goethals adopt efficient data structures for boosting the
+mining speed, they still employ candidate set generation-and-teststrategy to discover frequent itemsets,
+as has been shown to be far from efficient for mining a huge number of frequent itemsets [1,13]. Both
+FP-growth* and FP-growth employ partitioning-based, divide-and-conquer method to directly discover
+frequentitemsetswithoutcandidategeneration. AlthoughPrePostalsoemployscandidatesetgeneration-
+and-teststrategytodiscoveryfrequentitemsets,italsoadoptsanefficienttechniquebasedonCorollary1
+to find frequent itemsets quickly without generatingcandidates. We believe that the technique has great
+influence on the performances of PrePost. However,the exact influence of the technique is still unknown
+because it is very hard to be analyzed quantitatively.
+When datasets are sparse or the values of minimum support are moderate, the advantage of PrePost,
+FP-growth*,and FP-growthoverdEclatand eclat goethals is not so very distinct. Figures 7 (d) and (e)
+support the above conclusion.
+In summary, no matter which dataset is chosen, experimentalresults suggestthe following ordering of
+these algorithms as running time is concerned:
+PrePost>{FP-growth∗,FP-growth}>eclat goethals>dEclat,
+where “>” means “faster than”.
+
+--- Page 18 ---
+DengZH,etal. SciChina Inf Sci September2012Vol.55No.9 2025
+100000
+10000
+1000
+100
+10
+1
+75 73 71 67 65
+Minimum support (%)
+htgnel
+egarevA
+N-list diffset
+10000
+1000
+100
+10
+1
+69 1.0 0.9 0.8 0.7 0.6 0.5
+Minimum support (%)
+htgnel
+egarevA
+N-list diffset
+Figure 8 ComparisonofaveragelengthforPumsb. Figure 9 ComparisonofaveragelengthforT25I10D100K.
+1000
+100
+10
+1
+75 73 71 69 67 65
+Minimum support (%)
+snrettap
+etadidnac
+fo
+rebmuN
+×105
+PrePost dEclat
+1000
+100
+10
+1
+1.0 0.9 0.8 0.7 0.6 0.5
+Minimum support (%)
+nrettap
+etadidnac
+fo
+rebmuN
+×103
+PrePost dEclat
+Figure 10 Comparison of candidate itemsets for Figure 11 Comparison of candidate itemsets for
+Pumsb. T25I10D100K.
+ThereasonwhyPrePostissuperiortoFP-growth-alikealgorthmscanbeexplainedasfollows. Although
+PrePost adopts the structure of PPC-Tree, which is similar to FP-tree, it avoids the time consuming
+process of constructing a lot of conditional FP-tree as in FP-growth by simply intersecting N-lists. In
+fact, the intersection of two N-lists can be corresponding to the construction of a conditional FP-tree.
+However, our experimental result shows that the intersecting action of two N-lists is more efficient. In
+addition, PrePost can also directly find frequent itemsets without generating candidates as FP-growth
+does. This makes PrePoststill efficient when datasets are dense and frequent itemsets are long.
+The reason why PrePost outperforms Tid-set based vertical algorithms lies in the following facts:
+1)thelengthofN-listismuchshorterthanpreviouslyproposedverticalstructures(suchasDiffsets), and
+2)PrePostadoptsCorollary1tofindrelevantfrequentitemsetsquicklywithoutgeneratingcandidatesin
+somecases. Tovalidate1)and2),wechosePumsbandT25I10D100Kasthetestdatasets. Figures8and
+9 show the average length of N-lists and diffsets on Pumsb and T25I10D100K with different minimum
+supports respectively. Note that the basic unit of diffsets is transaction ID number and the basic unit
+of N-lists is PP-code, which is triple. The length of a diffset or an N-list is the number of basic units.
+Figure 8 indicates that the average length of diffsets of dEclat is about four orders of magnitude bigger
+than that of N-lists of PrePoston Pumsb. Figure 9 shows that the averagelength of diffsets of dEclat is
+overoneorderofmagnitudebiggerthanthatofN-listsofPrePostonT25I10D100K.Itshouldbepointed
+outthattheaveragelengthbecomesshorterwithdecreasingminimumsupportbecausediffsetsorN-lists
+of itemsets with lower support are usually shorter. Figures 10 and 11 shows the number of candidate
+itemsets generated by PrePostand dEclat. We observe that the number of candidate itemsets of dEclat
+is about 4 times of that of PrePost on Pumsb. On T25I10D100K, the number of candidate itemsets of
+dEclat is over 10 times of that of PrePost.
+5.3 Comparison of memory usage
+As for storage cost, we used Pumsb and T25I10D100Kas test datasets and adopted the largestmemory
+usage in the whole runtime of an algorithm as its memory usage.
+
+--- Page 19 ---
+2026 DengZH,etal. SciChinaInf Sci September2012Vol.55No.9
+16
+14
+12
+10
+8
+6
+4
+2
+0
+75 73 71 69 67 65
+Minimum support (%)
+)BK(
+yromeM
+×103
+PrePost ×103
+FP-growth FP-growth*
+dEclat eclat_goethals
+1000
+100
+10
+1
+5 4 3 2 1
+Minimum support (%)
+)BK(
+yromeM
+PrePost
+FP-growth FP-growth*
+dEclat Eclat_goethals
+0.5
+Figure12 MemoryusagecomparisonforPumsb. Figure 13 MemoryusagecomparisonforT25I10D100K.
+Table 3 Runningtime(s)ofallalgorithmsondatasets generatedfromT10I4
+Datasets
+Algorithms
+D100K D200K D500K D1000K D2000K
+PrePost 0.953 2.218 5.859 12.546 27.156
+FP-growth 2.046 3.922 10.171 21.218 45
+dEclat 3.546 9.859 13.093 26.203 53.015
+FP-growth* 1.296 2.797 7.843 16.421 34.656
+eclat goethals 5.406 10.312 24.828 48.921 96.73
+Figure 12 shows the memory cost of the compared algorithms on Pumsb, which is a dense dataset.
+The memory consumed by eclat goethals and dEclat is about 4 to 5 times of that of FP-growth, FP-
+growth*,andPrePost. The memoryusageofPrePostis onaverageabout1.2times ofthe memoryusage
+of FP-growthand FP-growth*. The difference between FP-growthand FP-growth* can be neglected.
+Figure 13 shows the memory cost of the compared algorithms on T25I10D100K, which is a sparse
+dataset. However, the memory consumed by FP-growth, FP-growth*, and PrePost is more than that
+of eclat goethals and dEclat. The memory usage of PrePost is on average about 1.8 times that of the
+memory usage of FP-growth* and about 1.4 times of the memory usage of FP-growth.
+The reason why PrePost consumes more memory than FP-growth and FP-growth* can be explained
+as follows. For these algorithms, the most consumption of memory is the original PPC-tree or FP-tree.
+Since a node of PPC-treecontains more information(pre-order and post-order) than a node of FP-tree,
+thePPC-treeofadatasetisalittlebiggerthanitsFP-tree. Inaddition,Algorithm3adoptedbyPrePost
+fordirectlyfindingfrequent2-itemsetsneedmaintainsatwo-dimensionarray,whichneedslargememories
+when there are a lot of frequent 1-itemsets.
+In summary, FP-growth, FP-growth*, and PrePost consume less memory than eclat goethals and
+dEclat when datasets are dense, while the situation is the opposite when datasets are sparse.
+5.4 Scalability
+Because the parameters of synthetic datasets are easily adjustable, we tested the scalability of all algo-
+rithms by running them on data sets generated from T10I4 and T25I10. The number of transactions
+in the data sets for Tables 3 and 4 ranges from 100k to 2 M. In all data sets generated from T10I4,
+the number of items is 1000, the average transaction length is 10, and the average maximal potentially
+frequentitemsetsizeis4. InalldatasetsgeneratedfromT25I10,thenumberofitemsis1000,theaverage
+transaction length is 25, and the averagemaximal potentially frequent itemset size is 10. All algorithms
+ran on data sets from T10I4 for minimum support 0.1 percent and data sets from T25I10 for minimum
+support 1 percent.
+
+--- Page 20 ---
+DengZH,etal. SciChina Inf Sci September2012Vol.55No.9 2027
+Table 4 Runningtime(s)ofallalgorithmsondatasets generatedfromT25I10
+Datasets
+Algorithms
+D100K D200K D500K D1000K D2000K
+PrePost 1.765 3.754 9.812 20.500 38.610
+FP-growth 3.109 7.375 18.500 38.078 79.437
+dEclat 2.265 4.937 13.125 23.296 49.796
+FP-growth* 2.484 5.031 13.140 28.031 62.421
+eclat goethals 10.109 19.562 47.843 94.812 189.015
+Table 5 Speedscalabilityofallalgorithmsondatasets generated fromT10I4
+D100K–D200K D200K–D500K D500K–D1000K D1000K–D2000K Average
+PrePost 2.327387 2.641569 2.141321 2.164515 2.318698
+FP-growth 1.916911 2.59332 2.086127 2.120841 2.1793
+dEclat 2.780316 1.328025 2.001298 2.023242 2.03322
+FP-growth* 2.158179 2.804076 2.093714 2.110468 2.291609
+eclat goethals 1.90751 2.804076 1.970396 1.977269 2.164813
+Table 6 Speedscalabilityofallalgorithmsondatasets generatedfromT25I10
+D100K–D200K D200K–D500K D500K–D1000K D1000K–D2000K Average
+PrePost 2.126912 2.613745 2.089278 1.883415 2.178338
+FP-growth 2.372145 2.508475 2.05827 2.086165 2.256264
+dEclat 2.179691 2.658497 1.774933 2.137534 2.187664
+FP-growth* 2.025362 2.611807 2.133257 2.226856 2.249321
+eclat goethals 1.935107 2.611807 1.981732 1.993577 2.130556
+Tables 3 and 4 show the running time of all algorithms on all datasets. For evaluating the scalability
+of a algorithm, we use the ratio of the running time on a dataset to the running time on the previous
+dataset (the biggest one that is small than it). For example, the value of the element, corresponding
+to PrePost and D100K–D200K in Table 5, is 2.327387. This value is the result of dividing 2.218, the
+running time of PrePost on D200K (T10I4), by 0.953, the running time of PrePost on D100K (T10I4).
+Tables 5 and 6 show the speed scalabilityof allalgorithms. The lastcolumns ofTables 5 and6 standfor
+the average speed scalability. From these tables, we find that all five algorithms show almost the same
+scalability.
+However, if we fix occurring frequency of each itemsets and just replicate transactions, PrePost, FP-
+growth*,andFP-growthwillscalemuchbetterthaneclat goethalsanddEclat. Thisisbecausenomatter
+howmanytimes the transactionsarereplicated, the formerbuilds upanFP-treeorPPC-treewitha size
+identical to that of the original one, which is built on nonreplicated transactions.
+From the figures of runtime, memory consumption, and scalability of all algorithms, we can draw the
+conclusion that PrePostis one of the best algorithms for mining frequent itemsets whether the data sets
+are dense or sparse. For sparsedatasets, the memory consumption of PrePostis unfortunately very high
+because itis essentiallybasedondatastructure similarto FP-tree. This is acommonfaultofalgorithms
+based on FP-tree [13]. However, when sparse datasets are used, PrePost is still the fastest algorithm,
+thanks to the N-list technique.
+5.5 Discussion
+Thedatasetswehaveusedinourexperimentshavebeenwidelyusedinpreviousresearches. Ouralgorithm
+not only obviously outperforms two state-of-the-art vertical algorithms (dEclat and eclat goethals) and
+FP-growth,butalsooutperformsFP-growth*,thestate-of-the-artimplementationofFP-growth,inmost
+
+--- Page 21 ---
+2028 DengZH,etal. SciChinaInf Sci September2012Vol.55No.9
+cases. We did not use Apriori algorithm and other vertical algorithms (such as Eclat algorithms) as
+baseline algorithms because FP-growth, dEclat and eclat goethals have been shown to outperform these
+algorithms [1,5]. In addition, we did not make comparison with PPV because FP-growth is claimed to
+be better than PPV on real datasets [6].
+In fact, PrePost combines the advantages of FP-growth and vertical algorithms. Both PrePost and
+FP-growth use compressed prefix tree to store the datasets. In some cases, PrePost also employs the
+same way as FP-growth to find frequent itemsets directly without generating candidates. However,
+PrePostcomputes the count ofan itemset by simply scanning its N-list without constructing complexity
+conditional FP-tree. On the other hand, PrePost and vertical algorithms adopt similar data structure
+originating from inverted list, which makes the counting of itemsets’ supports very simple and avoids
+scanning the datasets repeatedly. However, N-list used by PrePost is much smaller than that used by
+vertical algorithms. As a consequence, the efficiency of PrePostis much better than vertical algorithms.
+PrePost can directly find frequent itemsets without generating candidates. This is another important
+reason for PrePostto outperform vertical algorithms.
+Storage cost for maintaining the N-lists of itemsets is decided by the dataset used. If the dataset is
+dense, the storage cost is low. If the dataset is sparse, the storage cost is high, because the density of
+datasetsdecidesthesizeofPPC-tree,andhencethestoragecostformaintainingtheN-lists. Asstatedin
+Subsection5.3,becausePPC-treecontainsmoreinformationthanFP-tree,thememoryusageofPrePost
+is larger than that of FP-growth or FP-growth*. Therefore, how to design a good structure to store
+N-lists is an interesting issue.
+Note that this paper focuses on algorithmic concepts rather than implementations. As we know,
+the runtime is different for different implementations of the same algorithm. For example, we find the
+implementation of FP-tree construction in FP-growth* is faster than our implementation of FP-tree
+construction in FP-growth. Therefore, although the implementations of FP-growth* and eclat goethals
+used in this experiment are all in C/C++, the different data structures and libraries employed by these
+twoalgorithmmakethecomparisonunfair. Atpresent,ourimplementationofPrePostinthispaperonly
+adopts basic programming techniques. We think that if we employ some specific data structures and
+libraries suitable for PrePost,it will be improved both in time and space. This will be our future work.
+6 Conclusions
+In this paper, we have introduced a novel data structure, N-list, for storing compressed and lossless
+information about frequent itemsets. Based on N-lists, we developed an algorithm, PrePost, for fast
+mining frequent itemsets in databases. The advantages of the PrePost algorithm over other algorithms
+lie in the following facts: 1) It employs a compact data structure, N-list, which is usually substantially
+smaller than the original databases and thus avoids costly database scans in the subsequent mining
+processes. 2) The counting of itemsets’ supports is transformed into the intersection of N-lists and it
+employsanefficientstrategywithcomplexityofO(m+n)forintersectingtwoN-lists,wheremandnare
+the cardinalitiesof the twoN-lists respectively. 3) By making use of the single path property ofN-list, it
+directly finds frequent itemsets without generating candidate itemsets in some cases.
+We have implemented the PrePost algorithm and studied its performance in comparison with several
+well-known frequent itemset mining algorithms on a variety of real and synthetic datasets. Our perfor-
+mance study showsthatthe PrePostalgorithmis moreefficientthanthe algorithmscompared. Itis best
+in 4 out of 5 datasets as running time is concerned and it was not worse than the best competitor in the
+remaining dataset. Eventhough the algorithmconsumes more memory when the data sets are sparse, it
+is still the fastest one.
+As future extensions of this work, first we will extend our algorithm to mine maximal frequent
+itemsets [18,19], closed frequent itemsets [20,21], compressed frequent-itemset sets [22,23], high utility
+patterns [24,25], and impact-targeted activity patterns [26], second, we will further explore our method
+todiscoveryfrequentitemsetsfromdatastreams[27,28],thirdwewilltrytoeffectivelyintegratetheidea
+ofPrePostintotheprocessofminingpatternsfromcomplexdata[29–31]. Finally,astheavailabledatais
+
+--- Page 22 ---
+DengZH,etal. SciChina Inf Sci September2012Vol.55No.9 2029
+growing exponentially, parallel/distributed techniques, such as cloud computing, are becoming the main
+tools for analyzing and mining very huge databases. Therefore, the parallel/distributed implementation
+of our algorithm is also an interesting work.
+Acknowledgements
+This work was partially supported by National Natural Science Foundation of China (Grant No. 61170091) and
+National High Technology Research and Development Program of China (863 Program) (Grant No. 2009AA-
+01Z136).
+References
+1 Han J W, Pei J, Yin Y W. Mining frequent itemsets without candidate generation. In: The 2000 ACM SIGMOD
+International ConferenceonManagement ofdata(SIGMOD’00),NewYork,2000. 1–12
+2 Agrawal R, Imielinski T, Swami A. Mining association rules between sets of items in large databases. In: The 1993
+ACMSIGMODInternational ConferenceonManagement ofData(SIGMOD’93), Washington, 1993. 207–216
+3 HanJ,ChengH,XinD,etal. Frequentitemsetmining: currentstatusandfuturedirections. DataMinKnowlDiscov,
+2007,15: 55–86
+4 BaralisE,CerquitelliT,ChiusanoS.IMine: indexsupportforitemsetmining. IEEETKDEJ,2009,21: 493–506
+5 Zaki M J, Gouda K. Fast vertical mining using diffsets, In: The 9th ACM SIGKDD International Conference on.
+KnowledgeDiscoveryandDataMining(SIGKDD’03), Washington, 2003. 326–335
+6 Deng Z H, Wang Z H. A new fast vertical method for mining frequent itemsets. Int J Comput Intell Syst, 2010, 3:
+733–744
+7 Agrawal R, Srikant R. Fast algorithm for mining Association rules. In: The 20th International Conference on Very
+LargeDataBases(VLDB’94),Santiago deChile,1994. 487–499
+8 Savasere A,Omiecinski E,Navathe S.Anefficient algorithm forminingassociation rulesinlargedatabases. In: The
+21thInternational ConferenceonVeryLargeDataBases(VLDB’95),Zurich,1995. 432–443
+9 ShenoyP,HaritsaJR,SundarshanS,etal. Turbo-chargingverticalminingoflargedatabases. In: ACMInternational
+Conference onManagement ofDataandSymposiumonPrinciplesofDatabase Systems (SIGMOD’00), Dallas,2000.
+22–33
+10 ZakiMJ.Scalablealgorithmsforassociationmining. IEEETKDEJ,2000,12: 372–390
+11 Pei J, Han J, Lu H, et al. H-mine: Hyper-structure mining of frequent itemsets in large databases. In: IEEE
+International ConferenceonDataMining(ICDM’01),SanJose,2001. 441–448
+12 LiuG,LuH,LouW,etal. Efficientminingoffrequentitemsetsusingascendingfrequencyorderedprefix-tree. DMKD
+J,2004,9: 249–274
+13 GrahneG,ZhuJ.FastalgorithmsforfrequentitemsetminingusingFP-Trees. IEEETKDEJ,2005,17: 1347–1362
+14 Woon Y K, NgW K, Lim E P. A support-ordered triefor fast frequent itemset discovery. IEEE TKDE J, 2004, 16:
+875–879
+15 AnanthanarayanaVS,MurtyNM,SubramanianDK.Anincrementaldataminingalgorithmforcompactrealization
+ofprototypes. PatternRecognit, 2001,34: 2249–2251
+16 Grust T. Accelerating xpath location steps, In: The 2002 ACM SIGMOD International Conference on Management
+ofData(SIGMOD’02), Madison,2002. 109–120
+17 KleinbergJ,TardosE.Algorithmdesign. Boston: AddisonWesley,2005
+18 Bayardo Jr R J. Efficiently mining long itemsets from databases. In: ACM SIGMOD International Conference on
+Management ofData(SIGMOD’98), Seattle, 1998. 85–93
+19 Burdick D, Calimlim M, Flannick J, et al. Mafia: A maximal frequent itemset algorithm. IEEE TKDE J, 2005, 17:
+1490–1504
+20 Wang JY,HanJ,Pei J.CLOSET+: SearchingfortheBestStrate-gies forMiningfrequentcloseditemsets. In: The
+9th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (SIGKDD’03), Washington,
+2003. 236–245
+21 Lee A J T, Wang C S, Weng W Y, et al. An efficient algorithm for mining closed inter-transaction itemsets. Data
+KnowleEng,2008,66: 68–91
+
+--- Page 23 ---
+2030 DengZH,etal. SciChinaInf Sci September2012Vol.55No.9
+22 XinD,HanJ,YanX,etal. Oncompressingfrequentitemsets. DataKnowlEng,2007,60: 5–29
+23 LiH,ChenH.Miningnon-derivablefrequentitemsets overdatastream. DataKnowlEng,2009,68: 481–498
+24 YaoH,HamiltonH J,Butz CJ. Afoundational approach tominingitemsetutilities fromdatabases. In: TheSIAM
+DataMining(SDM’04),Florida,2004. 482–486
+25 YaoH,HamiltonHJ.Miningitemsetutilitiesfromtransactiondatabases. DataKnowlEng,2006,59: 603–626
+26 Cao L B, Zhao Y C, Zhang C Q. Mining impact-targeted activity itemsets in imbalanced data. IEEE TKDE, 2008,
+20: 1053–1066
+27 ChangJH,LeeWS.Findingrecentfrequentitemsetsadaptivelyoveronlinedatastreams. In: The9thACMSIGKDD
+International ConferenceonKnowledgeDiscoveryandDataMining(SIGKDD’03),Washington, 2003. 487–492
+28 Li X, Deng Z H. Mining frequent itemsets from network flows for monitoring network. Expert Syst Appl, 2010, 37:
+8850–8860
+29 Agrawal R, Srikant R. Mining sequential itemsets. In: The 11th International Conference on Data Engineering
+(ICDE’95), Taiwan,2003. 3–14
+30 Yan X, Han J. gSpan: Graph-based substructure pattern mining. In: The 2002 IEEE International Conference on
+DataMining(ICDM’02),Maebashi,2002. 721–724
+31 CaoLB,ZhangHF,ZhaoYC,etal. Combinedmining: Discoveringinformativeknowledgeincomplexdata. IEEE
+TransSystManCybernPartB-Cybern,2011, 41: 699–712
+
