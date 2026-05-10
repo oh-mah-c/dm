@@ -110,6 +110,8 @@ void dm_bench_stop(DM_BenchPhase phase) {
 }
 
 void dm_bench_record_results(size_t num_itemsets, size_t total_items) {
+    report.num_itemsets = num_itemsets;
+    report.total_items = total_items;
     report.result_ram_bytes = num_itemsets * 24 + total_items * 4;
     report.result_disk_est_bytes = total_items * 5 + num_itemsets * 8;
 }
@@ -180,5 +182,9 @@ void dm_bench_print_report(const char *algo_name, const char *dataset_name) {
     printf(" [4] STORAGE FOOTPRINT (Result Set)\n");
     printf("     - RAM Occupied     : %10.2f MB  (%zu Bytes)\n", report.result_ram_bytes / 1048576.0, report.result_ram_bytes);
     printf("     - Est. Disk (.txt) : %10.2f MB  (%zu Bytes)\n", report.result_disk_est_bytes / 1048576.0, report.result_disk_est_bytes);
+    printf("------------------------------------------------------------\n");
+    printf(" [5] MINING RESULTS\n");
+    printf("     - Frequent Itemsets: %zu\n", report.num_itemsets);
+    printf("     - Total Items      : %zu\n", report.total_items);
     printf("============================================================\n\n");
 }

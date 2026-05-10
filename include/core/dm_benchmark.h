@@ -21,6 +21,8 @@ typedef struct {
     
     size_t result_ram_bytes;    // Exact RAM footprint
     size_t result_disk_est_bytes; // Estimated Disk size (CSV/TXT)
+    size_t num_itemsets;        // Total FIs found
+    size_t total_items;         // Sum of lengths of all FIs
 } DM_BenchmarkReport;
 
 /**

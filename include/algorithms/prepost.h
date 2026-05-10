@@ -1,7 +1,7 @@
 #ifndef DM_PREPOST_H
 #define DM_PREPOST_H
 
-#include "dm_common.h"
+#include "core/dm_common.h"
 #include "dm_algorithm.h"
 #include "dm_dataset.h"
 

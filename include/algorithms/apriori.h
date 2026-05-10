@@ -8,6 +8,7 @@
  */
 typedef struct {
     double min_support;
+    double min_confidence;
 } DM_APRIORI_Params;
 
 #endif // DM_APRIORI_H
