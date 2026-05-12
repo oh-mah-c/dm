@@ -39,4 +39,22 @@ typedef struct {
     size_t count;
 } DM_Matrix_Row;
 
+/**
+ * @brief Utility itemset in a sequence
+ */
+typedef struct {
+    DM_Item *items;
+    size_t count;
+} DM_Trans_Sequence_Utility;
+
+/**
+ * @brief High utility sequence (Sequence of itemsets)
+ */
+typedef struct {
+    DM_Trans_Sequence_Utility *itemsets;
+    size_t count;
+    double total_utility;
+    double probability; /**< Probability of this sequence (for uncertain data) */
+} DM_Sequence_Utility;
+
 #endif // DM_DATASET_TYPES_H

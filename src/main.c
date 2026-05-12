@@ -68,10 +68,48 @@
 #include "algorithms/huci_miner.h"
 #include "algorithms/up_hist.h"
 #include "algorithms/r_miner.h"
+#include "algorithms/sum.h"
+#include "algorithms/clh_miner.h"
+#include "algorithms/feacp.h"
+#include "algorithms/mlhui_miner.h"
+#include "algorithms/fchm.h"
+#include "algorithms/foshu.h"
+#include "algorithms/tshoun.h"
+#include "algorithms/eihi.h"
+#include "algorithms/hui_list_ins.h"
+#include "algorithms/efim_closed.h"
+#include "algorithms/chui_miner.h"
+#include "algorithms/chuimine.h"
+#include "algorithms/cls_miner.h"
+#include "algorithms/ghui_miner.h"
+#include "algorithms/fhim.h"
+#include "algorithms/minfhm.h"
+#include "algorithms/skymine.h"
+#include "algorithms/sfui_uf.h"
+#include "algorithms/sfu_ce.h"
+#include "algorithms/uspan.h"
+#include "algorithms/hupspm.h"
+#include "algorithms/huim_bpso.h"
+#include "algorithms/hupe_garm.h"
+#include "algorithms/huim_aco.h"
+#include "algorithms/huim_hc.h"
+#include "algorithms/huim_sa.h"
+#include "algorithms/huim_bpso_tree.h"
+#include "algorithms/bio_huif.h"
+#include "algorithms/fhn.h"
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
+extern DM_Algorithm bio_huif_ga_algo;
+extern DM_Algorithm bio_huif_pso_algo;
+extern DM_Algorithm bio_huif_ba_algo;
+
 int main(int argc, char **argv) {
+    dm_register_algorithm(&bio_huif_ga_algo);
+    dm_register_algorithm(&bio_huif_pso_algo);
+    dm_register_algorithm(&bio_huif_ba_algo);
+
     if (argc < 3) {
         printf("Usage: %s <algo_id> <dataset_path> [type_id] [min_support]\n", argv[0]);
         printf("Types: 0=Transactional, 1=Utility, 2=Matrix\n");
@@ -131,6 +169,10 @@ int main(int argc, char **argv) {
     DM_TKHOIM_Params tkhoim_params;
     DM_HOIMTO_Params hoimto_params;
     DM_CFI_STREAM_Params cfi_stream_params;
+    DM_HUIM_SA_Params huim_sa_params;
+    DM_HUIM_BPSO_Tree_Params huim_bpso_tree_params;
+    DM_BioHUIF_Params bio_huif_params;
+    DM_FHN_Params fhn_params;
     DM_FIN_Params fin_params;
     DM_FINPLUS_Params finplus_params;
     DM_NEGFIN_Params negfin_params;
@@ -174,6 +216,32 @@ int main(int argc, char **argv) {
     DM_HUCI_Miner_Params huciminer_params;
     DM_UP_Hist_Params uphist_params;
     DM_R_Miner_Params rminer_params;
+    static DM_SUM_Params sum_params;
+    static DM_CLH_Miner_Params clhminer_params;
+    static DM_FEACP_Params feacp_params;
+    static DM_MLHUI_Miner_Params mlhuiminer_params;
+    static DM_FCHM_Params fchm_params;
+    DM_FOSHU_Params foshu_params = {0.43, 5};
+    static DM_TSHOUN_Params tshoun_params;
+    static DM_EIHI_Params eihi_params;
+    static DM_HUI_LIST_INS_Params hli_params;
+    static DM_EFIM_Closed_Params efc_params;
+    static DM_CHUI_Miner_Params chui_params;
+    static DM_CHUIMINE_Params cm_params;
+    static DM_CLS_Miner_Params clsm_params;
+    static DM_GHUI_Miner_Params ghuim_params;
+    static DM_FHIM_Params fhim_params;
+    static DM_MinFHM_Params minfhm_params;
+    static DM_SKYMINE_Params skymine_params;
+    static DM_SFUI_UF_Params sfui_uf_params;
+    static DM_SFU_CE_Params sfu_ce_params = { .sample_size = 1000, .max_iterations = 100, .quantile = 0.1, .mutation_factor = 0.2 };
+    static DM_USPAN_Params uspan_params;
+    static DM_HUPSPM_Params hupspm_params;
+    static DM_HUIM_BPSO_Params huim_bpso_params;
+    static DM_HUPE_GARM_Params hupe_garm_params;
+    static DM_HUIM_ACO_Params huim_aco_params;
+    DM_HUIM_HC_Params huim_hc_params;
+    static double min_uconf = 0.8;
     double min_bond = (argc >= 6) ? atof(argv[5]) : 0.2; // Default bond or 6th arg
     if (strcmp(algo_id, "ais") == 0) {
         ais_params.min_support = min_support;
@@ -400,7 +468,160 @@ int main(int argc, char **argv) {
         opus_miner_params.measure = DM_OPUS_MEASURE_LEVERAGE;
         opus_miner_params.check_indep = true;
         params = &opus_miner_params;
+    } else if (strcmp(algo_id, "sum") == 0) {
+        sum_params.min_utility = min_support;
+        sum_params.window_size = (argc >= 6) ? atoi(argv[5]) : 150;
+        sum_params.increment_size = (argc >= 7) ? atoi(argv[6]) : 0;
+        sum_params.dynamic_threshold = (argc >= 8) ? (atoi(argv[7]) != 0) : true;
+        params = &sum_params;
+    } else if (strcmp(algo_id, "clhminer") == 0) {
+        clhminer_params.min_utility = min_support;
+        clhminer_params.taxonomy_path = (argc >= 6) ? argv[5] : NULL;
+        params = &clhminer_params;
+    } else if (strcmp(algo_id, "feacp") == 0) {
+        feacp_params.min_utility = min_support;
+        if (argc >= 6) strncpy(feacp_params.taxonomy_path, argv[5], 1024);
+        else feacp_params.taxonomy_path[0] = '\0';
+        params = &feacp_params;
+    } else if (strcmp(algo_id, "mlhui_miner") == 0) {
+        mlhuiminer_params.min_utility = min_support;
+        mlhuiminer_params.taxonomy_path = (argc >= 6) ? argv[5] : NULL;
+        params = &mlhuiminer_params;
+    } else if (strcmp(algo_id, "fchm") == 0) {
+        fchm_params.min_utility = min_support;
+        fchm_params.min_bond = (argc >= 6) ? atof(argv[5]) : 0.2;
+        params = &fchm_params;
+    } else if (strcmp(algo_id, "fhn") == 0) {
+        fhn_params.min_utility = min_support;
+        params = &fhn_params;
+    } else if (strcmp(algo_id, "foshu") == 0) {
+        foshu_params.min_utility = min_support;
+        foshu_params.num_periods = (argc >= 6) ? atoi(argv[5]) : 5;
+        params = &foshu_params;
+    } else if (strcmp(algo_id, "tshoun") == 0) {
+        tshoun_params.min_utility = min_support;
+        tshoun_params.num_periods = (argc >= 6) ? atoi(argv[5]) : 5;
+        params = &tshoun_params;
+    } else if (strcmp(algo_id, "eihi") == 0) {
+        eihi_params.min_utility = min_support;
+        eihi_params.batch_size = (argc >= 6) ? atoi(argv[5]) : -1;
+        params = &eihi_params;
+    } else if (strcmp(algo_id, "hui_list_ins") == 0) {
+        hli_params.min_utility = min_support;
+        hli_params.batch_size = (argc >= 6) ? atoi(argv[5]) : -1;
+        params = &hli_params;
+    } else if (strcmp(algo_id, "efim_closed") == 0) {
+        efc_params.min_utility = min_support;
+        params = &efc_params;
+    } else if (strcmp(algo_id, "chui_miner") == 0) {
+        chui_params.min_utility = min_support;
+        params = &chui_params;
+    } else if (strcmp(algo_id, "chuimine_closed") == 0) {
+        cm_params.min_utility = min_support;
+        cm_params.find_maximal = false;
+        params = &cm_params;
+    } else if (strcmp(algo_id, "chuimine_maximal") == 0) {
+        cm_params.min_utility = min_support;
+        cm_params.find_maximal = true;
+        params = &cm_params;
+    } else if (strcmp(algo_id, "cls_miner") == 0) {
+        clsm_params.min_utility = min_support;
+        params = &clsm_params;
+    } else if (strcmp(algo_id, "hug_miner") == 0) {
+        ghuim_params.min_utility = min_support;
+        ghuim_params.mine_ghui = false;
+        params = &ghuim_params;
+    } else if (strcmp(algo_id, "fhim") == 0) {
+        fhim_params.min_utility = min_support;
+        params = &fhim_params;
+    } else if (strcmp(algo_id, "fhim_rules") == 0) {
+        fhim_params.min_utility = min_support;
+        min_uconf = (argc >= 6) ? atof(argv[5]) : 0.8;
+        params = &fhim_params;
+    } else if (strcmp(algo_id, "minfhm") == 0) {
+        minfhm_params.min_utility = min_support;
+        params = &minfhm_params;
+    } else if (strcmp(algo_id, "skymine") == 0) {
+        params = &skymine_params;
+    } else if (strcmp(algo_id, "sfui_uf") == 0) {
+        params = &sfui_uf_params;
+    } else if (strcmp(algo_id, "sfu_ce") == 0) {
+        params = &sfu_ce_params;
+    } else if (strcmp(algo_id, "uspan") == 0) {
+        uspan_params.min_utility = min_support;
+        params = &uspan_params;
+    } else if (strcmp(algo_id, "hupspm") == 0) {
+        hupspm_params.min_utility = min_support;
+        hupspm_params.min_probability = (argc >= 6) ? atof(argv[5]) : 0.5;
+        params = &hupspm_params;
+    } else if (strcmp(algo_id, "huim_bpso") == 0) {
+        huim_bpso_params.min_utility = min_support;
+        huim_bpso_params.pop_size = 20;
+        huim_bpso_params.max_iter = 1000;
+        huim_bpso_params.w = 0.8;
+        huim_bpso_params.c1 = 2.0;
+        huim_bpso_params.c2 = 2.0;
+        params = &huim_bpso_params;
+    } else if (strcmp(algo_id, "hupe_garm") == 0) {
+        hupe_garm_params.min_utility = min_support;
+        hupe_garm_params.pop_size = 50;
+        hupe_garm_params.max_iter = 100;
+        hupe_garm_params.p_max = 0.1;
+        hupe_garm_params.p_min = 0.01;
+        params = &hupe_garm_params;
+    } else if (strcmp(algo_id, "huim_aco") == 0) {
+        huim_aco_params.min_utility = min_support;
+        huim_aco_params.pop_size = 2000;
+        huim_aco_params.max_iter = 25;
+        huim_aco_params.alpha = 0.1;
+        huim_aco_params.beta = 3.0;
+        huim_aco_params.gamma = 5.0;
+        huim_aco_params.lambda = 1000.0;
+        huim_aco_params.tau = 0.8;
+        params = &huim_aco_params;
+    } else if (strcmp(algo_id, "huim_hc") == 0) {
+        huim_hc_params.min_utility = min_support;
+        huim_hc_params.pop_size = (argc >= 6) ? atoi(argv[5]) : 30;
+        huim_hc_params.max_gen = (argc >= 7) ? atoi(argv[6]) : 10000;
+        params = &huim_hc_params;
+    } else if (strcmp(algo_id, "huim_sa") == 0) {
+        huim_sa_params.min_utility = min_support;
+        huim_sa_params.pop_size = (argc >= 6) ? atoi(argv[5]) : 30;
+        huim_sa_params.temp = 100000.0;
+        huim_sa_params.min_temp = 0.00001;
+        huim_sa_params.alpha = 0.9993;
+        params = &huim_sa_params;
+    } else if (strcmp(algo_id, "huim_bpso_tree") == 0) {
+        huim_bpso_tree_params.min_utility = min_support;
+        huim_bpso_tree_params.pop_size = (argc >= 6) ? atoi(argv[5]) : 20;
+        huim_bpso_tree_params.max_iter = (argc >= 7) ? atoi(argv[6]) : 1000;
+        huim_bpso_tree_params.w = (argc >= 8) ? atof(argv[7]) : 0.9;
+        huim_bpso_tree_params.c1 = (argc >= 9) ? atof(argv[8]) : 2.0;
+        huim_bpso_tree_params.c2 = (argc >= 10) ? atof(argv[9]) : 2.0;
+        params = &huim_bpso_tree_params;
+    } else if (strcmp(algo_id, "bio_huif_ga") == 0 || strcmp(algo_id, "bio_huif_pso") == 0 || strcmp(algo_id, "bio_huif_ba") == 0) {
+        bio_huif_params.min_utility = min_support;
+        bio_huif_params.pop_size = (argc >= 6) ? atoi(argv[5]) : 30;
+        bio_huif_params.max_iter = (argc >= 7) ? atoi(argv[6]) : 1000;
+        params = &bio_huif_params;
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     printf("Executing %s...\n", algo->name);
     dm_bench_start(DM_PHASE_ALGO);

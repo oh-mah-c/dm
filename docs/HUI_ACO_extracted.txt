@@ -1,0 +1,515 @@
+Mining High Utility Itemsets Using Ant Colony
+Optimization
+Wei Song[0000-0003-0649-8850] and Jiakai Nan
+School of Information Science and Technology
+North China University of Technology, Beijing 100144, China
+songwei@ncut.edu.cn
+Abstract. Mining high utility itemsets (HUIs) is one of the most important re-
+search topics in data mining. Algorithms based on evolutionary computation are
+attracting increasing attention, as they have the advantage of avoiding the com-
+binatorial explosion of the HUI search space. In this paper, we propose an HUI
+mining algorithm based on ant colony optimization (HUIM-ACO) that gener-
+ates new candidate in a constructive way. In the HUIM-ACO algorithm, we use
+a search path to represent candidate HUIs. Each search path is initialized pro-
+portionally, and incremented by one item per step. A pheromone matrix is pro-
+posed to store the pheromone values of a pair of items, allowing the local and
+global values to be updated. Furthermore, an ant-path quad is designed for the
+efficient enumeration of HUIs. Experimental comparisons with three state-of-
+the-art HUI mining algorithms show that HUIM-ACO can discover more HUIs
+in a shorter period of time.
+Keywords: Data mining, High utility itemset, Ant colony optimization, Phero-
+mone matrix, Ant-path quad.
+1 Introduction
+High utility itemset mining (HUIM) has received increased interest in recent years [3,
+11]. As an extension of frequent itemsets (FIs), high utility itemsets (HUIs) focus on
+both the quantity and profit associated with sets of items. For HUIM problems, each
+item has its own profit and can occur multiple times in one transaction. The utility of
+an itemset is calculated by summing the product of the item’s profit and its number of
+occurrences in each relevant transaction. HUIM aims to discover all itemsets with
+utilities no lower than a user-specified threshold.
+Although several algorithms [7, 11] have been proposed, enumerating all HUIs ex-
+actly produces a very large search space when the number of items or size of the da-
+tabase is large. Furthermore, for application fields such as recommender systems, it is
+not necessary to use all HUIs [12].
+To solve the two abovementioned problems, evolutionary computation approaches
+can be used to discover most HUIs within an acceptable time. Kannimuthu and Prem-
+alatha proposed two HUIM algorithms based on genetic algorithms (GAs) with and
+without setting the minimum utility threshold, respectively [4]. The main problem
+2
+with these two algorithms is premature convergence, which results in few HUIs and a
+long execution time. Lin et al. proposed two HUIM algorithms based on particle
+swarm optimization (PSO) [5, 6]. Of these two PSO-based algorithms, HUIM-BPSO
+[6] provides better performance by using a novel tree structure. Song and Huang
+modeled the HUIM problem using an artificial bee colony (ABC) algorithm, and dis-
+covered HUIs by sequentially optimizing employed bees, onlooker bees, and scout
+bees in an iterative process [8].
+Different from the above methods, a general framework called Bio-HUIF has been
+proposed [9]. In Bio-HUIF, all discovered HUIs, rather than those with higher utility,
+are proportionally maintained in the next generation. Thus, the population is diverse,
+which is more suitable for the problem of HUIM.
+In this paper, we study the problem of HUIM from the perspective of ant colony
+optimization (ACO) [1], and propose a novel HUIM-ACO algorithm. We describe the
+modeling of HUIM based on ACO, including the search path and pheromone. Using a
+bitmap structure, we present the HUIM-ACO algorithm in detail and demonstrate its
+superiority through comparisons with three related algorithms in terms of efficiency
+and number of results.
+2 Preliminaries
+2.1 Problem of HUIM
+Let I= {i , i ,…, i } be a finite set of items and X ⊆ I be an itemset; an itemset con-
+1 2 m
+taining k items is called a k-itemset. Let D={T , T , …, T } be a transaction database.
+1 2 n
+Each transaction T∈D is a subset of I.
+i
+The internal utility q(i , T ) represents the quantity of item i in transaction T . The
+p d p d
+external utility p(i ) is the unit profit value of item i . The utility of item i in transac-
+p p p
+tion T is defined as u(i , T ) = p(i ) × q(i , T ). The utility of itemset X in transaction
+d p d p p d
+T is defined as u(X,T )=∑ u(i ,T ). The utility of itemset X in D is de-
+d d ip ∈X∧X⊆Td p d
+fined as u(X)=∑ u(X,T ). The transaction utility of transaction T is de-
+X⊆Td ∧Td ∈D d d
+fined as TU(T ) = u(T , T ). The minimum utility threshold δ is given as a percentage
+d d d
+of the total transaction utility values of the database, whereas the minimum utility
+value is defined as min_util =
+δ×∑
+TU(T ). An itemset X is called a high utility
+T∈D d
+d
+itemset if u(X) ≥ min_util.
+The transaction-weighted utilization (TWU) of itemset X [7] is the sum of the
+transaction utilities of all transactions containing X, which is defined as
+∑
+TWU(X)= TU(T ) . X is a high transaction-weighted utilization itemset
+X⊆T∧T∈D d
+d d
+(HTWUI) if TWU(X) ≥ min_util; otherwise, X is a low transaction-weighted utiliza-
+tion itemset (LTWUI). An HTWUI/LTWUI with k items is called a k-HTWUI/k-
+LTWUI.
+3
+2.2 Ant Colony Optimization
+ACO [1] is an evolutionary algorithm inspired by the foraging behavior of ants, and is
+well-suited to combinatorial problems. As HUIM is, in essence, a combinatorial prob-
+lem, ACO is used in this study for the efficient discovery of HUIs.
+Using ACO, the problem is tackled by simulating a number of artificial ants mov-
+ing on a graph, in which each vertex represents a place and each edge represents a
+connection between two places. A variable called a pheromone is associated with
+each edge and can be read and modified by the ants.
+ACO is an iterative algorithm executed by SN ants. At each iteration, each ant A (1
+t
+≤ t ≤ SN) builds a solution by walking from the current vertex v to vertex v on the
+c n
+graph, such that v has not been visited by A. During the walking process, the next
+n t
+vertex v is selected with a probability that is proportional to the pheromone associat-
+n
+ed with edge (v, v ). The pheromone value of edge (v, v ) is then updated to bias A
+c n c n t
+in future iterations to construct solutions similar to the best ones previously construct-
+ed. When all ants find the next vertex and update the pheromone values to their cur-
+rent node, the global update step updates the pheromone value of the best tour. Dif-
+ferent from the update provided by each ant, the pheromone values in all of the tours
+passed by the ants within this iteration are modified in the global update step. The
+process of walking to the next node, local pheromone update, and global pheromone
+update is repeated until some termination condition is satisfied.
+3 Modeling HUIM Using ACO
+3.1 Pheromone Matrix
+We propose the pheromone matrix to record the pheromone values of a pair of items.
+Definition 1. Let H be the number of 1-HTWUIs and let the pheromone matrix PM
+be an H×H matrix. Each entry e of PM corresponds to the pheromone value of the 2-
+j,k
+itemset ii. Entries along the principal diagonal, corresponding to pheromone values
+jk
+of an item with itself, are set to zero. For other entries where i ≠ i, e is initialized
+j k j,k
+as:
+u(ii )/2, if TWU(ii )≥min_util
+e = j k j k (1)
+j,k  0, otherwise
+We can see from Eq. 1 that e = e , so PM is a symmetric matrix and the entries
+j,k k,j
+of PM are symmetric with respect to the principal diagonal. Thus, we need only store
+half of PM with respect to the principal diagonal.
+For the local pheromone update stage, each entry of PM is modified as:
+e = e + u(ii)α/ (2)
+j,k j,k jk
+4
+where α (α > 0) is the local influence factor for adjusting the contribution of the utili-
+ty value in the pheromone and  ( > 1) is the evaporation factor for diluting the
+pheromone density.
+In the global pheromone update stage, we use a different strategy from the typical
+ACO. Rather than updating all paths within one iteration, once a new HUI is discov-
+ered, our algorithm only updates entries in this path. Specifically, for each entry e in
+j,k
+the path generating an HUI, the following modification is executed:
+e = e + TWU(ii)β/ (3)
+j,k j,k jk
+where β (β > 0) is the global influence factor for adjusting the contribution of the
+TWU value in the pheromone.
+For Eqs. 2 and 3, the utility value is used to update the local pheromone, and the
+TWU value is used to update the global pheromone. This is mainly because the granu-
+larity of the local update is different from that of the global update. As the local up-
+date is only executed between two adjacent vertices, the exact utility value is used to
+update the pheromone. For the global update, all pairs of adjacent vertices within the
+current path are updated, so we use TWU, the upper approximation of the path, to
+update the pheromone.
+3.2 Initialization of Search Path
+When an ant starts its search path, it selects the first item i proportionally, determined
+j
+by:
+TWUγ(i )/
+P = j (4)
+j ∑H TWUγ(i )/
+k=1 k
+where γ (γ > 0) is the transaction influence factor for adjusting the contribution of the
+TWU value in the first item selection.
+For each ant A, an ant-path quad is represented as AP = < i, Pa, Succ, TS >,
+t t c
+where i is the current item being visited by A, Pa is the set of items that have been
+c t
+visited by A, Succ is the set of items have not been visited by A, and TS is the set of
+t t
+transactions containing all items in Pa.
+3.3 State Transition Rule
+The state transition rule is used by an ant to probabilistically select its next vertex. Let
+A be an ant. The next vertex representing item i that A will visit is determined by:
+t next t
+  argmax {e }, if rand ≥τ
+i =  i j ∈AP t .Succ c,j (5)
+next i ∈AP.Succ with a probability P , otherwise
+k
+t c,k
+5
+where e is the pheromone value between AP.i and i in the pheromone matrix, rand
+c,j t c j
+is a random number uniformly distributed between 0 and 1, τ (0 ≤ τ ≤ 1) is the selec-
+tion threshold predefined by users, and the probability from item AP.i to item i is
+t c k
+defined as:
+e
+P = c,k (6)
+c,k ∑ e
+i∈AP.Succ c,l
+l t
+4 Mining HUIs Using ACO
+4.1 Bitmap Item Information Representation
+We use a bitmap, an effective representation of item information in FI mining and
+HUI mining algorithms [10], in HUIM-ACO to identify transactions containing the
+target itemsets. Specifically, HUIM-ACO uses a bitmap cover representation for
+itemsets. In a bitmap cover, one bit represents each transaction in the database. If item
+i appears in transaction T, then bit j of the bitmap cover for item i is set to one; oth-
+j
+erwise, the bit is set to zero. This naturally extends to itemsets. If X be an itemset,
+Bit(X) corresponds to the bitmap cover that represents the transaction set for the item-
+set X. Let X and Y be two itemsets. Then, Bit(X∪Y) can be computed as
+Bit(X)∩Bit(Y), i.e., the bitwise-AND of Bit(X) and Bit(Y).
+4.2 Proposed Algorithm
+Algorithm 1 describes our proposed HUIM-ACO algorithm.
+Algorithm 1 HUIM-ACO
+Input Transaction database D, population size SN, minimum utility value
+min_util, local influence factor α, global influence factor β, evapora-
+tion factor , maximal number of iterations max_iter
+Output HUIs
+1 Initialization( );
+2 do
+3 H = ∅;
+new
+4 iter = 1;
+5 while (iter ≤ max_iter) do
+6 for each ant A do
+t
+7 if (iter==1) then
+8 Initialize the first item visited by A using Eq.4;
+t
+9 Initialize the ant-path quad AP;
+t
+10 end if
+11 if (AP.Succ ≠ ∅) then
+t
+12 Select the next item i from the current item AP.i using
+t-next t c
+Eq.5;
+6
+if (TWU(AP.Pa ∪ i ) ≥ min_util AND (AP.Pa ∪ i ∉SH))
+13 t t-next t t-next
+then
+14 LocalUpdate(AP, i );
+t t-next
+15 if (u(AP.Pa)) ≥ min_util then
+t
+16 AP.Pa → H ;
+t new
+17 GlobalUpdate(AP);
+t
+18 end if
+19 end if
+20 end if
+21 end for
+22 iter ++;
+23 end while
+24 H → SH;
+new
+25 while (H ≠ ∅);
+new
+26 Output all HUIs in SH.
+In Algorithm 1, the procedure Initialization( ), described in Algorithm 2, is called
+in Step 1. The main loop from Steps 2 to 25 mines the HUIs iteratively until no new
+HUIs are discovered by any ants. Step 3 initializes H , the set of newly discovered
+new
+HUIs within one iteration, as the empty set. Step 4 then initializes the iteration num-
+ber to 1. The loop Steps 5–23 processes each individual ant with the condition that the
+search time has not exceeded the maximal threshold. The loop from Step 6 to Step 21
+describes the actions of an ant updating the pheromone values and discovering HUIs
+in one iteration. For the first iteration of one ant, the first selected item and the ant-
+path quad are initialized in Steps 7 to 10. If there are items to explore, the next item to
+be visited is determined in Step 12. If the TWU value of the current path adding the
+newly determined next item is no lower than the minimum utility threshold, and the
+merging result is not discovered as an HUI before, Step 14 calls the procedure Lo-
+calUpdate( ) described in Algorithm 3. Similarly, when the newly formed path is an
+HUI, the procedure GlobalUpdate( ), described in Algorithm 4, is called. The transac-
+tion set TS in the ant-path quad ensures that both the TWU value and utility value can
+be efficiently determined by resorting to transactions in TS, rather than the entire da-
+tabase. The search time is then incremented by one. In Step 24, the newly discovered
+HUIs within that iteration are added to SH, which is the set of all discovered HUIs.
+Finally, Step 26 outputs all mining results.
+Algorithm 2 Initialization( )
+1 Scan database D once, and delete 1-LTWUIs;
+2 Represent the reorganized database as a bitmap;
+3 Initialize each element of pheromone matrix PM using Eq. 1;
+4 SH=∅.
+In Algorithm 2, the 1-LTWUIs are first deleted in Step 1. Step 2 then constructs
+the bitmap representation of the database. The pheromone value of each pair of 1-
+HTWUIs is initialized in Step 3. Finally, the set of all HUIs SH is initialized to the
+empty set in Step 4.
+Algorithm 3 LocalUpdate(AP, i )
+t t-next
+1 Update local pheromone value on e using Eq. 2;
+c,t-next
+7
+2 i → AP.Pa;
+t-next t
+3 AP.Succ = AP.Succ \ i ;
+t t t-next
+4 AP.i = i ;
+t c t-next
+5 Update AP.TS.
+t
+In Algorithm 3, the pheromone value corresponding to AP.i and i are updated
+t c t-next
+in Step 1. Step 2 adds i to the path of the current ant. Then, i is deleted from
+t-next t-next
+the set of items that have not been visited in Step 3. Step 4 uses i as the new cur-
+t-next
+rent item. Finally, the set of transactions containing the current path is updated in Step
+5.
+Algorithm 4 GlobalUpdate(AP)
+t
+1 for l=1 to | AP.Pa | − 1 do
+t
+2 Update pheromone value e, using Eq.3;
+l l+1
+3 end for
+In Algorithm 4, the pheromone values of each pair of items in the current path are
+updated sequentially from the first pair to the (|AP.Pa| − 1)-th pair, where |AP.Pa| is
+t t
+the number of items in the current path AP.Pa.
+t
+5 Performance Evaluation
+In this section, we evaluate the performance of our HUIM-ACO algorithm and com-
+pare it with that of HUIM-BPSO [6], Bio-HUIF-GA [9], and Bio-HUIF-PSO [9]. The
+source code of the three comparison algorithms was downloaded from the SPMF data
+mining library [2].
+5.1 Test Environment and Datasets
+We conducted the experiments on a computer with a quad-core 2.50 GHz CPU and 8
+GB memory running 64-bit Microsoft Windows 10. We wrote our programs in Java.
+We used four real datasets, downloaded from the SPMF data mining library [2], to
+evaluate the performance of the algorithms. Table 1 summarizes the characteristics of
+the datasets used in the experiments.
+Table 1. Characteristics of datasets used for experimental evaluations
+Datasets Avg. trans. length No. of items No. of trans
+Chess 37 76 3,196
+Mushroom 23 119 8,124
+Connect 43 130 67,557
+Accident 33.8 468 340,183
+In our algorithm, the local influence factor α, global influence factor β, transaction
+influence factor γ, evaporation factor , selection threshold τ, population size SN, and
+maximal number of iterations max_iter must be set to appropriate values. We first
+outline the approximate range of these parameters, and then determine their optimal
+8
+values by progressive refinement. The final values of these parameters used in the
+experiments are listed in Table 2.
+Table 2. Parameter settings for the four datasets
+Datasets α β γ  τ SN max_iter
+Chess 0.10 3.00 5.00 1000 0.80 2000 25
+Mushroom 0.60 1.90 3.60 10000 0.90 2000 25
+Connect 1.00 2.10 4.00 10000 0.95 5000 30
+Accident 0.90 2.10 4.00 10000 0.93 2000 25
+5.2 Runtime
+First, we demonstrate the efficiency of the proposed algorithm. A comparison of the
+runtimes of each algorithm with each of the four datasets is shown in Fig. 1. When
+measuring the runtime, we varied the minimum utility threshold for each dataset.
+900 1600
+800 1400
+700 1200
+600
+1000
+500
+800 400
+600
+300
+200 400
+100 200
+0 0
+30.5 30.0 29.5 29.0 28.5 15.0 14.8 14.6 14.4 14.2 14.0
+35000 120000
+30000 100000
+25000
+80000
+20000
+60000
+15000
+40000
+10000
+5000 20000
+0 0
+32.2 32.0 31.8 31.6 31.4 13.4 13.2 13.0 12.8 12.6
+HUIM-BPSO Bio-HUIF-GA Bio-HUIF-PSO HUIM-ACO
+)ceS(
+emitnuR
+(a) Chess
+Minimum utility threshold (%)
+)ceS(
+emitnuR
+(b) Mushroom
+Minimum utility threshold (%)
+)ceS(
+emitnuR
+(c) Connect
+Minimum utility threshold (%)
+)ceS(
+emitnuR
+(d) Accident
+Minimum utility threshold (%)
+Fig. 1. Execution times for the four datasets
+For the Accident dataset, HUIM-BPSO did not return any results, even after four
+days; thus, we have not plotted the results for this algorithm in Fig. 1(d). We can see
+from Fig. 1 that the proposed HUIM-ACO is always one order of magnitude faster
+than HUIM-BPSO and Bio-HUIF-GA. For the Chess and Connect datasets, HUIM-
+ACO is one order of magnitude faster than Bio-HUIF-PSO. It is interesting to note
+9
+that the execution time of HUIM-ACO is steady, and is almost unaffected by the
+change in the minimum utility thresholds.
+5.3 Number of Discovered HUIs
+Because bio-inspired HUIM algorithms cannot ensure the discovery of all itemsets
+within a certain number of cycles, we compared the number of discovered HUIs
+among the various bio-inspired algorithms. For the same reasons stated in Section 5.2,
+we do not plot the results of HUIM-BPSO for the Accident dataset.
+300
+250
+200
+150
+100
+50
+0
+28.5 29.0 29.5 30.0 30.5
+sIUH
+fo
+rebmuN
+(a) Chess
+400
+350
+300
+250
+200
+150
+100
+50
+0
+14.0 14.2 14.4 14.6 14.8 15.0
+Minimum utility threshold (%)
+HUIM-BPSO Bio-HUIF-GA Bio-HUIF-PSO HUIM-ACO
+sIUH
+fo
+rebmuN
+(b) Mushroom
+Minimum utility threshold (%)
+500
+400
+300
+200
+100
+0
+31.4 31.6 31.8 32.0 32.2
+sIUH
+fo
+rebmuN
+(c) Connect
+300
+250
+200
+150
+100
+50
+0
+12.6 12.8 13.0 13.2 13.4
+Minimum utility threshold (%)
+sIUH
+fo
+rebmuN
+(d) Accident
+Minimum utility threshold (%)
+Fig. 2. Number of discovered HUIs
+As we can see from Fig. 2, the proposed HUIM-ACO discovers more HUIs than
+the other three algorithms, on average, for the Chess and Mushroom datasets. For the
+Connect dataset, HUIF-GA and Bio-HUIF-PSO can discover slightly more HUIs than
+HUIM-ACO. For the Accident dataset, although the number of HUIs discovered by
+HUIF-GA and Bio-HUIF-PSO is higher than for HUIM-ACO, the proposed method
+can find more HUIs than the other two algorithms when the minimum utility thresh-
+old is less than 12.8%.
+6 Conclusions
+This paper describes a heuristic approach to tackling HUIM problems by proposing a
+novel ACO-based algorithm called HUIM-ACO. In the HUIM-ACO algorithm, a
+pheromone matrix is proposed for storing the pheromone values of pairs of items, and
+10
+the ant-path quad is used to accelerate HUI discovery and pheromone value updates.
+Furthermore, the initialization and transition of the search path are defined for the
+problem of HUIM. Experimental results show that HUIM-ACO can discover more
+HUIs than other bio-inspired algorithms with high efficiency.
+Acknowledgments. This work was partially supported by the National Natural Sci-
+ence Foundation of China (61977001), the Great Wall Scholar Program
+(CIT&TCD20190305), and Beijing Urban Governance Research Center.
+References
+1. Dorigo, M., Birattari, M., Stützle, T.: Ant colony optimization: artificial ants as a computa-
+tional intelligence technique. IEEE Comput. Intell. M. 1(4), 28-39 (2006)
+2. Fournier-Viger, P., Lin, C. W., Gomariz, A., Gueniche, T., Soltani, A., Deng, Z., Lam, H.
+T.: The SPMF open-source data mining library version 2. In: Berendt, B., Bringmann, B.,
+Fromont, É., Garriga, G., Miettinen, P., Tatti, N., Tresp, V. (eds.) ECML PKDD 2016.
+LNCS, vol. 9853, pp. 36-40. Springer, Cham (2016)
+3. Fournier-Viger, P., Lin, J. C. W., Nkambou, R., Vo, B., Tseng, V. S.: High-Utility Pattern
+Mining. Springer, Cham (2019)
+4. Kannimuthu, S., Premalatha, K.: Discovery of high utility itemsets using genetic algorithm
+with ranked mutation. Appl. Artif. Intell. 28(4), 337-359 (2014)
+5. Lin, J. C.-W., Yang, L., Fournier-Viger, P., Wu, M.-T., Hong, T.-P., Wang, S.-L. L., Zhan,
+J.: Mining high-utility itemsets based on particle swarm optimization. Eng. Appl. Artif. In-
+tel. 55, 320-330 (2016)
+6. Lin, J. C.-W., Yang, L., Fournier-Viger, P., Hong, T.-P., Voznak, M.: A binary PSO ap-
+proach to mine high-utility itemsets. Soft Comput. 21(17), 5103-5121 (2017)
+7. Liu, Y., Liao, W.-K., Choudhary, A. N.: A two-phase algorithm for fast discovery of high
+utility itemsets. In: Ho, T. B., Cheung, D., Liu, H. (eds.) PAKDD 2005. LNCS, vol.3518,
+pp.689-695. Springer, Heidelberg (2005)
+8. Song, W., Huang, C.: Discovering high utility itemsets based on the artificial bee colony
+algorithm. In: Phung, D., Tseng, V., Webb, G., Ho, B., Ganji, M., Rashidi, L. (eds.)
+PAKDD 2018. LNCS, vol. 10939, pp. 3-14. Springer, Cham (2018)
+9. Song, W., Huang, C.: Mining high utility itemsets using bio-inspired algorithms: a diverse
+optimal value framework. IEEE Access 6, 19568-19582 (2018)
+10. Song, W., Liu, Y., Li, J.: BAHUI: fast and memory efficient mining of high utility itemsets
+based on bitmap. Int. J. Data Warehous. 10(1), 1-15 (2014)
+11. Song, W., Zhang, Z., Li, J.: A high utility itemset mining algorithm based on subsume in-
+dex. Knowl. Inf. Syst. 49(1), 315-340 (2016)
+12. Yang, R., Xu, M., Jones, P., Samatova, N.: Real time utility-based recommendation for
+revenue optimization via an adaptive online top-k high utility itemsets mining model. In:
+Proceedings of The 13th International Conference on Natural Computation, Fuzzy Systems
+and Knowledge Discovery, pp. 1859-1866 (2017)

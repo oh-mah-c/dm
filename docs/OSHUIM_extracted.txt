@@ -1,0 +1,528 @@
+Efficient Incremental High Utility Itemset Mining
+Philippe Fournier-Viger Jerry Chun-Wei Lin
+UniversityofMoncton HarbinInstituteoftechnology,
+Moncton,NB,Canada ShenzhenGrad. School
+philippe.fv@gmail.com Shenzhen,China
+jerrylin@ieee.org
+Ted Gueniche Prashant Barhate
+UniversityofMoncton InfosysLtd.
+Moncton,NB,Canada Jalgaon,India
+ted.gueniche@gmail.com prashantbarhate1990@gmail.com
+ABSTRACT dynamic databases [2, 12]. However, these incremental al-
+gorithms remain very costly in terms of execution time.
+High-utilityitemsetmining(HUIM)intransactiondatabases
+In this paper, we address this issue by proposing an algo-
+is an important data mining task with wide applications.
+rithmnamedEIHI(EfficientIncrementalHigh-utilityItem-
+However,mostHUIMalgorithmsassumetheunrealisticas-
+setminer),whichintroducesseveralnovelideastoefficiently
+sumption that databases are static. To address this issue,
+maintain high-utility itemsets in dynamic databases.
+algorithmshavebeendesignedtomaintainhigh-utilityitem-
+sets in dynamic databases. However, these incremental al-
+gorithmsstillremainverycostlyintermsofexecutiontime. 2. PROBLEMDEFINITION
+Inthispaper,weaddressthisproblembyproposinganalgo-
+LetI beafinitesetofitems(symbols). AnitemsetX isa
+rithmnamedEIHI(EfficientIncrementalHigh-utilityItem-
+finitesetofitemssuchthatX ⊆I. Atransactiondatabaseis
+setminer),whichintroducesseveralideastomoreefficiently
+a set of transactions D={T ,T ,...,T } such that for each
+maintain high-utility itemsets in dynamic databases. An 1 2 n
+transactionT ,T ⊆I andT hasauniqueidentifierccalled
+experimental study on four datasets shows that EIHI is up c c c
+its TID (Transaction ID). Each item i ∈ I is associated
+to two orders of magnitude faster than the state-of-the-art
+with a positive number p(i), called its external utility (e.g.
+HUI-LIST-INS algorithm.
+unitprofit). EveryitemiappearinginatransactionT has
+c
+a positive number q(i,T ), called its internal utility (e.g.
+c
+CCSConcepts
+purchase quantity).
+Forexample,considerthedatabaseinTable1,whichwill
+•Information systems → Data mining;
+be used as the running example in the rest of this paper.
+Transaction T indicates that items a, c, e and g appear in
+Keywords 2
+this transaction with an internal utility of respectively 2, 6,
+High-utility itemset mining; incremental pattern mining 2 and 5. Table 2 indicates that external utilities of these
+items are respectively 5, 1, 3 and 1.
+1. INTRODUCTION The utility of an item i in a transaction T c is denoted as
+u(i,T ) and defined as p(i)×q(i,T ) if i∈T . The utility
+High-Utility Itemset Mining (HUIM) [2, 3, 8, 14] is an c c c
+of an itemset X in a transaction T is denoted as u(X,T )
+emerging data mining task that extends Frequent Itemset (cid:80) c c
+anddefinedasu(X,T )= u(i,T )ifX ⊆T . Theutil-
+Mining (FIM) [1] by considering the case where items can c i∈X c c
+ityofanitemset X inadatabaseDisdenotedasu(X)and
+appear more than once in each transaction and where each (cid:80)
+definedasu(X)= u(X,T ),whereg(X)istheset
+item has a weight (e.g. unit profit). Therefore, it can be Tc∈g(X) c
+of transactions containing X. For example, u({a,c},T ) =
+used to discover itemsets having a high-utility (e.g. high 2
+16andu({a,c})=28. AnitemsetX isahigh-utilityitemset
+profit), that is High-Utility Itemsets (HUIs). Several algo-
+if its utility u(X) is no less than a user-specified minimum
+rithms have been proposed to mine high-utility itemsets in
+utility threshold minutil given by the user (i.e. u(X) ≥
+transaction databases [2, 3, 5, 6, 8, 14]. However, most of
+minutil). Otherwise,Xisalow-utilityitemset. Theproblem
+them assume that databases are static. A few algorithms
+of high-utility itemset mining inadatabaseD istodiscover
+have been designed for maintaining high-utility itemsets in
+the set H of all high-utility itemsets [3, 8, 14].
+Forexample,ifminutil=30,thehigh-utilityitemsetsare
+Permissiontomakedigitalorhardcopiesofallorpartofthisworkforpersonalor {b,d},{a,c,e},{b,c,d},{b,c,e},{b,d,e},{b,c,d,e},{a,b,c,
+classroomuseisgrantedwithoutfeeprovidedthatcopiesarenotmadeordistributed
+forprofitorcommercialadvantageandthatcopiesbearthisnoticeandthefullcita- d, e, f} with respectively a utility of 30, 31, 34, 31, 36, 40
+tiononthefirstpage. Copyrightsforcomponentsofthisworkownedbyothersthan and 30.
+ACMmustbehonored.Abstractingwithcreditispermitted.Tocopyotherwise,orre-
+publish,topostonserversortoredistributetolists,requirespriorspecificpermission
+and/orafee.Requestpermissionsfrompermissions@acm.org. Definition 1. The problem of maintaining high-utility
+ASEBD&SI2015,October7-9,2015,Taiwan itemsetsinadynamicdatabaseisdefinedasfollows[12]. Let
+beadatabaseD. AdatabaseD(cid:48) isanupdate of database D
+(cid:13)c 2015ACM.ISBN978-1-4503-3735-9/15/10...$15.00
+DOI:http://dx.doi.org/10.1145/2818869.2818887 if D(cid:48) =D∪N, where N is a non empty set of transactions
+for HUIM. In HUI-Miner and FHM, each itemset is associ-
+Table 1: A Transaction Database D
+ated with a structure named utility-list [3, 8]. Utility-lists
+TID Transaction
+allow calculating the utility of an itemset by making join
+T (a,1)(c,1)(d,1)
+1 operations with utility-lists of smaller itemsets.
+T (a,2)(c,6)(e,2)(g,5)
+2 Utility-lists are defined as follows. Let (cid:31) be a total or-
+T (a,1)(b,2)(c,1)(d,6)(e,1)(f,5)
+3 der on items from I, and X be an itemset. The remaining
+T (b,4)(c,3)(d,3)(e,1)
+4 utility of X in a transaction T is defined as re(X,T ) =
+T 5 (b,2)(c,2)(e,1)(g,2) (cid:80) u(i,T ). The ut c ility-list of an itemset X c in
+i∈Tc∧i(cid:31)x∀x∈X c
+a database D is a set of tuples such that there is a tuple
+(c,iutil,rutil) for each transaction T containing X. The
+Table 2: External Utility Values c
+iutil and rutil elements of a tuple respectively are the util-
+Item a b c d e f g
+ityofX inT (u(X,T ))andtheremainingutilityofX inT
+Profit 5 2 1 2 3 1 1 c c c
+(re(X,T )). Forexample,assumethelexicographicalorder.
+c
+The utility-list of {a,e} is {(T ,16,5), (T ,8,5)}.
+2 3
+To discover high-utility itemsets, HUI-Miner and FHM
+such that N (cid:54)⊆ D. Let minutil, D and H, respectively be
+perform a database scan to create utility-lists of patterns
+auser-specifiedminimumutility threshold, adatabase, and
+containing single items. Then, larger patterns are obtained
+the set of high-utility itemsets found in D. Let D(cid:48) be an
+by joining utility-lists of smaller patterns [8]. Pruning the
+update of database D. The problem of incremental high-
+search space and calculating the utility of an itemset is re-
+utility itemset mining is to find H(cid:48) the set of high-utility
+spectively done using the following properties.
+itemsets in D(cid:48), given minutil, D and H.
+Property 2 (Pruning using utility-lists). Let X
+Forexample,considerDtobethedatabaseoftherunning
+be an itemset. Let the extensions of X be the itemsets that
+example and minutil=30. Let D(cid:48) be the database D that
+canbeobtainedbyappendinganitemitoX suchthati(cid:31)x,
+is updated by inserting transaction T = (a,2)(b,5)(f,10).
+6 ∀x∈X. The remaining utility upper-bound of X is defined
+In the updated database D(cid:48), the high-utility itemsets are
+as reu(X) = u(X)+re(X), and can be computed by sum-
+{b,d},{a,c,e},{b,c,d},{b,c,e},{b,d,e},{b,c,d,e},{a,b,c,
+ming the iutil and rutil values in the utility-list of X. If
+d,e,f}and{d},whichrespectivelyhaveautilityof50,31,
+reu(X) < minutil, then X is a low-utility itemset as well
+34, 31, 36, 40, 30 and 30. In this example, the problem of
+as all its extensions [8].
+incrementalhigh-utilityitemset{d}miningistofindthata
+new high-utility itemset exists in D(cid:48) and that the utility of Property 3 (Utility using utility-list). The util-
+itemset {b,d} has been updated to 50. ity of an itemset X can be calculated as the sum of theiutil
+values in its utility-list [8].
+3. RELATEDWORK
+Tomaintainhigh-utilityitemsetsindatabaseswherenew
+HUIM is harder than FIM since the utility is not mono-
+transactions are inserted, IHUP [2] was proposed. Then,
+tonicoranti-monotonic[2,14],i.e. theutilityofanitemset
+theFUP-HUI-INS[10]andthePRE-HUI-INS[11]werepro-
+may be lower, equal or higher than the utility of its sub-
+posed to update the discovered high-utility itemsets based
+sets. Thus,strategiesusedinFIMtoprunethesearchspace
+on the FUP concept and pre-large concept, respectively. A
+based on the anti-monotonicity of the frequency cannot be
+limitationofthesealgorithmsisthattheyaretwophaseal-
+applied to the utility measure to discover high-utility item-
+gorithms, and thus generate a large amount of candidates.
+sets. Several HUIM algorithms circumvent this problem by
+To avoid this problem, a one-phase algorithm named HUI-
+overestimating the utility of itemsets using the TWU mea-
+LIST-INS was proposed [12] that extends the FHM algo-
+sure[2,14],whichisanti-monotonic. Thetransactionutility
+(cid:80) rithm. It is to our knowledge the state-of-the-art algorithm
+of a transaction T is defined as TU(T ) = u(x,T ).
+c c x∈Tc c for incremental high utility itemset mining.
+Thetransaction-weightedutilization(TWU)ofanitemsetX
+(cid:80)
+is defined as TWU(X) = TU(T ). For example,
+Tc∈g(X) c 4. THEEIHIALGORITHM
+consideritema. TWU(a)=TU(T )+TU(T )+TU(T )=
+1 2 3
+8+27+30 = 65. The following property of the TWU is In this section, we present our proposal, the EIHI algo-
+used to prune the search space. rithm. We first describe the main procedure, which is in-
+spiredbytheFHM[3]algorithm. Thisprocedureisabatch
+Property 1 (Pruning using the TWU). For any algorithm. We then explain how it is adapted to maintain
+itemset X, if TWU(X) < minutil, then X is a low-utility HUIs in an updated database. We call this new algorithm
+itemset as well as all its supersets. the EIHI algorithm. The main procedure (Algorithm 1)
+takesasinputatransactiondatabasewithutilityvaluesand
+Two phase algorithms such as IHUP [2], UP-Growth+ theminutilthreshold. Thealgorithmscansthedatabaseto
+[14],PB[7],andBAHUI[13]utilizeproperty1toprunethe calculate the TWU of each item. Then, it identifies the set
+search space. Those algorithms however suffers from the I∗ of all items having a TWU no less than minutil. The
+problem of generating a large amount of candidates. Re- TWU values of items are then used to establish a total or-
+cently, algorithms that mine high-utility itemsets using a der(cid:31)onitems,whichistheorderofascendingTWUvalues
+single phase and avoid the problem of candidate generation [3, 8]. A second database scan is then performed.Items in
+were proposed, such as HUI-Miner [8] and FHM [3], which transactions are reordered according to (cid:31), the utility-list
+were shown to outperform state-of-the-art two phase algo- of each item i ∈ I∗ is built and a structure named EUCS
+rithms. FHMistoourknowledgethecurrentbestalgorithm is built [3]. This structure stores the TWU of all pairs of
+items {a,b} such that u({a,b}) (cid:54)= 0. Then, the depth-first Algorithm 2: The Search Procedure
+searchexplorationofitemsetsstartsbycallingtherecursive
+input : P: an itemset, ExtensionsOfP: a set of
+procedureSearchwiththeemptyitemset∅,thesetofsingle
+extensions of P, the minutil threshold, the
+items I∗, minutil and the EUCS.
+EUCS structure
+output: the set of high-utility itemsets
+Algorithm 1: The EIHI Algorithm
+1 foreach itemset Px∈ExtensionsOfP do
+input : D: a transaction database, minutil: a
+2 if SUM(Px.utilitylist.iutils) ≥minutil then
+user-specified threshold
+output Px;
+output: the set of high-utility itemsets
+3 if SUM(Px.utilitylist.iutils)+
+1 Scan D to calculate the TWU of single items; 4 SUM(Px.utilitylist.rutils)≥minutil then
+2 I∗ ← each item i such that TWU(i)≥minutil; 5 ExtensionsOfPx←∅;
+3 Let (cid:31) be the total order of TWU ascending values on 6 foreach itemset Py∈ExtensionsOfP such that
+I∗; y(cid:31)x do
+4 Scan D to build the utility-list of each item i∈I∗ and 7 if TWU({x,y})≥minutil) then
+build the EUCS structure; 8 Pxy←Px∪Py;
+5 Search (∅, I∗, minutil, EUCS); 9 Pxy.utilitylist← Construct
+(P,Px,Py);
+10 ExtensionsOfPx←ExtensionsOfPx ∪
+TheSearchprocedure(Algorithm2)takesasinput(1)an
+Pxy;
+itemsetP,(2)extensionsofP havingtheformPz meaning
+11 end
+that Pz was previously obtained by appending an item z
+12 end
+to P, (3) minutil and (4) the EUCS. The search procedure
+13 Search (Px, ExtensionsOfPx, minutil);
+operates as follows. For each extension Px of P, if the sum
+of the iutil values of the utility-list of Px is no less than 14 end
+minutil, then Px is a high-utility itemset and it is output 15 end
+(cf. property3). Then,ifthesumofiutilandrutilvaluesin
+theutility-listofPxarenolessthanminutil,itmeansthat
+extensionsofPxshouldbeexplored(cf. property2). Thisis
+f},havingutilitiesofrespectively30,31,34,31,36,40and
+performed by merging Px with all extensions Py of P such
+30.
+thaty(cid:31)xandTWU({x,y})≥minutil,toformextensions
+Inserting an itemset P in the HUI-trie structure is very
+of the form Pxy containing |Px|+1 items. The utility-
+efficient,asitrequirestotraverse/create|P|+1nodesinthe
+list of Pxy is then constructed as in FHM by calling the
+tree (starting from the root). Searching for an itemset P in
+Construct procedure (cf. Algorithm 3) to join the utility-
+the HUI-trie structure is also very efficient. It requires to
+lists of P, Px and Py [3]. Then, a recursive call to the
+onlytraverseonepathinthetree. Furthermore,toincrease
+Search procedure with Pxy is done to calculate its utility
+efficiencyofsearchingintheHUI-trie,thelistofchildnodes
+and explore its extension(s). The Search procedure starts
+of each node is sorted according to the total order (cid:31). This
+from single items and recursively explores the search space
+allowstoperformabinarysearchateachnodewhenlooking
+to discover all high-utility itemsets [3].
+for the child node corresponding to a given item.
+We next explain how the algorithm is modified to main-
+tain high-utility itemsets in a dynamic database. We first
+introduce a few novel and very important ideas.
+The HUI-tree structure. The first important idea is
+the following. Let be an update D(cid:48) of a database D, such
+that D(cid:48) = D∪N, where N is a non empty set of transac-
+tions. Itcanbeobservedthatthesetofhigh-utilityitemsets
+H(cid:48) foundinD(cid:48) isalwaysasupersetofthesetofhigh-utility
+itemsets H found in D. Moreover, it can be observed that
+the utilities of itemsets in H may only increase or stay the
+same in H(cid:48) as a result of the insertion of the new transac-
+tions. For example, in the running example, the utility of
+itemset{b,d}isupdatedfrom30to50whentransactionT
+6
+isadded. Itisthusimportanttohaveanefficientmechanism
+forstoringitemsetsfoundinH tobeabletoquicklyupdate
+their utility. The solution adopted in EIHI to this problem
+istostoreallitemsetsfromH inatrie-likestructurethatwe
+call the HUI-trie. This structure is a trie, where each node
+representsanitemandeachitemsetisrepresentedbyapath
+starting from the tree root and ending by an inner node or
+aleaf. Moreover,eachnoderepresentingthelastitemofan
+itemsetisannotatedwiththeutilityofthatitemset. Forex-
+ample, Fig. 1 show the HUI-trie structure contructed with
+the HUIs found in the database of Table 1, that is {b,d},
+{a,c,e}, {b,c,d}, {b,c,e}, {b,d,e}, {b,c,d,e}, {a,b,c, d, e, Figure 1: The HUI-trie structure
+Algorithm 3: The Construct Procedure items. But in the database D(cid:48) some new items may appear
+and the TWU of items may change, wich may lead to a
+input : P: an itemset, Px: the extension of P with an
+different total order. To ensure that the pruning properties
+item x, Py: the extension of P with an item y
+still hold, it is necessary to use a total order for D(cid:48) that
+output: the utility-list of Pxy
+is compatible with the total order used for D. Thus, the
+1 UtilityListOfPxy←∅; algorithm is modified to keep the total order from D into
+2 foreach tuple ex∈Px.utilitylist do memoryandonlyinsertthenewitemsfromD(cid:48) inthistotal
+3 if ∃ey∈Py.utilitylist and ex.tid=exy.tid then order.
+4 if P.utilitylist(cid:54)=∅ then The fourth modification is to how utility-lists are con-
+5 Search element e∈P.utilitylist such that structed for each item in I∗ in Line 4 of Algorithm 1. A
+e.tid=ex.tid.; naiveapproachwouldbetobuildtheutility-listofeachitem
+6 exy← in I∗ for D(cid:48) from scratch, which would require to scan all
+(ex.tid,ex.iutil+ey.iutil−e.iutil,ey.rutil); transactionsinD(cid:48). However,sincethealgorithmwasprevi-
+7 end ously run on D, the utility-lists of items in D have already
+8 else beenbuilt. Therefore,itisonlynecessarytoaddelementsin
+9 exy←(ex.tid,ex.iutil+ey.iutil,ey.rutil); utility-listsfortransactionsinN. Inourimplementation,we
+10 end thusassigntoeachitemtwoutility-lists: (1)autility-listfor
+11 UtilityListOfPxy← D, and (2) a utility-list for N. Using these two utility-lists
+UtilityListOfPxy∪{exy}; is equivalent to using a single utility-list for D(cid:48). To build
+12 end the utility-lists for N, only transactions from N are read.
+13 end The fifth modification is to how the EUCS structure is
+14 return UtilityListPxy; builtinLine4ofAlgorithm1. Anaiveapproachforbuilding
+the EUCS would be to construct it for D(cid:48) by scanning the
+whole database D(cid:48). A better approach is to update the
+EUCS by scanning only the transactions N and adding the
+Efficiently mining the updated database. The sec-
+transactionutilitiesofitemsappearinginthesetransactions
+ond important idea in the EIHI algorithm is about how to
+totheTWUofpairsofitemsstoredintheEUCStoobtain
+efficiently mine itemsets in D(cid:48). For the original database
+the updated TWU of each pair of items.
+D, one only needs to apply Algorithm 1 to find the set of
+The sixth modification is with respect to how the algo-
+high-utility itemsets H. However, how to find the set H(cid:48) in
+rithm determines if an itemset is high-utility. Algorithm 2
+D(cid:48), given D and H? A naive solution would be to apply
+is modified as follows. Let ul (Px) denotes the utility-list
+Algorithm1ondatabaseD(cid:48). However,thiswouldbeineffi- D
+of an itemset Px in transactions D. Line 2 is modified by
+cientsinceitwouldminehigh-utilityitemsetsfromscratch.
+checkingifthesumofiutilsvaluesinul (Px)plusthesum
+D
+Moreover,anotherreasonisthatnumerousitemsetsappear-
+oftheiutilsvaluesinul (Px)isgreaterthanminutil. This
+ing in D may not appear in D(cid:48). This lead to the following N
+conditionistoensurethatonlyitemsetsthatarehigh-utility
+important property, which was not used in HUI-LIST-INS. in D(cid:48) are output.
+The seventh modification is Line 5 of the Search proce-
+Property 4. Let be an itemset x ∈ H appearing in D
+dure. This pruning condition is modified as if the sum of
+but not appearing in N, where D(cid:48) =D∪N. The utility of
+iutils and rutils values in ul (Px) plus the sum of the iu-
+x in D(cid:48) is the same as the utility of x in D. Thus, if x is a D
+tils and rutils values in ul (Px) is greater than minutil.
+high-utility itemset in D, it is also a high-utility itemset in N
+Thisistoensurethananitemsetanditsextensionsareonly
+D(cid:48). Similarly, if x is a low-utility itemset in D, it is also a
+pruned if the sum of iutil and rutil values in D(cid:48) is no less
+low-utility itemset in D(cid:48).
+than minutil (according to property 2). This pruning con-
+dition is formalized as follows.
+Based on property 4, to design an efficient algorithm to
+find H(cid:48), one should avoid exploring itemsets not appearing Property 5 (Pruning condition 1). For any item-
+in N. We next explain how this idea is implemented in
+set Px, if the the sum of iutils and rutils values in ul (Px)
+EIHI. The first modification is to the TWU calculation of D
+plus the sum of the iutils and rutils values in ul (Px) is
+single items in Line 1 of Algorithm 1. When the algorithm N
+lessthanminutil,thenPxanditsextensionsarelow-utility
+is run on D(cid:48), the TWU of items in D has been already
+itemsets.
+calculated when the algorithm was run on D. By keeping
+thisinformation,itisonlynecessarytoscantransactionsin
+The eight modification is a new pruning condition. In
+N to update the TWU of all items and obtai the TWU of
+Algorithm1,theutility-listofanitemsetPxy iscreatedby
+items in D(cid:48).
+combining the utility-lists of itemsets P, Px and Py using
+The second modification is to how the algorithm deter-
+theConstructprocedure. InEIHI,eachitemsethasutility-
+minethesetofitemI∗ tobeusedforgeneratingitemsetsin
+list for D and a utility-list for N. Thus, the Construct
+Line2ofAlgorithm1. ThesetI∗ isredefinedbyaddingthe
+procedurehastobecalledtwicetoconstructtheutility-lists
+condition that items from I∗ must appear in N. In other
+ofPxy forD andN. Anovelpruningconditionintroduced
+words, items that are appearing in D but not in N are not
+in EIHI is the following.
+used to generate itemsets (based on property 4).
+The third modification is to how the (cid:31) order is defined Property 6 (Pruning condition 2). For any item-
+in Line 3 of Algorithm 1. As previously explained, when setPxy,iftheutility-listofPxy inN isempty(ul (Pxy)),
+N
+the algorithm is run on D, a total order (cid:31) is established then the itemset Pxy and all its extension do not need to be
+on items from D based on the order of increasing TWU of explored.
+Rationale. If the utility-list of Pxy is empty, it means of 1,000 transactions, EIHI-5 indicates the performance of
+that Pxy does not appear in N. By property 4, it is thus EIHIwhenitisappliedfivetimes(totransactions1to200,
+not necessary to consider Pxy. Since Pxy does not appear 201 to 400, 401 to 600, 601 to 800 and 801 to 1,000). The
+in N, it follows that extensions of Pxy also do not appear comparison of execution times is shown in Fig. 2.
+in N. Thus, any extension of Pxy also do not need to be It can be oserved that EIHI is always considerably faster
+explored. than HUI-LIST-INS on all datasets for the same number of
+The above pruning condition is incorporated in Line 11 updates and minutil values (up to 220 times faster than
+of the Searchprocedure. If the utility-list ofPxy is empty, HUI-LIST-INS).Thelargestgapintermsofexecutiontime
+thenPxyisnotaddedtothesetExtensionsOfPx. Thanks between EIHI and HUI-LIST-INS is for the real shopping
+to this condition, only itemsets that appears in N will be datasets (retail and foodmart). For dense datasets, the gap
+consideredbythesearchprocedure. Afurtheroptimization issmallerbecauseitemsappearinalmosteverytransactions
+is to construct the utility-list of Pxy in N first before con- and thus the pruning condition of EIHI is less effective.
+structing the utility-list of Pxy in D. If the utility-list of It can also be oserved that the gap in terms of execu-
+Pxy in N is empty, the utility-list of Pxy in D does not tion time between the proposed EIHI algorithm and HUI-
+need to be constructed. LIST-INS increases considerably as the number of update
+Theninthimportantmodificationistohowahigh-utility increases. For example, on foodmart with 5, 25 and 50 up-
+itemset Px is output in Line 3 of the Search procedure. dates, the EIHI algorithm is respectively 16, 124 and 220
+For each high-utility itemset Px that is found, the EIHI times faster than HUI-LIST-INS.
+algorithmfirstsearchifthisitemsetisintheproposedHUI- In terms of memory usage, EIHI has very similar mem-
+triestructure. Ifyes,itmeansthatPxwaspreviouslyfound ory usage to HUI-LIST-INS. The reason is that both algo-
+when the algorithm was applied to D. In that case, the rithm are utility-list based algorithms based on the FHM
+utilityofPxisupdatedintheHUI-trie. Otherwise,itmeans algorithm and that the new pruning conditions introduced
+thatPxisanewhigh-utilityitemsetthatwaslow-utilityin in EIHI are designed to reduce execution time rather than
+D. Thus, Px is inserted in the HUI-trie with its calculated memory usage. For retail, foodmart, chess, mushroom and
+utility. When the algorithm terminates, all updated HUIs T10I6D100K,themaximummemoryusageofthealgorithms
+are in the HUI-trie. isrespectivelyabout500MB,200MB,100,500and800MB.
+Thetenthmodificationisthatattheendofthealgorithm,
+theutility-listsinDandinN aremergedtogethertoforma 6. CONCLUSION
+singleutility-listforD(cid:48). Thisistopreparethealgorithmfor
+We have presented EIHI, a novel algorithm for maintain-
+the next execution where the database D(cid:48) will be updated.
+inghigh-utilityitemsetsindynamicdatabases. Itintroduces
+Finally, the last modification is to incorporate the LA-
+numerousideastomoreefficientlymaintainhigh-utilityitem-
+prune optimization, which was proposed in HUP-Miner [9],
+sets in dynamic databases. Experimental results show that
+in the Construct procedure. This optimization is compati-
+EIHIisuptotwoordersofmagnitudefasterthanthestate-
+blewithanyutility-listbasedalgorithmandisnotmodified
+of-art HUI-LIST-INS algorithm and is more scalable with
+here. Therefore,itisnotdescribedandtheinterestedreader
+respect to the number of updates. The source code of the
+can refer to the paper about HUP-Miner for more details.
+EIHI and HUI-LIST-INS algorithms as well as all datasets
+Basedontheaboveexplanationsandproperties,itiseasy
+used in this paper are available as part of the SPMF open-
+to see that the algorithm is correct and complete for the
+source data mining library http://goo.gl/rIKIub.
+problem of incremental high-utility itemset mining.
+Forfuturework,weplantoexploreotherproblemrelated
+to the maintenance of patterns in dynamic databases. In
+5. EXPERIMENTALEVALUATION
+particular,weareinterestedinmininghigh-utilitysequential
+Experiments were performed on a computer with a third pattern [15] and sequential rules [16].
+generation64bitCorei5processorrunningWindows7and8
+GBofRAM.WecomparedtheperformanceofEIHIwiththe 7. ACKNOWLEDGEMENTS
+state-of-the-artalgorithmHUI-LIST-INS.Experimentswere
+ThisresearchwaspartiallysupportedbytheNaturalSci-
+carried on four datasets.Let NT, NI and AL respectively
+entific Research Innovation Foundation in Harbin Institute
+denote the number of transactions, number of items and
+ofTechnologyundergrantHIT.NSRIF.2014100,bytheTen-
+average transaction length of a dataset.
+centProjectundergrantCCF-TencentRAGR20140114,and
+The datasets are retail (NT = 88,162, NI = 16,470,
+bytheNationalNaturalScienceFoundationofChina(NSFC)
+AL = 10.3), foodmart (NT = 4,141, NI = 1,559, AL =
+under grant No.61503092.
+4.4), chess (NT = 3,196, NI = 75, AL = 35), and mush-
+room (NT = 8,124, NI = 120, AL = 23). The foodmart
+8. REFERENCES
+dataset contains real utility values. For the other datasets,
+externalutilitiesandinternalutilitieswererespectivelygen- [1] R. Agrawal and R. Srikant. Fast algorithms for mining
+eratedinthe[1,1000]and[1,5]intervalsasinpreviouswork association rules in large databases. In Proc. Intern.
+[2, 3, 8, 14]. Conf. Very Large Databases, pages 487–499. 1994.
+Algorithms were run on each dataset, while decreasing [2] C. F. Ahmed, S. K. Tanbeer, B.-S. Jeong and Y.-K.
+the minutil threshold until a clear winner was observed. Lee. Efficient tree structures for high-utility pattern
+Furthermore, for each dataset, we run each algorithm three mining in incremental databases. IEEE Trans. Knowl.
+times for each minutil value to test a different number of Data Eng, 21(12):1708–1721, 2009.
+updates to the database. The notation Y-x indicates that [3] P. Fournier-Viger, C.-W. Wu, S. Zida and V. S. Tseng.
+the algorithm Y was run x times on a given dataset by FHM: Faster high-utility itemset mining using
+splittingthedatasetintoxparts. Forexample,foradataset estimated utility co-occurrence pruning. In Proc. 21st
+retail foodmart
+1000 1000
+)s
+100
+(
+e
+m 100 )s 10
+itn
+u
+( e
+m
+R itn 1
+u
+R
+10
+10000 20000 30000 40000 50000 0 1000 2000 3000 4000 5000
+minutil
+minutil
+chess mushroom
+1000 1000
+800 800
+)s
+( e m 600
+)s
+( e m 600
+itn
+u R 2
+4
+0
+0
+0
+0 itn
+u R 2
+40
+0
+0
+0
+500000 550000 600000 650000 700000 100000 200000 300000 400000
+minutil minutil
+EIHI-5 EIHI_25 EIHI_50
+HUI-LIST-INS-5 HUI-LIST-INS_25 HUI-LIST-INS-50
+Figure 2: Comparison of execution times
+Intern. Symp. on Methodologies for Intell. Syst., Transaction Insertion. In Proc. 10th Intern. Conf. on
+pages 83–9. 2014. Advanced Data Mining and Appl., pages 44–56. 2014.
+[4] P. Fournier-Viger, A. Gomariz, T. Gueniche, A. [13] W. Song, Y. Liu and J. Li. BAHUI: Fast and memory
+Soltani, C.-W. Wu. and V. S. Tseng. SPMF: a Java efficient mining of high utility itemsets based on
+Open-Source Pattern Mining Library. Journal of bitmap. Intern. Journal of Data Warehousing and
+Machine Learning Research, 15:3389–3393, 2014. Mining, 10(1):1–15, 2014.
+[5] P.Fournier-VigerandS.Zida.FOSHU:FasterOn-Shelf [14] V. S. Tseng, B.-E. Shie, C.-W. Wu and P. S. Yu.
+High Utility Itemset MiningaˆA˘S¸ with or without Efficient algorithms for mining high utility itemsets
+negative unit profit. In Proc. 30th Symposium on from transactional databases. IEEE Trans. Knowl.
+Applied Computing, pages 857–864. 2015. Data Eng., 25(8):1772–1786, 2013.
+[6] P. Fournier-Viger, C. W. Wu and V. S. Tseng. Novel [15] J. Yin, Z. Zheng, L. Cao, Y. Song and W. Wei.
+Concise Representations of High Utility Itemsets using Efficiently mining top-K high utility sequential
+Generator Patterns. In 10th Intern. Conf. on Advanced patterns. In Proc. IEEE 13th Intern. Conf. on Data
+Data Mining and Applications, pages 30–43. 2014. Mining, pages 1259–1264. 2013.
+[7] G. C. Lan, T. P., Hong and V. S. Tseng. An efficient [16] S. Zida, P. Fournier-Viger, C.-W. Wu, J. C.-W. Lin
+projection-based indexing approach for mining high and V. S. Tseng. Efficient mining of high utility
+utility itemsets. Knowl. and Inform. Syst., sequential rules. In Proc. 11th Intern. Conf. Machine
+38(1):85–107, 2014. Learning and Data Mining, pages 1–15. 2015.
+[8] M. Liu and J. Qu. Mining high utility itemsets without
+candidategeneration.InProc. 22nd ACM Intern. Conf.
+Info. and Know. Management, pages 55–64. 2012.
+[9] S. Krishnamoorthy. Pruning strategies for mining high
+utility itemsets. Expert Systems with Applications,
+42(5):2371–2381, 2015.
+[10] J. C.-W. Lin, G. C. Lan and T. P. Hong. An
+Incremental Mining Algorithm for High Utility
+Itemsets. Expert Systems with Applications,
+39:7173aˆA˘S¸-7180, 2012.
+[11] J. C.-W. Lin, T. P. Hong, G. C. Lan, J. W. Wong and
+W. Y. Lin. Incrementally Mining High Utility Patterns
+based on Pre-large Concept. Applied Intelligence,
+40:343–347, 2014.
+[12] J. C.-W. Lin, W. Gan, T.P. Hong and J. S. Pan.
+Incrementally Updating High-Utility Itemsets with

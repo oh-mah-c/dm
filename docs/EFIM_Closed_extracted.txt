@@ -1,0 +1,732 @@
+EFIM-Closed: Fast and Memory Efficient
+Discovery of Closed High-Utility Itemsets
+Philippe Fournier-Viger1, Souleymane Zida2, Jerry Chun-Wei Lin3,
+Cheng-Wei Wu4, Vincent S. Tseng4,
+1 School of Natural Sciences and Humanities, Harbin Institute of Technology
+Shenzhen Graduate School, China
+2 Department of Computer Science, University of Moncton, Canada
+3 School of Computer Science and Technology, Harbin Institute of Technology
+Shenzhen Graduate School, China
+4 Department of Computer Science, National Chiao Tung University, Taiwan
+philfv@hitsz.edu.cn, esz2233@umoncton.ca, jerrylin@ieee.org,
+silvemoonfox@gmail.com, tsengsm@mail.ncku.edu.tw
+Abstract. Discovering high-utility temsets in transaction databases is
+apopulardataminingtask.Alimitationoftraditionalalgorithmsisthat
+ahugeamountofhigh-utilityitemsetsmaybepresentedtotheuser.To
+provide a concise and lossless representation of results to the user, the
+concept of closed high-utility itemsets was proposed. However, mining
+closedhigh-utilityitemsetsiscomputationallyexpensive.Toaddressthis
+issue, we present a novel algorithm for discovering closed high-utility
+itemsets, named EFIM-Closed. This algorithm includes novel pruning
+strategiesnamedclosurejumping,forwardclosurechecking andbackward
+closure checking toprunenon-closedhigh-utilityitemsets.Furthermore,
+it also introduces novel utility upper-bounds and a transaction merging
+mechanism. Experimental results shows that EFIM-Closed can be more
+than an order of magnitude faster and consumes more than an order of
+magnitudelessmemorythanthepreviousstate-of-artCHUDalgorithm.
+Keywords: pattern mining, high-utility itemset, closed itemset
+1 Introduction
+HighUtilityItemsetMining (HUIM)[2,3,6,8,9,7,10,14]isapopulardatamin-
+ingtaskfordiscoveringusefulpatternsincustomertransactiondatabases.Itcon-
+sistsofdiscoveringitemsetsthatyieldahighutility(e.g.highprofit),thatisHigh
+Utility Itemsets (HUIs). Besides customer transaction analysis, HUIM also has
+applications in other domains such as click stream analysis and biomedicine [2,
+3,8,10]. HUIM can be viewed as an extension of the problem of Frequent item-
+set Mining (FIM) [1], where a weight (e.g unit profit) may be assigned to each
+item, and where purchase quantities of items in transactions are not restricted
+to binary values. HUIM is generally viewed as a difficult problem, because the
+utility measure used in HUIM is neither monotonic or anti-monotonic, unlike
+the support measure in FIM. That is, the utility of an itemset may be greater,
+smallerorequaltotheutilityofitssubsets.Forthisreason,efficientsearchspace
+pruning techniques developped in FIM cannot be used in HUIM.
+SeveralalgorithmshavebeenproposedforHUIM[2,3,6,8,9,7,10,14].How-
+ever, an important limitation of traditional HUIM algorithms is that they often
+produce a huge amount of high-utility itemsets. Hence, it can be very time-
+consuming for users to analyze the output of these algorithms. Moreover, this
+makes HUIM algorithms suffer from long execution times and even fail to run
+duetohugememoryconsumptionorlackofstoragespace.Toaddressthisissue,
+itwasrecentlyproposedtomineaconciseandlosslessrepresentationofallHUIs
+named closed high-utility itemsets (CHUIs) [11]. The concept of CHUI extends
+the concept of closed patterns [13,12] from FIM. A CHUI is a HUI having no
+proper supersets that are HUIs and appear in the same number of transactions
+[11].Thislatterrepresentationisinterestingsinceitislossless(itallowsderiving
+all HUIs). Furthermore, it is also meaningful for real applications since it only
+discovers the largest HUIs that are common to groups of customers. However,
+CHUI mining can be very computationally expensive [11].
+Inthispaper,weaddresstheneedforamoreefficientCHUIminingalgorithm
+by proposing an algorithm named EFIM-Closed (EFficient high-utility Itemset
+Mining - Closed), based on the strict constraint that for each itemset in the
+search space, all operations for that itemset should be performed in linear time
+and space. EFIM-Closed propose three strategies to discover CHUIs efficiently:
+closure jumping (CJU), forward closure checking (FCC) and backward closure
+checking(BCC).Toreducethecostofdatabasescans,EFIM-Closedreliesontwo
+efficient techniques named High-utility Database Projection (HDP) and High-
+utility Transaction Merging (HTM).Also,theproposedEFIM-Closedalgorithm
+includes two new upper-bounds on the utility of itemsets named sub-tree utility
+andlocalutility toeffectivelyprunethesearchspace,andanefficientFastUtility
+Counting (FAC) technique to compute them. An experimental study show that
+EFIM-Closed is up to 71 times faster and consumes up to 18 times less memory
+than the state-of-the-art CHUD algorithm, and has excellent scalability.
+The rest of this paper is organized as follows. Sections 2, 3, 4, 5 and 6
+respectively presents the problem of HUIM, the related work, the EFIM-Closed
+algorithm, the experimental evaluation and the conclusion.
+2 Problem Statement
+This section introduces the problem of closed high-utility itemset mining. Let I
+be a finite set of items (symbols). An itemset X is a finite set of items such that
+X ⊆I. A transaction database is a multiset of transactions D ={T ,T ,...,T }
+1 2 n
+such that for each transaction T , T ⊆I and T has a unique identifier c called
+c c c
+its TID (Transaction ID). Each item i ∈ I is associated with a positive num-
+ber p(i), called its external utility (e.g. unit profit). Every item i appearing in
+a transaction T has a positive number q(i,T ), called its internal utility (e.g.
+c c
+purchasequantity).Forexample,considerthedatabaseinTable1,whichwillbe
+used as the running example. It contains five transactions (T ,T ...,T ). Trans-
+1 2 5
+action T indicates that items a, c, e and g appear in this transaction with an
+2
+internal utility of respectively 2, 6, 2 and 5. Table 2 indicates that the external
+utility of these items are respectively 5, 1, 3 and 1.
+Table 1: A transaction database Table 2: External utility values
+TID Transaction Item a b c def g
+T (a,1)(c,1)(d,1) Profit 52123 1 1
+1
+T (a,2)(c,6)(e,2)(g,5)
+2
+T (a,1)(b,2)(c,1)(d,6)(e,1)(f,5)
+3
+T (b,4)(c,3)(d,3)(e,1)
+4
+T (b,2)(c,2)(e,1)(g,2)
+5
+The utility of an item i in a transaction T is denoted as u(i,T ) and defined
+c c
+as p(i)×q(i,T ). The utility of an itemset X in a transaction T is denoted
+c c
+(cid:80)
+as u(X,T ) and defined as u(X,T ) = u(i,T ) if X ⊆ T . The utility
+c c i∈X c c
+of an itemset X in a database is denoted as u(X) and defined as u(X) =
+(cid:80)
+u(X,T ), where g(X) is the set of transactions containing X. The
+Tc∈g(X) c
+support of an itemset X in a database D is denoted as sup(X) and defined as
+|g(X)|. For example, the utility of item a in T is u(a,T )=5×2=10, and its
+2 2
+support is 1. The utility of itemset {a,c} is u({a,c}) = u({a,c},T )+u({a,c},
+1
+T )+u({a,c},T )=u(a,T )+u(c,T )+u(a,T )+u(c,T )+u(a,T )+u(c,T )=
+2 3 1 1 2 2 3 3
+5+1+10+6+5+1=28.
+An itemset X is a high-utility itemset if its utility u(X) is no less than a
+user-specified minimum utility threshold minutil given by the user (i.e. u(X)≥
+minutil). Otherwise, X is a low-utility itemset. A HUI X is a closed high-utility
+itemset (CHUI) [11] iff there exists no HUI Y such that X ⊂Y and sup(X)=
+sup(Y). The problem of (closed) high-utility itemset mining is to discover all
+(closed)high-utilityitemsets,givenathresholdminutil,setbytheuser[11].For
+example,ifminutil=30,thehigh-utilityitemsetsinthedatabaseoftherunning
+example are {b,d}, {a,c,e}, {b,c,d}, {b,c,e}, {b,d,e}, {b,c,d,e}, {a,b,c, d, e,
+f} with respectively a utility of 30, 31, 34, 31, 36, 40 and 30. Among those, the
+closedhigh-utilityitemsetsare{a,b,c,d,e,f},{b,c,d,e},{b,c,e}and{a,c,e}.
+3 Related Work
+A key challenge in HUIM is that search space prune techniques used in FIM
+cannot be used in HUIM because the utility measure is neither monotonic nor
+anti-monotonic [2,9,10]. Several HUIM algorithms circumvent this problem by
+overestimatingtheutilityofitemsetsusingtheconceptofTransaction-Weighted
+Utilization (TWU) measure [2,6,9,7,10,14], defined as follows.
+Definition 1 (Transactionweightedutilization).Thetransactionutility of
+a transaction T is the sum of the utilities of items from T in that transaction.
+c c
+(cid:80)
+i.e. TU(T ) = u(x,T ). The transaction weighted utilization (TWU) of
+c x∈Tc c
+(cid:80)
+an itemset X is defined as TWU(X)= TU(T ).
+Tc∈g(X) c
+For example, The TU of transactions T ,T ,T ,T and T for our running
+1 2 3 4 5
+examplearerespectively8,27,30,20and11.TheTWUofsingleitemsa,b,c,d,
+e, f and g are respectively 65, 61, 96, 58, 88, 30 and 38. The following property
+of the TWU is commonly used in HUIM to prune the search space.
+Property 1 (Pruning using the TWU). Let be an itemset X. If TWU(X) <
+minutil, then X is a low-utility itemset as well as all its supersets [9].
+Many HUIM algorithms [2,6,9,7,10,11,14] utilize Property 1 to prune the
+search space. They operate in two phases. In the first phase, they identify can-
+didate high-utility itemsets by calculating their TWUs. In the second phase,
+they scan the database to calculate the exact utility of all candidates to filter
+low-utilityitemsets.Recently,algorithmsthatminehigh-utilityitemsetsusinga
+single phase were proposed to avoid the problem of candidate generation [3,8],
+and were shown to outperform previous algorithms. One-phase algorithms rely
+mainly on the concept of remaining utility to prune the search space.
+Definition 2 (Remaining utility). Let (cid:31) be a total order on items from I,
+and X be an itemset. The remaining utility of X in a transaction T is defined
+c
+(cid:80)
+asre(X,T )= u(i,T ).Theremainingutility ofX inadatabase
+c i∈Tc∧
+(cid:80)
+i(cid:31)x∀x∈X c
+is defined as re(X)= re(X,T ).
+Tc∈D c
+Property 2 (Pruning using remaining utility). Let X be an itemset. Let the
+extensions ofX betheitemsetsthatcanbeobtainedbyappendinganitemito
+X such that i(cid:31)x, ∀x∈X. The remaining utility upper-bound of an itemset X
+is defined as reu(X)=u(X)+re(X). If u(X)+reu(X)<minutil, then X is a
+low-utility itemset as well as all its extensions [3,8].
+A crucial problem in HUIM is that the set of HUIs is often very large. To
+addressthisissue,itwasproposedtominetheconciseandrepresentativesubset
+of closed HUIs [11]. But mining CHUIs can be very computationally expensive.
+To address this issue, we next introduce a novel more efficient algorithm.
+4 The EFIM-Closed Algorithm
+The proposed EFIM-Closed algorithm is a highly efficient algorithm for closed
+HUI mining. It is a one phase algorithm designed using the strict design con-
+straint that for each itemset in the search space, all operations for that itemset
+should be performed in linear time and space. This section is organized as fol-
+lows. Subsection 4.1 introduces preliminary definitions related to the depth-first
+search of itemsets. Subsection 4.2 explains how EFIM-Closed reduces the cost
+of database scans. Subsection 4.3 explains how EFIM-closed prune low-utility
+itemsets in the search space. Subsection 4.4 explains how EFIM-Closed prunes
+non closed HUIs. Finally, subsection 4.5 put all the pieces together, and gives
+the full pseudocode of EFIM-Closed.
+4.1 The Search Space
+Let (cid:31) be any total order on items from I. According to this order, the search
+space of all itemsets 2I can be represented as a set-enumeration tree. For exam-
+ple, the set-enumeration tree of I = {a,b,c,d} for the lexicographical order is
+shown in Fig. 1. The EFIM-Closed algorithm explores this search space using a
+depth-firstsearchstartingfromtheroot(theemptyset).Duringthisdepth-first
+search, for any itemset α, EFIM-Closed recursively appends one item at a time
+to α according to the (cid:31) order, to generate larger itemsets. In our implementa-
+tion, the (cid:31) order is defined as the order of increasing TWU because it generally
+reduces the search space for HUIM [2,3,8,10]. However, we henceforth assume
+that (cid:31) is the lexicographical order, for the sake of simplicity. We next introduce
+definitions related to the depth-first search exploration of itemsets.
+Ø
+{a} {b} {c} {d}
+{a,b} {a,c} {a,d} {b,c} {b,d} {c,d}
+{a,b,c}{ a,b,d} {a,c,d} {b,c,d}
+{a,b,c,d}
+Fig.1: Set-enumeration tree for I ={a,b,c,d}
+Let be an itemset α. Let E(α) denote the set of all items that can be used
+to extend α according to the depth-first search, that is E(α) = {z|z ∈ I ∧z (cid:31)
+x,∀x ∈ α}. An itemset Z is an extension of α (appears in a sub-tree of α in
+the set-enumeration tree) if Z = α∪W for an itemset W ∈ 2E(α) such that
+W (cid:54)=∅. An itemset Z is a single-item extension of α (is a child of α in the set-
+enumeration tree) if Z = α∪{z} for an item z ∈ E(α). For example, consider
+the database of our running example and α = {d}. The set E(α) is {e,f,g}.
+Single-item extensions of α are {d,e}, {d,f} and {d,g}. Other extensions of α
+are {d,e,f}, {d,f,g} and {d,e,f,g}.
+4.2 Scanning the Database Efficiently
+As we will later explain, EFIM-Closed performs database scans to calculate
+the utility of itemsets and upper-bounds on their utility. To reduce the cost of
+database scans, it is desirable to reduce the database size. In EFIM-Closed this
+is performed by two techniques.
+High-utility Database Projection(HDP).Thistechniqueisbasedonthe
+observation that when an itemset α is considered during the depth-first search,
+all items x (cid:54)∈ E(α) can be ignored when scanning the database to calculate
+the utility of itemsets in the sub-tree of α, or upper-bounds on their utility. A
+database without these items is called a projected database.
+Definition 3 (Projected database). Theprojection of a transaction T using
+an itemset α is denoted as α-T and defined as α-T={i|i∈T ∧i∈E(α)}. The
+projection of a database D using an itemset α is denoted as α-D and defined as
+the multiset α-D={α-T|T ∈D∧α-T(cid:54)=∅}.
+For example, consider database D of the running example and α={b}. The
+projected database α-D contains three transactions: α-T ={c,d,e,f}, α-T =
+3 4
+{c,d,e} and α-T ={c,e,g}. Database projections generally greatly reduce the
+5
+cost of database scans since transactions become smaller as larger itemsets are
+explored. To implement database projection efficiently, each transaction in the
+originaldatabaseissortedbeforehandaccordingtothe(cid:31)totalorder.Then,each
+projectionisperformedasapseudo-projection,thatiseachprojectedtransaction
+is represented by an offset pointer on the corresponding original transaction.
+The complexity of performing a projection is o(nw), where n is the number of
+transactions and w is their average length.
+High-utility Transaction Merging (HTM). To further reduce the cost
+of database scans, EFIM-Closed also introduce an efficient transaction merg-
+ing technique named High-utilty Transaction Merging (HTM). HTM is based
+on the observation that transaction databases often contain identical transac-
+tions (transactions containing exactly the same items, but not necessarily the
+same internal utility values). The technique consists of replacing a set of iden-
+tical transactions Tr ,Tr ,...Tr in a (projected) database α-D by a single
+1 2 m
+new transaction T = Tr = Tr = ... = Tr where the quantity of each
+M 1 2 m
+(cid:80)
+item i ∈ T is defined as q(i,T ) = q(i,Tr ). For example, consider
+M M k=1...m k
+database D of our running example and α = {c}. The projected database α-D
+containstransactionsα-T ={d},α-T ={e,g},α-T ={d,e,f},α-T ={d,e}
+1 2 3 4
+andα-T ={e,g}.Transactionsα-T andα-T canbereplacedbyanewtrans-
+5 2 5
+action T ={e,g} where q(e,T )=3 and q(g,T )=7.
+M M M
+Transaction merging is obviously desirable. However, a key problem is to
+implementitefficiently.TofindidenticaltransactionsinO(nw)time,weinitially
+sort the original database according to a new total order (cid:31) on transactions
+T
+defined as the (cid:31) order when the transactions are read backwards. For example,
+let be transactions T = {b,c}, T = {a,b,c} and T = {a,b,e}. We have that
+x y z
+T (cid:31) T (cid:31) T . Sorting is achieved in O(nw log(nw)) time. This cost is
+z T y T x
+negligible because it is performed only once.
+Adatabasesortedaccordingtothe(cid:31) orderprovidesthefollowingproperty.
+T
+For a database D or any projected database α-D, identical transactions always
+appearconsecutivelyintheprojecteddatabaseα-D.Thispropertyholdsbecause
+(1) transactions are sorted according to the (cid:31) order when read backwards and
+(2) projections always remove the smallest items of a transactions according to
+the(cid:31)order.Usingtheaboveproperty,allidenticaltransactionsina(projected)
+database can be identified by only comparing each transaction with the next
+transaction in the database. Thus, using this scheme, transaction merging can
+be done very efficiently by scanning a (projected) database only once (linear
+time). It is interesting to note that transaction merging as proposed in EFIM-
+Closed is not performed in any other one-phase HUIM algorithms.
+4.3 Pruning Low-Utility Itemsets
+To propose an efficient CHUI mining algorithm, a key problem is to design an
+effectivemechanismforpruninglow-utilityitemsetsinthesearchspace.Forthis
+purpose, we introduce two new upper-bounds on the utility of itemsets.
+The subtree-utility and local utility upper-bounds. The first upper-
+bound is defined as follows.
+Definition 4 (Sub-tree utility). Letbeanitemsetαandanitemz suchthat
+z ∈E(α). The Sub-tree Utility of z w.r.t. α is su(α,z)=
+(cid:80) (cid:80)
+[u(α,T)+u(z,T)+ u(i,T)].
+T∈g(α∪{z}) i∈T∧i∈E(α∪{z})
+For example, if α={a}, we have that su(α,c) =(5+1+2) +(10+6+11)
++(5+1+20) = 61, su(α,d) = 25 and su(α,e) = 34. The following theorem of
+thesub-treeutilityallowsEFIM-Closedtoprunethesearchspace(proofomitted
+due to space limitation).
+Theorem 1 (Pruning using sub-tree utility). Let be an itemset α and an
+item z ∈ E(α). If su(α,z) < minutil, then the single item extension α∪{z}
+and its extensions are low-utility. In other words, the sub-tree of α∪{z} in the
+set-enumeration tree can be pruned.
+Using Theorem 1, we can prune some sub-trees of an itemset α. To further
+reduce the search space, we also identify items that should not be explored in
+any sub-trees of an itemset α.
+Definition 5 (Local utility). Letbeanitemsetα andanitemz ∈E(α).The
+(cid:80)
+Local Utility of z w.r.t. α is lu(α,z)= [u(α,T)+re(α,T)].
+T∈g(α∪{z})
+For example, if α={a}, we have that lu(α,c) =(8+27+30) =65, lu(α,d)
+= 30 and lu(α,e) = 57. The following property can be used for pruning low-
+utility itemsets (proof ommitted due to space limitation).
+Theorem 2 (Pruning using the local utility). Let be an itemset α and
+an item z ∈ E(α). If lu(α,z) < minutil, all extensions of α containing z are
+low-utility. i.e., item z can be ignored when exploring all sub-trees of α.
+The relationships between the proposed upper-bounds and the main ones
+used in previous work are the following. Let be an itemset α, an item z and
+an itemset Y = α∪{z}. It can be demonstrated easily that the relationship
+TWU(Y) ≥ lu(α,z) ≥ reu(Y) = su(α,z) holds. Thus, the local utility upper-
+bound is a tighter upper-bound on the utility of Y and its extensions compared
+to the TWU, which is commonly used in two-phase HUIM algorithms such as
+CHUD. About the su upper-bound, one can ask what is the difference between
+thisupper-boundandthereuupper-boundusedbysomeHUIMalgorithmssince
+theyaremathematicallyequivalent.Themajordifferenceisthatsuiscalculated
+when the depth-first search is at itemset α in the search tree rather than at the
+child itemset Y. Thus, if su(α,z) < minutil, EFIM-Closed prunes the whole
+sub-tree of z including node Y rather than only pruning the descendant nodes
+ofY.Thus,usingsuinsteadofreuismoreeffectiveforpruningthesearchspace.
+In the rest of the paper, for a given itemset α, we respectively refer to items
+having a sub-tree utility and local-utility no less than minutil as primary and
+secondary items. Formally, the primary items of an itemset α is the set of items
+defined as Primary(α) = {z|z ∈ E(α)∧su(α,z) ≥ minutil}. The secondary
+itemsof αisthesetofitemsdefinedasSecondary(α)={z|z ∈E(α)∧lu(α,z)≥
+minutil}. Because lu(α,z) ≥ su(α,z), Primary(α) ⊆ Secondary(α). For in-
+stance, consider that α={a}. Primary(α)={c,e}. Secondary(α)={c,d,e}.
+Calculating Upper-Bounds andSupport Efficiently using Fast Util-
+ity Counting (FUC). In the previous paragraphs, we introduced two new
+upper-bounds on the utility of itemsets to prune the search space. We now
+present a novel efficient array-based approach to compute these upper-bounds
+in linear time and space that we call Fast Utility Counting (FUC). It relies on a
+novel array structure called utility-bin.
+Definition 6 (Utility-Bin). LetbethesetofitemsI appearinginadatabase
+D. A utility-bin array U for a database D is an array of length |I|, having an
+entry denoted as U[z] for each item z ∈I. Each entry is called a utility-bin and
+stores a utility value (an integer in our implementation, initialized to 0).
+A utility-bin array can be used to efficiently calculate the following upper-
+bounds and the support in O(n) time (recall that n is the number of transac-
+tions), as follows.
+Calculating the TWU of all items. A utility-bin array U is initialized.
+Then, for each transaction T of the database, the utility-bin U[z] for each item
+z ∈T is updated as U[z]=U[z]+TU(T). At the end of the database scan, for
+each item k ∈I, the utility-bin U[k] contains TWU(k).
+Calculatingthesub-treeutilityw.r.t.anitemsetα.Autility-binarray
+U is initialized. Then, for each transaction T of the database, the utility-bin
+U[z] for each item z ∈T ∩E(α) is updated as U[z]=U[z]+u(α,T)+u(z,T)+
+(cid:80)
+u(i,T). Thereafter, U[k]=su(α,k) ∀k ∈E(α).
+i∈T∧i(cid:31)z
+Calculating the local utility w.r.t. an itemset α. A utility-bin array U
+is initialized. Then, for each transaction T of the database, the utility-bin U[z]
+for each item z ∈ T ∩E(α) is updated as U[z] = U[z]+u(α,T)+re(α,T).
+Thereafter, we have U[k]=lu(α,k) ∀k ∈E(α).
+Calculating the support w.r.t. an itemset α. A utility-bin array U is
+initialized. Then, for each transaction T of the database, the utility-bin U[z] for
+each item z ∈ T ∩E(α) is updated as U[z] = U[z]+1. Thereafter, we have
+U[k]=sup(α∪{k}) ∀k ∈E(α).
+This approach for calculating upper-bounds and the support is highly effi-
+cient.Foranitemsetα,thisapproachallowstocalculatethethreeupper-bounds
+andthesupportforallsingleextensionsofαinlineartimebyperformingasingle
+(projected) database scan. In terms of memory, it can be observed that utility-
+bins are a very compact data structure (O(|I|) size). To utilize utility-bins more
+efficiently, we propose three optimizations. First, all items in the database are
+renamed as consecutive integers. Then, in a utility-bin array U, the utility-bin
+U[i]foranitemiisstoredinthei-thpositionofthearray.Thisallowstoaccess
+the utility-bin of an item in O(1) time. Second, it is possible to reuse the same
+utility-bin array multiple times by reinitializing it with zero values before each
+use.Thisavoidscreatingmultiplearraysandthusgreatlyreducesmemoryusage.
+In our implementation, only four utility-bin arrays are created, to respectively
+calculate the TWU, sub-tree utility, local utility and support. This is a reason
+why the memory usage of EFIM-Closed is very low compared to the state-of-
+the-artCHUDalgorithm,asitwillbeshownintheexperimentalsection.Third,
+whenreinitializingautility-binarraytocalculatethesub-treeutilityorthelocal
+utility of single-item extensions of an itemset α, only utility-bins corresponding
+to items in E(α) are reset to 0, for faster reinitialization of the utility-bin array.
+4.4 Pruning Non Closed HUIs
+We now explain the techniques used by EFIM-closed to prune non closed HUIs.
+TofindonlyCHUIs,anaiveapproachwouldbetokeepallHUIsfounduntilnow
+into memory. Then, every time that a new HUI is found, the algorithm would
+compare the HUI with previously found HUIs to determine if (1) the new HUI
+isincludedinapreviouslyfoundHUIor(2)ifsomepreviouslyfoundHUI(s)are
+included in the new HUI. The drawback of this approach is that it can consume
+a large amount of memory if the number of patterns is large, and it becomes
+very time consuming if a very large number of HUIs is found, because a very
+large number of comparisons would have to be performed. In this paper, we
+present new checking mechanisms that can determine if a HUI is closed without
+having to compare a new pattern with previously found patterns. It is inspired
+by a similar mechanism used in sequential pattern mining [13]. The mechanism
+isbasedontwoseparatechecks,whichwerespectivelynamebackward extension
+checking check and forward-extension checking, and are defined as follows.
+Definition 7 (Forward/backward extensions). Let be an itemset β = α∪
+{i}. The itemset β is said to have a forward extension if there exists an item
+z (cid:31) i such that z ∈ E(β) and sup(β∪{z}) = sup(β). The itemset β is said to
+have a backward extension if there exists an item z ≺ i such that z (cid:54)∈ β and
+sup(β∪{z})=sup(β).
+The EFIM-Closed algorithms determine if an itemset is closed as follows.
+Property 3 (Identifying non closed itemsets). An itemset β =α∪{i} is a CHUI
+if it is a HUI and it has no backward and forward extension. Rationale. By
+definition,anitemsetisnotclosedifithasasupersetY =β∪{z}withthesame
+support. The additional item z can respect either z (cid:31) i or z ≺ i, which corre-
+spond respectively to the cases checked by forward and backward extensions.
+The above property only allows to decide if a HUI is closed or not. To also
+prune the search space of non closed HUIs, the following property is used.
+Property 4 (Backward extension pruning). Thewholesubtreeofanitemsetβ =
+α∪{i}canbeprunedduringthedepth-firstsearchifβhasabackwardextension.
+Rationale. Because there exists a backward extension with an item z, and z
+thusappearinalltransactionswhereβ appears,itfollowsthatallitemsetsinthe
+sub-tree of β also have a backward extension with z, and thus are not CHUIs.
+Furthermore, we also introduce a second property for pruning the search
+space that we name closure jumping.
+Property 5 (Closure jumping property). Let be an itemset β and a projected
+database β-D. If sup(β)=sup(β∪{z}) for all item z ∈E(β), then the itemset
+β∪E(β) is the only closed itemset in the sub-tree of β. The whole sub-tree of β
+can thus be pruned and β∪E(β) can be output if it is a HUI.
+This property can be easily demonstrated, and is very powerful. It allows to
+go directly from an itemset β to its closure and prune the rest of its sub-tree.
+4.5 The Algorithm
+Inthissubsection,wepresenttheproposedEFIM-Closedalgorithm,whichcom-
+bines all the ideas presented in the previous subsections. The main procedure
+(Algorithm 1) takes as input a transaction database and the minutil threshold.
+The algorithm initially considers that the current itemset α is the empty set.
+Thealgorithmthenscansthedatabaseoncetocalculatethelocalutilityofeach
+item w.r.t. α, using a utility-bin array. Then, the local utility of each item is
+compared with minutil to obtain the secondary items w.r.t to α, that is items
+that should be considered in extensions of α. Then, these items are sorted by
+ascending order of TWU and that order is thereafter used as the (cid:31) order (as
+suggested in [2,3,8,11]). The database is then scanned once to remove all items
+that are not secondary items w.r.t to α since they cannot be part of any high-
+utilityitemsetsbyTheorem2.Ifatransactionbecomesempty,itisremovedfrom
+the database. Then, the database is scanned again to sort transactions by the
+(cid:31) order to allow O(nw) transaction merging, thereafter. Then, the algorithm
+T
+scansthedatabaseagaintocalculatethesub-treeutilityofeachsecondaryitem
+w.r.t. α, using a utility-bin array. Thereafter, the algorithm calls the recursive
+procedure Search to perform the depth first search starting from α.
+TheSearchprocedure(Algorithm2)takesasparametersthecurrentitemset
+to be extended α, the α projected database, the primary and secondary items
+w.r.t α and the minutil threshold. The procedure performs a loop to consider
+each single-item extension of α of the form β = α∪{i}, where i is a primary
+item w.r.t α (since only these single-item extensions of α should be explored
+accordingtoTheorem1).Foreachsuchextensionβ,adatabasescanisperformed
+to calculate the utility of β and at the same time construct the β projected
+database. Note that transaction merging is performed whilst the β projected
+Algorithm 1: The EFIM-Closed algorithm
+input : D: a transaction database, minutil: a user-specified threshold
+output: the set of high-utility itemsets
+1 α=∅;
+2 Calculate lu(α,i) for all items i∈I by scanning D, using a utility-bin array;
+3 Secondary(α)={i|i∈I∧lu(α,i)≥minutil};
+4 Let (cid:31) be the total order of TWU ascending values on Secondary(α);
+5 ScanD toremoveeachitemi(cid:54)∈Secondary(α)fromthetransactions,anddelete
+empty transactions;
+6 Sort transactions in D according to (cid:31) T ;
+7 Calculate the sub-tree utility su(α,i) of each item i∈Secondary(α) by
+scanning D, using a utility-bin array;
+8 Primary(α)={i|i∈Secondary(α)∧su(α,i)≥minutil};
+9 Search (α, D, Primary(α), Secondary(α), minutil);
+database is constructed. If β has a backward extension, no extensions of β will
+be explored (by Property 4). Otherwise, the projected database of β is scanned
+to calculate the support, sub-tree and local utility w.r.t β of each item z that
+could extend β (the secondary items w.r.t to α), using three utility-bin arrays.
+This allows determining the primary and secondary items of β. If all items that
+can extend β have the same support as β, the closure jumping optimization is
+(cid:83)
+performed to directly output β ∪ {z} if it is a HUI and prune the
+z(cid:31)i∧z∈E(α)
+subtree of β. Otherwise, the Search procedure is recursively called with β to
+continue the depth-first search by extending β. If no extension of β have the
+same support as β and the utility of β is no less than minutil, β is output as a
+CHUI (by Property 3). Based on properties and theorems presented in previous
+sections, it can be seen that when EFIM-Closed terminates, all and only the
+CHUIs have been output.
+Complexity. The complexity of EFIM-Closed is briefly analyzed as follows.
+Intermsoftime,aO(nwlog(nw))sortisperformed.Thiscostisnegligiblesince
+it is performed only once. Then, to process each primary itemset α encountered
+duringthedepth-firstsearch,EFIM-Closedperformsdatabaseprojection,trans-
+action merging, backward/forward extension checking and upper-bound calcu-
+lation in linear time and space (O(nw)). Thus, the time complexity of EFIM-
+Closed is proportional to the number of itemsets in the search space, and it is
+linear for each itemset.
+5 Experimental Results
+We performed experiments to evaluate the performance of the proposed EFIM-
+Closed algorithm. Experiments were carried out on a computer with a fourth
+generation 64 bit core i7 processor running Windows 8.1 and 16 GB of RAM.
+TheperformanceofEFIM-Closedwascomparedwiththestate-of-the-artCHUD
+algorithm. Moreover, to evaluate the influence of the design decisions in EFIM-
+Algorithm 2: The Search procedure
+input : α: an itemset, α-D: the α projected database, Primary(α): the
+primary items of α, Secondary(α): the secondary items of α, the
+minutil threshold
+output: the set of high-utility itemsets that are extensions of α
+1 foreach item i∈Primary(α) do
+2 β =α∪{i};
+3 Scan α-D to calculate u(β) and create β-D; // with transaction merging
+4 if β has no backward extension then
+5 Calculate sup(β,z), su(β,z) and lu(β,z) for all item z∈Secondary(α)
+by scanning β-D once, using three utility-bin arrays;
+6 if sup(β)=sup(β∪{z})∀z(cid:31)i∧z∈E(α) then
+(cid:83)
+7 Output β∪ {z} if it is a HUI; // closure jumping
+z(cid:31)i∧z∈E(α)
+8 else
+9 Primary(β)={z∈Secondary(α)|su(β,z)≥minutil};
+10 Secondary(β)={z∈Secondary(α)|lu(β,z)≥minutil};
+11 Search (β, β-D, Primary(β), Secondary(β), minutil);
+12 if β has no forward extension and u(β)≥minutil then output β;
+13 end
+14 end
+15 end
+Closed, we also compared with a version of EFIM-Closed named EFIM(nop),
+where transaction merging (HTM), closure jumping, and search space pruning
+using the sub-tree utility were respectively deactivated, and a version named
+EFIM(lu), where only the sub-tree utility is desactivated. Algorithms were im-
+plementedinJava.Experimentswereperformedusingstandarddatasetsusedin
+the HUIM literature for evaluating HUIM algorithms, namely Accident, BMS,
+Chess,Connect,Foodmart andMushroom.Thesedatasetshavevariedcharacter-
+isticsrepresentingthemaintypesofdatabases(sparse,dense,longtransactions).
+Forthesedatasets,thenumberoftransactions/numberofdistinctitems/average
+transaction length are: Accident (340,183 / 468 / 33.8), BMS (59,601 / 497 /
+4.8), Chess (3,196 / 75 / 37.0), Connect (67,557 / 129 / 43.0), Foodmart (4,141
+/ 1,559 / 4.4), Mushroom (8,124 / 119 / 23.0). Foodmart contains real exter-
+nal/internalutilityvalues.Forotherdatasets,externalandinternalutilityvalues
+have been generated in the [1,000] and [1,5] intervals using a log-normal distri-
+bution,asdoneinpreviouswork[2,3,8,10,11].Thedatasetsandthesourcecode
+of the compared algorithms can be downloaded at https://goo.gl/ZaeD60.
+Influenceoftheminutil thresholdonexecutiontime.Weranthealgo-
+rithms on each dataset while decreasing the minutil threshold until algorithms
+were too slow, ran out of memory or a clear winner was observed. Results are
+shown in Fig. 2. It can be seen that EFIM-Closed clearly outperforms CHUD
+on all datasets. For Accident, BMS, Chess, Connect, Foodmart and Mushroom,
+EFIM-Closed is respectively up to 71 times, 3 times, 36 times, 2 times, 69 times
+and 9 times faster than CHUD. The main reasons why EFIM-Closed performs
+so well are, as we will show in the following experiments, that (1) the proposed
+sub-tree utility and local-utility upper-bounds allows EFIM-Closed to prune a
+larger part of the search space compared to CHUD, and that (2) the proposed
+HTM transaction merging technique greatly reduce the cost of database scans.
+Beside, the efficient calculation of the proposed upper-bounds and support in
+linear time using utility-bins also contribute to the time efficiency of EFIM-
+Closed.AreasonwhyEFIM-Closedissomemoryefficientisthatitusesasimple
+database representation, which does not requires to maintain much information
+inmemory(onlypointersforpseudo-projections).Moreover,EFIM-Closedisalso
+more efficient because it is a one-phase algorithm (it does not need to maintain
+candidates in memory), while CHUD is a two-phase algorithm. Lastly, another
+important characteristic of EFIM-Closed in terms of memory efficiency is that
+it reuses some of its data structures. As explained in section 4.3, EFIM-Closed
+usesaveryefficientmechanismcalledFastArrayCountingforcalculatingupper-
+bounds.FAConlyrequirestocreatefourarraysthatarethenreusedtocalculate
+the upper-bounds and support of each itemset considered during the depth-first
+search.
+Accident BMS Chess
+70000 1000 14000
+60000 12000
+50000 10000
+)s(
+em
+itnuR 2
+3
+4
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+)s(
+em
+itnuR 100
+)s(
+em
+itnuR 4
+6
+8
+0
+0
+0
+0
+0
+0
+0
+0
+0
+10000 2000
+10
+28500K 28000K 27500K 25000K 22500K 2280K 2270K 2260K 2250K 2240K 600K 550K 500K 400K 350K
+Minimum Utility Threshold Minimum Utility Threshold Minimum Utility Threshold
+25000 Connect 50 Foodmart 1000 Mushroom
+20000 40
+)s(em
+itnuR
+1
+1
+5
+0
+5
+0
+0
+0
+0
+0
+00
+0
+0 )s(
+em
+itnuR
+1
+2
+3
+0
+0
+0
+)s(
+em
+itnuR
+100
+10
+16000K 15000K 14000K 13000K 3000 2500 2000 1000 1 100K 95K 90K 85K 80K
+Minimum Utility Threshold Minimum Utility Threshold Minimum Utility Threshold
+EFIM-Closed EFIM-Closed(lu) EFIM-Closed(nop) CHUD
+Fig.2: Execution times on different datasets
+Influenceoftheminutil thresholdonmemoryusage.Intermsofmem-
+oryusage,EFIM-ClosedclearlyoutperformsCHUD.Themaximummemoryus-
+age for EFIM-Closed/CHUD on each dataset are (in megabytes): Accident (895
+/ 2,603), BMS (64 / 707), Chess (65 / 327), Connect (385 / 1,504), Foodmart
+(64 / 215) and Mushroom (71 / 1,308). It is also interesting that EFIM-Closed
+utilizes less than 100 MB on four out of the six datasets, and never more than
+1 GB, while CHUD often exceeds 1 GB.
+Influence of transaction merging on execution time. In terms of op-
+timizations, the proposed transaction merging and closure jumping techniques
+used in EFIM-Closed sometimes greatly increases its performance in terms of
+executiontime.ThisallowsEFIM-Closedtoperformverywellondenseorlarge
+datasets such as Accidents, Chess,Chess, Connect and Mushroom). For exam-
+ple,forAccidents andminutil=22500K,EFIM-Closedterminatesin6minutes
+while CHUD terminates in almost 7 hours. On dense datasets or datasets hav-
+ing long transactions, transaction merging and closure jumping is very effective
+as projected transactions are more likely to be identical. This can be clearly
+seen by comparing the runtime of EFIM-Closed and EFIM(nop). On Accidents,
+Chess, Connect and Mushroom, EFIM-Closed is up to 183, 90, 9 and 5 times
+faster than EFIM(nop). For other datasets, transaction merging also reduces
+execution times but usually by a lesser amount (EFIM-Closed is up to 19, 10
+times faster than EFIM(nop) on BMS and Foodmart). It is also interesting to
+note that transaction merging could not be implemented efficiently in CHUD
+because it uses a vertical database representation.
+Comparison of the number of visited nodes. We also performed an
+experiment to compare the ability at pruning the search space of EFIM-Closed
+to CHUD. For the same datasets and the lowest minutil values, the EFIM-
+Closed / CHUD algorithms visited the following number of nodes: Accident (
+1,341/29,932),BMS (7/27),Chess (348,633/7,759,252),Connect (19,336/
+218,059 ), Foodmart ( 6,680 / 6,680) and Mushroom ( 8,017 / 17,621). It can be
+observed that EFIM-Closed is much more effective at pruning the search space
+than CHUD, thanks to its proposed sub-tree utility and local utility upper-
+bounds. For example, on Chess, EFIM-Closed visits 22 times less nodes.
+6 Conclusion
+We have presented an efficient algorithm named EFIM-Closed for closed high-
+utility itemset mining. It relies on two new upper-bounds named sub-tree utility
+andlocalutility,andanarray-basedutilitycountingapproachnamedFastUtility
+Counting.Moreover,toreducethecostofdatabasescans,EFIM-Closedproposes
+twoefficienttechniquesnamedHigh-utility Database Projection andHigh-utility
+TransactionMerging.Lastly,todiscoveronlyclosedHUIs,threemechanismsare
+proposed: (1) forward closure checking, (2) backward closure checking, and (3)
+closure jumping. Experimental results shows that EFIM-Closed can be up to 71
+times faster and consumes up to 18 times less memory than the state-of-the-art
+CHUD algorithm. Source code and datasets are available as part of the SPMF
+datamininglibrary[5]athttp://www.philippe-fournier-viger.com/spmf/.
+For future work, we will consider extending ideas introduced in EFIM-closed
+for top-k HUI mining [4], and high-utility sequent pattern and sequential rule
+mining [15].
+Acknowledgement ThisresearchwaspartiallysupportedbyNationalNatural
+Science Foundation of China (NSFC) under grant No.61503092.
+References
+1. Agrawal, R., Srikant, R.: Fast algorithms for mining association rules in large
+databases. In: Proc. Int. Conf. Very Large Databases, pp. 487–499, (1994)
+2. Ahmed, C. F., Tanbeer, S. K., Jeong, B.-S., Lee, Y.-K.: Efficient tree structures
+forhigh-utilitypatternmininginincrementaldatabases.IEEETrans.Knowl.Data
+Eng. 21(12), 1708–1721 (2009)
+3. Fournier-Viger, P., Wu, C.-W., Zida, S., Tseng, V. S.: FHM: Faster high-utility
+itemsetminingusingestimatedutilityco-occurrencepruning.In:Proc.21stIntern.
+Symp. on Methodologies for Intell. Syst., pp. 83–92 (2014)
+4. Fournier-Viger,P.,Gomariz,A.,Gueniche,T.,Mwamikazi,E.,Thomas,R.:Efficient
+MiningofTop-KSequentialPatterns.In:Proc.9thIntern.Conf.onAdvancedData
+Mining and Applications Part I, pp. 109–120, Springer (2013)
+5. Fournier-Viger, P., Gomariz, A., Gueniche, T., Soltani, A., Wu., C., Tseng, V. S.:
+SPMF: a Java Open-Source Pattern Mining Library. Journal of Machine Learning
+Research (JMLR), 15, pp. 3389-3393 (2014)
+6. Lan, G. C., Hong, T. P., Tseng, V. S.: An efficient projection-based indexing ap-
+proach for mining high utility itemsets. Knowl. and Inform. Syst. 38(1), 85–107
+(2014)
+7. Song, W., Liu, Y., Li, J.: BAHUI: Fast and memory efficient mining of high utility
+itemsetsbasedonbitmap.Intern.JournalofDataWarehousingandMining.10(1),
+1–15 (2014)
+8. Liu,M.,Qu,J.:Mininghighutilityitemsetswithoutcandidategeneration.In:Proc.
+22nd ACM Intern. Conf. Info. and Know. Management, pp. 55–64 (2012)
+9. Liu, Y., Liao, W., Choudhary, A.: A two-phase algorithm for fast discovery of high
+utility itemsets. In: Proc. 9th Pacific-Asia Conf. on Knowl. Discovery and Data
+Mining, pp. 689–695 (2005)
+Shie, B.-E., Yu, P.S., Tseng, V.S.: Efficient algorithms for mining maximal high
+utilityitemsetsfromdatastreamswithdifferentmodels.ExpertSyst.Appl.39(17),
+pp. 12947-12960 (2012)
+10. Tseng, V. S., Shie, B.-E., Wu, C.-W., Yu., P. S.: Efficient algorithms for mining
+high utility itemsets from transactional databases. IEEE Trans. Knowl. Data Eng.
+25(8), 1772–1786 (2013)
+11. Tseng, V., Wu, C., Fournier-Viger, P., Yu, P.: Efficient algorithms for mining the
+concise and lossless representation of closed+ high utility itemsets. IEEE Trans.
+Knowl. Data Eng. 27(3), 726–739 (2015)
+12. T. Uno, M. Kiyomi, H. Arimura, ”LCM ver. 2: Efficient mining algorithms for
+frequent/closed/maximalitemsets,”Proc. ICDM’04 Workshop on Frequent Itemset
+Mining Implementations, CEUR, 2004.
+13. Wang, J., Han, J., Li, C.: Frequent closed sequence mining without candidate
+maintenance.IEEETrans.onKnowledgeDataEngineering19(8),10421056(2007)
+14. Yun, U., Ryang, H., Ryu, K. H.: High utility itemset mining with techniques for
+reducing overestimated utilities and pruning candidates. Expert Syst. with Appl.
+41(8), 3861–3878 (2014)
+15. Zida,S.,Fournier-Viger,P.,Wu,C.-W.,Lin,J.C.W.,Tseng,V.S.:Efficientmining
+of high utility sequential rules. In: Proc. 11th Intern. Conf. Machine Learning and
+Data Mining (MLDM 2015), pp. 1–15 (2015)

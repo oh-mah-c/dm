@@ -1,0 +1,1006 @@
+RESEARCHARTICLE
+Mining of high utility-probability sequential
+patterns from uncertain databases
+BinbinZhang1,JerryChun-WeiLin2*,PhilippeFournier-Viger3,TingLi2
+1DepartmentofBiochemistryandMolecularBiology,HealthScienceCenterofShenzhenUniversity,
+Shenzhen,China,2SchoolofComputerScienceandTechnology,HarbinInstituteofTechnologyShenzhen
+GraduateSchool,Shenzhen,China,3SchoolofNaturalSciencesandHumanities,HarbinInstituteof
+TechnologyShenzhenGraduateSchool,Shenzhen,China
+*jerrylin@ieee.org
+a1111111111
+a1111111111
+a1111111111
+Abstract
+a1111111111
+a1111111111
+High-utilitysequentialpatternmining(HUSPM)hasbecomeanimportantissueinthefield
+ofdatamining.SeveralHUSPMalgorithmshavebeendesignedtominehigh-utilitysequen-
+tialpatterns(HUPSPs).Theyhavebeenappliedinseveralreal-lifesituationssuchasfor
+consumerbehavioranalysisandeventdetectioninsensornetworks.Nonetheless,most
+OPENACCESS studiesonHUSPMhavefocusedonminingHUPSPsinprecisedata.Butinreal-life,uncer-
+Citation:ZhangB,LinJC-W,Fournier-VigerP,LiT taintyisanimportantfactorasdataiscollectedusingvarioustypesofsensorsthataremore
+(2017)Miningofhighutility-probabilitysequential
+orlessaccurate.Hence,datacollectedinareal-lifedatabasecanbeannotatedwithexisting
+patternsfromuncertaindatabases.PLoSONE
+probabilities.Thispaperpresentsanovelpatternminingframeworkcalledhighutility-proba-
+12(7):e0180931.https://doi.org/10.1371/journal.
+pone.0180931 bilitysequentialpatternmining(HUPSPM)formininghighutility-probabilitysequentialpat-
+terns(HUPSPs)inuncertainsequencedatabases.Abaselinealgorithmwiththreeoptional
+Editor:YongDeng,SouthwestUniversity,CHINA
+pruningstrategiesispresentedtomineHUPSPs.Moroever,tospeeduptheminingpro-
+Received:January6,2017
+cess,aprojectionmechanismisdesignedtocreateadatabaseprojectionforeachpro-
+Accepted:June24,2017
+cessedsequence,whichissmallerthantheoriginaldatabase.Thus,thenumberof
+Published:July25,2017 unpromisingcandidatescanbegreatlyreduced,aswellastheexecutiontimeformining
+Copyright:©2017Zhangetal.Thisisanopen HUPSPs.Substantialexperimentsbothonreal-lifeandsyntheticdatasetsshowthatthe
+accessarticledistributedunderthetermsofthe designedalgorithmperformswellintermsofruntime,numberofcandidates,memory
+CreativeCommonsAttributionLicense,which
+usage,andscalabilityfordifferentminimumutilityandminimumprobabilitythresholds.
+permitsunrestricteduse,distribution,and
+reproductioninanymedium,providedtheoriginal
+authorandsourcearecredited.
+DataAvailabilityStatement:Dataareavailable
+fromFigshareathttps://doi.org/10.6084/m9.
+figshare.5165638.Thislinkconsistsof11datasets
+Introduction
+formininghighutility-probabilitysequential
+patterns,whicharetherealisticdatasetssuchas Knowledgediscoveryindatabases(KDD)[1–4]aimsatfindingusefulorhiddeninformation
+SIGN,LEVIATHAN,FIFA,BIBLE,kosarak10k,BMS,
+indata.AssociationRuleMining(ARM)andFrequentItemsetMining(FIM)aretwosetsof
+andthesyntheticdatasetssuchasS10I4N4KD|X|
+techniquesthatplayanimportantroleinKDD.Theyhavebeenwell-studiedandhavemany
+K,whereXis100,200,300,400,and500,
+applications.TheApriorialgorithm[3]isthefirstalgorithmforminingassociationrules
+increments100Keachtime.
+(ARs).Itusesalevel-wiseapproachtoexplorethesearchspaceofpatterns.Initsfirstphase,
+Funding:Thisresearchwaspartiallysupportedby
+Apriorireliesonaminimumsupportthresholdtodiscoverfrequentitemsets(FIs).Initssec-
+theNationalNaturalScienceFoundationofChina
+ondphase,AprioricombinesthediscoveredFIstoobtainARsrespectingagivenminimum
+(NSFC)undergrantNo.61503092,bythe
+ResearchontheTechnicalPlatformofRural confidencethreshold.ARMandFIMonlyconsiderstheoccurrencefrequencyofitemsina
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 1/21
+MiningofHUPSPsfromuncertaindatabases
+CulturalTourismPlanningBasingonDigitalMedia binarydatabase.Thus,factorssuchastheprofit,weight,andinterestingnessofpatternsare
+undergrant2017A020220011,andbytheTencent notconsideredbythepatterndiscoveryprocessoftraditionalARMandFIM.
+ProjectundergrantCCF-TencentIAGR20160115.
+Toaddressthislimitation,theproblemofHigh-UtilityItemsetMining(HUIM)[5–9]has
+Thefundershadnoroleinstudydesign,data
+beenintroduced.ItisanextensionofFIMthatconsidersadditionalfactorssuchastheunit
+collectionandanalysis,decisiontopublish,or
+profitsofitemsandtheirquantitiesintransactions,tominehigh-utilityitemsets(HUIs).
+preparationofthemanuscript.
+ManyalgorithmssuchasTwo-Phase[5],HUP-tree[6],HUI-Miner[7]andFHM[8]have
+Competinginterests:Theauthorshavedeclared
+beenstudiedtomineHUIs.Yunetal.[10]presentedanincrementalalgorithmforhandling
+thatnocompetinginterestsexist.
+theinsertedtransactionsinthedynamicdatabaseforHUIM.RyangandYun[11]alsopro-
+posedanalgorithmforminingHUIsbasedonthedatastreams.Animprovedalgorithm[12]
+ofHUIMwasalsopresentedtospeedupminingperformanceofHUIs.However,adrawback
+ofthesealgorithmsisthattheydonotconsiderthesequentialorderingofitemsintransactions
+[4].Forinstance,considerthesequentialpattern<(bread),(milk),(apple)>,whichindicates
+thatsomecustomer(s)boughttheproductsbread,milkandappleinthatorder.HUIMtech-
+niqueswouldsimplyignoreinformationabouttheorderingofitems.Tofindpatternshaving
+asequentialorderingandrevealrelationshipsbetweenpurchaseditemsforcustomerbehavior
+analysis,SequentialPatternMining(SPM)hasbeenproposed.Itaimsatdiscoveringthecom-
+pletesetoffrequentsub-sequencesthatrespectaminimumsupportthresholdinasetof
+sequencesofcustomertransactions.Agrawaletal.[13]proposedtheAprioriAll,AprioriSome
+andDynamicSomealgorithmstominethesetofsequentialpatterns(SPs).Otheralgorithms
+suchasGSP[14],PrefixSpan[15]andSPAM[16]werealsodesigned.DifferentfromApriori-
+basedalgorithms,whichminesSPsusingalevel-wiseapproach,theSPADE[17]algorithm
+onlyneedsthreedatabasescanstodiscoverallSPs,whiletheFreeSpan[18]algorithmusesa
+patterngrowthapproachtominetheSPs.
+Motivatedbytheneedsofpracticalapplications,high-utilitysequentialpatternmining
+(HUSPM)wasintroduced[19].HUSPMisanextensionofSPM,whichconsistsofdiscovering
+sequentialpatternshavingahighutility(e.g.yieldingahighprofit)insequences.Suchpatterns
+haveseveralapplicationssuchasfortheanalysisofcustomershoppinghabitsinretailstores.
+ContrarilytotraditionalSPM,HUSPMconsidersthateachitemisassociatedwithaweightto
+indicateitsrelativeimportance(e.gweight,unitprofit,interestingness),andeachitemhas
+non-binarypurchasequantitiesinsequences.Asequenceisconsideredtobeahigh-utility
+sequentialpattern(HUSP)ifitsutilityisnolessthanapredefinedminimumutilitythreshold
+(count),selectedbytheuser.ThetaskofHUSPMismorecomplexthanthatoftraditional
+SPMsincethedownwardclosure(DC)propertydoesnotholdfortheutilitymeasure.Forthis
+reason,developingHUSPMalgorithmsrequirestodevelopnewstrategiesforreducingthe
+searchspacethathavenotbeenpreviouslyusedinSPM.Besides,HUSPMrequirestoconsider
+thepurchaseorderofitemsforminingHUSPs,whichisnon-trivial.Fewstudies[20–23]have
+beenpresentedtomineHUSPsdespitethatminingHUSPsisdesirableforseveralapplications.
+Toourknowledge,allthesestudiesconsiderthediscoveryofHUSPsinprecisedata.Butin
+real-lifesituations,dataisoftenuncertain.Forinstance,sensorsofawirelessnetworkmaycol-
+lectdataaboutthetemperatureandhumidityinvariouslocations.But,becausethesesensors
+areaffectedbyvariousinternalandexternalfactors,readingscanbeinherentlynoisyandthus
+uncertaintyvaluesmaybeassociatedtoeachreading.Toaddressthechallengeofmining
+HUSPsinuncertaindata,thispaperproposesthetaskofHighUtility-ProbabilitySequential
+PatternMining(HUPSPM)forminingHighUtility-ProbabilitySequentialPatterns(HUPSPs)
+inuncertaindatabases.Thekeycontributionsofthispaperarethefollowing.
+1. AnewframeworkcalledHighUtility-ProbabilitySequentialPatternMining(HUPSPM)is
+designedtohandletheproblemofhighsequentialpatternmininginuncertaindatabases.A
+baselinealgorithmcalledHUSPMisintroducedtominetheHighUtility-Probability
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 2/21
+MiningofHUPSPsfromuncertaindatabases
+SequentialPatterns(HUPSPs)inuncertaindatabases.BasedonthedesignedHighSequen-
+tial-WeightedUtility-ProbabilityPatterns(HSWUPs),adownward-closurepropertyis
+obtained,andthecorrectnessandcompletenessoftheproposedalgorithmfordiscovering
+HUPSPsisproven.
+2. Threepruningstrategiesarerespectivelydevelopedtoreducethesearchspacebypruning
+unpromisingcandidateHUPSPsearly.Resultsshowthattheproposedpruningstrategies
+canspeeduptheminingperformance,andthatthenumberofcandidatesandmemory
+usagecanbegreatlyreduced.
+3. Animprovedprojection-basedalgorithmcalledP-HUSPMisdesignedtoprovideaneffi-
+cientwayofreducingthenumberofcandidatesforfindingtheHUPSPs.Anexperimental
+studyshowthatthislatteralgorithmoutperformsthebaselinealgorithm.
+Relatedwork
+Sequentialpatternmining(SPM)[13]wasintroducedbyAgrawaletal.Theyproposedthe
+AprioriAll,AprioriSomeandDynamicSomealgorithmstodiscoverthesetofsequentialpat-
+terns(SPs)insequentialdatabases.Srikantetal.thendesignedtheGSP[14]algorithm,and
+Zakietal.designedtheSPADE[17]algorithmtomineSPsmoreefficiently.Butthesealgo-
+rithmsuseagenerate-and-testapproachtomineSPsandseveralofthemusealevel-wise
+approach.Asaresult,thesealgorithmscanproduceahugeamountofcandidatepatterns.To
+addressthisproblem,Peietal.proposedthePrefixSpan[15]algorithm,whichusesapattern-
+growthapproachtomineSPs.TheSPAM[16]algorithmwasthenproposed,whichperforms
+adepth-firstsearchtomineSPs.AlthoughSPMhasbeenwidelyusedandappliedinmany
+applications,SPMalgorithmscanonlyhandleitemsetsorsequencesfrombinarydatabases.
+Frequentitemsetmininginuncertaindata(UFIM)hasbeenwell-studied.Ithasbecomean
+importantresearchtopicinrecentyears.Twomainmodelshavebeendeveloped,whichare
+theexpectedsupport[24]andprobabilisticfrequentness[25]models.Intheformermodel,an
+item/setisdefinedasafrequentitemset(FI)inanuncertaindatabaseifitsexpectedsupportis
+nolessthanapredefinedminimumsupportthreshold.Intheprobabilisticfrequentness
+model,anitem/setisdefinedasanUFIifitsfrequentnessprobabilityisnolessthanaspecified
+minimumprobability.UApriori[24]isthefirstUFIMalgorithmbasedontheexpectedsup-
+portmeasure.SincetheUApriorialgorithmutilizesalevel-wiseapproach,itstillsuffersfrom
+theproblemofproducingahugeamountofcandidates.Toavoidthisproblem,theUFP-
+growth[26],UH-mine[27]andCUFP-growth[28]algorithmswererespectivelyproposedto
+mineFIsinuncertaindatabasesusingapattern-growthapproach.TheUFP-growthand
+CUFP-growthalgorithmsutilizesacompacttreestructuretodiscoverUFIs,whiletheUH-
+minealgorithmadoptsanhyper-structureforminingUFIs.Theabovealgorithmsareall
+basedontheexpectedsupportmodel.Leeetal.[29]adoptedtheuncertainmodeltominefre-
+quentitemsetswithdifferentitemimportance.LeeandYun[30]thenpresentedaminimum
+datastructurewithoutfalsepositivesforminingFIs.
+Asanalternativetotheexpectedsupportmodel,Berbeckeretal.[25]proposedtheprobabi-
+listicfrequentnessmodeltomineUFIs.Sunetal.[31]proposedthep-AprioriandTODIS
+algorithmstorespectivelymineUFIsusingbottom-upandtop-downapproaches.Tongetal.
+[32]comparedalgorithmsusingtheexpectedsupportandprobabilisticfrequentnessmodels.
+TomineUncertainFrequentSequentialPatterns(UFSPs)insequences,Muzammaletal.[33]
+proposedthreealgorithmsrelyingontheexpectedsupportmeasure.Twoalgorithmswerepre-
+sentedusingthegenerate-and-testapproachandonepattern-growthmethodwasdesignedto
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 3/21
+MiningofHUPSPsfromuncertaindatabases
+mineUFSPs.Zhaoetal.[34]establishedtwouncertainsequencedatamodelsandproposed
+theU-PrefixSpanalgorithm,whichextendsthefamousPrefixSpanalgorithm[15]tomine
+UFSPsusingtwodifferentuncertainsequencedatamodels.
+Inthepast,theproblemofHigh-UtilitySequentialPatternMining(HUSPM)wasintro-
+duced.TheUWAS-treeandIUWAS-tree[19]algorithmsweredesignedtousetreestructures
+forhandlingtheutilityofweblogsequences.Thesequence-weightedutility(SWU)measure
+wasproposedtomaintainthedownwardclosure(DC)propertyforminingHUSPs.Thecon-
+ceptofSWUissimilartothatoftheTWUmodel[5]forhigh-utilityitemsetmining.The
+SWUofapatternisdefinedasthesumoftheutilitiesofallsequencescontainingthepattern.
+TheSWUisusedasanupper-boundontheutilitiesofpatternstoobtainadownwardclosure
+propertyforminingHUSPs.Sincetheabovetwoalgorithmscannotdealwithsequencescon-
+tainingmultipleitemsineachsequenceelement(transaction),Ahmedetal.designedalevel-
+wiseUtilityLevel(UL)algorithmandapattern-growthUtilitySpan(US)[20]algorithmto
+mineHUSPs.Yinetal.[21]thendesignedtheLQS-treestructuretokeepimportantinforma-
+tionforminingHUSPs.BasedontheLQS-treestructure,theUSpanalgorithm[21]adoptsthe
+SWUmeasureandtheSequenceWeightedDownwardClosure(SWDC)propertytoprune
+unpromisingsequencesandimprovetheperformanceofHUSPmining.Lanetal.[22]then
+proposedtheprojection-basedhigh-utilitysequentialpatternmining(PHUS)algorithmfor
+miningHUSPswiththemaximumutilitymeasureandasequence-utilityupper-bound
+(SUUB)model.ThealgorithmextendsPrefixSpan[15]andusesaprojection-basedpruning
+strategytoobtaintightupper-boundsonsequenceutilitiestoavoidconsideringtoomanycan-
+didates,andthustoimprovetheperformanceofminingHUSPsusingtheSUUBmodel.
+Alkanetal.[23]designedanotherupper-boundmethodcalledCumulateRestofMatch
+(CRoM)anddevelopedaPruningBeforeCandidateGeneration(PBCG)strategytoprune
+unpromisingsequencesforminingHUSPs.
+Preliminariesandproblemstatement
+LetI={i ,i ,...,i }beasetofmdistinctitems.Anuncertainquantitativesequencedatabase
+1 2 m
+isasetofsequencesUSD={S ,S ,...,S },whereeachsequenceS 2USDhasauniqueidenti-
+1 2 n q
+fierq.AsequenceS isdefinedasanorderedlistofitemsets{I ,I ,...,I },whereeachitemset
+q 1 2 k
+I isasetofitems,whereeachitemhasaquantityq(i,I,S )andaprobabilityp(i,I,S ).More-
+r j r q j r q
+over,aprofittableptable={p(i ),p(i ),...,p(i )}indicatestheunitprofitvaluesofeachitem.
+1 2 n
+Twothresholdscalledtheminimumexpectedsupportthresholdandtheminimumutility
+threshold,arerespectivelydefinedasμandε.Forinstance,considertheuncertainquantitative
+sequencedatabaseshowninTable1,whichwillbeusedintherestofthispaperasrunning
+example.Itcontains4sequencesand6items,representedbytheletters(a)to(f).Thecorre-
+spondingunitprofittableisshowninTable2.Intherunningexample,theminimumexpected
+supportthresholdμandtheminimumutilitythresholdεaresettoμ(=35%)andε(=27.7%),
+respectively.
+Definition1Asequenceiscalledak-sequenceifthesequencecontainskitems.
+Table1.Anuncertainquantitativesequencedatabase.
+SID Sequence Probability
+S <(a,3),(b,4),[(a,1),(c,1),(e,2)]> 0.6
+1
+S <[(b,1),(c,1)],[(a,1),(d,1)],[(a,2),(b,2)]> 0.8
+2
+S <(f,1),[(f,1),(d,1)],[(b,4),(c,1)]> 0.5
+3
+S <(b,1),(c,1),[(a,1),(b,2)],[(a,4),(b,1)]> 0.9
+4
+https://doi.org/10.1371/journal.pone.0180931.t001
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 4/21
+MiningofHUPSPsfromuncertaindatabases
+Table2.Aunitprofittable.
+Item a b c d e f
+Profit 2 1 3 4 1 2
+https://doi.org/10.1371/journal.pone.0180931.t002
+Forexample,thesequence<(a),(b),(a,c,e)>isa5-sequencesinceitcontains5items,and
+thesequence<(a,c,e)>isa3-sequencesinceitcontains3items.
+Definition2ThenotationS (cid:18)S indicatesthatasequenceS =<I ,I ,...,I >isasub-
+a b a a1 a2 an
+sequenceofasequenceS =<I ,I ,...,I >.
+b b1 b2 bm
+Forexample,<(a),(a,c)>isasub-sequenceofthesequence<(a),(b),(a,c,e)>since(a)(cid:18)
+(a)and(a,c)(cid:18)(a,c,e).
+ThedefinitionsofHUIMcanbedirectlyappliedtoSPMforhigh-utilitysequentialpattern
+mining(HUSPM)byconsideringboththequantitiesandunitprofitsofitemsinadatabase.
+Thedefinitionsaregivennext.
+Definition3Theinternalutilityofanitem(i)inanitemsetI ofasequenceS isrepre-
+j k q
+sentedbyiu(i,I ,S )(i 2I ,andI 2S ),anddefinedas:
+j k q j k k q
+iuði;I ;S Þ¼qði;I ;S Þ(cid:2)pðiÞ: ð1Þ
+j k q j k q j
+Forexample,thesequenceS inTable1canberepresentedas<I ,I ,I >andI =[(b,1),
+2 1 2 3 1
+(c,1)],I =[(a,1),(d,1)],I =[(a,2),(b,2)].Theinternalutilityof(a)inI andI inS are
+2 3 1 2 2
+respectivelycalculatedas:iu(a,I ,S )=1×2(=2),andiu(a,I ,S )=2×2(=4).
+2 2 3 2
+Definition4Themaximumutilityofaniteminasequenceisthelargestutilityvaluefor
+thatiteminthatsequence.Itisdenotedasimu(i,S )anddefinedas:
+j q
+imuði;S Þ¼maxfiuði;I ;S Þji 2I ^I 2S g: ð2Þ
+j q j k q j k k q
+ForexampleinTable1,(a)appearstwiceinS .Themaximumutilityof(a)inS2iscalcu-
+2
+latedas:max{(iu(a,I ,S )=1×2(=2),iu(a,I ,S )=2×2(=4)}(=4).
+2 2 3 2
+Definition5Theutilityofasub-sequenceSinasequenceS isthemaximumutilityamong
+q
+theutilitiesofalloccurrencesofSinthesequence.Itisdenotedassu(S,S ).
+q
+ForexampleinTable1,thesub-sequenceS=<(b),(a)>hastwooccurrencesinS .The
+2
+utilityvaluesofthethesetwooccurrencesarerespectivelycalculatedas(1×1)+(1×2)(=3)
+and(1×1)+(2×2)(=5).Thus,theutilityofthesub-sequence<(b),(a)>iscalculatedassu
+(<(b),(a)>,S )=max(3,5)(=5).
+2
+Inuncertaindatamining,algorithmscanbecategorizedaseitherusingtheexpectedsup-
+port[24]orprobabilisticfrequentness[25]models.Theexpectedsupportmodelusedinthe
+designedalgorithmisdefinedasfollows.
+Definition6TheprobabilitythatasequenceSappearsinasequenceS (S(cid:18)S )isdenoted
+q q
+assp(S,S ),wheresp(S ,S)=sp(S ).
+q q q
+ForexampleinTable1,<(a)>(cid:18)S and<(b),(d)>(cid:18)S .Moreover,sp(S )(=0.6),sp(S )(=
+1 1 1 2
+0.8);sp(<(a)>,S )(=0.6)andsp(<(b),(d)>,S )(=0.8).
+1 2
+Thispapercombinestheideaofhigh-utilitysequentialpatternminingwiththeexpected
+supportmodeltoproposethenovelproblemofmininghighutility-probabilitysequentialpat-
+ternsinuncertaindatabases.Thisproblemisdefinedbasedonthefollowingdefinitions.
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 5/21
+MiningofHUPSPsfromuncertaindatabases
+Definition7TheutilityandprobabilityofasequenceSinanuncertainquantitative
+sequencedatabaseUSDarerespectivelydefinedas:
+X
+suðSÞ¼ suðS;S Þ;
+q ð3Þ
+S(cid:18)Sq^Sq2USD
+X X
+spðSÞ¼ spðS;S Þ¼
+q spðS Þ: ð4Þ
+S(cid:18)Sq^Sq2USD S(cid:18)Sq^Sq2USD q
+ForexampleinTable1,asequenceS=<(a),(b)>iscontainedinS ,S andS wheresu(S,
+1 2 4
+S )(=10),su(S,S )(=4),su(S,S )(=3)andsp(S,S )=sp(S )(=0.6),sp(S,S )=sp(S )(=0.8),
+1 2 4 1 1 2 2
+sp(S,S )=sp(S )(=0.9).Thus,theutilityandprobabilityofSarecalculatedassu(S)(=10+4
+4 4
++3)(=17)andsp(S)(=0.6+0.8+0.9)(=2.3),respectively.
+Definition8TheutilityofasequenceS inanuncertainquantitativesequencedatabase
+q
+USDisdenotedasSU(S )anddefinedas:
+q
+X
+SUðS Þ¼ suði;I ;S Þ:
+q j k q ð5Þ
+ij2Ik^Ik2Sq
+ForexampleinTable1,theutilityofS iscalculatedasSU(S )(=6+4+2+3+2)(=17).
+1 1
+Toobtainadownwardclosureproperty,thesequence-weightedutility(SWU)isthenutilized
+asanupper-boundontheutilityofasequence,whichextendstheTWUmodel[5]ofHUIM.
+Definition9Thesequence-weightedutility(SWU)ofasequenceSinadatabaseUSDisthe
+sumoftheutilitiesofallsequencescontainingS,thatis:
+X
+SWUðSÞ¼ SUðS Þ:
+q ð6Þ
+S(cid:18)Sq^Sq2USD
+ForexampleinTable1,theSWUofasequenceS=<(a),(b)>canbecalculatedasSWU(S)
+=SU(S )+SU(S )+SU(S )(=17+16+17)(=50).
+1 2 4
+Definition10ThetotalutilityofasequencedatabaseUSDisdenotedasTSUanddefined
+asthesumoftheutilitiesofallsequencesinUSD:
+X
+TSU ¼ SUðS Þ:
+q ð7Þ
+Sq2USD
+ForexampleinTable1,thesequenceutilitiesofsequences toS arerespectivelycalcu-
+S1 4
+latedasSU(S )(=17),SU(S )(=16),SU(S )(=15)andSU(S )(=17).Hence,thetotalutilityof
+1 2 3 4
+theuncertainsequentialdatabaseis(17+16+15+17)(=65).
+Definition11AsequenceSinadatabaseUSDisdefinedasaHighUtility-Probability
+SequentialPatterns(HUPSP)if1)sp(S)(cid:21)|USD|×μ,and2)su(S)(cid:21)TSU×ε.
+Inthedesignedalgorithm,itrecursivelyfindsthesetofHUPSPswithdifferentlengths.For
+example,thesetof1-sequencesisdenotedasHUPSPs1inthedesignedalgorithm,andtheset
+of2-sequencesisdenotedasHUPSPs2inthedesignedalgorithm.Thus,thepurposeofthis
+paperistorecursivelyfindthesetofk-sequences(k(cid:21)1,denotedasHUPSPsk)untilnocandi-
+datesaregenerated(thesetof(k-1)-sequences(HUPSPsk−1)becomesnull).
+ProblemStatement:Basedontheabovedefinitions,theproblemofmininghighutility
+sequentialpatternsinuncertaindatabasesistodiscoverthecompletesetofhighutility-proba-
+bilitysequentialpatterns(HUPSPs).AsequenceSisaHUPSPinanuncertaindatabaseifits
+probabilityisnolessthantheminimumexpectedsupportcountanditsutilityisnolessthan
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 6/21
+MiningofHUPSPsfromuncertaindatabases
+Table3.ThederivedHUPSPsfortherunningexample.
+Sequence ExpectedSupport Utility Sequence ExpectedSupport Utility
+<(a)> 2.3 18 <(b),(a),(a)> 1.7 18
+<(a),(a)> 2.3 24 <(c),(a,b)> 1.7 21
+<(b),(a)> 2.3 21 <(c),(a),(a)> 1.7 22
+<(c),(a)> 1.7 18 <(c),(a),(a,b)> 1.7 25
+<(a),(a,b)> 1.7 19 <(b),(a),(a,b)> 1.7 21
+<(b),(a,b)> 1.7 18
+https://doi.org/10.1371/journal.pone.0180931.t003
+theminimumutilitycount,thatis:
+HUPSPs fSjspðSÞ(cid:21)jUSDj(cid:2)m^suðSÞ(cid:21)TSU(cid:2)εg: ð8Þ
+Forinstance,considerthedatabaseillustratedinTables1and2fortherunningexample.
+Foraminimumexpectedsupportthresholdμof35%andaminimumutilitythresholdεof
+27.7%,thesetofHUPSPsisshowninTable3.
+Proposedalgorithmsandpruningstrategies
+Proposedbaselinealgorithm
+SeveralalgorithmshavebeenproposedtomineHigh-UtilitySequentialPatterns(HUSPs)
+[19–21,23]andHighProbabilityItemsets(HPIs)[35].However,thosetwomodelscannotbe
+directlycombinedforminingHighUtility-ProbabilitySequentialPatterns(HUPSPs).This
+paperaddressesthisissuebyfirstpresentingabaselinealgorithmwiththreepruningstrategies
+todiscovertheHUPSPs.Detailsaregivenbelow.
+Definition12(Matchingsequence)LettherebetwosequenceS =<I ,I ,...,I >and
+a 1 2 n
+S =<I0,I0,...,I0 >.Furthermore,assumewithoutlossofgeneralitythatitemsinitemsetsof
+b 1 2 m
+sequencesaresortedinlexicographicalorder.WecansaythatS matchesS if(S —I )=
+a b a 1
+(S —I0 ).
+b m
+Forexample,<(a),(c,e),(b)>matchesthetwosequences<(c,e),(b,d)>and<(c,e),(b),
+(d)>butnotthesequenceof<(e,c),(b),(d)>.
+Definition13(S-Concatenation)Lettherebetwok-sequencesS andS suchthatS
+a b a
+matchesS .IfthelastelementI0 inS hasonlyoneiteminit,thesequenceS isgeneratedby
+b m b ab
+addingI0 toS ,whichiscalledthejoinofS withS byS-Concatenation.
+m a a b
+Forexample,thesequence<(a),(c,e),(b)>matchesthesequence<(c,e),(b),(d)>.The
+sequence<(a),(c,e),(b),(d)>isobtainedbyjoiningbyS-Concatenationthosetwo
+sequences.
+Definition14(I-Concatenation)Lettherebetwok-sequencesS andS suchthatS
+a b a
+matchesS .IfthelastelementI0 inS hasmorethanoneiteminit,thesequenceS isgener-
+b m b ab
+atedbyaddingthelastiteminI0 tothelastelementinS .ThisoperationiscalledthejoinofS
+m a a
+withS byI-Concatenation.
+b
+Forexample,thesequence<(a),(c,e),(b)>matchesthesequence<(c,e),(b,d)>.The
+sequence<(a),(c,e),(b,d)>isobtainedbyjoiningthetwoprevioussequencesby
+I-Concatenation.
+Givenasetofk-sequences,(k+1)-sequencesaregeneratedasfollows.Ifkisequalto1,
+2-sequencesaregenerated.Each1-sequenceinthesetisjoinedwithitselfusingaS-Concate-
+nationandisjoinedwithall1-sequenceslocatedafteritself(accordingtothesortingorder)
+bothbyI-ConcatenationandS-Concatenation.Moreover,eachsequenceisjoinedwithall
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 7/21
+MiningofHUPSPsfromuncertaindatabases
+1-sequenceslocated(sortedorder)beforeitselfbyS-Concatenation.Forexample,consider
+thesetof1-sequences{<a>,<(b)>,<(c)>}.Forthe1-sequence<(b)>,thefollowing
+2-sequencesaregenerated<(b),(b)>,<(b,c)>,<(b),(c)>,and<(b),(a)>.Foreachk-
+sequence(k(cid:21)2)S intheset,letS beasequencesucceedingS intheset,ifS matchesS and
+a b a a b
+thelastelementinS hasonlyoneitem,S isjoinedwithS byS-Concatenation.IfS matches
+b a b a
+S andthelastelementinS hasmorethanoneitem,S isjoinedwithS byI-Concatenation.
+b b a b
+Forexample,considerthesetof2-sequences{<(ab)>,<(a),(b)>,<(b,c)>,<(b),(c)>}.For
+thesequence<(a),(b)>,severalsequencesaregeneratedincluding<(a),(b,c)>,<(a)and
+(b),(c)>.
+Usingthetraditionallevel-wiseapproachforexploringthesearchspaceofpatterns,itis
+necessarytoevaluatepatternsateachlevel,whichistimeconsuming.Wethusproposethefol-
+lowinglemmasandpruningstrategiestoreducethesearchspaceforminingtheHUPSPs.
+Lemma1TheSWUofasequenceinanuncertainquantitative sequencedatabaseisgreater
+thanorequaltotheSWUofanyofitssupersets.
+Proof1LetSkbeak-sequenceandSk−1beoneofitssubsets.SinceSk−1(cid:18)Sk,thesetof
+sequenceIDs(namedSIDs)ofSk−1isasubsetoftheSIDsofSk,thus:
+SWUðSkÞ¼S SuðS Þ(cid:20)S ¼SWUðSk(cid:0) 1Þ
+Sk(cid:18)Sq^Sq2USD q Sk(cid:0)1(cid:18)Sq^Sq2USD
+)SWUðSkÞ(cid:20)SWUðSk(cid:0) 1Þ:
+Basedontheabovelemmas,wecanobtainthefollowingtheorem.
+Theorem1(Highprobabilitydownwardclosureproperty,HPDCproperty)Thedown-
+wardclosurepropertyholdsforhighprobabilitysequentialpatterns.
+Proof2LetSkbeak-sequence,andSk−1beoneofitssub-sequences.Thus,sp(Sk,S )=sp(S ).
+q q
+ForanysequenceS inUSD,sp(Sk,S )=sp(Sk−1,S ).SinceSk−1isasub-sequenceofSk,the
+q q q
+setofSIDsofSk−1isasubsetoftheSIDsofSk.Thus,
+spðSkÞ¼S spðS ;SkÞ(cid:20)S ¼spðSk(cid:0) 1Þ
+Sk(cid:18)Sq^Sq2USD q Sk(cid:0)1(cid:18)Sq^Sq2USD
+)spðSkÞ(cid:20)spðSk(cid:0) 1Þ:
+Thus,ifSkisaHPSP,anditsprobabilityisnolessthantheminimumexpectedsupportsp(Sk)
+(cid:21)|USD|×μ,thenthesubsetSk−1isaHPSP.
+Corollary1.IfasequenceSkisaHPSP,eachsuper-sequenceSk−1ofSkisalsoaHPSP.
+Corollary2.IfasequenceSkisnotaHPSP,eachnonsuper-sequenceSk+1ofSkisaHPSP.
+Definition15AsequenceSinadatabaseUSDisdefinedasaHighSequence-Weighted
+Utility-ProbabilityPattern(HSWUP)if1)sp(S)(cid:21)|USD|×μ,and2)SWU(S)(cid:21)TSU×ε.
+Inthedesignedalgorithm,itrecursivelyfindsthesetofHSWUPswithdifferentlengthsto
+maintainthedownwardclosureproperty(orcalledHSWUPDCproperty)forlaterdiscovering
+thesetofHUPSPs.Forexample,thesetof1-sequencesisdenotedasHSWUPs1inthedesigned
+algorithm,andthesetof2-sequencesisdenotedasHSWUPs2inthedesignedalgorithm.Thus,
+thealgorithmistorecursivelyfindthesetofk-sequences(k(cid:21)1,denotedasHSWUPsk)until
+nocandidatesaregenerated(thesetof(k-1)-sequences(HSWUPsk−1)becomesnull).
+ForexampleinTable1,supposethatμissetto35%.Theminimumexpectedsupportiscal-
+culatedas4×35%(=1.4).Supposethatεissetto27.7%.Theminimumutilitycountiscalcu-
+latedas65×27.7%(=18).Asequence<(a)>isaHSWPUPsinceitsutilitysequence-weighted
+utility(SWU)isSWU(<(a)>)=SU(S )+SU(S )+SU(S )(=17+16+17)(=50>18),andits
+1 2 4
+probabilityissp(<(a)>)=sp(S )+sp(S )+sp(S )(=0.6+0.8+0.9)(=2.3>1.4).
+1 2 4
+Theorem2(Highsequence-weightedutility-probabilityclosureproperty,HSWUPDC
+property)LetSkbeak-sequence,andSk−1beoneofitssub-sequence,whereSk−1isaHSWUP.
+TheHSWUPDCpropertyindicatesthatSWU(Sk−1)(cid:21)SWU(Sk)andsp(Sk−1)(cid:21)sp(Sk).
+Proof3SinceSk−1(cid:18)Sk,thesetofSIDsofSk−1isasubsetoftheSIDsofSk.LetSkbeak-
+sequence,andSk−1beoneofitssub-sequences.Itfollowsthat:
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 8/21
+MiningofHUPSPsfromuncertaindatabases
+SWUðSkÞ¼S SUðS Þ(cid:20)S SUðS Þ)SWUðSk(cid:0) 1Þ
+Sk(cid:18)Sq^Sq2USD q Sk(cid:0)1(cid:18)Sq^Sq2USD q
+)SWUðSkÞ(cid:20)SWUðSk(cid:0) 1Þ:
+FromTheorem1,itcanbefoundthatsp(Sk)(cid:20)sp(Sk−1).Therefore,fromTheorems1and2,
+wehavethatifSkisaHSWUP,Sk−1isalsoaHSWUP.
+Corollary3.IfasequenceSkisaHSWUP,everysubsetSk−1ofSkisalsoaHSWUP.
+Corollary4.IfasequenceSkisnotaHSWUP,eachnonsuper-sequenceSk+1ofSkisa
+HSWUP.
+Theorem3(HUPSPs(cid:18)HSWUPs)ThedownwardclosurepropertyofHSWUPensuresthat
+HUPSPs(cid:18)HSWUPs.ItindicatesthatifasequentialpatternisnotaHSWUP,noneofitssuper-
+setsareHUPSPseitherHSWUPs.
+Proof48Sk2USDsuchthatSk−1isa(k-1)-sequence.We havethat:
+1.AccordingtoTheorem2,wecanobtainthatifSk−1isnotaHSWUP,noneofitssupersetsSk
+willbeaHSWUP.
+2.SincesuðSk(cid:0) 1Þ¼S suðSk(cid:0) 1;S Þ(cid:20)S SUðS Þ¼SWUðSk(cid:0) 1Þ:
+Sk(cid:0)1(cid:18)Sq^Sq2USD q Sk(cid:0)1(cid:18)Sq^Sq2USD q
+)suðSk(cid:0) 1Þ(cid:20)SWUðSk(cid:0) 1Þ:
+Thus,ifSk−1isnotaHSWUP,Sk−1willnotbeaHUPSPnoraHSWUP.Anysuper-sequence
+SkisneitheraHSWUPnoraHUPSP.Thistheoremholdsandisthebasisthatensurethecorrect-
+nessandcompletenessoftheproposedalgorithmforminingHUPSPs.
+Basedontheabovedefinitionsandtheorems,threepruningstrategiesaredevelopedasfol-
+lowstoreducethesearchspaceforminingHUPSPs.
+Pruningstrategy1:IftheexpectedsupportandtheSWUofak-sequenceSkdonotsatisfy
+thetwoconditions:1)sp(Sk)(cid:21)|USD|×μ,and2)SWU(Sk)(cid:21)TSU×ε,thissequencecanbe
+directlyprunedfromthesearchspacesincenoneofitssupersetisaHUPSP.
+Rationale.AccordingtoTheorems2and3,thispruningstrategyensuresthatallHUPSP
+canbefound.
+Pruningstrategy2:LetSkbeak-sequence.Ifany(k-1)-sub-sequenceofthesequenceSkis
+notaHPSP,SkandallitssupersetsarenotHUPSPs.
+Rationale.AccordingtoTheorem1,thispruningstrategywillnotpruneanyHUPSPs.
+Lemma2(sub-sequenceUtilityStructure,SUS)IftheSWUofa2-sequenceislessthanthe
+minimumutilitycount,itssuper-sequencesareneitherHSWUPsnorHUPSPs.
+Proof5LetS2bea2-sequence,andSkbeak-sequence(k(cid:21)3)thatisasupersetofS2.Thus,
+SWU(Sk)(cid:20)SWU(Sk−1)andHUPSPs(cid:18)HSWPUPshold.IfSWU(S2)<TU×μ,S2isnota
+HSWPUPandanysupersetofS2w.r.t. ak-sequenceisneitheraHSWPUPnoraHUPSP.
+AccordingtothedefinitionofHUPSP,aHUPSPmustsatisfytwoconstraintsbyconsider-
+ingboththeutilityandprobabilitymeasures(followingtheexpectedsupportmodel).Thus,if
+asequenceisnotaHUSP,itisalsonotaHUPSP.Astructurenamedsub-sequenceUtility
+Structure(SUS)isbuilttostoretheSWUvalueofall2-sequences.Thisstructurecanhelpusto
+avoidperformingdatabasescansandpruneunpromisingcandidatesearly.Fromthegiven
+exampleinTable1,thebuiltSUSisshowninTable4.
+BasedontheSUS,thefollowingpruningstrategyisobtained.
+Pruningstrategy3:LetSkbeak-sequence(k(cid:21)3).IftheSWUofa2-sequenceS(cid:18)Skand
+itsSWUislessthanthantheminimumutilitycountfoundinSUS,SkisnotaHSWUPandis
+notaHUPSP.Moreover,noneofitssuper-sequencesareHUPSPs.
+Rationale.AccordingtoLemmas1and3,thispruningstrategyiscorrect.Thereasonis
+thatsinceHUPSPs(cid:18)HSWUPs,thusifa2-sequenceS(cid:18)SkholdsSWU(S)(cid:20)STU×ε,Sisnot
+aHSWUP.Moroever,Sandallitssuper-sequencesarenotHUPSPs.Hence,usingtheSUS
+pruningstrategy,ahugenumberofunpromisingsequencescanbeprunedearly.
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 9/21
+MiningofHUPSPsfromuncertaindatabases
+Table4.ThebuiltSUSfortherunningexample.
+Sequence SWU Sequence SWU
+<(a),(a)> 50 <(b,c)> 31
+<(a,b)> 33 <(b),(c)> 34
+<(a),(b)> 50 <(c),(c)> 0
+<(a,c)> 17 <(c),(b)> 33
+<(a),(c)> 17 <(c),(a)> 33
+<(b),(b)> 33 <(b),(a)> 50
+https://doi.org/10.1371/journal.pone.0180931.t004
+Basedontheabovedefinitionsandtheorems,thefollowingprocessforminingHUPSPsis
+proposed,whichisdividedintotwophases.Inthefirstphase,thedesignedbaseline
+U-HUSPMalgorithmperformsabreadth-firstsearchtominethecompletesetofHSWUPs.
+BasedontheHSWUPDCproperty,iftheprobabilityvalue(expectedsupport)ofasequential
+patternislessthantheminimumexpectedsupportcountoritsSWUvalueislessthanthe
+minimumutilitycount,thispatternandallitssupersetsarenotHSWUPs,andcanthusbe
+prunedinthesearchspace.Inthesecondphase,anadditionaldatabasescanisperformedto
+identifytheactualHUPSPsfromthesetofHSWUPsdiscoveredinthefirstphase.The
+pseudo-codeoftheproposedalgorithmisshowninAlgorithm1.
+Algorithm1:BaselineU-HUSPM
+Input:USD,anuncertainquantitativesequencedatabase;ptable,aunit
+profittable;ε,minimumutilitythreshold;μ,minimumexpectedsupport
+threshold.
+Output:HUPSPs,asetofcompletehighutility-probabilitysequential
+patterns
+1foreachi 2USDdo
+j
+2 scanUSDtocalculateSWU(i )andsp(i )
+j j
+3calculateTSUofUSD;
+4foreachi 2USDdo
+j
+5 ifsp(i )(cid:21)|USD|×μ^SWU(i )(cid:21)TSU×μthen
+j j
+6 HSWUPs1 HSWUPs1[i ;
+j
+7setk 2;
+8whileHSWUPsk−16¼nulldo
+9 C =genCand(HSWUPsk−1);
+k
+10 foreachSk2C do
+k
+11 if9s(cid:18)Sk^sp(s)<|USD|×μkSWU(s)<TSU×εthen
+12 continue;;
+13 calculateSWU(Sk)andsp(Sk);
+14 ifsp(Sk)(cid:21)|USD|×μ^SWU(Sk)(cid:21)STU×εthen
+15 HSWUPsk HSWUPsk[Sk;
+16 HSWUPs HSWUPs[HSWUPsk;
+17 k k+1;
+18foreachS2HSWUPsdo
+19 ifsu(S)(cid:21)TSU×εthen
+20 HUPSPs HUPSPs[S;
+21returnHUPSPs;
+TheproposedU-HUSPMalgorithmtakesasinput:(1)anuncertainsequentialdatabase
+USD,(2)aunitprofittableptableindicatingtheunitprofitofeachitem,(3)theminimumutil-
+itythresholdε,and(4)theminimumexpectedsupportthresholdμ.Thealgorithmperforms
+thefollowingsteps.First,thedatabaseisscannedtocalculatetheSWUandtheexpectedsup-
+portofeachitem(Lines1to2).Intherunningexample,1-sequencesaresp(a)=2.3,
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 10/21
+MiningofHUPSPsfromuncertaindatabases
+sp(b)=2.8,sp(c)=0.8,sp(d)=1.3,sp(e)=0.6,sp(f)=0.5andSWU(a)=50,SWU(b)=65,
+SWU(c)=65,SWU(d)=31,SWU(e)=17,SWU(f)=15.
+Foreach1-sequence,thedesignedalgorithmfirstcheckswhethertheSWUandthe
+expectedsupportofeach1-sequencesatisfiestheconditionsandkeeptheHSWUPs(Lines4
+to6).Intherunningexample,1-sequences<(a)>,<(b)>and<(c)>areconsideredasthe
+HSWUPsandputintothesetofHSWUP1.Theparameterkisthensetto2(Line7),anda
+loopisperformedtodiscoverallHSWUPsusingalevel-wiseapproach(Lines8to17).Notice
+thatkisdefinedasthelengthofthesequences.Forexample,kisdefinedas1(k=1)forrepre-
+sentingthe(k=1)-sequences;kisdefinedas2(k=2)forrepresenting(k=2)-sequences.The
+designedU-HUSPMalgorithmfirstgeneratesthesetof2-sequencecandidatesbyjoining
+1-sequencesinthesetofHSWUPs1.
+Duringthe(k-1)-thiterationoftheloop,thesetofHSWUPkisobtainedbythefollowing
+process.First,pairsof(k-1)-sequencesinHSWUPkarejoinedtogeneratetheirsuper-
+sequencesoflengthkbyapplyingthegenerate-and-testprocedureusingI-Concatenations
+andS-Concatenations.DetailsofthisprocesswasgiveninDefinitions14and15.Thepruning
+strategies2and3areappliedtopruneunpromisingsequencesearly,andthusreducethe
+searchspace.Forexample,thebuiltSUSshowninTable4canbeusedtoeasilyobtainthe
+SWUvaluesofeach2-sequence.Usingthisstructure,thealgorithmcaneasilypruneunprom-
+isingcandidateswithoutrescanningthedatabase.IftheSWUofasequenceisnolessthanthe
+minimumutilitycountanditsexpectedsupportcountisnolessthantheminimumexpected
+supportcount,thissequenceisputintothesetHSWUPk.Forexample,considerthesequence
+<(a),(b),(c)>.ItisnotnecessarytoscanthedatabasetocalculatetheSWUvaluesofthe
+2-sequencesof<(a),(c)>sinceitdoesnotsatisfythecondition(theSWUvalueislessthanthe
+minimumutilitycount).
+TheloopisrepeateduntilnoHSWUPsaregenerated.Afterthat,anadditionaldatabase
+scanisperformedtofindtheactualHUPSPsfromthesequencesinthesetofHSWUPs(Lines
+18to20).Finally,thesetofHUPSPsisreturnedasthefinalresult(Line21).Fortherunning
+example,thefinalresultisshowninTable3.
+0.1Animprovedprojectionmodel
+Sincethebaselinealgorithmappliesalevel-wiseapproachtomineHUPSPs,itcanhavelong
+executiontimesandconsumesahugeamountofmemory.Toovercomethisproblem,thissec-
+tionproposesanimprovedalgorithmnamedP-HUSPM.TheP-HUSPMalgorithmutilizes
+theprojectionmechanismtoprojectadatabaseintosmallerdatabasesforeachprocessed
+sequence.Usingthisapproach,theruntimeandmemoryusagecanbereduced.
+Definition16LettherebetwosequencesS =<I ,I ,...,I >andS =<I0,I0,...,I0 >
+a 1 2 n b 1 2 m
+(1(cid:20)m(cid:20)n).Moreover,assumethatallitemsineachelementinsequencesarelexicographi-
+callyordered.ThesequenceS iscalledaprefixofS iff1)I0 ¼I (1(cid:20)i(cid:20)m-1);2)I0 (cid:18)I and
+b a i i m m
+allitemsin(I (cid:0) I0 )arelexicographicallyorderedafterthoseinI .
+m m m
+Forexample,<a>,<(a),(c)>and<(a),(c,e),(b)>areprefixesofthesequence<(a),
+(c,e),(b,d)>but<(a),(e)>and<(a),(c,e),(d)>isnot.
+Definition17LettherebetwosequenceSandS suchthatS(cid:18)S .Asub-sequenceofthe
+q q
+sequenceS iscalledaprojectedsequenceofSif(1)thesequencehasprefixSand(2)noproper
+q
+super-sequenceofSsuchthatthesequenceisasub-sequenceofS havingSasprefix.Thisrela-
+q
+tionshipisdenotedasS |S.Thus,theprojecteddatabaseofasequenceSinanuncertaindata-
+q
+baseUSDisthecollectionofallprojectedsequencesofeachsequenceinthedatabase
+correspondingtothesequenceS,denotedbyUSD|S.
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 11/21
+MiningofHUPSPsfromuncertaindatabases
+Table5.Theprojecteddatabaseof<(a)>.
+SID Sequence ExpectedSupport SU
+1 <(a,3),(b,4),[(a,1),(c,1)]> 0.6 15
+2 <[(a,1)],[(a,2),(b,2)]> 0.8 8
+3 <[(a,1),(b,2)],[(a,4),(b,1)]> 0.9 13
+https://doi.org/10.1371/journal.pone.0180931.t005
+Forexample,theprojectedsequenceof<(a),(b),(a,c,e)>of(a)is<(b),(a,c,e)>.Forthe
+runningexampleofTable1,theprojecteddatabaseofthesequence<(a)>isshownin
+Table5.
+Thepseudo-codeoftheP-HUSPMalgorithmisshowninAlgorithm2.
+Algorithm2:ProjectionHUSPM,P-HUSPM
+Input:USD,anuncertainquantitativesequencedatabase;ptable,aunit
+profittable;ε,minimumutilitythreshold;μ,minimumexpectedsupport
+threshold.
+Output:HUPSPs,asetofcompletehighutility-probabilitysequential
+patterns
+1foreachS 2USDdo
+q
+2 scanUSDtocalculateSU(S );
+q
+3foreachi 2USDdo
+j
+4 calculatesp(i )andSWU(i );
+j j
+5HSWUPs1 {<(i )>|SWU(i )(cid:21)TSU×ε^sp(i )(cid:21)|USD|×μ};
+j j j
+6removei 2=HSWUPs1fromUSDasUSD’;
+j
+7foreach1-sequenceS2HSWUPs1do
+8 calculatesu(S);
+9 ifsu(S)(cid:21)TSU×εthen
+10 HUPSPs S;
+11 Mining(USD’,ptable,ε,μ,HSWUPs1)
+TheP-HUSPMalgorithmtakesasinput(1)USD,anuncertainquantitativesequencedata-
+base,(2)ptable,aunitprofittable,(3)ε,theminimumutilitythreshold,and(4)μ,themini-
+mumexpectedsupportthreshold.First,eachsequenceisscannedtofinditssequenceutility
+(Lines1to2).Foreachindividualitemi (1-sequence)inUSD,thesequential-weightedutility
+j
+(SWU)andexpectedsupportcountarerespectivelycalculated(Lines3to4).IftheSWUofthe
+sequenceisnolessthantheminimumutilitycountanditsexpectedsupportisnolessthanthe
+minimumexpectedsupportcount,thesequenceisthenputintothesetofHSWPUP1(Line5).
+Inthisexample,1-sequencessatisfyingthisconditionare<(a)>,<(b)>and<(c)>,which
+willbeputintothesetofHSWUPs1.Adatabasescanisperformedtoremoveitemsthatdonot
+appearinthesetofHSWPUP1andthereviseddatabaseUSD’isthenobtained(Line6).For
+example,thesequence<(a)>isaHSWUPanditsprojecteddatabaseisshowninTable5.
+Foreach1-sequenceinHSWPUP1,thesequentialutilityiscalculated.Iftheutilityisnoless
+thantheminimumutilitythreshold,thissequenceisoutputasaHUPSP(Lines9to10).
+Finally,thesub-processMining(USD’,ptable,ε,μ,HSWPUP1)isrecursivelyexecutedtodis-
+coverallHUPSPs(Line11).Thepseudo-codeoftheMiningprocessisshowninAlgorithm3.
+Fortherunningexample,thefinalresultisshowninTable3.
+Algorithm3:Mining(USD’,ptable,ε,μ,HSWUPsk)
+Input:USD,anuncertainquantitativesequencedatabase;ptable,aunit
+profittable;ε,minimumutilitythreshold;μ,minimumexpectedsupport
+threshold;HSWUPsk,thediscoveredHSWUPsofklength.
+Outut:HUPSPs,asetofcompletehighutility-probabilitysequential
+patterns
+1foreachsequenceSk2HSWUPskdo
+2 projectsub-databaseUSD0|Sk;
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 12/21
+MiningofHUPSPsfromuncertaindatabases
+3 HSWUPsk+1 null;
+4 foreachSk+1ofSkinUSD0|Skdo
+5 calculateSWU(Sk+1),sp(Sk+1);
+6 ifSWU(Sk+1)(cid:21)TSU×ε^sp(Sk+1)(cid:21)|USD|×μthen
+7 HSWUPsk+1 HSWUPsk+1[Sk+1;
+8 calculatesu(Sk+1)fromHSWUPsk+1;
+9 foreachs2Sk+1do
+10 ifsu(s)(cid:21)TSU×εthen
+11 HUPSPs HUPSPs[s;
+12 Mining(USD0|Sk,ptable,ε,μ,HSWUPsk+1);
+TheMiningprocesstakesasinput:(1)USD’,arefineduncertainquantitativesequence
+database,(2)ptable,aunitprofittableindicatingtheunitprofitofeachitem,(3)ε,themini-
+mumutilitythreshold,(4)μ,theminimumexpectedsupportthreshold,and(5)HSWUPsk,the
+HSWUPsoflengthk.Foreachk-sequenceSkinHSWUPsk,adatabasescanisperformedto
+generatetheprojecteddatabaseUSD0|Sk(Line2).Fortherunningexample,theextended
+sequencesofsequence<(a)>are<(a),(a)>,<(a,b)>,<(a),(b)>,<(a,c)>and<(a),(c)>.
+AnemptysetHSWUPsk+1isthencreated(Line3).TheUSD0|Skisscannedoncetofindthe
+SWUandspofSk+1byperformingI-ConcatenationsandS-Concatenations(Lines4to5).If
+theSWUofSk+1isnolessthantheminimumutilitycountanditsexpectedsupportcount
+valueisnolessthantheminimumexpectedsupportcount,thissequencewillbeaddedtothe
+setHSWUPsk+1(Lines6to7).Theactualutilityofthissequenceisthencalculatedandthe
+HUPSPsareoutput(Lines8to11).ThisloopisrepeateduntilallsequencesinHSWUPskhave
+beenprocessed(Line12).
+1Experimentalevaluation
+Substantialexperimentswereconductedtoevaluatetheeffectivenessandefficiencyofthepro-
+posedalgorithms.TwoversionsofthebaselinealgorithmnamedU-HUSPM1and
+U-HUSPM2areconsidered.Theyrespectivelyapplypruningstrategies1and2(U-HUSPM1),
+andpruningstrategies1to3(U-HUSPM2).TheP-HUSPMalgorithmadoptsnotonlyprun-
+ingstrategies1to3butalsotheprojectionmechanismtoreducethesizeofprojecteddata-
+bases,whichcangreatlyreducethetimerequiredforprocessingadataset.Noticethatthisis
+thefirstpaperwheremininghighutility-probabilitysequentialpatternsinuncertaindatabases
+isconsidered.Hence,nopreviousworkcanbedirectlycomparedtotheproposedalgorithms.
+ExperimentswereperformedonapersonalcomputerhavinganIntel(R)Core(TM)i7-4790
+CPU@3.60GHzand8GBofRAM,runningthe64-bitMicrosoftWindows7operatingsystem.
+AllalgorithmswereimplementedusingtheJavalanguage.
+Experimentswerecarriedonseveralreal-lifedatasets,havingvariouscharacteristics.All
+testeddatabaseswereobtainedfromtheSPMFwebsite[36].TheBMSandthekosarak10k
+datasetsarebothsparsedatasetscontainingafewverylongsequences.
+SIGNisadensedatasetcontainingnumerousverylongsequences.LEVIATHANandthe
+FIFAaremoderatelydensedatasets,havingmanylongsequences.BIBLEisamoderately
+densedatasethavingmanymediumlengthsequences.Foralltesteddatasets,thelog-normal
+distributionwasusedtogeneratetheexternalutilitiesofallitemsinsequencesintherangeof
+0and1000.Thepurchasequantitiesofitemswasrandomlygeneratedintherangeof1and5.
+Theprobabilityofallsequenceswererandomlygeneratedinthe0and1interval.Insummary,
+theparametersdescribingthesedatasetsare:#|D|,thenumberofsequences,#|I|,thenumber
+ofdistinctitems,AvgLen,theaveragesequencelength,MaxLen,themaximalsequencelength,
+andType,thedatabasetype.Characteristicsofthedatasetsusedintheexperimentsarepre-
+sentedinTable6.Thedatasetsusedintheexperimentsareprovidedinhttp://ikelab.net/db/
+plosone_db.rar.
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 13/21
+MiningofHUPSPsfromuncertaindatabases
+Table6.Characteristicsofthedatasets.
+Dataset #|D| #|I| AvgLen MaxLen Type
+SIGN 730 267 52 94 signlanguage
+LEVIATHAN 5,834 9,025 33.8 100 book
+FIFA 20,450 2,990 36.2 100 click-stream
+BIBLE 36,369 13,905 21.6 100 book
+kosarak10k 10,000 10,094 8.1 608 click-stream
+BMS 59,601 497 2.5 267 click-stream
+https://doi.org/10.1371/journal.pone.0180931.t006
+Toassesstheperformanceofthedevelopedalgorithms,theruntime,numberofgenerated
+candidates,memoryusageandscalabilitywereevaluated.Ineachexperiment,analgorithm
+wasterminatedifitsruntimeexceeded10,000secondsorifitranoutofmemory.
+1.2Runtime
+Inthissection,theruntimesoftheproposedU-HUSPM1,U-HUSPM2,andP-HUSPMalgo-
+rithmsarecompared.Fig1showstheruntimeoftheproposedalgorithmswhentheminimum
+expectedsupportthresholdμisfixedandtheminimumutilitythresholdεisvariedwithina
+predefinedintervalforeachdatabase.
+ItcanbeobservedinFig1thattheproposedP-HUSPMalgorithmoutperforms
+U-HUSPM1andU-HUSPM2onthesixdatasetsforafixedminimumexpectedsupport
+thresholdwhentheminimumutilitythresholdisvaried.Whenμissetto8%andεissetto
+12%ontheFIFAdataset,forexample,theruntimesofU-HUSPM1,U-HUSPM2and
+P-HUSPMarerespectively564,497and11seconds.AreasonisthatP-HUSPMusesthepro-
+jectionmechanism,whichcanreducethesizeofdatabasesforprocessedsequences.Forlarge
+sequences,projecteddatabasesaresmaller.P-HUSPMthusoutperformstheU-HUSPM1and
+Fig1.Runtimeswhenμisfixedandεisvaried.
+https://doi.org/10.1371/journal.pone.0180931.g001
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 14/21
+MiningofHUPSPsfromuncertaindatabases
+U-HUSPM2algorithms.ItcanalsobeobservedthattheU-HUSPM2algorithmhasbetterper-
+formancethanthatoftheU-HUSPM1algorithmformostdatasets.Thereasonisthatthe
+U-HUSPM2algorithmadopspruningstrategies1to3,whiletheU-HUSPM1algorithmonly
+appliesthepruningstrategies1and2.Pruningstrategy3canprunehugeamountsofunprom-
+isingsequencesearlytoavoidperformingmultipledatabasescansforcalculatingtheSWUand
+expectedsupportofsequences.Forexample,whenμissetto1.4%andεissetto2%onthe
+BIBLEdataset,theruntimesofU-HUSPM1andU-HUSPM2arerespectively161and83sec-
+onds.ItcanalsobeobservedthattheperformancegapbetweenU-HUSPM1andU-HUSPM2
+islargefortheSIGN,LEVIATHAN,FIFAandBIBLEdatasetsespeciallywhenμissettosmall
+values.Thereasonisthatthesefourdatasetsaredense,andmanycorrelatedHUPSPsare
+found.Asaresult,pruningstrategy3canbeusedtopruneunpromisingHSWUPsearly.In
+addition,Fig2showstheruntimeoftheproposedalgorithmsforafixedεandvariousμ
+values.
+ItcanbeobservedthatP-HUSPMandU-HUSPM2arefasterthanU-HUSPM1onthesix
+datasetsforminingtheHUPSPs.ThereasonsarethatP-HUSPMusestheprojectionmecha-
+nismtoreducethesizeoftheprojecteddatabases,andtheU-HUSPM2adoptsallthedesigned
+pruningstrategiestoreducethesizeofthesearchspace.Moreover,astheminimumexpected
+supportthresholdμisincreased,thethreealgorithmsspendlesstimetodiscovertheHUPSPs.
+Thereasonisthatasμisincreased,lesscandidatesaregeneratedforminingtheHUPSPs.It
+canbealsoobservedinFig2thattheperformancegapbetweenU-HUSPM1andU-HUSPM2
+isgreaterfortheSIGN,LEVIATHAN,FIFAandBIBLEdatasets.Thereasonisthesameasin
+Fig1.Thus,theproposedpruningstrategy3cangreatlyimprovetheperformanceofthebase-
+lineU-HUSPMalgorithmstodiscovertheHUPSPs.
+1.2Numberofcandidates
+Thissectionevaluatestheperformanceintermsofnumberofcandidatesgeneratedbyeachof
+thethreealgorithms.Asequenceisconsideredtobeacandidateifitrequiresanadditional
+Fig2.Runtimesforafixedεandvariousμvalues.
+https://doi.org/10.1371/journal.pone.0180931.g002
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 15/21
+MiningofHUPSPsfromuncertaindatabases
+Fig3.Numberofcandidatesforafixedμwhenεisvaried.
+https://doi.org/10.1371/journal.pone.0180931.g003
+databasescantodetermineitsactualutility.Fig3showsthenumberofcandidatesforthe
+threealgorithmsforafixedμwhentheminimumutilitythresholdεisvaried.Fig4showsthe
+numberofcandidatesgeneratedbythethreealgorithmsforafixedεwhentheminimumutil-
+itythresholdμisvaried.
+InFigs3and4,itcanbefoundthatthenumberofcandidatesdecreasesastheminimum
+utilitythresholdisincreasedorastheminimumexpectedsupportthresholdisincreased.The
+Fig4.Numberofcandidatesforafixedεwhenμisvaried.
+https://doi.org/10.1371/journal.pone.0180931.g004
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 16/21
+MiningofHUPSPsfromuncertaindatabases
+reasonisthatwhentheminimumexpectedsupportthresholdorminimumutilitythreshold
+areincreased,fewercandidatesaregeneratedforminingtheHUPSPs.Itisalsoobvioustosee
+thattheP-HUSPMalgorithmalwaysgenerateslesscandidatesthantheothertwoalgorithms.
+Forexample,whenμissetto8%andεissetto1%ontheSIGNdatabase,thenumberofcandi-
+datesforU-HUSPM1,U-HUSPM2andP-HUSPMarerespectively347,396,234,841and
+87,309.ThereasonisthattheP-HUSPMalgorithmadoptstheprojectionmechanismtogener-
+ateasmalldatabaseforeachprocessedsequence.Thus,theSWUvalueofaprocessedsequence
+ismuchsmallerthanthatobtainedbythebaselineU-HUSPM1andU-HUSPM2algorithms.
+Theprojectionmechanismcanbeusedtogreatlyreducethesizeoftheprocessedcandidates
+forminingthefinalsetofHUPSPs.ItalsocanbeobservedinFig4thattheU-HUSPM2algo-
+rithmalwaysgenerateslesscandidatesthantheU-HUSPM1algorithm.Thereasonisthat
+pruningstrategy3isusedinU-HUSPM2toreducethenumberofcandidates.
+1.3Memoryusage
+Experimentswerealsocarriedouttoassessthememoryusageofthecomparedalgorithms.
+Fig5showstheresultsforafixedμwhenεisvaried,whileFig6showstheresultsforafixedε
+whenμisvaried.
+Inmostcases,theU-HUSPM2algorithmconsumeslessmemorythantheU-HUSPM1and
+P-HUSPMalgorithms.TheP-HUSPMalgorithmappliestheprojectionmechanismtoproject
+adatabaseforeachprocessedsequence.Thus,thisprocessrequiresmorememory.However,
+P-HUSPMperformsbetterthanU-HUSPM2inFig5(c)and5(e).Thereasonisthatthosetwo
+datasetsaresparse.Whentheprojectionmechanismisperformed,amuchsmallerdatabaseis
+obtainedforagivensequence.SincetheU-HUSPM2algorithmadoptsthepruningstrategy3
+toreducethenumberofcandidates,itsmemoryusageisgreatlyreducedeventhoughanextra
+(butfew)arraysareusedtostoretherelationshipsof2-sequences.FortheU-HUSPM2algo-
+rithm,itisunnecessarytoprojectandstoretheprojecteddatabasesofaprocessedsequence.
+ThuslessmemoryisusedcomparedtotheP-HUSPMalgorithminmostcases.Thus,the
+Fig5.Memoryusageforafixedμwhenεisvaried.
+https://doi.org/10.1371/journal.pone.0180931.g005
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 17/21
+MiningofHUPSPsfromuncertaindatabases
+Fig6.Memoryusageforafixedεwhenμisvaried.
+https://doi.org/10.1371/journal.pone.0180931.g006
+U-HUSPM2algorithmalwaysrequireslessmemorycomparedtotheU-HUSPM1and
+P-HUSPMalgorithms.TheU-HUSPM1algorithmdoesnotadoptpruningstrategy3toeffi-
+cientlyreducethesearchspaceforminingtherequiredinformation.Hence,morememoryis
+requiredforhandlingunpromisingcandidates.AlthoughtheP-HUSPMalgorithmadopts
+pruningstrategies1to3,itsometimesneedsextramemorytoperformprojections,especially
+fordensedatasetsorwhenasequencehasahighchanceofhavingalmostthesameutilityand
+probabilityinasparsedataset.Thereisthusatrade-offbetweenmemoryusageandruntime.
+Although,P-HUSPMsometimesrequiresmorememorythanU-HUSPM1(inFigs5(f),6(e)
+and6(f)),P-HUSPMisfasterthanU-HUSPM1algorithm.FortheU-HUSPM2algorithm,it
+canbeseenthatitgenerallyoutperformsU-HUSPM1,aswellasP-HUSPMintermsofmem-
+oryusageexceptforverysparsedatasetssuchasFIFAandkosarak.
+1.4Scalability
+Thescalabilityoftheproposedalgorithmswasalsoevaluated.Experimentswereperformedon
+aseriesofsyntheticdatasetsnamedS10I4N4KD|X|K,wherethenumberofsequencesXwas
+variedfrom100kto500ksequencesusingincrementsof100k.Sincethereisnodatasetavail-
+ableforthedesignedframeworkyet,theparametersthatweusedforgeneratingsequential
+datasetwereobtainedfromtheliterature[7,35–38].Thoseparametersarecommonlyusedfor
+generatingsyntheticdatasets.Theminimumutilitythresholdissetto0.08%,whilethemini-
+mumprobabilitythresholdissetto0.2%.Resultsintermsofruntime,numberofcandidates
+andmemoryusageareshowninFig7.
+InFig7,itcanbeseenthattheP-HUSPMalgorithmhasbetterscalabilitycomparedtothe
+othertwoalgorithms,especiallyintermsofruntime.Italsocanbeobservedthattheruntime
+andmemoryusageincreasesasdatabasesizeisincreased,butthatthenumberofcandidates
+remainssteady.Itcanbealsoeasilyobservedthatthenumberofcandidatesforthethreealgo-
+rithmsremainstablefordifferentdatasetsizes.However,theruntimeandthememoryusage
+increasesincethedevelopedalgorithmsneedsmoreruntimetocalculatetheSWUandthe
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 18/21
+MiningofHUPSPsfromuncertaindatabases
+Fig7.Scalabilityofthecomparedalgorithms.
+https://doi.org/10.1371/journal.pone.0180931.g007
+expectedsupportofsequences.Thisprocessalsoconsumesmorememorytokeeptherequired
+informationforminingtheHUPSPs.
+2Conclusion
+Inthepast,severalstudieshaveproposedalgorithmstominehighutilitysequentialpatternsin
+precisedatabutnostudieswerepublishedtohandleuncertaindatabasesforminingthehigh
+utility-probabilitysequentialpatterns.Inthispaper,twobaselinealgorithmsnamed
+U-HUSPMandP-HUSPMwererespectivelypresentedtoefficiencyandeffectivelyminethe
+highutility-probabilitysequentialpatterns(HUPSPs)inuncertaindatabases.TheU-HUSPM
+algorithmminestheHUPSPsusingalevel-wiseapproach,andappliesthreepruningstrategies
+toreducethenumberofunpromisingcandidatesinthesearchspace.Besides,animproved
+P-HUSPMalgorithmwasdesigned.Itsprojectionmechanismallowstocreatesmallprojected
+databasesforeachprocessedsequence,whichspeedsuptheminingprocess.Substantialexper-
+imentswereconductedonbothsyntheticandrealdatasetstoevaluatetheperformanceofthe
+developedalgorithmsintermsofruntime,numberofcandidates,memoryusageandscalabil-
+ity.Resultshaveshownthattheproposedalgorithmsandthedesignedpruningstrategiescan
+efficientlydiscoverHUPSPsandthecorrectnessandcompletenesshasbeendemonstrated.
+Sincethisisthefirstpapertolevel-wiselyminetheHUPSPs,moreextensionswithbetter
+structures(suchin[22,23])canbealsoconsideredtoefficiencyimprovetheminingperfor-
+mance.However,itisanon-trivialtasksincethedownwardclosurepropertyusedinthevar-
+ieddatastructuresisnecessarytobemaintainedandre-designed,aswellasthepruning
+strategiestoearlyreducetheunpromisingcandidatesandreducethesearchspaceformining
+HUPSPs.Moreover,thedesignedalgorithminthispaperminesHUPSPs.However,theutility
+ofasequenceincreasesalongwiththesizeofit.Theaverage-utilitymodelcanbeusedtopro-
+videafairmeasurementregardingtothelengthoftheitemset/sequence(numberofitems
+withinit).Itisalsoaninterestingtopictominethehighaverage-utilitysequencesunder
+uncertaindatabases.
+Acknowledgments
+ThisresearchwaspartiallysupportedbytheNationalNaturalScienceFoundationofChina
+(NSFC)undergrantNo.61503092,bytheResearchontheTechnicalPlatformofRuralCul-
+turalTourismPlanningBasingonDigitalMediaundergrant2017A020220011,andbythe
+TencentProjectundergrantCCF-TencentIAGR20160115.
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 19/21
+MiningofHUPSPsfromuncertaindatabases
+AuthorContributions
+Conceptualization:BinbinZhang,JerryChun-WeiLin,PhilippeFournier-Viger,TingLi.
+Formalanalysis:JerryChun-WeiLin.
+Supervision:JerryChun-WeiLin.
+Writing–review&editing:PhilippeFournier-Viger.
+References
+1. AgrawalR,ImielinskiT,SwamiA.Databasemining:Aperformanceperspective.IEEETransactionson
+KnowledgeandDataEngineering.1990; 5(6):914–925.https://doi.org/10.1109/69.250074
+2. AgrawalR,ImielinskiT,SwamA.Miningassociationrulesbetweensetsofitemsinlargedatabase.
+ACMSIGMODInternationalConferenceonManagementofData.1993;207-216.
+3. AgrawalR,SrikantR.Fastalgorithmsforminingassociationrulesinlargedatabases.InternationalCon-
+ferenceonVeryLargeDataBases.1994;619-624.
+4. Fournier-VigerP,LinJCW,KiranRU,KohYS,ThomasR.Asurveyofsequentialpatternmining.Data
+ScienceandPatternRecognition.2017; 1(1):54–77.
+5. LiuY,LiaoW,ChoudharyA.Atwo-phasealgorithmforfastdiscoveryofhighutilityitemsets.The
+Pacific-AsiaConferenceonKnowledgeDiscoveryandDataMining.2005;689-695.
+6. LinCW,HongTP,LuWH.Aneffectivetreestructureformininghighutilityitemsets.ExpertSystems
+withApplications.2011; 38(6):7419–7424.https://doi.org/10.1016/j.eswa.2010.12.082
+7. LiuM,QuJ.Mininghighutilityitemsetswithoutcandidategeneration.ACMInternationalConferenceon
+InformationandKnowledgeManagement.2012;55-64.
+8. Fournier-VigerP,WuCW,ZidaS,andTsengVS.FHM:Fasterhigh-utilityitemsetminingusingesti-
+matedutilityco-occurrencepruning.InternationalSymposiumonMethodologiesforIntelligentSystems.
+2014;83-92.
+9. TsengVS,WuCW,ShieBE,YuPS.UP-growth:Anefficientalgorithmforhighutilityitemsetmining.
+The16thACMSIGKDDInternationalConferenceonKnowledgeDiscoveryandDataMining.2010;
+253-262.
+10. YunU,RyangH,LeeG,FujitaH.Anefficientalgorithmformininghighutilitypatternsfromincremental
+databaseswithonedatabasescan.Knowledge-BasedSystems.2017; 124(15):188–206.https://doi.
+org/10.1016/j.knosys.2017.03.016
+11. RyangH,YunU.Highutilitypatternminingoverdatastreamswithslidingwindowtechnique.Expert
+SystemswithApplications.2016; 57:214–231.https://doi.org/10.1016/j.eswa.2016.03.001
+12. RyangH,YunU,RyuK.Fastalgorithmforhighutilitypatternminingwiththesumofitemquantities.
+IntelligentDataAnalysis.2016; 20(2):395–415.https://doi.org/10.3233/IDA-160811
+13. AgrawalR,SrikantR.Miningsequentialpatterns.InternationalConferenceonDataEngineering.1995,
+3-14.
+14. SrikantR,AgrawalR.Miningsequentialpatterns:generalizationsandperformanceimprovements.
+InternationalConferenceonExtendingDatabaseTechnology.1996;3-17.
+15. PeiJ,HanJ,Mortazavi-AslB,WangJ,PintoH,ChenQ,DayalU,HsuMC.Miningsequentialpatterns
+bypattern-growth:thePrefixSpanapproach.IEEETransactionsonKnowledgeandDataEngineering.
+2004; 16(11):1424–1440.https://doi.org/10.1109/TKDE.2004.77
+16. AyresJ,FlannickJ,GehrkeJ,YiuT.Sequentialpatternminingusingabitmaprepresentation.ACM
+SIGKDDInternationalConferenceonKnowledgeDiscoveryandDataMining.2002;429-435.
+17. ZakiMJ.SPADE:Anefficientalgorithmforminingfrequentsequences.MachineLearning.2001;
+42(1-2):31–60.https://doi.org/10.1023/A:1007652502315
+18. HanJ,PeiJ,Mortazavi-AslB,ChenQ,DayalU,HsuMC.“FreeSpan:frequentpattern-projected
+sequentialpatternmining,”ACMSIGKDDInternationalConferenceonKnowledgeDiscoveryandData
+Mining,pp.355-359,2000.
+19. AhmedCF,TanbeerSK,JeongBS.Mininghighutilitywebaccesssequencesindynamicweblogdata.
+InternationalConferenceonSoftwareEngineering,ArtificialIntelligence,NetworkingandParallel/
+DistributedComputing.2010;76–81.
+20. AhmedCF,TanbeerSK,JeongBS.Anovelapproachformininghigh-utilitysequentialpatternsin
+sequencedatabases.ETRIJournal.2010; 32(5):676–686.https://doi.org/10.4218/etrij.10.1510.0066
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 20/21
+MiningofHUPSPsfromuncertaindatabases
+21. YinJ,ZhengZ,CaoL.USpan:Anefficientalgorithmformininghighutilitysequentialpatterns.ACM
+SIGKDDInternationalConferenceonKnowledgeDiscoveryandDataMining.2012;660–668.
+22. LanGC,HongTP,TsengVS,WangSL.Applyingthemaximumutilitymeasureinhighutilitysequential
+patternmining.ExpertSystemswithApplications.2014; 41(11):5071–5081.https://doi.org/10.1016/j.
+eswa.2014.02.022
+23. AlkanOK,KaragozP.CRoMandHuspExt:Improvingefficiencyofhighutilitysequentialpatternextrac-
+tion.IEEETransactionsonKnowledgeandDataEngineering.2015; 27(10):2645–2657.https://doi.
+org/10.1109/TKDE.2015.2420557
+24. ChuiCK,KaoB,HungE.Miningfrequentitemsetsfromuncertaindata.ThePacific-AsiaConferenceon
+KnowledgeDiscoveryandDataMining.2007;47-58.
+25. BerneckerT,KriegelHP,RenzM,VerheinF,ZueflA.Probabilisticfrequentitemsetmininginuncertain
+databases.ACMSIGKDDInternationalConferenceonKnowledgeDiscoveryandDataMining.2009;
+119-128.
+26. LeungCKS,MateoMAF,BrajczukDA.Atree-basedapproachforfrequentpatternminingfromuncer-
+taindata.ThePacific-AsiaConferenceonKnowledgeDiscoveryandDataMining.2008;653-661.
+27. AggarwalCC,LiY,WangJ,WangJ.Frequentpatternminingwithuncertaindata.ACMSIGKDDInter-
+nationalConferenceonKnowledgeDiscoveryandDataMining.2009;29-38.
+28. LinCW,HongTP.Anewminingapproachforuncertaindatabasesusingcufptrees.ExpertSystems
+withApplications.2012; 39(4):4084–4093.https://doi.org/10.1016/j.eswa.2011.09.087
+29. LeeG,YunU,RyangH.Anuncertainty-basedapproach:frequentitemsetminingfromuncertaindata
+withdifferentitemimportance.Knowledge-BasedSystems.2015; 90:239–256.https://doi.org/10.1016/
+j.knosys.2015.08.018
+30. LeeG,YunU.Anewefficientapproachformininguncertainfrequentpatternsusingminimumdata
+structurewithoutfalsepositives.FutureGenerationComputerSystems.2017; 68:89–110.https://doi.
+org/10.1016/j.future.2016.09.007
+31. SunL,ChengR,CheungDW,ChengJ.Mininguncertaindatawithprobabilisticguarantees.ACM
+SIGKDDInternationalConferenceonKnowledgeDiscoveryandDataMining.2010;273-282.
+32. TongY,ChenL,ChengY,YuPS.Miningfrequentitemsetsoveruncertaindatabases.Proceedingsof
+theVLDBEndowment.2012; 5(11):1650–1661.https://doi.org/10.14778/2350229.2350277
+33. MuzammalM,RajeevR.Miningsequentialpatternsfromprobabilisticdatabases.KnowledgeandInfor-
+mationSystems.2015; 44(2):325–358.https://doi.org/10.1007/s10115-014-0766-7
+34. ZhaoZ,D.YanD,W.Ng.Miningprobabilisticallyfrequentsequentialpatternsinlargeuncertaindata-
+bases.IEEETransactionsonKnowledgeandDataEngineering.2014; 26(5):1171–1184.https://doi.
+org/10.1109/TKDE.2013.124
+35. LinCW,GanW,Fournier-VigerP,HongTP,TsengVS.Efficientalgorithmsformininghigh-utilityitem-
+setsinuncertaindatabases.Knowledge-BasedSystems.2016; 96:171–187.https://doi.org/10.1016/j.
+knosys.2015.12.019
+36. Fournier-VigerP,LinJCW,GomarizA,GuenicheT,SoltaniA,DengZ,LamHT.TheSPMFopen-
+sourcedatamininglibraryversion2MachineLearningandKnowledgeDiscoveryinDatabases.2016;
+36-40.
+37. WangJ,HanJ,LuY,TzvetkovP.TFP:Anefficientalgorithmforminingtop-Kfrequentcloseditemsets.
+IEEETransactionsonKnowledgeandDataEngineering.2005; 17(5):652–664.https://doi.org/10.
+1109/TKDE.2005.81
+38. YunU,RyangH,RyuKH.Highutilityitemsetminingwithtechniquesforreducingoverestimatedutilities
+andpruningcandidates.ExpertSystemswithApplications.2014; 4:3861–3878.https://doi.org/10.
+1016/j.eswa.2013.11.038
+PLOSONE|https://doi.org/10.1371/journal.pone.0180931 July25,2017 21/21

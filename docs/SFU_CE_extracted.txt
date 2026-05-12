@@ -1,0 +1,512 @@
+SFU-CE: Skyline Frequent-Utility Itemset
+Discovery Using the Cross-Entropy Method
+B
+WeiSong( ) andChuanlongZheng
+SchoolofInformationScienceandTechnology,NorthChinaUniversityofTechnology,
+Beijing100144,China
+songwei@ncut.edu.cn
+Abstract. Consideringbothfrequencyandutility,skylinefrequent-utilityitem-
+sets(SFUIs)increasetheamountofactionableinformationavailablefordecision-
+making.Inthispaper,weproposeanalgorithmforminingSFUIscalledskyline
+frequent-utilityminingbasedoncross-entropy(SFU-CE).WefirstmodeltheSFUI
+miningproblemusingCEwithutilityastheoptimizationobject.Wethenpropose
+criticalutilitypruningforunpromisingitemsetswithutilityanditsupperbound.
+Furthermore,wealsodesignarandommutationstrategytomakeitemsetswithin
+eachsamplemorediverse.WedemonstratetheefficiencyandaccuracyofSFU-CE
+bycomparingitwithstate-of-the-artalgorithms.
+Keywords: Skylinefrequent-utilityitemsets·Cross-entropy·Criticalutility·
+Randommutation
+1 Introduction
+Asanimportantsub-fieldofdatamining,itemsetminingisusedtodiscoverinteresting
+andusefulpatternsintransactiondatabases.Toevaluatetheinterestingnessorusefulness
+ofitemsets,various measures havebeen proposed,among whichfrequency andprofit
+arethetwomostinfluentialmeasures.
+Considering both frequency and profit, the utility-frequent itemset (UFI) was
+designed and two algorithms were proposed in [14]. For the UFI model, both mini-
+mumutilityandsupportarerequired.However,itisdifficultforuserstosetappropriate
+thresholdsandthemodelincursahighcomputationalcost.
+Tosolvethisproblem,Goyaletal.introducedSFUIsandproposedtheSKYMINE
+algorithmforminingthem[4].SFUIsareitemsetsthatarenotdominatedbyanyother
+itemsets in terms of both frequency and utility. Thus, neither the frequency threshold
+norutilitythresholdisrequired.Usingbothfrequencyandutilityismeaningfulinprac-
+ticaldecision-making.Forexample,parentsmaychoosetorenthousesforthestudents
+accordingtothepriceanddistanceofthehousesfromtheschooltosavethetimethatit
+takesforstudentstotraveltoandfromschool.Inthiscase,thedistancefromthehouse
+totheschoolandthepriceofthehousearecontrasted;thatis,ahousethatiscloseto
+theschoolnormallyhasahigherpricethanahousethatisfarfromtheschool.
+©SpringerNatureSwitzerlandAG2021
+H.Yinetal.(Eds.):IDEAL2021,LNCS13113,pp.354–366,2021.
+https://doi.org/10.1007/978-3-030-91608-4_35
+SFU-CE:SkylineFrequent-UtilityItemsetDiscovery 355
+In the first SKYMINE algorithm [4], the UP-tree structure was used to transform
+the original information for mining SFUIs. In the recent algorithms SFU-Miner [8],
+SKYFUP-D[5],andSKYFUP-B[5],theutility-list(UL)structurewasusedtoimprove
+efficiency.InadditiontotheULstructure,differentarrays,suchastheumaxarrayand
+utilmaxarray,havealsobeendesignedtorecordtheutilityandfrequencyofintermediate
+results. Because mining SFUIs does not require either a support threshold or utility
+threshold, the algorithm’s efficiency remains the most challenging issue for the SFUI
+mining(SFUIM)problem.
+Inspiredbybiologicalandphysicalphenomena,heuristicmethodshavebeenused
+to discover itemsets within an acceptable time. Typical heuristic methods include the
+geneticalgorithm[2],particleswarmoptimization[6],andartificialbeecolonyalgorithm
+[9]. Recently, the cross-entropy (CE) [11, 13] method has also been used to discover
+top-khighutilityitemsets(HUIs)andhasdemonstratedhighefficiency.
+DifferentfromTKU-CEandTKU-CE+[11,13]thatuseCEforminingHUIs,we
+propose a CE-based algorithm called skyline frequent-utility mining based on cross-
+entropy (SFU-CE) for mining SFUIs. First, we model the SFUIM problem using the
+typicalCEmethodsothatitemswithinitemsetswithhigherutilitieshavemoreoppor-
+tunitiestoappearinthenextsample.Thus,thesamplecanfilteritemsetswithalower
+utility, which tend to be dominated by other itemsets. Second, we focus on the max-
+imal utility of items with the highest frequency among all single items, and propose
+criticalutilitypruning.Thus,thesearchspaceisnarrowedusingutilityandtransaction-
+weightedutilization.Third,wedesignarandommutation(RM)strategytoimprovethe
+diversity of each sample. Different from the typical CE method that generates a new
+sample strictly following the probability vector, the RM strategy generates new item-
+setsaccordingtoprobabilitieshigherthan0.5.Experimentalresultsdemonstratedthat
+SFU-CEdiscoveredsufficientSFUIsinlesstime.
+2 Preliminaries
+2.1 SFUIMProblem
+Let I = {i , i ,…, i } be a finite set of items. Set X ⊆ I is called an itemset, or a
+1 2 m
+k-itemset if it contains k items. Let D = {T , T , …, T } be a transaction database.
+1 2 n
+Each transaction T ∈D (1 ≤ d ≤ n),where d is a unique identifier, is a subset of I.
+d
+ThefrequencyofitemsetX,denotedbyf(X),isdefinedasthenumberoftransactionsin
+whichX occursasasubset.
+Theinternalutilityq(i ,T )representsthequantityofitemi intransactionT .The
+p d p d
+externalutilityp(i )istheunitprofitvalueofitemi .Theutilityofitemi intransaction
+p p p
+T
+d
+is defined as u(i
+p
+, T
+d
+) = p(cid:2)(i
+p
+) × q(i
+p
+, T
+d
+). The utility of itemset X in transaction
+T is defined as u(X,T ) = u(i ,T ). The utility of itemset X in D is defined
+d (cid:2) d ip ∈X p d
+as u(X) = u(X,T ). The transaction utility (TU) of transaction T is
+definedasTU(T
+X⊆
+)
+Td= ∧T
+u
+d
+(
+∈
+T
+D
+,T ).
+d
+Thetransaction-weightedutilization(TWU)mode
+d
+lis
+d d d
+generallyusedastheupperboundofutility,andithasbeenproventhatanitemsetisnot
+anHUIifitsTWUislowerthantheminimumutilitythreshold[7].Formally,theTWU
+ofitemsetX ist(cid:2)hesumoftheTUsofallthetransactionscontainingX,whichisdefined
+asTWU(X)= TU(T ).
+X⊆Td ∧Td ∈D d
+356 W.SongandC.Zheng
+AnitemsetXdominatesanotheritemsetY inthedatabaseiff(X)≥f(Y)andu(X)
+>u(Y),orf(X)>f(Y)andu(X)≥u(Y).AnitemsetX isanSFUIifitisnotdominated
+byanyotheritemsetsinDconsideringbothfrequencyandutilityfactors.TheSFUIM
+problemistodiscoverallthenon-dominateditemsetsinthedatabase.
+Table1. Exampledatabase
+TID Transactions TU
+1 (A,1)(B,3)(C,1)(E,3)(G,1) 30
+2 (B,1)(C,1)(F,2) 10
+3 (B,2)(C,1)(D,1)(E,2) 20
+4 (A,1)(B,1)(C,1)(D,1)(E,1)(F,1)(G,1) 20
+5 (D,2)(E,2) 10
+6 (G,1) 4
+Table2. Profittable
+Item A B C D E F G
+Profit 2 5 3 3 2 1 4
+Asarunningexample,considerthedatabaseinTable1andtheprofittableinTable
+2.Forconvenience,anitemset{B,C}isdenotedbyBC.Intheexampledatabase,the
+utilityofitemBintransactionT isu(B,T )=5×3=15,theutilityofitemsetBCin
+1 1
+transactionT isu(BC,T )=15+3=18,andtheutilityofitemsetBCinthetransaction
+1 1
+databaseisu(BC)=u(BC,T )+u(BC,T )+u(BC,T )+u(BC,T )=47.TheTU
+1 2 3 4
+ofT isTU(T )=u(ABCEG,T )=30,andtheutilitiesoftheothertransactionsare
+1 1 1
+showninthethirdcolumnofTable1.BecausetransactionsT ,T ,T ,andT contain
+1 2 3 4
+BC,f(BC)=4,andTWU(BC)=TU(T )+TU(T )+TU(T )+TU(T )=80.We
+1 2 3 4
+canfurtherverifythatBCisnotdominatedbyanyotheritemsets,soitisanSFUI.The
+otherSFUIinthisexampleisBCE,wheref(BCE)=3andu(BCE)=51.
+2.2 Cross-EntropyMethod
+The CE method is an effective heuristic method that can be used for solving difficult
+combinatorialoptimizationproblems(COPs)[1].Inthispaper,wedeterminetheSFUIs
+followingtheCOPmethodology.
+LetY =(y ,y ,…,y )beann-dimensionalbinaryvector,thatis,thevalueofy (1
+1 2 n i
+≤i≤n)iseitherzeroorone.ThegoaloftheCEmethodistoreconstructtheunknown
+vectorY bymaximizingthefunctionS(X)usingarandomsearchalgorithm:
+(cid:3) (cid:4) (cid:4)
+S(X)=n− n (cid:4) x −y (cid:4). (1)
+j=1 j j
+SFU-CE:SkylineFrequent-UtilityItemsetDiscovery 357
+AnaiveapproachtodetermineY istorepeatedlygeneratebinaryvectorsX =(x ,
+1
+x ,…,x )untilasolutionisequaltoY,whichleadstoS(X)=n.Elementsofthetrial
+2 n
+binaryvectorX,thatis,x ,x ,…,x ,areindependentBernoullirandomvariableswith
+1 2 n
+success probabilities, and these probabilities comprise a probability vector (PV) P =
+(p ,p ,…,p ).TheCEmethodforCOPconsistsofcreatingasequenceofPVsP ,P ,
+1 2 n 0 1
+…andlevelsγ ,γ ,…suchthatthesequenceP ,P ,…convergestotheoptimalPV
+1 2 0 1
+andthesequenceγ ,γ ,…convergestotheoptimalperformance.
+1 2
+Initially,P =(1/2,1/2,…,1/2).ForasampleX ,X ,…,X ofBernoullivectors,
+0 1 2 N
+calculateS(X )foralliandsorttheelementsindescendingorderofS(X ).Letγ bea
+i i t
+ρ samplequantileoftheperformances,thatis,
+γ
+t
+=S(X(cid:7)ρ×N(cid:8) ), (2)
+where(cid:7)ρ×N(cid:8)isthesmallestintegerthatisgreaterthanorequaltoρ ×N.Theneach
+elementoftheprobabilityvectorisupdatedby
+(cid:5)
+(cid:2)
+P t,j = N i=1 I{S(Xi )≥γ t } ×I{ Xij =1 } (cid:2) N i=1 I{S(Xi )≥γ t } , (3)
+wherej=1,2,…,n,X =(x ,x ,…,x ),tistheiterationnumber,and
+i i1 i2 in
+(cid:6)
+1, ifEis true
+I = , (4)
+E 0, otherwise
+whereE isanevent.
+Equation 3 is used iteratively to update the PV until the stopping criterion is met.
+Therearetwopossiblestoppingcriteria:γ doesnotchangeforanumberofsubsequent
+t
+iterationsorthePVhasconvergedtoabinaryvector.
+3 SFU-CEAlgorithm
+3.1 ModelingSFUIDiscoveryUsingtheCE
+Weusebitmap[12]inSFU-CEtoidentifytransactionsthatcontainthetargetitemsets.
+We calculate the frequency and utility values of the target itemsets efficiently using
+bitwiseoperations.
+Specifically,SFU-CEusesabitmapcover representationforitemsets.Inabitmap
+cover,thereisonebitforeachtransactioninthedatabase.Ifitemiappearsintransaction
+T ,thenbitjofthebitmapcoverforitemiissettoone;otherwise,thebitissettozero.
+j
+Thisnaturallyextendstoitemsets.LetXbeanitemset,Bit(X)correspondstothebitmap
+coverthatrepresentsthetransactionsetfortheitemsetX.LetX andY betwoitemsets.
+Bit(X ∪Y)canbecomputedasBit(X)∩Bit(Y),thatis,thebitwise-ANDofBit(X)and
+Bit(Y).
+Inthispaper,abinaryvectorrepresentinganitemsetiscalledanitemsetvector(IV),
+anditsdimensionsarethesameasthoseofthePV.TheIVswithinthekthiterationare
+determinedbythekthPV.Then,the(k+1)thPVisdeterminedbytheIVswithinthekth
+358 W.SongandC.Zheng
+iterationaccordingtoEq.3.Thisprocedureisrepeateduntiltheterminationconditions
+arereached.
+TodiscovertheSFUIsfromthetransactiondatabase,weusetheutilityoftheitemset
+toreplaceEq.1directly;thatis,foranitemsetX,
+S(X) = u(X) (5)
+Ineachiterationt,wesortasampleX ,X ,…,X indescendingorderofS(X )(1
+1 2 N i
+≤i≤N),andupdatethesamplequantileγ andthePVP accordingly.
+t t
+3.2 CriticalUtilityPruning
+Becausethefrequencymeasurefollowsthedownward-closureproperty,thefrequencies
+of1-itemsetsaretypicallyhigh,whichcanbeusedasapruningstrategytonarrowthe
+searchspace.
+Definition1. The critical utility of SFUIs (CUS) in transaction database D is the
+maximalutilityofsingleitemsthathavethehighestfrequency,andisdefinedas.
+CUS = max{u(i)|f(i) = f } (6)
+max
+whereiisaniteminDandf isthemaximalfrequencyofall1-itemsetsinD.
+max
+Intherunningexample,threeitemshavethehighestfrequency:f(B)=4,f(C)=4,
+andf(E)=4.Becauseu(B)=35,u(C)=12,andu(E)=16,CUS=35.
+Theorem1. LetX beanitemset.Ifu(X)<CUS,X isnotanSFUI.
+Proof. Let i be the 1-itemset, where f(i ) = f and u(i ) = CUS, and i be the
+c c max c x
+1-itemsetsuchthati ∈X.Then,f(X)≤f(i ).Becausef(i )≤f ,f(X)≤f holds.
+x x x max max
+Consideringu(X)<CUS,X isdominatedbyi andX isnotanSFUI.(cid:2)
+c
+UsingTheorem1,oncea1-itemsetisfoundtohaveutilitylowerthantheCUS,it
+canbeidentifiedimmediatelyasnotanSFUI.Astheupperboundofutility,itisobvious
+thatTWUcanalsobeusedforpruningwiththeCUS.
+Corollary1. LetX beanitemset.IfTWU(X)<CUS,X andallitemsetscontainingX
+arenotSFUIs.
+Proof. Let i be the 1-itemset with f(i ) = f and u(i ) = CUS. Similar to
+c c max c
+Theorem1,wecaneasilyprovethatX isnotanSFUI.
+ConsideranarbitraryitemsetY containingX:u(Y)≤TWU(Y)≤TWU(X)<CUS
+= u(i ), and f(Y) ≤ f(X) ≤ f = f(i ). Thus, Y is dominated by i and Y is not an
+c max c c
+SFUI.(cid:2)
+SFU-CE:SkylineFrequent-UtilityItemsetDiscovery 359
+Using Corollary 1, once a 1-itemset is found to have TWU lower than the CUS,
+thisitemsetandallitssupersetscanbeprunedsafely.Intherunningexample,because
+TWU(F)=30<CUS,Fisdeletedfromthedatabase.
+3.3 RandomMutation
+ForthetypicalCE-baseditemsetdiscoveryalgorithm[11],theIVsstrictlyrelyonthe
+PV.BecauseoftherandomnessofCE,thealgorithmtendstofallintothelocalminimum,
+whichleadstoitmissingthecorrectSFUIs.ToincreasethenumberofcorrectSFUIs,a
+mutation(aclassicalconceptinthegeneticalgorithm)isusedintheproposedalgorithm.
+Withineachiteration,inadditiontotheIVsfollowingthePVs,SFU-CEalsogenerates
+partofthenewIVsrandomly.
+For each iteration t, let P = (p , p ,…, p ) be the current PV with j (1 ≤ j ≤ n)
+1 2 n
+probabilities higher than 0.5. These j probabilities are denoted by p , p , …, p (1
+r1 r2 rj
+≤ r ≤ r ≤ … ≤ r ≤ n). To perform RM, a positive integer num (1 ≤ num ≤ j) is
+1 2 j
+generatedfirst,thennumbits(amongther -th,r -th,…,r -thbits)ofanIVperforming
+1 2 j
+RMareselectedrandomly,andtheirvaluesaresettooneandtheotherbitsaresetto
+zero.
+Letα(0<α<1)bethemutationfactor.Ineachiteration,(cid:11)N ×α(cid:12)IVsaregenerated
+byRM,andtheremainingN −(cid:11)N ×α(cid:12)IVsarestillgeneratedaccordingtothePV.It
+shouldbenotedthatonlythebitscorrespondingtoprobabilitiesstrictlyhigherthan0.5
+performRMbecauseiftheprobabilityof0.5isalsoconsidered,alltheIVsinthefirst
+iterationareallgeneratedbyRM.
+Considertherunningexample,supposethePVinoneiterationis<0.3,0.8,0.7,0.2,
+0.6, 0.1>. There are only six probabilities because F is deleted using Corollary 1. In
+thisPV,threeprobabilitiesarehigherthan0.5:thesecondprobability,thirdprobability,
+andfifthprobability.TogenerateanIVusingthisPV,apositiveintegernohigherthan
+threeisgeneratedfirst.Forexample,letthisnumberbetwo.Then,twobitswithinthe
+second,third,andfifthbitsaresettoone,andtheotherbitsaresettozero.Wecansee
+that<010010>issuchanIVcorrespondingtoitemsetBE.
+3.4 AlgorithmDescription
+TheproposedSFU-CEalgorithmforminingSFUIsisdescribedinAlgorithm1.
+360 W.SongandC.Zheng
+InAlgorithm1,theprocedureInitialization,describedinAlgorithm2,iscalledin
+Step1.TheloopfromStep2toStep12discoverstheSFUIswhentheiterationnumberis
+nohigherthanthethresholdandthePVisnotabinaryvector.ForabinaryPV,alltheN
+itemsetsarethesameinoneiterationbecauseeachitemineachitemsetisdefinitelyone
+orzero.InStep3,thePVisupdatedaccordingtothecurrentsample.Withinthecurrent
+sample, (cid:11)N ×α(cid:12) IVs are generated by RM (Step 4), whereas other IVs are produced
+with the probabilities in PV (Step 5). In Step 6, the itemsets are sorted in descending
+orderofutility.IntheloopfromStep7toStep9,eachitemsetischeckedbythefunction
+SFUI-Filter(describedinAlgorithm3).Then,inStep10,thesamplequantileisupdated,
+andinStep11,theiterationnumberisincrementedbyone.Finally,allitemsetsinCSFUI
+areoutputasSFUIsinStep13.
+SFU-CE:SkylineFrequent-UtilityItemsetDiscovery 361
+InAlgorithm2,inStep1,thedatabaseisscannedandunpromisingitemsarepruned
+usingCorollary1.Next,thedatabaseisrepresentedbyabitmapinStep2.InStep3,all
+theprobabilitiesinthePVareinitializedto1/2.UsingthisPV,theitemsetsofthefirst
+iterationaregeneratedinStep4.InStep5,theitemsetsaresortedinutility-descending
+orderandinStep6,CSFUI,thesetofcandidateSFUIsisinitializedasanemptyset.Inthe
+loopfromSteps7to9,eachitemsetischeckedbythefunctionSFUI-Filter(describedin
+Algorithm3).InStep10,thesamplequantileiscalculated.Finally,theiterationnumber
+issettooneinStep11.
+According to Theorem 1, Algorithm 3 does not perform a meaningful operation
+unless the utility of the enumerating itemset is no lower than the CUS (Steps 1 to 7).
+In Step 2, the itemsets in CSFUI are deleted if it is dominated by the enumerating
+itemset.IftheenumeratingitemsetisdominatedbyanitemsetinCSFUI,inSteps3to
+5,thealgorithmisterminatedandCSFUI isreturned.Iftheenumeratingitemsetisnot
+dominatedbyanyitemsetinCSFUI,itisinsertedintoCSFUI inStep6.Finally,ifthe
+algorithmisnotterminatedbefore,CSFUI isreturnedinStep8.
+4 PerformanceEvaluation
+WeevaluatetheperformanceofSFU-CEalgorithmandcompareitwithSKYMINE[4],
+SFU-Miner[8],SKYFUP-D[5],andSKYFUP-B[5].Wedownloadedthesourcecode
+ofSKYMINEandSFU-MinerfromtheSPMFdatamininglibrary[3],andobtainedthe
+sourcecodeofSKYFUP-DandSKYFUP-Bfromtheauthor.
+Weperformedtheexperimentsonacomputerwithaquad-core3.40GHzCPUand
+8GBmemoryrunning64-bitMicrosoftWindows10.WewroteourprogramsinJava.We
+usedfourdatasetsforperformanceevaluation,twosyntheticdatasetsgeneratedusingthe
+transactionutilitydatabasegeneratorprovidedontheSPMF[3],andtworealdatasets
+downloaded from the SPMF [3]. The characteristics of the datasets are presented in
+Table3.
+Forallexperiments,wesetthesamplesizeto2,000,maximumnumberofiterations
+to2,000,quantileρ to0.2,andmutationfactorαto0.3.
+362 W.SongandC.Zheng
+Table3. Characteristicsofthedatasets
+Datasets Avg.trans.Length No.ofitems No.oftrans
+T25I50D10k 25 50 10,000
+T35I10050k 35 100 50,000
+Chess 37 75 3,156
+Connect 43 129 67,557
+4.1 Runtime
+First, we consider the efficiency performance of these algorithms, and show the
+comparisonresultsinTable4.
+Table4. Executiontimesofthefivealgorithms
+Unit(Sec) SKYMINE SFU-Miner SKYFUP-D SKYFUP-B SFU-CE
+T25I50D10k 20.03 1915.78 77.75 – 7.82
+T35I10050k 163.67 – 1006.42 – 69.28
+Chess – 167.53 37.92 36.22 16.20
+Connect – – 6523.72 – 673.28
+For the four datasets, the proposed SFU-CE algorithm and SKYFUP-D algorithm
+returnedresultsinallcases,whereastheotherthreealgorithmscouldnot.Specifically,
+SKYMINEranoutofmemoryontwodatasets,SKYFUP-Branoutofmemoryonthree
+datasets,andSFU-Minerdidnotreturnanyresultsafter20hontwodatasets.Weuse
+“-”forthesesevenentries.
+Table4showsthattheproposedSFU-CEalgorithmalwaysranfasterthanthecom-
+paredalgorithms.OnT35I100D50k, SFU-CEwasoneorder ofmagnitude fasterthan
+SKYFUP-D. This shows that CE improved the efficiency of SFUIM. There are three
+reasonsfortheefficiencyimprovement.First,differentfromthefourexactalgorithms,
+SFU-CEonlyconsidereditemsetsthathadhighutilityvalueswithgradualPVconver-
+genceandRMratherthanallcombinationsofitems.Second,thecriticalutilitypruning
+strategiesusingTheorem1andCorollary1werealsoeffectiveforomittingunpromis-
+ing itemsets. Third, SFU-CE did not record the utilities of different frequencies with
+differentarraystructures,suchasumininSKYMINE[4],umaxinSFU-Miner[8],and
+utilmax in SKYFUP-D and SKYFUP-B [5]. Accordingly, the time cost of dominant
+relationcheckingwithinthesearrayswasavoided.
+4.2 Accuracy
+A heuristic SFUIM algorithm cannot ensure the discovery of all the correct itemsets
+withinacertainnumberofiterations;thatis,someitemsetsdiscoveredbySFU-CEmay
+SFU-CE:SkylineFrequent-UtilityItemsetDiscovery 363
+notcorrespondtotheactualSFUIsoftheentiredataset.Sowecomparethepercentageof
+SFUIsdiscoveredbySFU-CEtotheactualSFUIs.WeusedtheSKYFUP-Dalgorithm
+todiscovertheactualSFUIsfromthefourdatasets,andusedthefollowingequationto
+calculatetheaccuracyofSFUIsdiscoveredbySFU-CE:
+Acc = Num_CE/Num × 100%, (7)
+whereNum_CE isthenumberofactualSFUIsdiscoveredbySFU-CEandNumisthe
+totalnumberofactualSFUIs.
+Table5. Accuracyforthefourdatasets
+Datasets Num_CE Num Acc(%)
+T25I50D10k 6 6 100
+T35I10050k 4 4 100
+Chess 35 35 100
+Connect 42 46 91.30
+Table5showsthatSFU-CEdiscovered SFUIswith100%accuracy, exceptonthe
+Connect dataset, for which the average accuracy was 97.825% on the four datasets.
+TheseresultsdemonstratethattheCE-basedalgorithmdiscoveredmostofactualSFUIs
+inlesstime.
+4.3 Diversity
+ToverifytheeffectofRMproposedinSect.3.3,weevaluatedthedegreeofdiversityof
+theminingresultsusingthebiteditdistance(BED)[10],whichisdefinedas.
+BED(V,V) = NBits, (8)
+t
+whereV andV aretwoIVsandNBitsisthenumberofbitwise-complementoperations
+t
+transformedfromV toV .WecanseefromEq.8thatthegreaterthevalueofBED(V,
+t
+V ),themoreobvious thedifference betweenV and V .For example, transformingV
+t t
+= <110100>toV = <101110>requiresthreebitwise-complementoperations:
+t
+transformthesecondbitfrom1to0,transformthethirdbitfrom0to1,andtransform
+thefifthbitfrom0to1.Thus,BED(V,V )=3.
+t
+Following[10],weusedtwotypesofBEDinourexperiments:thegreatestdegree
+of diversity of all pairs of IVs, maximal BED (Max_BED), and the average degree of
+diversityofallpairsofIVs,averageBED(Ave_BED).LetV ,V ,…,V betheIVs
+1 2 N
+inoneiteration.Max_BEDisdefinedas.
+(cid:7) (cid:8)
+Max_BED = max{BED V,V | 1 ≤ i ≤ N, 1 ≤ j ≤ N,i (cid:13)= j}, (9)
+i j
+andAve_BEDisdefinedas
+(cid:2) (cid:2) (cid:7) (cid:8)(cid:5)
+Ave_BED= i j(cid:13)=i BED V i ,V j N ×(N −1) . (10)
+364 W.SongandC.Zheng
+WealsoimplementedanalgorithmthatstrictlygeneratesalltheIVswithineachiter-
+ationaccordingtothePV,withoutRM,andrefertothisalgorithmasSFU-Base.Because
+thenumberofiterationsforwhichthetwoalgorithmsconvergedwasinconsistent,we
+usedthepercentageofthetotalnumberofiterationswhencomparingtheirdiversity.
+Table6. BEDfortheT25I50D10kdataset
+Percentageoftotalnumberofiterations(%) SFU-Base SFU-CE
+Ave_BED Max_BED Ave_BED Max_BED
+25 4.58 18.0 4.89 18.0
+50 2.46 13.0 2.73 15.0
+75 1.56 9.0 1.64 9.0
+100 0.0 0.0 0.27 1.0
+Table7. BEDfortheT35I10050kdataset
+Percentageoftotalnumberofiterations(%) SFU-Base SFU-CE
+Ave_BED Max_BED Ave_BED Max_BED
+25 11.82 23.0 10.85 24.0
+50 1.97 9.0 2.92 13.0
+75 1.06 4.0 1.55 6.0
+100 0.0 0.0 0.0 0.0
+Tables6and7showthediversitycomparisonresultsonthetwosyntheticdatasets.
+Although the diversity of SFU-CE was better, its advantage over SFU-Base was not
+obvious.ThereasonbehindtheseresultsisthatallSFUIsonthesetwosyntheticdatasets
+were1-itemset.ThismeansthattherewasonlyoneprobabilityinthePVthatwashigher
+than0.5;hence,theeffectofRMwasnotobvious.
+ThediversitycomparisonresultsonthetworealdatasetsareshowninTables8and
+9. In the first few iterations, the effect was similar to that on the synthetic datasets:
+the difference between the two algorithms was not obvious. As the number of itera-
+tions increased, the diversity advantage of SFU-CE became increasingly significant.
+TheresultsdemonstratedthattheproposedRMstrategyimprovedthediversityofthe
+samples.Consequently,theexecutionspeedincreasedandaccuracyimproved.
+SFU-CE:SkylineFrequent-UtilityItemsetDiscovery 365
+Table8. BEDforthechessdataset
+Percentageoftotalnumberofiterations(%) SFU-Base SFU-CE
+Ave_BED Max_BED Ave_BED Max_BED
+25 13.40 28.0 11.46 28.0
+50 5.83 16.0 6.36 16.0
+75 1.97 7.0 3.95 13.0
+100 0.0 0.0 2.91 12.0
+Table9. BEDfortheconnectdataset
+Percentageoftotalnumberofiterations(%) SFU-Base SFU-CE
+Ave_BED Max_BED Ave_BED Max_BED
+25 12.73 26.0 8.22 24.0
+50 7.62 19.0 7.39 19.0
+75 2.43 9.0 5.10 18.0
+100 0.0 0.0 3.92 16.0
+5 Conclusion
+Inthispaper,westudiedtheSFUIMproblemfromtheperspectiveofCEandproposedan
+SFUIMalgorithmcalledSFU-CE.BecauseSFUIsareitemsetsthatarenotdominated
+by other itemsets when considering both frequency and utility constraints, we used
+utilityastheoptimizationobjectofCEthatcheckedintermediateresultsusingutility,
+andproposedcriticalutilitypruningthatfilteredintermediateresultsbyfrequencyand
+utility.Toimprovethediversityofeachsample,wedesignedRMtogeneratesomenew
+itemsetsinadditiontothePV.Experimentsonpubliclyavailabledatasetsdemonstrated
+thattheSFU-CEalgorithmwasefficient,accurate,andproduceddiversesamples.
+Acknowledgments. We thank Prof. Jerry Chun-Wei Lin for providing the source code of the
+SKYFUP-D and SKYFUP-B algorithms. This work was partially supported by the National
+Natural Science Foundation of China (61977001) and the Great Wall Scholar Program
+(CIT&TCD20190305).
+References
+1. deBoer,P.-T.,Kroese,D.P.,Mannor,S.,Rubinstein,R.Y.:Atutorialonthecross-entropy
+method.Ann.OR134(1),19–67(2005)
+2. Djenouri,Y.,Comuzzi,M.:GA-apriori:combiningaprioriheuristicandgeneticalgorithms
+forsolvingthefrequentitemsetsminingproblem.In:Kang,U.,Lim,E.-P.,Yu,J.X.,Moon,
+Y.-S.(eds.)PAKDD2017.LNCS(LNAI),vol.10526,pp.138–148.Springer,Cham(2017).
+https://doi.org/10.1007/978-3-319-67274-8_13
+366 W.SongandC.Zheng
+3. Fournier-Viger,P.,etal.:TheSPMFopen-sourcedatamininglibraryversion2.In:Berendt,
+B.,etal.(eds.)ECMLPKDD2016.LNCS(LNAI),vol.9853,pp.36–40.Springer,Cham
+(2016).https://doi.org/10.1007/978-3-319-46131-1_8
+4. Goyal, V., Sureka, A., Patel, D.: Efficient skyline itemsets mining. In: Proceedings of the
+EighthInternationalC*ConferenceonComputerScienceandSoftwareEngineering,pp.119–
+124(2015)
+5. Lin, J.C.-W., Yang, L., Fournier-Viger, P., Hong, T.-P.: Mining of skyline patterns by
+consideringbothfrequentandutilityconstraints.Eng.Appl.Artif.Intell.77,229–238(2019)
+6. Lin,J.-W.,Yang,L.,Fournier-Viger,P.,Hong,T.-P.,Voznak,M.:AbinaryPSOapproachto
+minehigh-utilityitemsets.Soft.Comput.21(17),5103–5121(2016).https://doi.org/10.1007/
+s00500-016-2106-1
+7. Liu,Y.,Liao,W.-K.,Choudhary,A.:Atwo-phasealgorithmforfastdiscoveryofhighutility
+itemsets.In:Ho,T.B.,Cheung,D.,Liu,H.(eds.)PAKDD2005.LNCS(LNAI),vol.3518,
+pp.689–695.Springer,Heidelberg(2005).https://doi.org/10.1007/11430919_79
+8. Pan,J.-S.,Lin,J.C.-W.,Yang,L.,Fournier-Viger,P.,Hong,T.-P.:Efficientlyminingofskyline
+frequent-utilitypatterns.Intell.DataAnal.21(6),1407–1423(2017)
+9. Song, W., Huang, C.: Discovering high utility itemsets based on the artificial bee colony
+algorithm. In: Phung, D., Tseng, V.S., Webb, G.I., Ho, B., Ganji, M., Rashidi, L. (eds.)
+PAKDD2018.LNCS(LNAI),vol.10939,pp.3–14.Springer,Cham(2018).https://doi.org/
+10.1007/978-3-319-93040-4_1
+10. Song,W.,Li,J.:Discoveringhighutilityitemsetsusingset-basedparticleswarmoptimization.
+In:Yang,X.,Wang,C.-D.,Islam,M.S.,Zhang,Z.(eds.)ADMA2020.LNCS(LNAI),vol.
+12447,pp.38–53.Springer,Cham(2020).https://doi.org/10.1007/978-3-030-65390-3_4
+11. Song,W.,Liu,L.,Huang,C.:TKU-CE:cross-entropymethodforminingtop-khighutility
+itemsets.In:Fujita,H.,Fournier-Viger,P.,Ali,M.,Sasaki,J.(eds.)IEA/AIE2020.LNCS
+(LNAI),vol.12144,pp.846–857.Springer,Cham(2020).https://doi.org/10.1007/978-3-030-
+55789-8_72
+12. Song,W.,Liu,Y.,Li,J.:Verticalminingforhighutilityitemsets.In:Proceedingsofthe2012
+IEEEInternationalConferenceonGranularComputing,pp.429–434(2012)
+13. Song,W.,Zheng,C.,Huang,C.,Liu,L.:Heuristicallyminingthetop-khigh-utilityitemsets
+with cross-entropy optimization. Appl. Intell. (2021). https://doi.org/10.1007/s10489-021-
+02576-z
+14. Yeh,J.-S.,Li,Y.-C.,Chang,C.-C.:Two-phasealgorithmsforanovelutility-frequentmin-
+ing model. In: Proceedings of the International Workshops on Emerging Technologies in
+KnowledgeDiscoveryandDataMining,pp.433–444(2007)

@@ -1,0 +1,2151 @@
+Accepted Manuscript
+An efficient approach for mining association rules from high utility itemsets
+Jayakrushna Sahoo, Ashok Kumar Das, A. Goswami
+PII: S0957-4174(15)00158-X
+DOI: http://dx.doi.org/10.1016/j.eswa.2015.02.051
+Reference: ESWA 9901
+To appear in: Expert Systems with Applications
+Please cite this article as: Sahoo, J., Das, A.K., Goswami, A., An efficient approach for mining association rules
+from high utility itemsets, Expert Systems with Applications (2015), doi: http://dx.doi.org/10.1016/j.eswa.
+2015.02.051
+This is a PDF file of an unedited manuscript that has been accepted for publication. As a service to our customers
+we are providing this early version of the manuscript. The manuscript will undergo copyediting, typesetting, and
+review of the resulting proof before it is published in its final form. Please note that during the production process
+errors may be discovered which could affect the content, and all legal disclaimers that apply to the journal pertain.
+✩
+An efficient approach for mining association rules from high utility itemsets
+JayakrushnaSahooa,AshokKumarDasb, A.Goswamia,∗
+aDepartmentofMathematics,IndianInstituteofTechnology,Kharagpur721302,India
+bCenterforSecurity,TheoryandAlgorithmicResearch,InternationalInstituteofInformationTechnology,Hyderabad500032,India
+Abstract
+Traditionalassociationruleminingbasedonthesupport-confidenceframeworkprovidestheobjectivemeasureofthe
+rulesthatareofinteresttousers. However,itdoesnotreflectthesemanticmeasureamongtheitems. Thesemantic
+measureofanitemsetischaracterizedwithutilityvaluesthataretypicallyassociatedwithtransactionitems,wherea
+userwillbeinterestedtoanitemsetonlyifitsatisfiesagivenutilityconstraint.Inthispaper,wefirstdefinetheproblem
+offindingassociationrulesusingutility-confidenceframework,whichis a generalizationof the amount-confidence
+measure. Using this semantic concept of rules, we then propose a compressed representation for association rules
+having minimal antecedentand maximal consequent. This representationis generatedwith the help of high utility
+closeditemsets(HUCI)andtheirgenerators. Weproposethealgorithmstogeneratetheutilitybasednon-redundant
+associationrulesandmethodsforreconstructingallassociationrules.Furthermore,wedescribethealgorithmswhich
+generatehighutilityitemsets(HUI)andhighutilitycloseditemsetswiththeirgenerators.Theseproposedalgorithms
+areimplementedusingbothsyntheticandrealdatasets. Theresultsdemonstratebetterefficiencyandeffectivenessof
+theproposedHUCI-Mineralgorithmcomparedtootherwell-knownexistingalgorithms.Inaddition,theexperimental
+resultsshowbetterqualityinthecompressedrepresentationoftheentirerulesetundertheconsideredframework.
+Keywords: Datamining,Highutilityitemsetmining,Associationrulemining,Condensedrepresentations,
+non-redundantassociationrules.
+1. Introduction
+An expert system is a computer system, which emulates, or acts in all respects, with the decision-making ca-
+pabilitiesof a humanexpert(Mishraetal., 2014). Ingeneral, thereare threecomponentsassociatedwith an expert
+system,whichare(1)knowledgebase,(2)inferenceengine,and(3)userinterface(Huynh-Thi-Leetal.,2015). The
+centralofexpertsystemsistheknowledgebaseasithastheproblemsolvingknowledgeoftheparticularapplication
+(Sadik,2008).Alonsoetal.(2012)pointedoutthecooperationbetweenexpertknowledgeanddataminingdiscovered
+knowledge.Theyalsofoundthattheexpertknowledgeanddiscoveredknowledgearetwopowerfultoolsthatcanbe
+combinedtogether.Dataminingtechniquesareusefulinordertodiscoverefficientlythehiddeninterestinganduseful
+informationfromlargedatabases,wheretheimplicationofinterestingandusefulinformationdependsontheproblem
+formulationandtheapplicationdomain.Animportantdataminingtaskthathasreceivedconsiderableresearchatten-
+tioninrecentyearsisthediscoveryofassociationrulesfromthetransactionaldatabases(AgrawalandSrikant,1994;
+Hanetal.,2000;Parketal.,1995;Webb,2006). Thetraditionalassociationrulesmining(ARM)techniquesdepend
+on supportconfidence framework in which all items are given same importance by consideringthe presence of an
+itemwithin a transaction,butnotthe profitof itemin thattransaction. Thegoalofsuchtechniquesisto extractall
+thefrequentitemsets,wheretheitemsetshavingthegivenminimumsupportsuchthatthesupportisthepercentageof
+✩ Apartofthispaper(Section4.1andSection4.3)hasarchivedinarxiv(http://arxiv.org/abs/1410.2988.pdf), whichisneithercommunicated
+norsubmittedtoanyjournalorconferences orconferences includingproceedingsforpublication andcontains 20%ofthiswork. Torepresent
+alltheideasandexpressinshorterform,thenameofthisarticleisdifferentfromtheuploadedversion. Theuploadedversioninarxivfinally
+redirects/linkedtothisoriginalarticleifacceptedortheuploadedversioninarxivmaybedeletedaccordingtotheethicsandrulesofarxiv.
+∗Corresponding author. Tel.: +91-3222-283650; Fax: +91-3222-255303. E-mail addresses: jayakrushnas@gmail.com (J. Sahoo),
+iitkgp.akdas@gmail.com,ashok.das@iiit.ac.in(A.K.Das),goswami@maths.iitkgp.ernet.in(A.Goswami)
+PreprintsubmittedtoElsevier February14,2015
+Table1:AnexampletransactiondatabaseD Table2:Utilitytable
+T Transaction
+id
+t A(4),C(1),E(6),F(2) Item Utility
+1
+t D(1),E(4),F(5) A 3
+2
+t B(4),D(1),E(5),F(1) B 4
+3
+t D(1),E(2),F(6) C 5
+4
+t A(3),C(1),E(1) D 2
+5
+t B(1),F(2),H(1) E 1
+6
+t D(1),E(1),F(4),G(1),H(1) F 1
+7
+t D(7),E(3) G 2
+8
+t G(10) H 1
+9
+transactionscontainingtheitemset,whichgenerateallthevalidassociationrulesA→ BfromfrequentitemsetA∪B
+whoseconfidencehasatleast theuser definedconfidencesuchthatthe confidenceis thepercentageoftransactions
+containingitemsetBamongthesetoftransactionscontainingA. Inotherwords,givenasubsetoftheitemsinanitem-
+set,weneedtopredicttheprobabilityofthepurchaseoftheremainingitemsinatransactionaldatabase. Ingeneral,
+fromconfidenceofarulegeneratedfromanitemset,wecanknowthepercentageofnumbertransactionsoftheitems,
+whichissoldtogetherwithremainingitemsofthatitemset. However,wemaynotknowthepercentageofitsprofit
+obtained. Therefore,ifwecanknowthepercentageoftheitems’profit,weareinapositiontofindoutarule,which
+ismorevaluablethansupportandconfidence,andasaresult,itcanallowustopermitwithmoreaccuratefinancial
+analysisand decisions. Nevertheless, this support-confidenceframeworkdoesnotprovidethe semanticmeasure of
+the rule but onlyit providesthe statistical measure as the relative importanceof itemsis notconsidered. However,
+suchmeasureisnotanadequatemeasuretothedecisionmakerastheitemsetcannotbemeasuredintermsofstock,
+costorprofit,calledutility. Considerasalesmanagerwhoaimstopromoteitemsetstoincreasetheitemselling. The
+followingexampleisevidentthatasupport-confidencebasedframeworkforassociationruleminingmaymisleadthe
+managerinthedecisionmakingfordeterminingthefinancialimplicationsofanitemset.
+Example1. ConsiderthetransactiondatabaseDshowninTable1thatincludesninetransactionst throught and
+1 9
+eightitems AthroughH. Thenumbersinthetransactiondatabase,whicharebracketed,indicatethesalesquantity
+for each item. Table 2 provides the unit profit for each item. The support and utility of the itemset DEF can be
+calculatedusingTable1andTable2as4and36,respectively,asthetransactionscontainingDEF aret ,t ,t and
+2 3 4
+t .Sincet includesoneD,fourEsandfiveFs,t includesoneD,fiveEsandoneF,t containsoneD,twoEsandsix
+7 2 3 4
+Fs,andt containsoneD,oneEandfourFs,atotaloffourDs,12Esand16Fsappearintransactionscontaining
+7
+the itemset DEF. Using Table 2, the profit of items D, E and F are respectively 2, 1 and 1. Thus, the profit of the
+itemsetDEFis36. Usingthestandardconfidence(AgrawalandSrikant,1994),theconfidenceoftherule D → EF
+is4/5 = 80%asonly5transactionscontainingintheitemD,whicharet ,t ,t ,t andt . Again,theconfidenceof
+2 3 4 7 8
+theruleF → DE is4/6=67%. ThetotalutilityofitemsDandFarethen22and20,respectively. Thecontribution
+ofitemsDandFtowardstothetotalprofitofitemset DEF are8and16,respectively. Therefore,ifweconsiderthe
+minimumconfidenceas 70%, the rule F → DE is an invalidrule, butthe contributionof F from its utility is more
+thanthe contributionofitem D towardstothe totalprofitofitemset DEF. Thisclearly indicatesthatthesellingof
+itemsetDEF contributesagreatportiontothetotalutilityofFto16outof20,andhence,therule,D→EF,having
+confidenceabovetheuserdefinedthreshold,maymisleadtothemanagertowardsthevaluebaseddecisionmaking.
+Thesupport-confidenceframeworkforassociationruleminingapproachexplainedinExample1doesnotprovide
+anyadditionalknowledgetothemanagerexceptthemeasuresthatreflectsthestatisticalcorrelationamongitems. In
+addition, it doesnotreflect their semantic implication towardsthe miningknowledge. In other words, the support-
+confidencemodelmaynotmeasuretheusefulnessofaruleinaccordancewithauser’sobjective(forexample,profit).
+In order to address the above shortcoming of support confidence framework, several researchers have focused
+on weighted association rule (Caietal., 1998; Ramkumaretal., 1998; Taoetal., 2003; Wangetal., 2000). In such
+framework, the weights of items (the importance of items to the user) are considered and it also varies differently
+in applicationdomains. However,this frameworkhas two pitfalls. Firstly, these schemesstill considerthe support
+of an itemset to measure their importance and secondly, these models do not employ the quantities or prices of
+2
+items purchased. Considering both quantities of items in a transaction and weights of items Carteretal. (1997)
+proposedashare-confidencemodeltodiscoverassociationruleamongnumericalattributeswhichareassociatedwith
+items in a transaction. Carter et al.’s share-confidencemodeldeals with the amount-sharethat is a fractionof total
+weightbutnottheutilityvalue,suchasthenetprofit,totalcost(GengandHamilton,2006). Asaresult,thismodel
+doesnotaccomplishto conventionalutility mining(Linetal., 2011; Liuetal., 2005; Yaoetal., 2004) in which the
+requirementsofdecisionmakersareusedtoextracttheitemsetswithhighutility,theutilityofitemsetisnolessthan
+theuserspecifiedminimumutilitythreshold,whicharecomposedofweightsandpurchasedquantities. Theweight
+representstheimportanceofdistinctitemsknownasexternalutility, andthepurchasedquantityineachtransaction
+isknownas internalutility ofthe items. The productof externalutility withsum totalofinternalutility ofanitem
+is called utility of the item. As utility does not satisfy downward closure property (Liuetal., 200 5 ), most of the
+methods proposed in the literature are applied to find the candidate high utility itemsets first and then to identify
+actualhigh utility itemsets by an additionaldatabase scan. Some researchersproposedmethodsto find high utility
+itemsetswithoutcandidategenerations(Fournier-Vigeretal.,2014b;LiuandQu,2012)toavoidadditionaldatabase
+scan. However,thediscoveringprocessofhighutilityitemsetstakesmoreexecutiontimeandremainsachallengeto
+formulatemoreeffectivealgorithms. Inthispaper,weproposedaneffectivealgorithmwhichismorethantwotimes
+fasterthanthestate-of-the-artalgorithmfordiscoveringhighutilityitemsets.
+1.1. Motivatingexamplesofapplicationsforutility-confidenceframework
+The share-confidence(we callit as the utility-confidence)modelcan be appliedin variousapplications, includ-
+ing online purchases in e-commerce (Shieetal., 2013), retail sales (BarberandHamilton, 2003; Hildermanetal.,
+1998),cross-selling(Leeetal.,2013)andprofitmining(Chenetal.,2007;Wangetal.,2002). Notethattheutility-
+confidence framework is also applicable to the market share rule (Zhangetal., 2004), where the profit is obtained
+transaction-wise, but not item-wise. In this paper, we provide the examples, which are from the retail transaction
+datasets. Toincreasetheprofit,themanagerdecidestorewardthecustomerswhopurchasedmorethansomevalue
+andgrantadiscountonthepurchase,orthemanagerofferingashippingdiscountmayencouragebuyertobuyaddi-
+tionalitemsbywhichshippingisfreeordiscounted.Forexample,ifacustomerpurchasesitemsetDEF,theshipping
+costofFisfreeordiscounted.Inotherway,ifacustomerpurchasesitemsetDE,andifhealsopurchaseitemsetF,he
+willgetsomediscountonitemF.
+In e-commerce retail business, not only the frequencies but also the profits of the products are crucial factors
+to analyzetotalprofitsof eachitem, decisionsonproductpromotion,offeringdiscountandshipmentfree decision.
+Consider a manager who handles a transaction set sketched by Table 1. The manager’s main aim is to boost the
+revenueobtainedfromanitemsetfromavalueatleastequalto50%toavalueatleastequalto60%ofthetotalprofits
+oftheproduct.Tofurtherincreasetheaveragesalesthemanagerconsiderstooffersomeincentivessothatcustomers
+findtheproductattractive. Therefore,toboostthesalesthemanagerwillgivesomediscountontheproductFwhile
+purchasingitemsetDEF,soastoboosttherevenueandaswellassales.
+Another better example is suggested as the web recommendation system (YanandLi, 2006). In this system,
+recommendingwebpagesisproposedwiththeconsiderationoftheimportanceofeachpageandthenumberoftimes
+theuservisitedaparticularpage. Insuchcase,theproductofimportanceofeachpageandthenumberoftimesthat
+page visited gives the utility of the page. So, given a set of visited web pages, the share-confidencemodel can be
+usefultodeterminethedominatingwebpagesinawebtransactionrecordsforwebrecommendationsystem.
+Theapplicationoftraditionalshare-confidencemodelislimitedbythenumberofrulesgeneratedthatareoftennot
+interestingtotheuserespeciallywhenthesharethresholdisverylowandsomeinterestingrulesaremissedwhenthe
+sharethresholdisveryhigh. Intheextractedruleset,mostoftherulessharethesamesemanticmeasureorstatistical
+measurewithotherrules,andtheyarecalledtheredundantrules. Henceforth,itlimitstheusefulnessoftheruleset
+fortheusertovalidateandtakedecisions. Torepresenthighutilityitemsetcompactly,Chanetal.(2003)introduced
+the concept of utility frequentclosed patterns, where the notion of high utility itemset is differentfrom that of the
+conventionalutilitymining. Later,Shieetal.(2010, 2012)proposedthemaximalhighutilityitemset, andWuetal.
+(2011,2014)proposedthehighutilitycloseditemset. Intheseworks,thereisnoalgorithmwasprovidedtogenerate
+rules. So,ifweapplytraditionalassociationrulemining,therulesgeneratedfromthesehighutilityitemsetswould
+containredundancy,andalsoofhugesizeastheycompactlyrepresenthighutilityitemsetsbutnottherules.
+Theabovedrawbacksandmotivatingapplicationsmotivateustoapplytheamountconfidencemeasure(Hildermanetal.,
+1998)totheutilitydatabase.Asthismeasureappliesonutilitymining,wecallitasutility-confidenceframeworkasit
+3
+alliestoamount-confidenceframework.Theutility-confidenceframeworkisusedtominenon-redundantassociation
+rules amonghigh utility itemsets, which enable the user to his/her perspectivesconcerningthe importanceof rules
+dependingon valuesand provideuseful information. In this framework,at first the high utility itemset with utility
+valuelargerthanapredefinedthresholdismined,andthentherulesaregeneratedamongtheitemsets,whoseutility-
+confidencesarelargerthantheuserdefinedconfidencethreshold. Todiscoverthenon-redundantassociationrulesin
+support-confidenceframework,severalapproacheshavebeenproposedintheliterature(Balca´zar,2013;Sahooetal.,
+2014;Xuetal.,2011;Yahiaetal.,2009). Ingeneral,thefrequentcloseditemsets(Pasquieretal.,1999)andfrequent
+generators(Zaki,2004)areusedtodiscovernon-redundantassociationrules. However,thesemethodsaredeveloped
+forsupport-confidenceframework. Therefore,inthispaperweraiseanimportantquestionasfollows. Howcanwe
+compressthe association rules in utility-confidenceframework? We aim to answer this question by integratingthe
+conceptoffrequentcloseditemsetsandfrequentgeneratortohighutilityitemset.
+1.2. Ourcontributions
+Ourcontributionsarelistedbelow:
+• Wefirstintegratetheconceptofminimalgeneratorsofsupport-confidenceframeworktothehighutilitymining.
+• We then introduce the notion of non-redundantassociation rule in utility-confidence framework to represent
+association rulescompactly and the correspondingalgorithmto mine the non-redundantrules. An algorithm
+named HUCI-Miner (High Utility Closed Itemset-Miner) algorithm has been proposed to mine high utility
+closeditemsetsandalsotheirgeneratorssimultaneously.
+• Tomineallhighutilityitemsets,anotheralgorithm,calledFHIM(FastHigh-UtilityItemsetMiner),isproposed
+whichisabouttwotimesfasterthanthestate-of-the-artexistingHUIminingalgorithm. Theproposedpruning
+strategiesarchiveefficiency.
+• We further propose an inference mechanism to generate all the association rules from the discovered non-
+redundantrulesetsusingthehighutilitycloseditemsets.
+• Finally,weconductseveralexperimentstoshowtheefficiencyoftheproposedalgorithmsandcompactnessof
+theproposednon-redundantruleset.
+1.3. Theorganizationofthepaper
+The restofthe paperis sketchedas follows. In Section2, we brieflyreviewthe existingworksproposedin the
+literature. InSection3,weprovidesomebasicpreliminariesandourproblemstatementbyintroducingtheconcept
+of the utility-confidencemeasure. Section 4 introducesour proposedFHIM and HUCI-Miner algorithms. We also
+discusstheprocedurefor derivinghighutility closeditemsets andgenerators. In Section5, we providethe method
+for utility-based non-redundant association rule. In Section 6, we simulate the proposed algorithms method in a
+realdataset, andthenevaluatethe performanceof ourproposedalgorithmsandcomparethese withexistingrelated
+approaches.Finally,thepaperendswiththeconcludingremarksinSection7.
+2. Relatedwork
+Inthissection,wereviewtheexistingmethodsforassociationrules,highutilityitemsetmining,andgeneration
+ofnon-redundantassociationrulesinsupport-confidenceframework. Inthesupport-confidenceframework,thenon-
+redundant association rules are generated from the frequent closed itemsets and their generators. We also review
+existingworksongenerationoffrequentcloseditemsetstogetherwiththeirgeneratorsasitisessentialforgeneration
+ofnon-redundantassociationrules.
+4
+2.1. Associationrulesmining
+Associationrulesdiscoverymethodsfindthecoincidentoccurrenceofitemsandbuildtheaffinitiesamongthem
+in a transactional database. The methods in the literature are of two types: exhaustive search based algorithms
+andevolutionarybasedalgorithms. Therulediscoveryprocessbasedonexhaustivesearchisstraightforward,if the
+supportsofthefrequentitemsetsareknown.Hence,thefrequentitemsetsminingphaseoftheARMmethodsplaysa
+vitalroleintherulediscoveryprocess.Severalmethodshavebeenproposedintheliterature,whicharethevariations
+of the two widely used methods: Apriori (AgrawalandSrikant, 1994) and FP-Growth (Frequent Pattern Growth)
+(Hanetal., 2000), for discovering the frequent itemsets. The Apriori algorithm for discovering frequent itemsets
+is a level-wise candidate generation approach, which is based on the Apriori property. This property states that if
+an itemset is not a frequent, no superset of that itemset is frequent. This property reduces the search space, but it
+takesmoredatabase scan in orderto calculate the frequencyof itemsets andit resultsin increasein executiontime
+and memoryoverhead. To overcomemultiple database scan, Hanetal. (2000) proposedthe FP-Growth algorithm,
+whichusesthedivide-and-conquerandprefixbaseddepth-firstsearchprocedures. In thisapproach,the databaseis
+firstconvertedintoa tree structure,namedFP-tree, which isa compressedrepresentationof originaldatabase. The
+algorithmthenpartitionstheoriginaldatabaseintosmallerconditionaldatabaseforagivenitemsetanditsextensions
+areminedseparatelyfromtheconditionaldatabase.
+The basic evolutionary algorithms for mining association rules are ARMGA (Association Rule Mining Ge-
+netic Algorithm)(Yanetal., 2005), QuantMiner(Salleb-Aouissietal., 2007), GENAR(Genetic AssociationRules)
+(Mataetal.,2001),andG3PARM(Grammar-GuidedGeneticProgrammingforAssociationRuleMining)(Lunaetal.,
+2012). InARMGA,eachassociationruleisencodedintoasinglechromosomeusingtheindicesofitemscontained
+in the rule and another indicator indicates the separation of antecedent from the consequent. That means a chro-
+mosomeoflength k representsan association ruleof lengthk−1. The algorithmgeneratesa newchromosomeby
+usingthemutationandcrossoveroperatorsofgeneticalgorithm.TheGENAR(Mataetal.,2001)algorithmdiscovers
+thequantitativeassociation rulesusingthe geneticalgorithm. Eachindividualin GENAR representsan association
+ruleandkeepstheinformationabouttheminimumandmaximumvaluesofeachnumericalattribute. Theevolution-
+aryalgorithmcalculatesthefitnessofeachindividualandprocessestheselection,crossoverandmutationoperators.
+QuantMiner(Salleb-Aouissietal.,2007)isageneticalgorithmbasedalgorithm,whichisusedtoextractquantitative
+associationrules. Thealgorithmlearnsthegoodintervalsfornumericalattributeanddynamicallyoptimizesthein-
+tervalsduringthe miningprocessand itdependsonall thenumericalattributespresentin the rule. The knowledge
+from the extracted association rules using G3PARM (Lunaetal., 2012) is more expressive and flexible. The algo-
+rithmusesthecontext-freegrammartorepresentanindividualbydefiningthesyntaxconstraintsforbothcategorical
+andnumericalattributes. The algorithmkeepsthe best individuals, whose supportand confidenceare largerthan a
+certainthresholdinanauxiliarypopulationofafixedsize. Toavoidoptimizingthehighnumberofparametersinnon-
+deterministic search procedure, Lunaetal. (2014) proposed a grammar guided by genetic programmingalgorithm,
+whichisfreefromparametersasotherexistingapproaches.Theirmethoddiscoversthequantitativeassociationrules,
+whichconstitutesthesmall-sizegaps.
+2.2. Highutilityitemsetmining
+The traditional association rule mining methods (AgrawalandSrikant, 1994) are based on support-confidence
+framework,whereallitemsareconsideredwiththesamelevelofimportance.Themethodsproposedin(AgrawalandSrikant,
+1994; Hanetal., 2000; Parketal., 1995; Peietal., 2001) to extract association rule follow this classical statistical
+measurementproducingthesameresultonagivenminimumsupportandminimumconfidence. Theweightedasso-
+ciationrulemining(WARM)generalizesthetraditionalframeworkbygivingimportancetoitems,whereimportance
+isgivenasweights.Ramkumaretal.(1998)introducedtheconceptofweightedsupportofitemsetsandweightedas-
+sociationrulesonthebasisofcostsassignedtobothitemsandtransactions. Later,consideringonlytheitemweights
+into account, Caietal. (1998) proposed the weighted support of association rules. However, the weighted support
+of the association rules does notsatisfy the downwardclosure property, which results in the performancedegrada-
+tion. Inorderto overcomesuchproblem,byconsideringtransactionweight,Taoetal. (2003)providedthe concept
+ofweighteddownwardclosureproperty.Consideringbothsupportandweightofitemsets,Yun(2007)thenpresented
+a newstrategy,called theweightedinterestingpatternmining(WIP).Pearsetal. (2013) furtherproposeda WARM
+methodthatautomatestheprocessofweightassignmenttotheitemsbyformulatingalinearmodel.
+5
+In WARM framework, note that the quantities of items in transactions are not considered. Considering items’
+quantitiesintransactionsandtheirindividualimportance,highutilityitemsetmining(HUIM)receivedaconsiderable
+researchattention(Liuetal.,2005;Yaoetal., 2004,2006). Yaoetal. (2004, 2006)proposeda mathematicalmodel
+ofutilityminingbygeneralizingtheshare-confidencemodel(BarberandHamilton,2001). Asutilityminingdoesnot
+fulfillthedownwardclosureproperty, Liuetal. (2005) proposedthetwo-phasealgorithmthatusesthetransaction-
+weighted downward closure property to prune the candidate high utility itemsets in the first phase and then all the
+completesets ofhighutilityitemsetsareobtainedin thesecondphase. To reducethenumberofcandidateitemsets
+inthefirstphase, Lietal.(2008)also proposedanisolateditemsdiscardingstrategy(IIDS)to thelevel-wiseutility
+miningmethod.
+Ahmedetal. (2009) proposed a FP-Growth based algorithm that uses a tree structure, named I H UP-Tree, and
+efficientlygeneratesthecandidatehighutilityitemsetsforincrementalandtheinteractivemining. Yunetal.(2014)
+proposed a faster algorithm than IHUP (Ahmedetal., 2009) named MU-Growth (Maximum Utility Growth) with
+effective pruning strategies in mining process using the data structure MIQ-Tree (Maximum Item Quantity Tree).
+Tofurtherreducethenumberofitemsetsinthefirstphase,Tsengetal.(2013, 2010)proposedthetree-basedmeth-
+ods, namedtheUP-GrowthandUP-Growth+, whichuse severalstrategiesto decreasethe estimatedutilityvalueof
+an itemset, and as a result, they enhance the performance. To avoid the level wise candidate generation and test
+strategy,Songetal.(2014)proposedaconcurrentalgorithm,calledtheCHUI-Mine,forminingHUIsfromtransac-
+tiondatabasesusingtheirproposeddatastructureCHUI-Treeto maintainthe informationofHUIs. Theirproposed
+algorithm generates the potential high utility itemsets using two concurrentprocesses: the first process is used for
+constructionand dynamicpruningthe tree, and then placingthe conditionaltrees into a buffer, and the second one
+forreadingthe conditionalpatternlist fromthebufferand miningHUIs. To speed upthe executionandreducethe
+memoryrequirementintheminingprocess,Lanetal.(2014)proposedanefficientutilityminingapproachthatadopts
+aprojection-basedindexingmechanismthatdirectlygeneratestherequireditemsetsfromthetransactionsdatabase.
+Ahmedetal. (2011) proposed a novel tree-based candidate pruning technique, called the High Utility Candidates
+Prune(HUC-Prune),foravoidingmoredatabasescansandthelevel-wisecandidategeneration.
+To avoid the computational cost of candidate generation and utility computation, LiuandQu (2012) then pro-
+poseda data structure,namedthe utility-list, to storeboththe utility informationaboutan itemsetandthe heuristic
+informationforpruningthesearchspace.Usingtheconstructedutility-listsfromamineddatabase,theydevelopedan
+efficientalgorithm,calledtheHUI-Miner,whichmineshighutilityitemsetswithoutcandidategenerationinadepth-
+firstsearchmanner.Theiralgorithmworksinasinglephasebydirectlyidentifyinghighutilityitemsetsinanefficient
+way and it is also scalable. To reduce the cost of join operation in the calculation of the utility-list of an itemset
+in HUI-Miner, Fournier-Vigeretal. (2014b) improved the HUI-Miner with incorporating the items co-occurrences
+strategy(namedasFHM)whichisaboutsixtimesfasterthantheHUI-Miner.
+2.3. Closeditemsetswiththeirgeneratorsandnon-redundantassociationrulemining
+To generate both frequentclosed itemsets (FCI) and generators, Pasquieretal. (1999) proposedthe CLOSE al-
+gorithm that is based on level-wise searching approach with the help of Apriori property. Szathmaryetal. (2007)
+proposed the ZART algorithm that generates FCIs with their generatorsin a level-wise manner. They further pro-
+posedtheEclat-Z algorithm(Szathmaryetal., 2008) thatminesfrequentitemsetsin a depth-firstway andthe FCIs
+with their generators are identified in level-wise manner. An effective method, named as Touch (Szathmaryetal.,
+2009), was developed by combining the FCI method Charm (Zaki, 2004) and the frequent generator (FG) mining
+algorithm,Talky-G(Szathmaryetal.,2009).TheFCIsareminedusingCharmandFGsareminedusingTalky-Gand,
+thenTouchassociatesthegeneratorstotheircloseditemsetsusingasuitablehashfunction.
+Wuetal. (2011) introduced the closer concept to high utility itemsets. They called the extracted itemsets as
+closed+highutilityitemsets.Onincorporatingclosurebasedonsupportofitemsets,theyproved,firstminingthesetof
+highutilityitemsetsandthenapplyingclosedconstraintproducesthesameresultwhileminingallthecloseditemsets
+firstandthenapplyingtheutilityconstraint.TheyproposedaneffectivemethodnamedasCHUD(Closed+HighUtil-
+ityitemsetDiscovery)forminingclosed+highutilityitemsets.Further,theyproposedamethodcalledtheDAHU(De-
+riveAllHighUtilityitemsets),torecoverallhighutilityitemsetsfromthesetofclosed+highutilityitemsetswithout
+furtheraccessingthedatabase. Inaddition,theyproposedAprioriHCandAprioriHC-Dalgorithms(Wuetal.,2014)
+and mentioned that CHUD performs better than AprioriHC and AprioriHC-D. Later, Fournier-Vigeretal. (2014c)
+proposed two concise representations, which are the Generator of High Utility Itemsets (GHUIs) and High Utility
+6
+Generators(HUGs),byadoptingtheconceptofminimalgeneratorsoffrequentitemsetmining.However,nosuitable
+methodforhighutilitycloseditemsetwiththeirgeneratorwasproposedforhighutilityitemsetmining.
+Toreducethenumberofassociationrulesextractedinsupportconfidence-framework,severalmethodshavebeen
+developed in the literature (Balca´zar, 2013; Kryszkiewicz, 1998; Sahooetal., 2014; Xuetal., 2011; Yahiaetal.,
+2009). Kryszkiewicz (1998) proposed the representative association rules (RR) with the help of a cover operator
+thatrepresentsa setof associationrules. Zaki(2004) proposeda methodto reducethe numberofassociation rules
+and the extracted rules, called the general rules, which have shortest antecedentand shortest consequentgiving an
+equivalenceclass ofrulesofsame supportandconfidence. Pasquieretal. (2005) definedthe min-maxruleshaving
+minimalantecedentandmaximalconsequent.Theirproposedmethodeliminatesthenon-redundantrulesasmin-max
+exactandmin-maxapproximaterulesfromthefrequentcloseditemsetsandtheirgenerators. Further m ore,toreduce
+morerules,Chengetal.(2008)proposedtheconceptofδ-tolerance,whichisarelaxationontheclosuredefinedon
+thesupportoffrequentitemset. Yahiaetal.(2009)proposedaninformativebasistoreducethenumberofassociation
+rules, whichis furtherefficientlycompressedby Sahooetal. (2014). Xuetal. (2011) filteredthe min-maxrulesby
+definingredundancyandprovidedthereliableexactbasisandreliableapproximatebasisofthesameinferencecapac-
+ity. Balca´zar (2013) furtherobtaineda small andcrisp set of association rulesbythe help of confidenceboostof a
+rule,whicheliminatestheruleswithsimilarconfidence.
+3. Basicpreliminariesandproblemstatement
+Inthissection,wefirstdiscusssomebasicpreliminariesandthenwediscusstheconceptoftheutility-confidence
+measureinSection3.2.
+LetI = {i ,i ,i ,...,i }beafinitesetofitems,whereeachitemi , 1 ≤ ℓ ≤ m,haveanexternalutility p , 1 ≤
+1 2 3 m ℓ ℓ
+ℓ ≤ mintheutilitytable. Asubset X ⊆ I iscalledanitemset, if X containsk distinctitems{i ,i ,i ,...,i }, where
+1 2 3 k
+i ∈ I, 1≤ℓ≤k,calledak-itemset. LetDbethetaskrelevantdatabasecomposedofutilitytableandthetransaction
+ℓ
+tableT ={t ,t ,t ,...,t },containingasetofntransactions,whereeachtransactiont ⊆ I,1≤d ≤n,inthedatabase
+1 2 3 n d
+be associated with a unique identifier, say t . In every transaction t , 1 ≤ d ≤ n, each item i , 1 ≤ ℓ ≤ m has a
+id d ℓ
+non-negativequantityq(i ,t ),whichrepresentsthepurchasedquantityknownasinternalutilityoftheitemi inthe
+ℓ d ℓ
+transactiont .
+d
+3.1. Theexistingsupport-confidencemeasure
+Eachitemset X hasa statistical measurecalled the supportof X, which isdefinedbythe ratio ofthe numberof
+transactionscontainingXtothetotalnumberoftransactions|D|,anddenotedbysupp(X).Inotherwords,supp(X)=
+|{t|t∈D,X⊆t}|. LetF bethesetofalltheitemsetsinDhavingpositivesupportandF = {X|X ∈ 2I,supp(X) > 0}.An
+|D|
+associationruleisanimplicationoftheformR:X →Y,whereX,Y ⊆I,Y ,∅,andX∩Y =∅.TheitemsetsXandY
+arecalledantecedentandconsequentoftheruleR,respectively. Associationrulesareassociatedwithtwostatistical
+measures,whicharesupportandconfidence. ThesupportoftheruleRis supp(X∪Y)andtheconfidenceoftherule
+RisdefinedbytheratioofthesupportofX∪Y tothesupportofX,anddenotedbyconf(R). Hence,itisclearthat
+conf(R)= supp(X∪Y).
+supp(X)
+Supportand confidenceare used as interesting measuresfor determiningthe importanceof an association rule.
+The supportof a rule precisely providesthe statistical useful informationof the correspondingitemset from which
+the rule is derived but it does not indicate the relative importance of itemsets, which limits its financial implica-
+tions. The confidencemeasure indicatesthe statistical conditionalmeasureof the interestingnessof the association
+rule. However, it does not provide any value based decision as indicated in Example 1. Note that there are other
+interestingmeasuresbased on the probability,such as Lift, Convictionand Leverage,which are explainedin detail
+in (GengandHamilton, 2006). However, these interesting measures do notconsider the quantity of each item in a
+transactionandtheprofitofeachitem.
+3.2. Theutility-confidencemeasure
+Inthissection,wedescribetheconceptoftheutilityconfidencemeasure,whichisusefulforourproposedalgo-
+rithmslaterinthispaper.Forthispurpose,weusex todenotetheithitemofanitemsetX.
+i
+7
+Definition1. Theutilityofanitemi inatransactiont isdenotedbyu(i ,t )anddefinedbytheproductofinternal
+ℓ d ℓ d
+utilityq(i ,t )andexternalutility p ofi ,thatis,u(i ,t )= p ×q(i ,t ).
+ℓ d ℓ ℓ ℓ d ℓ ℓ d
+Definition2. TheutilityofanitemsetX containedinatransactiont ,denotedbyu(X,t )anddefinedbythesumof
+d d
+utilityofeveryitemsofXint . Inotherwords,u(X,t )= u(i ,t ).
+d d Piℓ∈X∧X⊆td ℓ d
+Definition3. TheutilityofanitemsetXinDisdenotedbyu(X)anddefinedbythesumoftheutilitiesofX inallthe
+transactionscontainingXinD,thatis,u(X)= u(X, t )= u(i , t ).Thesetoftransactions
+PX⊆td∧td∈D d PX⊆td∧td∈DPiℓ∈X ℓ d
+containinganitemsetX,indatabaseDiscalledtheprojecteddatabaseofitemsetXanditisdenotedbyD .
+X
+Definition4. Anitemset X iscalledahighutilityitemset, iftheutilityof X hasatleasttheuserspe c ifiedminimum
+utility threshold, min util. Otherwise, it is called a low utility itemset. Let H be the complete set of high utility
+itemsets. Then,H ={X|X ∈F,u(X)≥min util}.
+Example2. ConsideragainthetransactiondatabaseinTable1with theutilitytablegiveninTable2. From Table
+2, note thatthe external utility of item B is 4 and the internalutility of the item B in the transactiont is 4. Thus,
+3
+the utility of item B in t is u(B,t ) = p ×q(B,t ) = 4×4 = 16. The utility of the itemset BF in the transaction
+3 3 B 3
+t is u(BF,t ) = u(B,t )+u(F,t ) = 4×1+1×2 = 6 and the utility of the itemset BF in D becomes u(BF) =
+6 6 6 6
+u(BF,t )+u(BF,t )=23. Notethat,iftheminimumutilitythresholdis20,theitemsetBFisahighutilityitemset.
+3 6
+Definition5. Thelocalutilityvalueofanitem x inanitemsetX,denotedbyluv(x,X)anddefinedbythesumofthe
+i i
+utilityvaluesoftheitemsx inallthetransactionscontainingX,thatis,luv(x,X)= u(x,t ).
+i i PX⊆td∧td∈D i d
+Definition6. ThelocalutilityvalueofanitemsetXinanotheritemsetY suchthatX ⊆Y,denotedbyluv(X,Y),isthe
+sumoflocalutilitymeasurevaluesofeachitem x ∈ XinitemsetY,whichisgivenbyluv(X,Y)= luv(x,Y).
+i Pxi∈X⊆Y i
+TocalculatethelocalutilityvalueofanitemsetXinanotheritemsetY suchthatX ⊆Y,anutilityunitarrayneeds
+tobeattachedtoeachhighutilityitemset,whichisdefinedasfollows.
+Definition7. (Wuetal.,2011)TheutilityunitarrayofanitemsetX = {i , i , i , ..., i }isdenotedbyU(X) = {u ,
+1 2 3 k 1
+u ,u ,...,u },whereeachu isluv(i ,X), 1≤ℓ≤k.
+2 3 k ℓ ℓ
+Example3. Theutilityunitarray,U(X)ofanitemsetXcontainsthelocalutilityvaluesoftheconstituentitemsofX.
+ConsidertheitemsetACE whichappearsintransactionst andt inTable1. ThelocalutilityvalueoftheitemAin
+1 5
+ACE isluv(A,ACE) = u(A,t )+u(A,t ) = 21.Theutilityunitarrayof ACE isU(ACE) = {21,10,7}. Further, the
+1 5
+localutilityvalueofitemsetAEinACEisluv(AE,ACE)=luv(A,ACE)+luv(E,ACE)=28.
+Property 1. (Wuetal., 2011) For a given itemset X with its utility unit array U(X), the utility of X is defined as
+u(X)= luv(x,X).
+Pxi∈X i
+Wefollowthedefinitionofamount-confidencemeasureinassociationruleminingfrom(Hildermanetal.,1998)
+anddefinethefollowingutility-confidenceforanassociationrule.
+Definition 8. An association rule is an implication of the form R : X → Y, where X,Y ⊆ I, X(, ∅) is known as
+antecedentoftherule,Y(,∅)isknownasconsequentoftherule,andX∩Y =∅. Theutility-confidenceoftheruleR
+isdenotedbyuconf(R)anddefinedbyuconf(R)= luv(X,X∪Y).
+u(X)
+Rationale1. Theproposedutility-confidencemeasurebecomestheconfidencemeasurewhentheinternalutilityand
+external utility of the items of an itemset are set to 1. The utility-confidence measure shows the fraction of total
+utilityoftheantecedentcontributedtotheutilityofthecorrespondingitemset. So,theutility-confidenceoftherule
+R: X →Y reflectstheshareofutilityofitemsetXtotheutilityofX∪Y. ThatmeansthatthefractionofutilityofX
+iscoveredbyX∪Y. Itissimilartotheamount-confidencemeasureexceptthatitisbasedonutilityvalueofitemset
+suchasprofitsindollarsratherthanamount-sharethatisafractionoftotalweights.
+Wesayanassociationruleinutility-confidenceframeworkisvalid,ifitsatisfiesthefollowingtwoconditions:
+(i) Theantecedentanditemsetformedbycombinationofantecedentandconsequentarehighutilityitemset.
+8
+Table3:ExtractedHUIswithminimumutility20 Table4: Extractedhighutilityvalidruleswithminimumutility-
+confidence80%
+Itemset utility Itemset utility
+A 21 B 20 Rules Uconf(%) Rules Uconf(%)
+D 22 G 22 A→C 100 A→E 100
+E 22 F 20 B→E 80 F →E 90
+AC 31 AE 28 B→F 100 D→E 100
+BE 21 DF 24 E→F 81 F →D 80
+BF 23 DE 37 A→CE 100 AC→E 100
+FE 36 ACE 38 AE→C 100 B→DE 80
+AFE 20 DFE 36 BE→D 100 B→FE 80
+BDE 23 BFE 22 BE→F 100 F→DE 80
+ACFE 25 BDFE 24 DF→E 100 AFE→C 100
+B→DEF 80 BE→DF 100
+BDE→F 100 BEF→D 100
+(ii) The utility-confidence is more than or equal to the specified minimum utility-confidence threshold, say min
+uconf.
+Example4. ConsiderthetransactiontableshowninTable1,andtheutilitytableinTable2. Lettheminimumutility
+thresholdandminimumutility-confidencethresholdbe20and80%,respectively.Then,theutilityoftheitemsetBDE,
+whoseutilityis23byDefinition3,isahighutilityitemsetandcontainedinthetransactiont only. Ifweconsiderthe
+3
+ruleB→DE,theutility-confidenceofB→DE becomes luv(B,BDE) = u(B,t6) = 16 =80%.
+u(B) u(B) 20
+Generation of valid utility based association rules from high utility itemsets is relatively straightforward. The
+rules of the form R : X → Y are generated for all high utility itemsets X, and X ∪ Y, for all X,Y , φ, and the
+rule R providesthe utility-confidenceof the rule having at least min uconf. Since X ∪Y is a high utility itemset,
+thegeneratedrule isguaranteedtobe highutility. Toderiveallpossiblevalid rules, we needto examineeachhigh
+utilityitemsetandrepeattherulegenerationprocessasinApriorialgorithm(AgrawalandSrikant,1994)withutility
+constraint. When the minimum utility value is min util = 20, Table 3 shows all the high utility itemsets. Again,
+consideringtheminimumutility-confidencemin uconf = 80%,Table4showsthesetofallutilitybasedassociation
+ruleswithconfidenceaboveorequaltomin uconf =80%.
+ItcanbeobservedthatinTable4somerulesareredundanttoothers,forexample,A →C,A → E,andAC → E
+are redundantto A → CE. To eliminate the non-redundantrules in share-confidenceframework, we integrate the
+conceptoffrequentcloseditemsetsandfrequentgeneratortohighutilityitemsetmining,andtheoverallprocessofall
+thenon-redundantutilitybasedassociationrulesgenerationisgiveninFigure1.Werefertheutilitybasedassociation
+rulesashighutilityassociationrules(HAR)andutilitybasednon-redundantassociationrulesasnon-redundanthigh
+utility association rules (NHAR). To identify the high utility closed itemsets with their generators, we propose the
+HUCI-Miner algorithm. Since the identification of high utility closed itemsets with their generators takes all high
+utilityitemsetsasinputs,soanotheralgorithmFHIMisproposedtodiscoverallhighutilityitemsetsefficiently.After
+identifyingthehighutilitycloseditemsetswiththeirgenerators,thesetofNHARisobtained,whichisdiscussedin
+Section5. Ondemandofauser,thesetofallrulesisderivedfromthesetofNHARandhighutilitycloseditemsets.
+4. TheproposedHUCI-Mineralgorithm
+Inthissection,wefirstdiscusssomeusefuldefinitionsandtheoremsbeforedescribingourproposedalgorithm.
+The Apriori property used to prune the candidate itemset search space cannot be applied directly to mine high
+utilityitemset,sincetheutilityconstraintisneithermonotonenoranti-monotone. Toreducethesizeofsearchspace
+andenhancingtheperformanceofminingtask,Liuetal.(2005)proposedtheconceptoftransaction-weightedutility,
+whichsatisfiesthedownwardclosurepropertyandisbasedonthefollowingdefinitions.
+Definition9. Theutilityofatransactiont isdenotedbytu(t )anddefinedbytu(t )=u(t ,t ).
+d d d d d
+Definition 10. The transaction-weightedutility (TWU) of an itemset X in a database D is denoted by twu(X) and
+definedbythesumoftheutilitiesofallthetransactionscontainingX inD,wheretwu(X)= tu(t ).
+Ptd∈D∧X⊆td d
+9
+(cid:1)(cid:2)
+(cid:3)(cid:4)(cid:5)
+Figure1:Theoverallprocessofgenerationofutilitybasednon-redundantassociationrules.
+Property2. Thetransaction-weightedutilitysatisfiesthedownwardclosureproperty. Thatmeansforagivenitemset
+X,iftwu(X)islessthanthespecifiedmin util,allsupersetsofXarenothighutility.
+Table5showsthetransaction-weightedutilityofeachitem. Forexample,thetransactionutilityoft istu(t ) =
+1 1
+u(A,t )+u(C,t )+u(E,t )+u(F,t )=12+5+6+2=25.Again,considertheitemsetACEwhichisintransactiont
+1 1 1 1 1
+andt havingthetransaction-weightedutilityofACE,twu(ACE)=tu(t )+tu(t )=25+15=40.Ifthemin utilisset
+5 1 5
+to45,allsupersetsofACEarenothighutilityitemsetaccordingtoProperty2. Foragivenitemset,ifitstransaction-
+weightedutilityhasatleastmin util,wecalltheitemsetashightransaction-weightedutilityitemset(HTWUI).
+Table5:TWUofeachitemofdatabasegiveninTable1
+Item A B C D E F G H
+TWU 40 31 40 72 112 87 30 17
+Definition11. AnitemsetY iscalledtheclosureofanitemsetX,denotedbyγ(X),iftheredoesnotexistotherlarge
+supersetofXthanY,with supp(X)= supp(Y). AnitemsetXisthencalledthecloseditemset,ifX =γ(X).
+Property3. ForagivenitemsetX,twu(X)=twu(γ(X)).Inotherwords,thetransaction-weightedutilityofanitemset
+issameasitsclosure.
+Rationale2. Since the transactionscontainingan itemset X also containsits closureγ(X), their TWU valuesmust
+be same. For example, the itemsets A andCE have support2 and belong to the same set of transactions {t ,t } in
+1 5
+databasegiveninTable1andtheyhavethesameTWU valueequalsto40.
+Property4. (Wuetal.,2011)TheutilityandutilityunitarrayofanitemsetX canbecalculatedfromtheutilityunit
+arrayofitsclosureitemsetγ(X).
+Property5. IfanitemsetX isahighutilityitemset,γ(X)isalsoahighutilityitemset. However,theconverseisnot
+alwaystrue.
+Rationale3. The transactionscontainingan itemset X also containsits closure γ(X). Moreover,if X is notclosed
+itemset,γ(X)containsmorenumberofitemsthanX as X ⊂ γ(X). So,if X isahighutilityitemset,u(X) ≥ min util
+andsoalsou(γ(X))asitisthesumofutilitiesof X withsomenon-negativequantity. Fortheconverse,considerthe
+itemsetsCE andACE. ItcanbeobservedfromTable1thatACE istheclosureofCE. TheutilityvaluesofCE and
+ACE are17and38,respectively. Ifweconsidertheminimumutilitythresholdas20, ACE isahighutilityitemset,
+butCE isnotahighutilityitemset.
+10
+4.1. IntegratingtheclosurepropertywithHUIM
+In this subsection, we discuss how to unify the minimal generator concept of the traditional ARM into high
+utilityitemsetmining. Ingeneral,theitemsetsinatransactionaldatabasearenotcompletelyindependentfromother
+itemsets. A groupof itemsets are commonto the same set of transactions, and hence, they have the same support.
+Using the closure operator the itemsets can be grouped into equivalent classes. Two itemsets in a class are called
+equivalentiftheybelongtothesamesetoftransactions. Amaximalelementinaclass, iscalledthecloseditemset,
+whichistheclosureofotheritemsetsinthatclass,andtheminimalelements(smallestsubsetsofthemaximalelement
+oftheclass)arecalledthegenerators. Allotherelementsinaclasscanbederivedusingthecloseditemsets,andthe
+generatorsandalltheelementsinaclasshavethesamesupport.Thecloseditemsetswiththeirgeneratorsleadtothe
+fundamentalprinciplebehindtheeffectiveconstructionofnon-redundantassociationrulesinthesup p ort-confidence
+framework.
+AnaturalquestionarisesthathowtoincorporatethesimilarstrategyinHUIM,whichmeanstheformationofhigh
+utility closed itemset together with their generators those are also high utility itemsets. As suggested by Wuetal.
+(2011),theclosurebasedonutilityofitemsetdoesnotachieveahighreductiononthenumberofhighutilityitemset
+andtheydefinedtheclosureonthesupportsofitemsets. Onincorporatingclosurebasedonsupportofitemsets,they
+showedthatthejoinorderofclosedconstraintandutilityconstraintiscommutative.Thismeans,firstminethesetof
+highutilityitemsetsandthenapplyclosedconstraintwhichwillproducethesameresultwhileminingalltheclosed
+itemsetsfirstandthenapplyingtheutilityconstraint. Concludingthatanyequivalenceclassconstructedamonghigh
+utilityitemsetsusingclosurebasedonsupport,themaximalelementcanbefoundinbothways. However,laterwe
+showthat,thiscommutativenessbetweenutilityconstraintandclosurebasedonsupportdoesnotholdforgenerators.
+Asclosedhighutilityitemsetsandhighutilitycloseditemsetsaresame,soWuetal.(2011)definedtheclosed+high
+utilityitemset(CHUI).
+Definition12. AnitemsetXiscalledhighutilitycloseditemset,ifX =γ(X)andu(X)≥min util.
+4.1.1. Generatorswithutilityconstraints
+Following the definition of generators of a closed itemset in traditional ARM, the problem arises how we can
+incorporateittohighutilityitemsetmining.Thiscanbedoneintwoways. Firstmineallgeneratorsbasedonsupport
+constraint and then apply utility constraint. Secondly, first find all high utility itemset and then mine all generator
+applyingsupportconstraint. We will analyzethis joining orderbetween utility constraintand supportconstraintto
+extractthe generatorsandconcludethattheresultofbothorderingaredifferent. In firstcase, we miss theminimal
+highutilityitemsetsofanequivalenceclassandinthelatercasewedonotlosetheminimalhighutilityitemsets. As
+a consequence, we suggestfinding the minimal generatorsamong high utility itemsets. Thus, the utility constraint
+shouldbeconsideredfirstandthensupportconstraint.
+Forfirstcompositionmethod,weminegeneratorsbasedonsupportandthenpruneitemsetswhichdonotsatisfy
+theutilityconstraints.Basedoncompositionorder,wecandefinegeneratorwithhighutilityasfollows.
+Definition13(Generatorwithhighutility). AnitemsetX isageneratorwithhighutility,ifthereisnopropersubset
+ZofXsuchthatsupp(Z)= supp(X).Moreover,Xmustsatisfytheutilityconstraints.
+Definition13simplystatesthatinordertominegeneratorwithhighutility,usingsupportconstraint,theitemsets
+arefirstverifiedwhethertheyaregeneratorsornot. Thentheitemsetsaretested forhighutilityitemsetwith utility
+constraints.So,ifanitemsetisnotagenerator,theitemsetisnotageneratorwithhighutility,withoutverifyingwith
+utilityconstraints. Forexample,theitemsetAC(2,31)(itemset(support,utility))inthetransactionaldatabasegivenin
+Table1withminimumutilityconstraint20,isnotageneratorwithhighutilitywithouttestingwithutilityconstraint
+asitisnotageneratorbecausethereisasubset A(2,21)whosesupportissameassupportof AC(2,31). Again,the
+itemset AF(1,14) is a generator but not a generator with high utility as it does not satisfy the utility constraint of
+minimumutility20.
+Sincetheabovecompositionhasnorestrictionontheutilityofthesubsetofgenerators,soafterapplyingutility
+constraintsomegeneratorsarepruned. Asalltheitemsetsofanequivalenceclasscanbegeneratedfrombothclosed
+itemsetsandtheirgenerators,ifsomegeneratorsarepruned,somesubsetsofthatitemsetmaynotbegenerated. For
+example,assumethattheminimumutilityconstraintis20inthetransactionaldatabaseshowninTable1.Considerthe
+equivalenceclassoftheitemsetACFE(1,25).ThegeneratorsofthiscloseditemsetareAF(1,14)andCF(1,7).After
+11
+applyingtheutilityconstraint,notethatthereisnogeneratorofACFE(1,25)becausebothAF(1,14)andCF(1,7)are
+prunedastheirutilityislessthan20. However,fromTable3weobservethattheitemsetAFE(1,20)isahighutility
+itemsetbelongingtotheequivalenceclassofACFE (1,25). Butinthegenerationprocessofgenerators,theitemset
+AFE(1,20)isprunedasitisthesupersetofAF(1,14)withsamesupport.Inotherwords,beforeAF(1,14)ispruned
+bytheutilityconstraint,theitemsetAFE(1,20)isprunedbyitemsetAF(1,14)asbothhavesamesupportandlaterone
+isthesubsetoftheformer.Asaresult,thegeneratoritemsetofACFE(1,25)isempty.So,whileapplyingtraditional
+itemsetgenerationprocedurefromgeneratorsofanequivalenceclass,theitemsetAFE(1,20)willnotgenerate. This
+problemarisesbecauseofconsideringtheclosurepropertyfirstandtheutilityconstraintlater.
+Theotherwaytojointheutilityconstraintsandtheclosurepropertyisthatweneedtofirstminealltheitemsets
+withutilityconstraintandthenapplyclosurepropertytocomputethegenerators. Fromthisordering ,wecandefine
+highutilitygeneratorsasfollows.
+Definition14(Highutilitygenerators). AnitemsetXisahighutilitygenerator,ifitisahighutilityitemsetandthere
+existsnoproperhighutilitysubsetZsuchthatsupp(Z)= supp(X).
+Inthisapproachafterextractingallhighutilityitemsets,theclosurepropertyisappliedtocomputethegenerators.
+Again, from these high utility closed itemsets and their generators, all other high utility itemsets of that equivalent
+classcanbegeneratedusingtraditionalmethodbycombiningtheitemsets. Fromtheanalysis,theresultsofthejoin-
+ingorderbetweenthetwoconstraintsaredifferent.
+Rationale4. ThebasicdifferencebetweenDefinitions13and14isbasedontheconstraintappliedtothesubsetZ.
+Eventhoughthegeneratortakestheutilityconstraintintoaccountinbothdefinitions,butthesedefinitionsdifferthe
+wayutilityconstraintisapplied.InDefinition13,initiallythereisnorestrictionontheutilityconstraintofZ,whereas
+inDefinition14itisforhighutilityitemset. Ontheotherhand,inDefinition13,initiallythesupportisappliedand
+latertheutilityconstraint,whichisoppositetothatofDefinition14.
+4.1.2. Windingupthediscussions
+Itiswell-definedfromtheanalysis,weloosesomeminimalhighutilityitemsets,ifwefirstfindgeneratorsbasedon
+supportandthenapplyutilityconstraint.Nevertheless,inDefinition14,wegeneratetheactualhighutilitygenerators.
+As a consequence, the second approach generates high utility minimal generators of an equivalence class in high
+utilityitemsetmining.Throughoutthispaperweapplythesecondapproachandnowonwardswemeanthegenerator
+meansthehighutilitygenerator.
+Assume there isa pre-determinedtotalorderingΩ amongthe items I in the databaseD. Accordingly,if item i
+is occurred before item j in the ordering, we denote this by i ≺ j. For ∀j ∈ Y, if i ≺ j, we say i ≺ Y, where Y
+is an itemset. Similarly, for itemsets X andY if x ≺ Y in accordanceto the orderrelationΩ, for1 ≤ i ≤ m, m =
+i i
+min(|X|,|Y|),wesayX ≺Y. Thisorderingcanbeusedtoenumeratealltheitemsetswithoutduplication. Hereinafter,
+wealwaysconsideranitemsetasanorderedset,inparticular,itisasequenceofdistinctandincreasinglysorteditems
+withrespecttotheTWUvaluesofitems. IftheTWUvaluesoftwoitemsareequal,theyaresortedaccordingtothe
+lexicographicorder.
+Let f be a function that assign to each itemset X ∈ H to the set of all transactions that contain X, that is,
+f(X) = {t ∈ T | X ⊆ t ,X ∈ H}. Clearly,forX ⊂ Y, f(Y) ⊆ f(X). TwoitemsetsX,Y ∈ H aresaidtobeequivalent,
+d d
+denotedbyX (cid:27)Y,iff f(X)= f(Y). ThesetofitemsetsthatareequivalenttoanitemsetXisdenotedby[X]andgiven
+by[X]={Y ∈H |X (cid:27)Y}.
+Theorem1. LetX ∈H. Ifluv(X,Y)=u(X),thenY ∈[γ(X)].
+Proof. SinceX ⊂ Y,luv(X,Y) = u(X)andX ∈ H. WethenhaveY ∈ H. FromDefinitions3,5and6,bothX andY
+arecontainedinsametransaction.Thus, f(X)= f(Y)= f(γ(X))andY (cid:27)γ(X).Hence,Y ∈[γ(X)].
+Corollary1. Ifsupp(X)= supp(Y)andX ⊆Y,thenluv(X,Y)=u(X).
+Corollary2. ForagivenitemsetX,iftheredoesnotexistanyitemsetY ⊃ X suchthatluv(X,Y) = u(X),thenX isa
+closeditemset.
+12
+Definition15. Anitemset X ∈ [X]iscalledagenerator,if X hasnopropersubsetin[X]. Inotherwords, ithasno
+propersubsetwiththesamesupportanditisahighutilityitemset.
+Theorem2. Let X bea highutility itemsetand x ∈ X. If X \ x isa highutility itemset, X ∈ [X \ x] iff supp(X) =
+supp(X\x).
+Proof. Let x ∈ X and X\ xbeahighutilityitemset. LetX ∈ [X\x]. Then f(X) = f(X\x)meansthat supp(X) =
+supp(X\x).Theconversefollowstrivially.
+Theorem3. LetXbeahighutilityitemset.Then,Xisageneratoriffsupp(X),min{supp(X\x): x∈X,(X\x)∈H}.
+Proof. Let X be a generator. Let g be a high utility itemset of length k−1 with minimum supportand a subset of
+X. Then, g ⊂ X ⇒ f(g) ⊇ f(X). If f(g) = f(X), supp(X) = supp(g) and X is not a generator. Moreover, it
+is not the element with the smallest support, whose closure is γ(X). This concludes that f(g) ⊃ f(X) and hence,
+supp(X) , min{supp(X \ x) : x ∈ X, (X \ x) ∈ H}. On the other hand, if supp(X) , min{supp(X \ x) : x ∈ X,
+(X\x)∈H},Xisthesmallestelementoftheclosureγ(X). Hence,X isagenerator.
+Corollary 3. Let X be a high utility itemset. If X is not a generator, then supp(X) = min{supp(X \ x) : x ∈ X,
+(X\x)∈H}.
+Property6. ForahighutilitycloseditemsetX,ifgbeagenerator,thenu(g,X)<u(g′,X),whereg′ ∈[X]andg⊂g′.
+Rationale5. Sinceg′ ∈[X],bothgandg′belongtothesamesetoftransactions. Furthermore,asg⊂g′,Property6
+holdsasaconsequenceofProperty5.
+Theorem4. LetX ∈ H. Thestatement“IfX isagenerator,then∀Y ∈ H,Y ⊂ X,Y isagenerator”isfalseinthis
+context.
+Proof. Thiscanbeprovedbygivingacounterexample. Considertheitemset AFE withsupport1andutilityvalue
+20. If the minimumutility is set to 20, this is a generatorin the context. However,the subsets AF and AE are not
+generators.NotethatAF isnotahighutilityitemset,whereasAEbecomesahighutilityitemset.
+Rationale6. Theorem4statesthatthesubsetsofahighutilitygeneratormayormaynotbeagenerator.However,in
+thesupport-confidenceframeworkthesubsetsofageneratoraregenerators,andhence,ifanitemsetisnotagenerator,
+itssupersetisnotalsoagenerator.Thispropertyisusedtoprunetheitemsetsspacetoobtainthegeneratorsinsupport-
+confidenceframework. Since this propertydoes not satisfy in the high utility context, this pruningstrategy cannot
+beemployed. AF isprunedasitisnotahighutilityitemset,and AE isprunedasitisnotagenerator. Thus,bythe
+traditional procedureof a support-confidenceframework, the itemset AFE will not be generated. However, it is a
+minimalitemsetin[AFE].
+4.2. Mininghighutilityitemsets
+ItisobservedfromtheanalysisinSection4.1thatinordertoextractallhighutilitygenerators,weneedtodiscover
+theentirespaceofhighutilityitemsets.Itisthusnecessarytoprovideaneffectiveproceduretogenerateallhighutility
+itemsets. Inthissection,usingtheconceptofverticalminingofHUI(LiuandQu,2012),FHM(Fournier-Vigeretal.,
+2014b),andtheproposedpruningstrategies,anefficientmethodisproposedtoextractallhighutilityitemsets.
+4.2.1. Verticalhighutilityitemsetmining
+To avoid the computationalcost of candidate generation and multiple database scans for utility computation, a
+verticalminingmethodnamedasHUI-Miner,proposedbyLiuandQu(2012). TheHUI-Mineralgorithmgenerates
+the high utility itemsets in a single phase using a verticalrepresentationof the database. To representthe database
+vertically,itusesanoveldatastructure,namedutility-listtoeachitemset. Togenerateallthehighutilityitemsets,it
+performsa depth-firstsearch in a pre-orderway, from left-to-rightas shown in Figure 2. The utility and utility-list
+ofak-itemsetisconstructedfromtheutility-list of(k−1)-itemsets. Thesymbol‘−’in Figure2 representsthatthe
+utility-listoftheitemsaregeneratedsimultaneouslyfromthemineddatabase. Notethatthereisnotreeusedinthe
+algorithms,Figure2onlyshowsthegenerationofitemsetsinarecursivecall.
+13
+Definition 16. (LiuandQu, 2012) Let Ω be a pre-determined total ordering among the items I in a database D.
+GivenanitemsetX andatransactiont,X ⊆ t,aftersortingthetransactiontandX accordingtotheorderΩ,theset
+ofitemsafter X int isdenotedbyt/X. Foragivenitemset X inD, theutility-listof X isacollectionoftuples(tid,
+iutil,rutil)foreachtransactiont containingX. TheutilityofX int ,denotedbyiutil,isthesumoftheutilitiesof
+tid tid
+allitemsint /X,thatis,rutil= u(i,t ). Wedenotetheutility-listofXasUL(X).
+tid Pi∈ttid/X tid
+Example 5. Considerthe transactiont in Table 1. After sorting it accordingto the order Ω, we have t = {A,C,
+1 1
+F, E}. For the item C in t , we have rutil = u(F, t )+ u(E,t ) = 8. The utility-list element ofC for transaction t
+1 1 1 1
+is(1,5,8). InthesecondscanofthedatabaseD,theproceduregeneratestheutility-listforeachpromisingitemas
+showninTable6. Theconstructionoftheutility-listofak-itemsetX,wherek≥2,canbeobtainedusingtheconstruct
+algorithm(LiuandQu,2012).
+Table6:utility-listofeachpromisingitem
+Item utility-list
+G h(7,2,7), (9,20,0)i
+B h(3,16,8), (6,4,2)i
+A h(1,12,13), (5,9,6)i
+C h(1,5,8), (5,5,1)i
+D h(2,2,9), (3,2,6), (4,2,8), (7,2,5), (8,14,3)i
+F h(1,2,6), (2,5,4), (3,1,5), (4,6,2), (6,2,0),
+(7,4,1)i
+E h(1,6,0), (2,4,0), (3,5,0), (4,2,0), (5,1,0),
+(7,1,0), (8,3,0)i
+Property7. (LiuandQu,2012)ForagivenitemsetXwithitsutility-list,ifthesumofiutilvaluesoftheutility-listof
+Xislessthanmin util,Xisnotahigh-utilityitemset. Otherwise,itisahighutilityitemset.
+Property 8. (LiuandQu, 2012) Let X be an itemset with its utility-list. Given an ordering Ω, an itemset Y is an
+extensionofX,ifY =X∪Z,forsomeZ withX ≺Z. Givenaminimumutilitythresholdmin util,ifthesumofallthe
+iutil’sandrutil’sinutility-listislessthanmin util, theredoesnotexistanyextensionY ofX,whichisahighutility
+itemset. Wecallthesumofalltheiutil’sandrutil’sinutility-listofagivenitemsetXasthepromisingutilityofX.
+4.2.2. Co-occurrence-basedpruning
+To reducethecostofjoiningoperationsin the calculationofutility-list foran itemset Pxy, Fournier-Vigeretal.
+(2014b) proposed the Estimated Utility Co-occurrence Pruning (EUCP) strategy to directly eliminate a low-utility
+extensionof Pxyandallitstransitiveextensionswithoutconstructingtheirutility-list. TheyusedtheTWUpruning
+strategy(Liuetal.,2005)toeliminatealargeritemsetoflengthmorethanthreeusingtheTWUvalueofallitssubset
+oflengthtwo. TheTWUvalueofeach2-itemsetsisstoredinamatrix,knownastheEstimatedUtilityCo-Occurrence
+Structure(EUCS),whichisdefinedasfollows.
+Definition17(EstimatedUtilityCo-occurrenceStructure(EUCS)(Fournier-Vigeretal.,2014b)). EUCSisacollec-
+tionoftuplesoftheform(a,b,c)∈ I′×I′×RsuchthatTWU(ab)=c.
+TheEUCScanberepresentedasatriangularmatrixorahashmap.Toachievethememoryefficiencyinimplemen-
+tation,thehashmapisusedbecauseEUCSissparseinnature.MostoftheentriesofEUCSarezero,whichindicates
+thatveryfewitemsco-occurswiththerestitems. TheconstructionofEUCSisperformedinasingledatabasescan
+atthetimeofconstructionofutility-list. ItoccupiesverylessmemoryandistheorderofO(|I′|2). Table7showsthe
+EUCSofthepromisingitemsofthedatabaseDgiveninTable1.
+Property9(EstimatedUtilityCo-occurrencePruning(EUCP)(Fournier-Vigeretal.,2014b)). ForagivenitemsetX
+= {x , x , x , ..., x } and an item y, if there is no tuple (x , y, c) in EUCS such that c < min util, then Xy and no
+1 2 3 k k
+supersetofXyarehighutilityitemsets.
+14
+Table7:EUCSofpromisingitems
+Table8:PromisingUtilityCo-OccurrenceStructureofitemA,B
+Item G B A C D F
+B 0 PUCS A PUCS B
+A 0 0 Item C F Item D F
+C 0 0 40 F 25 F 24
+D 9 24 0 0 E 40 25 E 24 24
+F 9 30 25 25 54
+E 9 24 40 40 71 79
+Thispruningstrategysimplyconcludesthatfortheitemset X ={x , x , x ,..., x },ifthevalueoftheentry(x ,
+1 2 3 k k
+y)islessthantheminimumutility,thenthereisnoneedtoexploreitsanyextensionintheitemsetspace. Integrating
+EUCPstrategyinHUI-Miner,calledthealgorithmasFHM(FastHigh-UtilityMiner)(Fournier-Vigeretal.,2014b),
+leadstoreducethenumberofjoiningoperationsthatareneededforformationofutility-listofalargeritemset. This
+strategy is actually performed before the joining operations to be performed. If the value is higher than the given
+min util,thejoinoperationisexecuted;otherwise,thelargeritemsetneednottobeexplored.
+Itisobservedthatindepth-firstsearchstrategy,theitemsetsearchspaceproblemispartitionedintonon-overlapping
+sub-problemssuchthattheitemsetsearchspaceofeachitemiisnotincludedinthesearchspaceoftheitem j,with
+i ≺ j (Wuetal., 2011). In the procedureof HUI-Minerand FHM, the promisingutility of item j doesnot contain
+the utility value of any item i such that i ≺ j. The estimated utility co-occurrencevalue of item pair (j,k) can be
+furtherreducedafter completionof the subproblemof item i such that i ≺ j and i ≺ k. Thismeans thatthe utility
+valuecontributedtotheestimatedutilityco-occurrencevaluesbyihasnoeffectafterthesubproblemoftheitemiis
+processed.ThisideamotivateustoprovideaPromisingUtilityCo-OccurrenceStructure(PUCS)foreachpromising
+item to furtherreducethe numberof candidatesitemsets. We observethat thisnovelstructure, FHM, can be made
+morefaster(seeSection6fordetails)byfurtherreducingcomputationalcostofjoinoperation.Wecallthisalgorithm
+asFHIM(FastHigh-utilityItemsetMiner).WenowdefinePUCSforagivenitemasfollows.
+Definition18(PromisingUtilityCo-OccurrenceStructure(PUCS)). ThePromisingUtilityCo-OccurrenceStructure
+(PUCS)ofagivenitema,denotedbyPUCS ,isasetoftuplesoftheform(b,c,v),a≺b,a≺c,D ,∅andD ,∅
+a ab ac
+suchthatv= (e.iutil+e.rutil).
+Pe∈UL(a)∧e.tid∈Dabc
+In Definition 18, the value v in a tuple (b,c,v) is v = TWU(bc) in the projected database of the item a. Table
+8 shows the PUCS of items A and B. The PUCS takes less memory as it is only for a subproblem and then it is
+removedafterthesubproblemissolved.TheproposedmodelgenerateshighutilityitemsetfasterthanFHM.Itseems
+that the PUCS for each item is constructedbefore beginningof the depth-firstsearch, but it is not the case. In our
+implementationof the proposed algorithm, the PUCS for each item is not computed at the beginningat each time
+ratheritisconstructedandupdatedfrom2-itemsets. ForagivenitemsetX ={x,y,z},theentry(y,z)ofPUCSof xis
+calculatedatthetimeofconstructionoftheutility-listoftheitemsetXfromxyandxz. However,avariableisusedto
+accumulatethetotalpromisingutilityzatthetimeofcomputingtheutility-listoftheitemsetX. Tofurtheroptimize
+the method, two construction procedureshave implemented: one for construction of 3-itemset and another for the
+rest. Thiscansignificantlyreducetimetocomputetheestimatedutilityforpruning. Further,inordertooptimizethe
+memoryused,onceanodeisprocessedtogenerateitsallextensions,itisthensafetoremoveitfrommemory,which
+isperformedinStep17ofAlgorithm1.
+OurFHIMearnsthenoveltywiththeproposedpruningscheme,calledPUCP(PromisingUtilityCo-occurrence
+Pruning),whichisbasedonPUCS.ThispruningschemeimmediatelyeliminatesallextensionsofanitemsetXwithout
+furtherconstructingtheirutility-list. Theproposedschemeisdescribedasfollows.
+Theorem5(PUCPStrategy). Let P ={x , x , x ,..., x }beak-itemset,where2 ≤ k < m,and x ≺ x ≺ x ≺...
+1 2 3 k 1 2 3
+≺ x . Let Pxand Pybetheitemsetsformedbythecombinationofitemset Pwithitems xandy,respectively,where
+k
+x≺y. Ifthereisatuple(x,y,v)inPUCSofx suchthatv<min util,Pxyandallitsextensionsarepruned.
+1
+Proof. LetY be anextensionof Pxy. Since |Pxy| > 3, |Y| > 3. Anyextensionof Pxy is anextensionof x . Then,
+1
+{x } ⊂ x xy ⊂ Pxy ⊆ Y. Let D be the projected database of x . Let Z be a set of items after excluding x
+1 1 x1 1 1
+15
+in Y. That means Z = Y/x . Clearly, Pxy/x ⊆ Z ⊆ t/x . If Tidset(x ) denotes the set of tid’s of UL(x ), we
+1 1 1 1 1
+denote Tidset(Pxy) for the set of tid’s of UL(Pxy), and Tidset(Y) for the set of tid’s of UL(Y). Then, Tidset(Y)
+⊆Tidset(Pxy)⊆Tidset(x )=D . Thus,theutilityvalueofY inD isgivenas
+1 x1 x1
+u(Y) =
+X
+u(Y,t)=
+X
+u(x
+1
+,t)+u(Z,t)
+t∈Tidset(Y) t∈Tidset(Y)
+≤
+X
+u(x
+1
+,t)+u(t/x
+1
+,t)
+t∈Tidset(Y)
+≤
+X
+u(x
+1
+,t)+u(t/x
+1
+,t)
+t∈Tidset(Pxy)
+= e.iutil+e.rutil
+X
+e∈UL(x1)∧e.tid∈Tidset(Pxy)
+≤ e.iutil+e.rutil
+X
+e∈UL(x1)∧e.tid∈Tidset(x1xy)
+= e.iutil+e.rutil
+X
+e∈UL(x1)∧e.tid∈Dx1
+= v, since(x,y,v)∈PUCS
+x1
+< min util.
+Hence, the itemset Y is not a high utility itemset in D . Since all the transactions containing Y are only in the
+x1
+projecteddatabaseD ,sou(Y,D )=u(Y,D).Hence,thetheoremfollows.
+x1 x1
+NotethatthepruningPUCPstrategyisapplicableforthegenerationofthelargeritemsetsoflengthatleastfour.
+Forthegenerationofitemsetshavinglength3orless,theEUCPstrategyisused(providedinDefinition17). Before
+constructing the utility-list of Pxy, except the pair (x,y), the rest pairs of items in Pxy have already been tested in
+previousrecursionsofthedepth-firstprocedure. AgenuinepointaboutthePUCPstrategyistotesttheitemset Pxy
+thepromisingutilityvalueofthepair(x,y)shouldbe availableinthe correspondingPUCS structure. Forexample,
+beforeconstructingtheutility-listoftheitemset{a,b,c,d}fromtheitemset{a,b,c}and{a,b,d},thepromisingutility
+valueofthe pair (c,d)in PUCS shouldbe tested with min util. Forthis reason, the promisingutility valueof the
+a
+pair (c,d) in PUCS needs to be computed before processing the itemset {a,b,c,d}. That means the utility-list of
+a
+theitemset{a,c,d}iscomputedfirst. Inotherwords,allsubsetsof{a,b,c,d}withprefixawillbegeneratedbefore
+{a,b,c,d}itself. Thiscanbeachievedbythereversepre-ordertraversalonasub-treerootedattherootnodediscussed
+inSection4.2.4.
+4.2.3. Progressiveexpectedutilitypruning
+Itis observedthatin the FHM andHUI-Minerprocedures,an itemset Px is combinedwith anotheritemset Py,
+whichliesrighttoit. ThepruningstrategyproposedbyLiuandQu(2012)isastraightforwardstrategy,whichchecks
+iftheestimatedutilityofPxisgreaterthanthethresholdornot. IntheEUCSstrategy(Fournier-Vigeretal.,2014b),
+before joining the utility-list of Px and Py, it checks if xy is a promising itemset or not. If it is so, it continues;
+otherwise, it stops searching in that sub-tree. By the above proposedstrategy, the estimated utility of 2-itemsets is
+furtherdecreased. ButastheTWUobeysanti-monotonepropertytheTWU(Py)islessthanorequalto xy. Wethus
+haveTWU(Pxy)≤TWU(Py)≤TWU(xy).Thisinequalityalsoholdsfortheprojecteddatabase.Foragivenitemset
+Px, if TWU(Py) is no more than the utility threshold, Py will not be combined with Px to form the itemset Pxy.
+However,inthedepth-firstsearchusingtheutility-listitisexpensivetofindTWU(Py)inthecorrespondingprojected
+databasesinceitrequiresto sumupalliutil andrutilof theelementsforthe commontransactions. Asa result, we
+provideanestimatedutilityofPy,whichsayswhetheritcanbecombinedwiththeleftitemsetsornot. This,inturn,
+increasestheperformance,whichisevidentfromSection6.
+16
+Definition19. ForagivenitemsetPx,andanitemPzwith x ≺z,theprogressiveestimatedutilityoftheitemsetPxz
+isPEUP(Pxz)= (u(Px,tid)+ru(Px,tid)).
+Ptid∈Tidset(Pxz)
+Theorem6(PEUPStrategy). Let PbeanitemsetandPyan1-extensionitemset. IfEU(Py) <min util,thereisno
+extensionY ofPsuchthatPy⊂Y,whichisahighutilityitemset.
+Proof. LetY beanextensionofPandPy⊂Y. LetTidset(P)denotethesetoftids’sofUL(P),Tidset(Py)thesetof
+tids’sofUL(Py),andTidset(Y)thesetoftids’sofUL(Y). Then,Tidset(Y) ⊆Tidset(Py). Foralltransactionstsuch
+thatY ⊆t,wehave,
+u(Y,t) = u(Py,t)+u((Y−Py),t)
+= u(P,t)+u(y,t)+u((Y−Py),t)
+= u(P,t)+u((Y−P),t)=u(P,t)+u((Y/P),t)
+= u(P,t)+ u(i,t)≤u(P,t)+ u(i,t)
+X X
+i∈Y/P i∈t/P
+= u(P,t)+ru(P,t).
+Now,
+u(Y) =
+X
+u(Y,t)≤
+X
+u(P,t)+ru(P,t)
+t∈Tidset(Y) t∈Tidset(Y)
+≤
+X
+u(P,t)+ru(P,t)
+t∈Tidset(Py)
+= EU(Py,t)<min util.
+Hence,thetheoremfollows.
+ThePEUPpruningstrategysimplystatesthatthejoinoperationbetweenPxandPywillnotbeperformed,ifthe
+estimated utility of Py with Px is less than the minimum utility. Before performingthe join operation, the itemset
+Pxy and the sub-tree rooted at node Pxy are removed from the search space. Observe that the estimated utility of
+anitemsetPxyiscalculatedattheconstructionprocedureusingDefinition19. Avariableisalsousedtoaccumulate
+the estimated utility of each utility list. Integrating both the strategies, the proposed method yields a significant
+improvementin performance. From the experiments, it is evident that the proposed method takes less memory or
+comparable memory for different thresholds. The reason is that we reduce the search space as the corresponding
+utility-listisnotgeneratedandasaresult,itconsumeslessmemory.
+4.2.4. Reversepre-ordertraversal
+The HUI-Mineris the first HUI miningmethodthatcombinesthe verticalrepresentationof a database with the
+depth-firstsearchbasedontraversaloftheEclatalgorithmoffrequentitemsetmining. Ittraversesthesearchspace
+from left-to-rightin the set enumerationtree. FHM adopts the searching procedureof HUI-Miner to the exclusive
+generationoftheHUIs. Toreducethecostofjoinoperation,itreliesonatechnique,calledEUPSstrategy,thatchecks
+whether any superset of the itemset is a HUI or not by consideringall its subsets of TWU values as they obey the
+anti-monotoneproperty. To apply our pruning strategies, it must ensure that while before an itemset is generated,
+alltheexpectedco-occurrenceutilityofeachtwo-pairitemsneedtobecomputed. Thissuggeststhatallthesubsets
+oflength3begeneratedbeforethegenerationoftheitemset. ThetechniquepresentedinTalky-G(Szathmaryetal.,
+2009), called the reverse pre-ordertraversal, ensures that all the subsets of a given itemset are in right to the node
+in the setenumerationtree. Thistraversalalso ensuresthatallthe subsetsof an itemset X are generatedbeforethe
+generationofX. Weadoptthistraversalforthesub-treerootedatthechildoftherootnode.Thecompletetraversalis
+showninFigure2.
+4.2.5. TheFHIMalgorithm
+In this section, we describe an efficient algorithm, called FHIM, for mining high utility itemsets. The utility
+database D and the minimum utility threshold min util are taken as inputs in the main algorithm, FHIM, provided
+17
+{ } { }
+- A 1 - B 9 - C 13 - D 15 - A 1 - B 9 - C 13 - D 15
+1 AB 2 2 AC 6 3 AD 8 8 BC 10 9 BD 12 11 CD 14 2 AB 5 3 AC 3 4 AD 2 9 BC 11 10 BD 10 12 CD 1 4
+4 ABC 3 5 ABD 5 7 ACD 7 10 BCD 1 1 Traversal order 6 ABC 7 7 ABD 6 5 ACD 4 11 BCD 1 2 Search order
+6
+ABCD 4 1
+C
+A
+o
+B
+ns t
+2
+r uctio n
+It e
+o
+m
+rd
+s
+e
+e
+r
+t
+of utility-list 8
+ABCD 8 2
+C
+A
+o
+B
+ns
+5
+t ruc ti o n
+It e
+o
+m
+rd
+s
+e
+e
+r
+t
+of utility-list
+(a) Pre-order traversal in (Fournier-Vigeretal., 2014b; (b) Reversepre-ordertraversalinasub-treeoftherootinFHIM
+LiuandQu,2012)
+Figure2:Thesearchspacetraversal
+Algorithm1.
+Algorithm1:FHIM(D,min util)
+Input: D: database,min util: minimumutilitythreshold.
+Output:Highutilityitemsets.
+1 ScanDtogetTWU ofeachitem.;
+2 LetCbethesetofitemsxsuchthatTWU(x)≥min util.;
+3 SorttheitemsinCinincreasingorderofTWU value.;
+4 RemovetheitemsfromthedatabasewhoseTWU <min util.;
+5 Constructtheutility-listULasUL={UL(x)|TWU(x)≥min util}andbuildtheEUCSstructure.;
+6 foreach itemx∈C
+7 if (SUM(UL(x).iutils)≥min util)
+8 Write{x},{x}.utility,{x}.support;// High utility 1-itemset
+9 if (SUM(UL(x).iutils)+SUM(UL(x).rutils)≥min util)
+10 Settail=∅.;
+11 foreachitemy∈C,x≺yfromlefttoright
+12 if ∃(x,y,v)∈ EUCS suchthatv≥min util
+13 ComputeX ={x}∪{y};
+14 ComputeUL(X)=Construct(∅,∅,UL(x),UL(y));
+15 Computetail=tail∪UL(X);
+16 CallRsearch(x,tail,min util);
+17 RemoveUL(X)fromUL;
+Atfirst, theTWU of allitemsare calculatedby a databasescan inStep 1. Ifthe TWU ofanyitem isless than
+thespecifiedmin util,theitemisdiscardedaccordingtoProperty2forsubsequentminingprocess.Theitems,whose
+TWU are higherthan min util (knownas promising items), are sorted accordingto the orderrelation Ω and stored
+in a global TWU Table (Liuetal., 2005). In the next pass, the transactions are sorted according to Ω, and at the
+same time the initialutility-list foreach promisingitem and the EUCS structureareconstructed. These procedures
+areperformedduringSteps2-5. InSteps7-8,itfindsthehighutility1-itemsets. Allpromising2-itemsetsandtheir
+utility-listaregeneratedusingProperty8andtheEUCPstrategyinStep9-14. Step13callstheConstructprocedure
+to construct the utility-list of 2-itemsets. One can find the details of this procedure in (LiuandQu, 2012). In this
+construction procedure, the progressive expected utility of the utility-list is calculated in Steps 9-12. Also, in this
+procedure,thePUCSstructureofanitemisupdated. ThecompletemodifiedConstruct procedureofHUI-Mineris
+givenintheprocedureConstruct. Afterthis,thereversedepth-firstsearchprocedure,Rsearch,isexploredatStep15
+togeneratealltheitemsetsofthesubproblemofanitemx.
+In the Rsearch procedure, the reverse traversal searching is applied in Step 2. This generates the high utility
+18
+Procedure:Construct(UL(P),UL(Px),UL(Py))
+Input: a: itemaforthesubproblem,UL(P):Utility-listofparentP,UL(Px):Utility-listofPx,UL(Py):
+Utility-listofPy.
+Output: UL(Pxy):Utility-listoftheitemsetPxy.
+1 SetUL(Pxy)=∅;
+2 SetPxy.EU =0;// Expected utility of Pxy for PUEP strategy
+3 Seteu=0;// Expected co-occurrence utility of Pxy for PUCP strategy if |Pxy|=3
+4 foreachelemente x ∈UL(Px)
+5 if ∃e y ∈UL(Py)ande x .tid ==e y .tid
+6 if UL(P),∅
+7 Finde∈UL(P)suchthate.tid ==e x .tid;
+8 Computeexy=(e x .tid,e x .iutil+e y .iutil−e.iutil,e y .rutil);
+9 ComputePxy.EU = Pxy.EU+e x .iutil+e x .rutil;
+10 else
+11 Computeexy=(e x .tid,e x .iutil+e y .iutil,e y .rutil);
+12 ComputePxy.EU = Pxy.EU +e x .iutil+e x .rutil;
+13 Computeeu=eu+e.itil+e.rutil;// For PUCP strategy if |Pxy|=3
+14 AddexytoUL(Pxy);
+15 if |Pxy|==3
+16 AddeutoPUCS a ;
+17 returnUL(Pxy);
+18 EndProcedure
+Procedure:Rsearch(a,tail,min util)
+Input: a: itemforthesubproblem,tail: Setofutility−list,min util: minimumutilitythreshold.
+Output: Highutilityitemsets.
+1 if (tail==∅) return;
+2 foreachPx∈tailfromrighttoleft
+3 if (SUM(UL(Px).iutils)≥min util)
+4 WritePx,Px.utility,Px.support
+5 if SUM(UL(Px).iutils)+SUM(UL(Px).rutils)≥min util)
+6 Settail Pxy =∅;
+7 foreach Py∈tailwith x≺yfromlefttoright
+8 if (JOIN(a,Px,Py,min util)==true)
+9 ComputePxy= Px∪Py;
+10 ComputeUL(Pxy)=Construct(a,P,Px,Py);
+11 Computetail Pxy =tail Pxy ∪UL(Z);
+12 CallRsearch(a,tail Pxy ,min util);
+13 EndProcedure
+itemsetoflengthmorethan1inSteps3-4.Steps7-13aresameastheFHMexceptStep8. Step8containstheEUCP,
+PUCPandPUEPstrategiesinanotherprocedure,called JOIN. Thisprocedureverifieswhetherthejoiningbetween
+two itemsets Px and Py is performedor not. If the progressiveexpectedutility of Py is belowthe minimumutility
+threshold,JOIN procedurereturnsfalse,otherwiseitchecksforthepromisingutilityvalueinEUCSorPUCSmatrix
+dependingon the size of Px. If this sub procedurereturnstrue, the itemsets Px and Py are combinedto form Pxy
+inStep9oftheRsearchprocedure. Theutility-listofthisitemsetisconstructedinStep10bycallingtheConstruct
+procedure.Theprocedurecallsitselfrecursivelyuntiltail,∅. Otherwise,itreturnstothemainproceduretoperform
+theexplorationonthenextsubproblem.
+19
+Procedure:JOIN(a,Px,Py,min util)
+if EU(Py)≥min util
+if |Px|==2
+if ∃(x,y,v)∈EUCS suchthatv<min util
+returnfalse;
+else
+if ∃(x,y,v)∈PUCS suchthatv<min util
+a
+returnfalse;
+returntrue;
+elsereturnfalse;
+EndProcedure
+4.3. Derivinghighutilitycloseditemsetsandgenerators
+TheHUCI-MineralgorithmgiveninAlgorithm2identifiesthehighutilitycloseditemsetsandgeneratorsamong
+thehighutilityitemsets. Itenablestotheefficientgenerationofthenon-redundantassociationrulesamongthehigh
+utilityitemsetsusingtheutility-confidenceframework. Thealgorithmoutputstheresultantset,CH, whichcontains
+thehighutilitycloseditemsetsH ,whereeachsetH ,1≤k ≤max,hasallhighutilityk-itemsetsandmaxisthesize
+k k
+ofthelongesthighutilityitemset. Thisalgorithmgeneratesthehighutilitycloseditemsetsandgeneratorsfromthe
+highutilityitemsetsusingTheorem2,3andCorollary3. Notethatnoadditionaldatabasescanisrequiredinorder
+tofindouttheutilityunitarrayofeachcloseditemset,whichisusedtocalculatethelocalutilityvalueofanysubset.
+Byscarifyingalittlemorememoryconsumption,thiscanbecalculatedfromtheutlity-listoftheconstituentitemsof
+anitemset.
+Thepseudo-codeoftheHUCI-Mineralgorithm,providedinAlgorithm2,isalevel-wiseprocedure. Itidentifies
+allthehighutilityitemsetssuccessivelyasthehighutilitycloseditemsetorgeneratorineachset H ,1 ≤ k ≤ max,
+k
+containsthe high utility itemset of length k. It derivesthe setsCH , 1 ≤ k ≤ max, containingthe closed itemsets
+k
+andtheirsupports,utilityvaluesandthecorrespondinggenerators. Atfirst,itfindsallthehighutilityitemsetsusing
+the FHIM algorithm. After this exploration, the algorithm examineseach high utility k-itemset, k ≥ 2, which is a
+generatorofahighutilityk-itemset(k≥2)byconsideringthesupportsofallitssubsetsoflengthk−1.Thealgorithm
+thenverifiesifitisacloseditemsetbyexaminingthesupportsofallitssubsetsoflengthk−1.Twobooleanvariables
+closed andkey areusedinordertoidentifywhetheranitemsetisahighutilitycloseditemsetoragenerator. If H
+k
+isemptyandH isnonempty,byconsequenceofProperty5theelementsofH areclosedanditisperformedin
+k−1 k−1
+Steps15-16. Conversely,ifH isnonemptyandH isempty,allitemsetsinH aregenerators,andnoextrastepis
+k k−1 k
+neededasallitemsetsareinitiallymarkedasgenerators.
+An itemsetc is identifiedas a generatorduringSteps 8-12in the algorithmHUCI-Miner. If the supportof c is
+sameasoneofitssubsetshavinglengthk−1in H , thenc isnota generator,andconversely,itisnotclosed. In
+k−1
+Steps15-18,allthecloseditemsetsoflengthk−1areaddedtothesetCH . Step21discoversthecloseditemset
+k−1
+ofthemaximumlength. InSteps16,19and22,theGet generatorsprocedureiscalledinordertoupdatetheglobal
+listof generatorsandassignthe generatorsto therespectivecloseditemset. IttakesthesetCH asinput. Foreach
+k
+closeditemsetch∈CH ,itspropersubsetsintheglobalsetofgeneratorsHGarethenremovedandthenaddedtothe
+k
+thegeneratorsofch(Steps1-5inGet generatorsprocedure).Thisprocedureupdatesthetheglobalsetofgenerators
+HGbytheitemsets,whicharenotclosedbuttheyaregeneratorsbeforethestartingofthenextiteration. Ifthesetof
+generatorsofagivencloseditemsetisempty,itindicatesthatthecloseditemsetisthegeneratorofitself.Forexample,
+consideringthedatabasegiveninTable1withmin util = 20%. TheHUCIsareG(),F(),E(),BF(B),DE(D),FE(),
+ACE(A),DFE(DF),BDFE(BE)andACFE(AFE),whereX(Y)meansXisthecloseditemsetandY isitsgenerator.
+Theorem7. For a given minimum utility threshold, the proposedHUCI-Miner algorithm generatesallhigh utility
+closeditemsetswiththeirgeneratorscorrectly.
+Proof. ThecorrectnessofourproposedHUCI-MineralgorithmisbasedonTheorems2and3.Theorem2determines
+a high utility itemseth , which is a high utility closed itemset, by comparingits supportwith the supportsof the
+k−1
+highutility k-itemseth containingthe itemseth . Theorem3 enablesif a highutility k-itemset h is a generator
+k k−1 k
+byexaminingitssupportwiththesupportsofthehighutility(k−1)-itemsets,whichareincludedinh . Sinceahigh
+k
+20
+Algorithm2:HUCI-Miner(D,min util)
+Input: HUI :{H ,H ,...,H },whereH isthesetofhuisoflengthk,maxisthesizeoflargesthigh
+1 2 max k
+utilityitemset.
+Output:Highutilitycloseditemsetswiththeirgenerators.
+1 SetCH←∅,HG←∅// HG: Set of high utility generators
+2 ComputeH = FHIM(D,min util)// H ={H 1 ,H 2 ,...H max }, H k Set of high utility k-itemset
+3 foreachitemseth∈H 1 do
+4 Seth.closed←true;h.key←true;
+5 end
+6 for(k=2;k≤max;k++)do
+7 if H k ,∅
+8 foreachitemseth∈H k do
+9 Seth.key←true;h.closed←true;
+10 forallsubsetsh′ ∈ H K−1 ofhdo
+11 if (supp(h′)== supp(h))
+12 Seth.key← false;h′.closed ← false;
+13 end
+14 end
+15 SetCH k−1 ←{h∈ H k−1 |h.closed=true};
+16 Get generators(CH k−1 ,H k );
+17 else
+18 SetCH k−1 ←{h∈ H k−1 |h.closed=true};
+19 Get generators(CH k−1 );
+20 end
+21 SetCH k ←H k ;
+22 Get generators(CH k );
+23 SetCH←∪ k CH k withgenerators;
+24 Calculateutilityunitarrayofeachcloseditemset;
+25 Endprocedure
+Procedure:Get generators(CH ,H )
+k−1 k
+Input:CH :highutilitycloseditemsetoflength(k−1)
+k−1
+Output:AssignthegeneratorstoeachcloseditemsetsofCH
+k−1
+1 foreachitemsetch∈CH k do
+2 forallsubsetsc′ ∈HGofchdo
+3
+Addc′inch.generator;
+4 end
+5 end
+6 ComputeHG=HG∪{h∈ H k |h.key=true∧h.close= false};
+utilitycloseditemsetcannotbeageneratorforthelargeitemsets,theyarenotinthegloballistofgenerators.Again,
+theclosureofanon-generatoritemsetcisthesmallestsupersetofcinthesetofthehighutilitycloseditemsets. This
+provesthattheidentificationofthegeneratorsofacloseditemsetiscorrect.
+4.4. Complexityanalysis
+Thetimecomplexityoftheutility-listconstructprocedureisintheorderofO(slogs),where sisthemaximum
+supportamongallitemsetsandthebinarysearchalgorithmisusedtogetanelementfromautility-list.Thecomplexity
+ofFHIMandFHMareproportionaltothecostoftotalnumberofcandidatehighutilityitemsetsgeneratedduringthe
+miningprocess.Thus,thetimecomplexityofFHIMandFHMareO(Can )andO(Can ),respectively,where
+FHIM FHM
+21
+Can andCan are the numberof candidate high utility itemsets generatedusing the respective algorithms.
+FHIM FHM
+FHIMis basedonthe pruningstrategies, PUCP andPUEP,is improvedversionsof FHM algorithm. The proposed
+pruningstrategiesreducethegenerationofthenumberofcandidatehighutilityitemsetsthanthatofFHM(SeeTable
+13). Ingeneral,itcanbeshownthatCan ≤ Can ,whichmakesFHIMismoreefficientthanFHM.If N
+FHIM FHM max
+isthemaximumnumberofhighutilityitemsetspresentsinsomeH andmaxisthemaximumlengthofhighutility
+K
+itemsetobtained,the timecomplexityofHUCI-MineralgorithmisO(N2 ×max)anditisstraightforwardasitis
+max
+basedonthesubsetcheckinginalevel-wisemannerandduetothedominatingthreeforloopsinSteps6,8and10.
+5. Utilitybasednon-redundantassociationrule
+FromtheexperimentsinSection6.5,itisobservedthatalargenumberofruleswithhighutilityandhighutility
+confidence are generated and it grows rapidly. In this subsection, we use high utility closed itemsets to eliminate
+redundant association rule. A small number of rules can be generated and provided to the user for the decision
+making,fromwhichallthevalidrulescanbederivedbyusingthethehighutilitycloseditemsetsandtheutilityunit
+array.Beforeproposingournon-redundantrulegenerationalgorithm,westartwithanexampletoshowtheexistence
+ofredundancyfollowedbyadefinitionprovidedinDefinition20.
+Example6. ConsideranassociationruleR : X → Y withutilityuandutility-confidenceconanutility-confidence
+framework. The semantic interpretation of such a rule is that the utility value of the itemset X ∪ Y is u and the
+utility-confidencecreflectsthecontributionofutilityofitemset X totheutilityof X∪Y fromitstotalutilityvalue.
+Thismeansthefractionofutilityof X iscoveredbyX∪Y. Themanagercandecidetheimportanceoftherule,ifu
+andcsatisfythespecifiedthresholds. ConsiderthedatabasegiveninTable1. Letthemanagerwanttopromotethe
+itemsforincreasingthesells. Thequestionisthat“whatistheleastsetofitemsfromwhichthemanagercantakehis
+decisionto promotethe sells?”. Considerthe validrulesR : B → DFE (24, 80%), R : BE → DF (24, 100%),
+1 2
+R : BDE → F (24, 100%), and R : BFE → D (24, 100%). The rules R , R , and R are not usefulfor taking
+3 4 2 3 4
+decisionfor promotingthe itemset BDFE from the least set of items, since the decision forthe itemset BDFE has
+alreadytakenfromtheruleR ,whichhasminimalantecedent. WesaytherulesR ,R ,andR areredundanttothe
+1 2 3 4
+ruleR ,andR isanon-redundantrule.
+1 1
+Definition20. LetR : X → Y andR : X → Y betwovalidassociationrulesonutility-confidenceframework.
+1 1 1 2 2 2
+WesaythattheruleR isredundanttotheruleR ,ifX ∪Y ⊆ X ∪Y ,R .utility≥R .utility, supp(R )= supp(R )
+2 1 2 2 1 1 1 2 1 2
+andX ⊆ X ,Y ⊆Y ,whereR.utilityistheutilityoftheruleR fori=1,2.
+1 2 2 1 i i
+Definition20simplystatesthatanassociationruleRisavalidnon-redundantruleinutility-confidenceframework,
+iftheredoesnotexistanyothervalidruleR′withsamesupport,havingmoreutility,andanantecedentthatisasubset
+of the antecedentof R, and a consequentwhich is a super set of the consequentof R. In general, a non-redundant
+associationruleisarulewithminimalantecedentandmaximalconsequent. Wecallanon-redundantruleinutility-
+confidence framework as a high utility generic rule (hgr) and denote the set of such non-redundantrules as HGR.
+Based on this definition, for the generation of all hgrs, we have proposed the high utility generic basis (HGB) in
+Section5.1.
+5.1. HighutilityGenericBasis(HGB)
+ItcanbenoticedthatalltherulesR : X →Y havingthesamesupportand{X ∪Y}∩{X ∪Y },∅, i, j,have
+i i i i i j j
+thesameclosureγ(X ∪Y). So,ifgbeageneratorofγ(X ∪Y),alltheitemsetsintheinterval[g, γ(X ∪Y)]have
+i i i i i i
+thesamesupport.Thus,iftheruleR:g→γ(g)\gisavalidnon-redundantrule,alltherulesR :l→γ(g)\l, g⊂l,
+i
+areredundanttotheruleR,whichhasminimalantecedentandmaximalconsequent.Ifitisnotavalidnon-redundant
+ruleandnosubsetofgalsogeneratesavalidrule,byconcatenatingtheitemsofγ(g)\gvalidnon-redundantrulescan
+beformed.ThisexplanationextendstodefinethefollowingbasisgiveninDefinition21thatcontainsalltheelements
+ofHGRdefinedinDefinition20.
+Definition21. Let HUCI bethesetofhighutilitycloseditemsets. Thenthehighutility genericbasisisdefinedby
+HGB = {R : g → h\g|h ∈ HUCI ∧g , ∅,g ⊂ h,uconf(R) ≥ min uconf ∧∄g′ : g′ ⊂ g∧uconf(g′ → h\g′) ≥
+min uconf}.
+22
+ConsiderthedatabaseDintherunningexamplegiveninTable1. FromFigure1,itisclearthat DFE isahigh
+utilitycloseditemsetwithutility36. Considerallvalidrulesfromthisitemset. Letmin uconf = 80%. Itiseasyto
+verifythatthehighutilitysubsetsofDFE areD(22),F (20),E (22)DE (37),DF (24),FE (36),whereutilitiesare
+specifiedwithintheparenthesis. Theitemsetsforwhichuconf(X → DFE) ≥ min uconf,X ⊆ DFE are F (20)and
+DF (24).Hence,F →DE isaHGBrulewithutility36andutility-confidence0.8.
+InDefinition21,theconditiong⊂h,withg,∅,statesthatthereisnorule,whichiseitherwithemptyantecedent
+oremptyconsequent. Fortheformationofbasisfromhighutilitycloseditemsets,HUCI ensuresthattheeliminated
+redundantrulehasthesamesupport. ThenonexistenceofsubsetsofanantecedentofavalidruleinthebasisHGB
+indicatesthatitistherulewithsmallestantecedentandsinceitisderivedfromthecloseditemset, ithasmaximum
+consequent. Theorem 8 concludes that the construction of HGB leads to extraction of all non-red u ndantrules on
+utility-confidenceframework.
+Theorem 8. Let h and h′ be two high utility closed itemsets such that h′ ⊂ h. Let HG′ be the set containing the
+h
+generatorsofh′andg∈ HG′ suchthatuconf(R:g→h\g)≥min uconf. Iftheredoesnotexistanysubsetg′ofg
+h
+suchthatuconf(R′ :g′ →h\g′)≥min uconf,thenR:g→h\g∈ HGB.
+Proof. ItdirectlyfollowsfromDefinition21. R : g → h\gisavalidruleandtheredoesnotexistanysubsetg′ of
+gsuchthatuconf(g′ → h\g′) ≥ min uconf. Hence,Risgeneratedfromhcontainingthesmallestantecedentand
+R∈ HGB.
+WenowprovideanapproachthatconstructsHGBbasisbyexaminingallhighutilityclosedpatternslevel-by-level
+inAlgorithm3. TheHGBconstructionalgorithmtakesasinputthehighutilitycloseditemsetswiththeirgenerators,
+the set HUCI and the user-provided threshold values min uconf, and min util. The main idea of this proposed
+algorithmisbasedonTheorem8. Abasisisaddedintothe HGBsetonlyiftheredoesnotexistanyvalidrulewith
+smaller antecedent and of same support. According to Theorem 6, if for a high utility closed itemset h we have a
+validrulewithsomegeneratorofasubsetitemseth′ ⊂ h,thatruleisaHGBrule. Ifsuchavalidruledoesnotexist,
+wecanjointheitemslevel-by-leveltoobtainanantecedentwithsmallerlength. Whileaddingitemstoagenerator,
+thealgorithmcheckswhethertheresultingantecedentis a highutility itemsetornot. A set L isused to keepthe
+ma
+minimalantecedentforavalidrule,discoveredsofar,whichisanemptysetatthebeginningofeachiteration. The
+algorithmstartssearchingfortheminimalantecedent,andassoonasitisfound,itisaddedto L iftheredoesnot
+ma
+existasubsetinL . ThesupersetsofthecurrentlyaddedsetareremovedfromL . Oncealltheclosedsubsetsofa
+ma ma
+closeditemsetareprocessed,theHGBrulesaregeneratedbytakingtheelementsofL asantecedent.Thealgorithm
+ma
+continues to generate HGB rules until no more high utility closed itemsets are processed. Finally, all elements of
+HGBbasisaregenerated.
+Each high utility closed itemset consists of high utility closed itemset itself, its generators, support, utility unit
+arrayand utility. ThealgorithmreturnsHGBcontainingallnon-redundantruleswith utilityand utility-confidence.
+Atfirst, HGBisinitializedwiththeemptysetandthencloseditemsetsarepassedinincreasingorderoftheirsizes.
+Foran itemset, its closedsubsetsare processedin increasingorderoftheir size in Step 3. The algorithmprocesses
+the generatorsof the closed subsets h′ for generatinga valid HGB rule in Step 5. If a generatorg satisfies the rule
+generation criteria in Step 6, it is added to the set L in Step 7. Otherwise, it is added to a temporary set L
+ma temp
+for further expansion in Step 9. After processing all the generators of a subset h′, if the set L is nonempty,
+temp
+the algorithm finds other elements of the equivalence class [h′] level-by-level by simply adopting the Apriorigen
+procedure(AgrawalandSrikant,1994)withoutpruningstrategywithitemsofh′\gusingSteps12-23.TheApriorigen
+procedureisusedforgeneratingthek-itemsetfromk−1-itemset. Theexpansionofgisdonebycombiningwiththe
+elementsoftheitemsetsreturnedbyApriorigenprocedure.TheresultingitemsetsaretestedforHGBconditions,and
+iftheconditionsaresatisfied,theyareaddedtotheset L duringSteps15-20. Afterprocessingallthesubsets,the
+ma
+algorithmprocesseseachelementofL ,whichcontainstheminimalantecedenttogeneratevalidrulesfromaclosed
+ma
+itemset,andtheruleisgeneratedandaddedtotheglobalsetHGBusingSteps25-30.Finally,afterprocessingallthe
+highutilitycloseditemsets,thealgorithmreturnsHGBbasis.
+Example7. ConsideragainthedatabaseDgiveninTable1.Further,considermin util=20andmin uconf =80%.
+TheextractedHGBbasisisshowninTable9usingAlgorithm3.
+23
+Algorithm3:HGBconstruction
+Input: HUCI: Highutilitycloseditemsetwithutilityunitarray,min uconf:minimumutility-confidence
+andmin util.
+Output: HGB:HighutilityGenericBasis.
+1 foreachitemseth∈HUCIdo
+2 SetL ma ={};// ma: minimal antecedent
+3 foreachh′ ⊆hinincreasingorderofsizedo
+4 SetL temp ={};
+5 foreachg∈HG h′ andg,hdo
+6 if (lu u v ( ( g g ) ,h) ≥min uconf and∄g s ∈L ma |g s ⊂g)
+7 ComputeL ma = L ma ∪g;
+8 else
+9 ComputeL temp = L temp ∪g;
+10 end
+11 foreachg∈L temp do
+12 ComputeA 1 ={i 1 , i 2 ,...,i k },whereeachi j ∈h′\g;
+13 for(j=1; A j ,∅;and(i≤k);i++)do
+14 for alll∈ A j do
+15 if (lu u v( ( { { g g l l } } , ) h) ≥min uconf and∄g s ∈ L ma |g s ⊂{gl})
+16 Removealll′ ⊃{gl}fromL ma ;
+17 ComputeL ma = L ma ∪{gl};
+18 end
+19 ComputeA j+1 = Apriorigen(A j ,min util);// without pruning techniques
+20 end
+21 end
+22 end
+23 foreachg s ∈L ma do
+24 ComputeR=g s →h\g s ;
+25 ComputeR.utility=h.utility;
+26 ComputeR.uconf = luv(gs,h);
+u(gs)
+27 ComputeHGB= HGB∪R;
+28 end
+29 end
+Table9:HGBbasisextractedfromTable1withminutil=20andminuconf =80%
+Rule (utility,uconf(%))
+B→F (23,100)
+D→E (37,100)
+F→E (36,90)
+E→F (36,81)
+A→CE (38,100)
+F→DE (36,80)
+B→DFE (24,80)
+AFE→C (25,100)
+Theorem9. Allrulesinthe HGBbasisarehighutilitygenericrules. Inotherwords, ifR ∈ HGB,thenR ∈ HGR
+andvice-versa.
+Proof. Let R : g → h\g ∈ HGB. By Definition 21, h is a closed itemset. We need to justify whether R : g →
+24
+h\g ∈ HGR or not. On contrary, assume that R : g → h\g < HGR. Then there exists a valid association rule
+R′ : g′ → h′ \g′ ∈ HGR such that supp(R) = supp(R′), g′ ⊆ g, and h ⊆ h′. If h = h′ and g = g′, then R = R′.
+If h ⊂ h′, we have γ(h) = h ⊂ h′ ⊆ γ(h′). Then, f(γ(h)) ⊃ f(γ(h′)) ⇒ supp(γ(h)) > supp(γ(h′)) ⇒ supp(h) >
+supp(h′) ⇒ supp(R) > supp(R′). Again, if g′ ⊂ g, there is a valid rule R′ : g′ → h′ \g′ which has the smaller
+antecedentthantheantecedentgoftheruleR. Thus,byDefinition21,R < HGB. Thisleadstoacontradiction,and
+hence,R∈HGR. TheconversepartfollowsstraightforwardlyfromDefinition21itself.
+Theorem10. OurproposedalgorithmgiveninAlgorithm3iscompleteandsound.
+Proof. FromTheorem9, anyhighutilitynon-redundantassociationruleis in HGBandvice-versa. Asa result, the
+proposedalgorithmiscompleteaswellassound.
+5.2. DerivingallhighutilityassociationrulesfromHGBbasis
+Notethateachelementintheproposedhighutilitygenericbasis(HGB)giveninAlgorithm3isavalidassociation
+rule.Sincethehighutilitycloseditemsetswithutilityunitarrayareloss-less(Wuetal.,2011),wecanderiveallhigh
+utility itemsets with their actualutility values withoutaccessing the datasets. As a result, all the valid rulescan be
+derivedfromHGBbasisusingHUCI bytheantecedentexpansionofabasiselementandconsequentdiminutionby
+itemsusingTheorem11.
+Algorithm4:AllhighutilityassociationrulesgenerationfromHGB
+Input: HGB,min util,min uconf.
+Output: HAR:setofallvalidhighutilityassociationrules.
+1 SetHAR=∅;
+2 forallruleR 1 :X →Y ∈ HGBdo
+3 ComputeHAR= HAR∪{R 1 :X →Y,R 1 .utility,R 1 .uconf};
+4 forallZsuchthatZ ⊂Y, Z ,∅do
+5 find utility(X∪Z);// Calculates the utility of X∪Z from the utility unit
+array of γ(X∪Z).
+6 if ({X∪Z}.utility≥min util)
+7 if (luv({X∪Z},{X∪Y}) ≥min uconf)
+u({X∪Z})
+8 ComputeHAR= HAR∪{R 2 : X∪Z →Y\Z,R 1 .utility,R 2 .uconf};
+9 end
+10 end
+11 forallrulesR 1 :X →Y ∈ HARdo
+12 forallZsuchthatZ ⊂Y, Z ,∅do
+13 find utility(X∪Z);
+14 if ({X∪Z}.utility≥min util)
+15 if R 2 :X →Z < HAR
+16 ComputeHAR= HAR∪{R 2 : X →Z,R 2 .utility,R 2 .uconf};
+17 end
+18 end
+Algorithm4providestherequiredproceduretogenerateallvalidassociationrulesfromHGBbasis,whichtakes
+theinputsasHGB,min util,andmin uconf. Theutilityvalueofanyitemsetiscalculatedwiththehelpoftheutility
+unitarrayofeachcloseditemset. Wearealsoabletoreconstituteallhighutilitycloseditemsetsbyjoiningantecedent
+andtheconsequentpartsofaHGBrule. Sincethesupportofanitemsetisevaluatedfromthesmallestcloseditemset
+containingit,theutilityandutility-confidenceofalltherulescanbederivedexactly.
+Theorem 11. Let HUCI be the set of all high utility closed itemsets and HGB the high utility generic basis. If
+R : X → Y ∈ HGB,forallsubsetsZ ofY, thenR′ : X → Z isalso avalidassociationrule, where XUZ is ahigh
+utilityitemset.
+25
+Proof. Let R : X → Y ∈ HGB and HUCI be the set of all high utility closed itemsets. The utility confidence
+of the rule R : X → Y is given by uconf(R) = luv(X,Y). Since Z ⊂ Y, we have luv(X,Y) ≤ luv(X,Z). Hence,
+u(X)
+luv(X,Z) ≥ luv(X,Y) ≥min uconf. Asaresult,theruleR′ :X →ZisvalidasXUZisahighutilityitemset.
+u(X) u(X)
+Corollary4. LetR:X →Ybeavalidassociationruleonautility-confidenceframework.ThenforanysubsetZ ⊂Y,
+ifX∪Zisahighutilityitemset,R′ :X →Zisalsoavalidassociationrule.
+Theorem12. TheproposedinferencealgorithmforgeneratingallvalidhighutilityassociationrulesgiveninAlgo-
+rithm4iscomplete.
+Proof. Let R : X → Y is a HGB basis. Steps 2-10 of Algorithm 4 generate all valid associati o n rules by the
+augmentationon antecedentby the subset of consequentparts of a HGBbasis. Since all HGB basis are also valid
+rules,theyareaddedtotheglobalsetHAR,whichisusedtokeepallthehighutilityassociationrulesinStep3. After
+generationofallvalidrulesbyantecedentexpansions,thealgorithmgeneratesthevalidassociationrulesbyapplying
+decompositiononthegeneratedassociationrulesusingTheorem11andCorollary4duringSteps11-17. Hence,the
+proposedinferencealgorithmforgeneratingallvalidhighutilityassociationrulesiscomplete.
+6. Performanceevaluation
+InSection6.1,wefirstperformthesimulationofourproposedutility-confidenceframeworkonasmalldataset.
+We then demonstrate the computationalperformance of our proposed FHIM, HUCI-Miner, and HGB construction
+algorithms using both synthetic (T10I4D100K) and real datasets (Foodmart, Chess, Mushroom, Connect, Retail,
+Chain-store)inSections6.2-6.5. Inourexperiments,sevendatasetsareselectedinordertoindicatethestrengthof
+ourproposedmethodsonthedifferentcharacteristicsvaryfromthelessnumberoftransactionstothelargenumber
+oftransactions,fromthelessnumberofitemstomorenumberofitems,andalsofromfullysparsetofullydense.
+The datasets T10I4D100K, Chess, Mushroom, Connect and Retail are obtained from frequent itemset mining
+datasetrepository(FIMI,2003),Chain-storeisobtainedfromNU-MineBench2.0(Pisharathetal.,2005),andFood-
+martisfromMicrosoftfoodmart2000database.Table10showsthecharacteristicsregardingthesedatasetsintermsof
+thenumberoftransactions(|T|),thenumberofdistinctitems(|I|),theaveragenumberofitemsinatransaction(AvgL),
+themaximumlengthoftransactionMaxL,anditstype:denseorsparse. ExceptChain-storeandFoodmart,theother
+fourremainingconsidereddatasetsdonotprovideunitprofitsofeachitem(externalutility)anditemcountforeach
+transaction(internalutility).Asin(Ahmedetal.,2009,2011;LiuandQu,2012;Liuetal.,2005;Tsengetal.,2010),
+weassignineachtransactionofT10I4D100K,Mushroom,Chess,ConnectandRetail,theinternalutilitiesrandomly
+between 1 and 10, and the external utilities of each item are randomly generated using a log-normal distribution
+between the range 0.01 and 10. To show the performanceof our proposedalgorithms, we compare these with the
+existing well-known algorithms: FHM (Fournier-Vigeretal., 2014b), CHUD (Wuetal., 2011, 2014), UP-Growth
+(Tsengetal.,2010)andUP-Growth+ Tsengetal.(2013). TheFHMimplementationisdownloadedfromtheSPMF
+framework(Fournier-Vigeretal., 2014a). We implementallthe experimentsusingthe Java programminglanguage
+andrunwiththeWindows7operatingsystemonamachinewithCPUclockrate3.20GHzandintelcorei5processor
+with3.41GBofmainmemory. Toenhancetheperformanceofallalgorithms,thediscoveredcandidateitemsetsand
+highutilityitemsetsarestoredinthemainmemory.Inalltheexperimentswehaveusedtheminimumutilitythreshold
+min util,asthepercentageoftotaltransactionutilityvaluesofthedatabase.
+Table10:Characteristicsofdatasets
+Dataset |T| |I| AvgL MaxL Type
+Foodmart 4,141 1,559 4.4 14 Sparse
+Chess 3,196 75 37 37 Dense
+Mushroom 8,124 119 23 23 Dense
+Connect 67,557 129 43 43 Dense
+T10I4D100K 100,000 870 10.1 29 Sparse
+Retail 88,162 16,470 10.3 76 Sparse
+Chain-store 1,112,94946,086 7.2 170 Sparse
+26
+6.1. Simulation
+We haveperformedthesimulationforourproposedutility-confidenceframeworkonasampledataset,available
+in Microsoft SQL Server 2012 Data Mining Add-ins for Microsoft Office. This dataset contains 13050 number
+of transactions and 37 items. The selling cost of each item provided in this dataset is considered as the utility of
+each item and the internalquantity is assigned randomlybetween 1 and 10, in order to demonstratethe usefulness
+of our utility-confidence framework. Since utility value is normally larger than support, a comparison of the two
+constraints is not signified with the same thresholds. As an alternative, we have considered the same confidence
+andutility-confidencethresholdsandgeneratesthetop100ruleswithrespecttosupportandutility,respectively. To
+extract the top 100 association rules in support confidence framework the TopKRules (Fournier-Vigeretal., 2012)
+implementationinSPMFisused. Theminimumconfidenceissetto0.4,andafterallrulesareextr a ctedthetop14
+associationruleswithrespecttothesupportarepresentedinTable11.Additionally,Table11containstheutilityvalue
+and utility-confidenceinformationof the extracted association rules. We then simulate our proposedalgorithm for
+utility-confidenceframeworkandcompareitwithtraditionalassociationrulemining.Thetop14ruleswithrespectto
+utilityareextractedandshowninTable12.
+Table11:Top14ruleswithrespecttosupportinsupport-confidenceframework
+RuleNo. Rule support confidence utilityvalue utility-confidence
+1 MountainBottleCage→WaterBottle 998 0.83 82295 0.83
+2 RoadBottleCage→WaterBottle 897 0.89 70427 0.9
+3 MountainTireTube→Sport-100 749 0.42 245572 0.4
+4 HLMountainTire→MountainTireTube 552 0.68 121680 0.67
+5 TouringTireTube→TouringTire 507 0.57 94737 0.87
+6 TouringTire→TouringTireTube 507 0.87 94737 0.57
+7 MLMountainTire→MountainTireTube 435 0.66 84810 0.66
+8 MLRoadTire→RoadTireTube 363 0.68 66636 0.68
+9 Half-FingerGloves→Sport-100 352 0.41 154524 0.42
+10 Touring-1000→Sport-100 344 0.42 4532612 0.53
+11 Mountain-200,MountainBottleCage→WaterBottle 344 0.8 4426705 0.81
+12 WaterBottle,Mountain-200→MountainBottleCage 344 1 4426705 1
+13 LLRoadTire→RoadTireTube 334 0.55 57495 0.56
+14 HLRoadTire→RoadTireTube 326 0.7 78795 0.72
+Table12:Top14ruleswithrespecttoutilityinutility-confidenceframework
+RuleNo. Rule utilityvalue utility-confidence support confidence
+1 Touring-1000→Sport-100 4532612 0.57 344 0.42
+2 WaterBottle,Mountain-200→MountainBottleCage 4426705 1 344 1
+3 MountainBottleCage,Mountain-200→WaterBottle 4426705 0.81 344 0.8
+4 MountainTireTube,Mountain-200→HLMountainTire 2734660 1 204 1.0
+5 HLMountainTire,Mountain-200→MountainTireTube 2734660 0.67 204 0.65
+6 Road-550-W→Sport-100 2610225 0.73 264 0.43
+7 Touring-1000,WaterBottle→RoadBottleCage 2322753 1 195 1.0
+8 RoadBottleCage,Touring-1000→WaterBottle 2322753 0.9 195 0.9
+9 Road-750,WaterBottle→RoadBottleCage 1742757 1 278 1.0
+10 Road-750,RoadBottleCage→WaterBottle 1742757 0.95 278 0.87
+11 MountainBottleCage,Sport-100→Mountain-200 1718844 0.4 135 0.4
+12 Patchkit,Mountain-200→HLMountainTire 1373430 0.61 89 0.46
+13 TouringTireTube,Touring-1000→TouringTire 1319548 1 95 1.0
+14 TouringTire,Touring-1000→TouringTireTube 1319548 0.87 95 0.89
+Observethatthetwoconfidencemeasuresaccordonmostoftheassociationrules,thoughtheybothdifferinsome
+rules. Again, mostof the rulesrankingare differentin boththe frameworks. In essence, the traditionalassociation
+ruleminingframeworkmissestwotypesofrules:
+27
+• Ruleshavelowfrequentandhighutilityvalues.
+• Ruleswithsmallconfidencebutcontributesmoreprofitsharetotheutilityvalueoftheantecedent.
+For example, in Table 12 the rule Touring Tire, Touring-1000→ Touring Tire Tube is of less frequentbut high
+utilityvaluethantheruleHLRoadTire→RoadTireTubeofTable11andisoffirsttype.Again,theutility-confidence
+oftherulePatchkit,Mountain-200→HLMountainTireis0.61inTable12,whichislargerthanitsconfidencevalue.
+Itindicatesthat61%profitofPatchkit,Mountain-200isobtainedfromthecompositesellingofPatchkit,Mountain-
+200andHLMountainTire, whichismoreacceptablethanitsfrequencyofselling. Thisinformationisnotqualified
+bysupport-confidenceframework,andthisruleisofsecondtype.
+From Tables 11 and 12, it is observed that the high support of a rule does not necessarily imply a high utility
+itemset, because there exist less frequent items, which are more profitable than highly occurrence itemsets. From
+the confidence and utility-confidence, it is also clear that the confidence indicates the percentage of simultaneous
+occurrenceof the antecedentwith the consequent, while the utility confidence indicates the percentage of profit of
+antecedentcontributedtowardstoitstotalprofitsellingwiththeconsequent. Hence,usingboththemeasuressimul-
+taneously,onecanimprovethefinancialdecisions.
+6.2. Impactonnumberofcandidatehighutilityitemsets
+Inthispartofexperiment,we comparethe thenumberof candidatehighutilityitemsetsgeneratedinFHM and
+FHIMmethods. ThecomparisonwithothermethodsisnotshownasFHMgenerateslesscandidatethanHUI-Miner
+algorithm, which generatesless numberof candidatesthan UP-Growth and UP-Growth+. The numberof potential
+candidatesin both FHM and FHIM algorithmsindicates the numberof recurrencesin the respectivemethods. For
+eachdataset,wevarythevalueofmin utilasthepercentageoftotalutilityandwecalculatethenumberofcandidate
+itemsets.TheresultsofmostdatasetsareshowninTable13.Thefifthcolumnofthistablerepresentsthepercentageof
+candidateprunedbyFHIM.Weobservethatthenumberofcandidatepatternsinourproposedmethod,FHIM,isless
+thanthenumberofpatternsgeneratedbyFHMalgorithm. Theexperimentalresultsshowthattheproposedpruning
+strategyenablesFHIMinreducingthenumberofcandidatepatternsascomparedtothatforFHMalgorithm. Also,
+inmostdatasets,itisobservedthatthepercentageofcandidatesprunedincreaseswiththedecreaseoftheminimum
+utilityvalue.ThismakesFHIMmorefasterthanFHM.
+6.3. Impactonexecutiontime,memoryconsumptionandscalability
+Wehaveevaluatedtheefficiencyofourproposedmethodsintermsofrunningtime,andmemorybyvaryingthe
+minimum utility min util value against FHM, CHUD, UP-Growth and UP-Growth+ algorithms. When the HUCI-
+Miner algorithmis compositewith FHIM, the utility unitarray of an itemset is calculated fromutility list. For the
+experimentsofUP-GrowthandUP-Growth+,thegeneratedcandidateitemsetsarestoredinafile. Tocalculatetheir
+actualutilityvaluesinphase-II,thegeneratedcandidateitemsetsareloadedinmainmemory.Tooptimizethephase-
+II of UP-Growth and UP-Growth+ the original dataset is transformed to the revised dataset that only contains the
+promisingitemsandthedatabasescanisperformedonthereviseddatasetasin(LiuandQu,2012). Thephase-IIof
+CHUDalgorithmisalsoperformedontherevisedtransactionswiththeoptimizationtechniqueprovidedin(Wuetal.,
+2011).
+Figure3plotsthecomparisonresultsonrunningtimeforFoodmart,Chess,Mushroom,T10I4D100K,Retailand
+Chain-storedatasets. Theminimumutilityvaluethresholdmin utilinpercentageistakenonX-axisaslinerscaleand
+the running time in second is taken on Y-axis as log scale. All the six algorithmsare executed for five times each
+forfixedmin utilvalueandtheaveragerunningtimeisplottedforeachmin util. FromFigure3,weobservethatthe
+runningtimeforallthedatasetsismoreforlowmin utilvalue,anditgrowsfastasmin utilvaluedecreases. Figure
+3(a)and3(c)showthecomparisontimeondatasets,FoodmartandMushroom,respectively. NotethatinFoodmart
+datasetforhighutilityvalue,HUCI-MinerismoreefficientthanCHUD,buttheperformanceofHUCI-Minerdegrades
+asmin utilvaluedecreases.IncaseofMushroomdataset,CHUDachievesbetterperformancethanHUCI-Miner.The
+reasonisHUCI-Minerperformsmoreactivityforthegenerationofhighutilityitemsetgenerators,whichscansover
+the all high utility itemsets. The running time comparison on Chess, Retail and Chain-store are shown in Figure
+3(b),Figure3(e)andFigure3(f),respectively. TheplotofthesefiguresshowsthatHUCI-Minertakeslesstimethan
+CHUD.Inthiscase, theintersectionoperationamongtheTidlistsinCHUDtakesmoretimethanthesubsettesting
+28
+Table13:Numberofcandidatesgeneratedwithdifferentminutilofdifferentdatasets
+Dataset min util(%) #ofCand.forFHM #ofCand.forFHIM %ofCand.pruned(%)
+0.05 2,862,896 1,198,011 58.15
+0.06 15,98,864 1,180,953 26.13
+Foodmart
+0.07 1,252,117 1,175,749 6.09
+0.08 1,187,833 1,173,032 1.25
+20 1,251,083 1,238,568 1
+22 500,398 494,654 1.15
+Chess
+24 199,649 197,239 1.21
+26 81,662 80,436 1.5
+1 41,169,325 38,416,343 6.68
+2 8,230,798 7,702,670 6.42
+Mushroom
+3 2,788,719 2,611,890 6.34
+4 1,152,048 1,079,207 6.32
+0.004 89,455,922 31,066,876 65.27
+0.005 52,524,204 24,037,538 54.23
+T10I4D100K
+0.006 34,750,540 19,176,083 44.82
+0.007 24,972,505 15,598,576 37.54
+0.01 71,880,396 50,381,512 29.9
+0.02 31,073,941 29,086,264 6.39
+Retail
+0.03 20,662,033 20,058,672 2.92
+0.04 14,535,985 14,299,784 1.62
+0.04 13,217,269 13,211,125 0.05
+0.05 6,271,300 6,268,374 0.05
+Chain-store
+0.06 3,001,556 2,999,339 0.07
+0.07 1,311,632 1,310,693 0.07
+among high utility itemsets in HUCI-Miner. Also, in the datasets Retail and Chain-store the CHUD method takes
+moretimethanUP-Growthasthesedatasetscontainmoreitemsandtransactions. Theintersectionoperationamong
+Tidlists is costly. In the dataset T10I4D100K, for high minimum utility threshold, HUCI-Miner is more efficient,
+butasthemin utilvaluedecreasestheplotofHUCI-Minerincreasesexponentially. Again,inalldatasetstheFHIM
+methoddominatesthestate-of-the-arthighutilityminingalgorithmFHM.TheproposedFHIMmethodistwotimes
+fasterthan FHM methodforlow min util value. Itis clear thatFHIM is fasterthan otherexistingmethods. Forall
+mostdatasets, and min util values, the superiorityofFHIM demonstratesthe effectivenessof the proposedpruning
+strategies.
+WehaveshownthememoryconsumptionofsixalgorithmsonFoodmart,Chess,Mushroom,T10I4D100K,Retail
+andChain-storedatasets. The averagemaximummemoryused byeachalgorithmiscalculatedbyvaryingmin util
+andexecutingfivetimes. Figure4(a)plotsthegraphformemoryusedonthesparsedataset, Foodmart. Thisfigure
+shows when the min util value is less than 0.04%, the memory used increases very fast in HUCI-Miner. CHUD
+consumeslessmemorythanFHMandalmostsamememoryusedbyFHIM.Forhighutilityvalue,FHIMdominates
+CHUD.Figure4(b)plotsthememoryconsumptiongraphforthedensedataset, Chess. Thegrowthrateofmemory
+used by CHUD is slightly more than the memory used in HUCI-Miner as more number of intersection operations
+is executed in CHUD. The memory consumption growth rate of HUCI-Miner is similar to the growth of CHUD
+in Mushroom and T10I4D100Kdatasets, which is evident from Figure 4(c) and Figure 4(d). The graph on Retail
+datasetsshowninFigure4(e)reflectsthatthememoryusedbyUP-GrowthandUP-Growth+ isalmostconstant,but
+for othersit growslinearly. The memoryconsumptionof UP-Growthis very less in the sparse dataset Chain-store
+29
+4
+10
+3
+10
+2
+10
+1
+10
+0
+10
+-1
+10
+0.02 0.04 0.06 0.08 0.10
+(e) Execution time on Retail (f) Execution time on Chain-store
+FHIM
+).ceS(
+emiT
+4
+10
+3
+10
+2
+10
+1
+10
+0
+10
+25 26 27 28 29 30
+min_util (%)
+(a) Execution time on Foodmart (b) Execution time on Chess
+(c) Execution time on Mushroom (d) Execution time on T10I4D100K
+FHM
+).ceS(
+emiT
+min_util (%)
+4
+10
+3
+10
+2
+10
+1
+10
+0
+10
+5 6 7 8 9 10
+CHUD
+).ceS(
+emiT
+4
+10
+3
+10
+2
+10
+1
+10
+0
+10
+0.01 0.02 0.03 0.04
+min_util (%)
+HUCI-Miner
+).ceS(
+emiT
+min_util (%)
+4
+10
+3
+10
+2
+10
+1
+10
+0.02 0.04 0.06 0.08 0.10
++
+UP-Growth UP-Growth
+).ceS(
+emiT
+4
+10
+3
+10
+2
+10
+1
+10
+0.05 0.06 0.07 0.08 0.09 0.10
+min_util (%)
+).ceS(
+emiT
+min-util (%)
+Figure3:ExecutiontimecomparisononthedatasetsmentionedinTable10
+as shown in Figure 4(f). In all the plots, it can be observed that the memory consumptionof FHIM and FHM are
+comparable. ThememoryconsumedbybothFHIMandFHM varyalternativelyinRetailandChain-storedatasets.
+Thememoryconsumedbythelocalco-occurrencetableislessthanthememoryusedbytheutility-listoftheextra
+candidateitemsetsgeneratedbyFHM.Ingeneral,asthememoryusedineachalgorithmisproportionaltothenumber
+ofcandidateitemsetsgenerated,FHIMconsumeslessmemorythanFHM.
+Wehaveperformedtheexperimentsontheextremelydensedataset,Connect.Forthisdataset,ourimplementation
+ofUP-Growth,UP-Growth+,andCHUDcouldnotbeexecuted(showingoutofmemory)fortheconsideredminimum
+utilitypercentage. So,wehaveexecutedandplottedthegraphsforFHIM,FHMandHUCI-Minerfortheexecution
+timeandmemoryusedineachalgorithmshowninFigure5.Wevarytheminimumutilitythresholdfrom27%to30%.
+Figure5(a)showstheplotofrunningtimecomparisonandFigure5(b)showsthegraphformemoryconsumptionon
+this dataset. The FHM algorithm consumes more time than FHIM and HUCI-Miner, but the growth rate of these
+algorithmsarelinear. ThememoryconsumedbytheHUCI-Mineralgorithmismorethanothertwoasitmaintainsall
+theextractedhighutilityitemsetsinthemainmemoryforgeneratinggeneratorsandhighutilitycloseditemsets.
+Wehaveperformedtheexperimentsonthescalability,whichismeasuredintermsoftheamountofmainmemory
+usedandexecutiontimebyanalgorithm.ThestudyofscalabilityofFHIMandHUCI-Minerisperformedbyvarying
+the transaction size and number of items with fixed min util. We have used the Chain-store dataset, which is a
+30
+1000
+100
+10
+1
+0.02 0.04 0.06 0.08 0.10
+FHIM
+)BM(
+noitpmusnoC
+yromeM
+1000
+100
+10
+1
+26 27 28 29 30
+min_util (%)
+)BM(
+noitpmusnoC
+yromeM
+min_util (%)
+(a) Memory comparison on Foodmart (b) Memory comparison on Chess
+1000
+100
+10
+1
+5 6 7 8 9 10
+(d) Memory comparison on T10I4D100K
+(e) Memory comparison on Retail (f) Memory comparison on Chain-store
+CHUD
+)BM(
+noitpmusnoC
+yromeM
+1000
+100
+10
+0.01 0.02 0.03 0.04
+min_util (%)
+(c) Memory comparison on Mushroom
++ UP-Growth UP-Growth
+)BM(
+noitpmusnoC
+yromeM
+min_util (%)
+1000
+100
+10
+0.02 0.04 0.06 0.08 0.10
+FHM
+)BM(
+noitpmusnoC
+yromeM
+1000
+900
+800
+700
+600
+500
+0.06 0.07 0.08 0.09 0.10
+min_util (%)
+HUCI-Miner
+)BM(
+noitpmusnoC
+yromeM
+min_util (%)
+Figure4:MemoryConsumptioncomparisononthedatasetsmentionedinTable10
+104
+103
+102
+27.0 27.5 28.0 28.5 29.0 29.5 30.0
+).ceS(
+emiT
+1000
+FHIM
+FHM HUCI-Miner
+100
+10
+27.0 27.5 28.0 28.5 29.0 29.5 30.0
+min_util (%)
+(a) Executiontimecomparison
+)BM(
+noitpmusnoC
+yromeM
+FHIM
+FHM
+HUCI-Miner
+min_util (%)
+(b) MemoryConsumptioncomparison
+Figure5:ExperimentonConnectdatasetwithvaryingminimumutilitythreshold(minutil)in%
+sparsedatasetwithalargenumberoftransactionsanddistinctitems. Asthisdatasetcontains1,112,949numberof
+transactions, another 87,051random transaction are added to make it a dataset of 1200000number of transaction.
+Againasthisdatasetcontains46,086numberofitems,another3,914numberofitemsareaddedtothisdatasetwith
+theirutilityvaluearechosenrandomlyfromtheexistingutilityvaluedistributionofChain-store. Thenthemodified
+datasetis processedfor scalability testing. Initially, 200000randomnumbersof transactionsare selected fromthis
+modified Chain-store dataset and processed. In each process, another 200000 random numbersof transactions are
+31
+4
+10
+3
+10
+2
+10
+1
+10
+0
+10
+2 4 6 8 10 12
+).ceS(
+emiT
+min_util = 0.06% 1200
+1000
+800
+600
+400
+min_util = 0.06%
+2 4 6 8 10 12
+5
+No. of Transactions ( 1 unit =10 )
+FHIM FHM CHUD HUCI-Miner UP-Growth UP-Growth+
+)BM(
+noitpmusnoC
+yromeM
+5
+No. of Transactions ( 1 unit =10 )
+(a) Scalability on Time (b) Scalability on Memory
+Figure6:ScalabilitystudybyvaryingnumberoftransactionsonChain-store
+selectedandaddedtothepreviousprocesseddatasettoincreasethetransactionsize. Theperformanceresultsofthe
+experimentsforexecutiontimeandmemoryrequirementbyvaryingthenumberoftransactionsarereportedinFigure
+6. Figure6(a)showstheexecutiontime ofourFHIMandHUCI-MineralgorithmsandexistingCHUD,FHM,UP-
+GrowthandUP-Growth+algorithmsasafunctionofthetransactionsize. Figure6(b)showsthememoryrequirement
+versusthenumberoftransactions. Itisclearthattheoverallminingtimeandmemoryconsumptionincreaseswhen
+the number of transactions increases. However, FHM, FHIM, HUCI-Miner, UP-Growth and UP-Growth+ show a
+linearincreaseinrun-timeandmemoryutilizationwhenthenumberoftransactionsincreases.
+4
+10
+3
+10
+2 10
+1
+10
+20k 30k 40k 50k
+).ceS(
+emiT
+1200
+min_util = 0.06% 1000
+800
+600
+400
+min_util = 0.06%
+200
+20k 30k 40k 50k
+No. of Items
+FHIM FHM CHUD HUCI-Miner UP-Growth UP-Growth+
+)BM(
+noitpmusnoC
+yromeM
+No. of Items
+(a) Scalability on Time (b) Scalability on Memory
+Figure7:ScalabilitystudybyvaryingnumberofitemsonChain-store
+In order to perform the scalability by varying the number of items, the same modified database Chain-store is
+chosen. Initially 20000 items are randomlychosen, such that each transaction of Chain store contains at least one
+item of these 20000items. The modified database is processedfor a fixed min util. In each process, another5000
+numberofrandomitemsareselectedandaddedtothetransactionofthepreviousprocesseddatabaserandomly. The
+execution and memory consumption by varying number of items with a fixed min util is shown in Figure 7. The
+graphsof this figure shows that both FHIM and HUCI-Miner grow linearly as the number of items increases as in
+FHM.
+Inordertostrengthenourexperiments,wehaveperformedthescalabilityonasyntheticdensedataset,T30I1D500K,
+whichisgeneratedusingthecodeofIBMQuestSyntheticDataGenerator. Thisdatasetcontains100itemswiththe
+averagetransactionallength30and500,000transactions.TheexecutionofCHUDimplementationsisoutofmemory
+forthisdatasetforthechosenminimumutilitythreshold. Totestthescalability,initiallythefirst50,000transactions
+are chosen and for the subsequentprocessnext 50,000transactionsare added. The plots of the rest algorithmson
+scalabilityareshowninFigure8. Theexecutiontimetakenbyeachalgorithmgrowslinearlyanditisevidentfrom
+Figure8(a). AlthoughthememoryconsumedbyeachalgorithminFigure8(b)followssomezigzagpath,thegraphs
+arenearlylinearasthenumberoftransactionsincreases.
+32
+104
+103
+102
+101
+5 10 15 20 25
+).ceS(
+emiT
+1000
+FHIM 100
+FHM CHUD
+HUCI-Miner
+UP-Growth min_util = 5% UP-Growth+
+10
+5 10 15 20 25
+4 No. of Transactions ( 1 unit =10 )
+(a) Scalabilityonexecutiontime
+)BM(
+noitpmusnoC
+yromeM
+min_util = 5%
+FHIM
+FHM CHUD
+HUCI-Miner
+UP-Growth UP-Growth+
+4 No. of Transactions ( 1 unit =10)
+(b) Scalabilityonmemory
+Figure8:ScalabilitystudybyvaryingnumberoftransactionsonT30I1D500K
+6.4. Impactonnumberofhighutilitycloseditemsetsversusthenumberofhighutilityitemsets
+Table14reportsthenumberofhighutility itemsets(HUI),highutilitycloseditemsets(HUCI),andhighutility
+generators(HG) extractedbyHUCI-Miner in variousdatasetswith differentmin util values. Theitemset, which is
+a generatorof itself, is notcounted in HG. The symbol‘−’ representsthat there is no generatorexceptthose, who
+aregeneratorsofthemselves. FromTable14,weseethatthetotalnumberofHUCIandHGislessthanorequalto
+the totalnumberof highutility itemsets. Since allHUIs can be generatedfromHUCIswith the helpof utility unit
+array,HGshelpinfindingnon-redundantrulesinsupport-confidenceframeworkofhighutilitymining.Notethatour
+proposedHUCI-Mineralgorithmachievesagreatreductionincompressingthenumberofhighutilityitemsets.
+6.5. PerformanceofHGBwithdifferentmin uconf
+WehaveevaluatedthecompactnessofourproposedHGBbasis. Themajorissueonextractingassociationruleon
+theutility-confidenceframeworkisconcernedwiththesizeoftheextractedrulesets. Wehaveevaluatedthenumber
+of rules in HGB basis and the total number of high utility rules on different datasets by keeping the fixed min util
+valueandvaryingmin uconf,andtheresultsarereportedinTable15. Let|HAR|bethetotalnumberofhighutility
+association rules and |HGB| the total number of HGB rules. The compression ratio (δ) gained by the basis HGB
+againstthetotalrulesHARisgivenbyδ=1− |HGB|.
+|HAR|
+Compressiongainindicatesthatthereis less numberof HGBrulesgeneratedas comparedto the totalrules. In
+Foodmart, Mushroom and Chess datasets, the compression gain is more as compared to the compression gain in
+Chain-storedataset. ItcanbeobservedthatexceptChessandChain-storedataset,thenumberofHARsareincreased
+with the decrease of min uconf. On the other hand, the number of HGB rules are increased with the increase of
+min uconf. InChain-storedataset, thereisverylessnumberofhighutilityitemsetsoflargersizewiththemin util
+valueascomparedtootherdatasets.
+ToshowtheexecutiontimeofHGBandallhighutilityassociationrulesgenerationprocess,wehaveusedsome
+notationsas follows. The directgenerationof high utility association rulesfrom the high utility itemsets using the
+traditionalrulegenerationmethodisdenotedasDHAR. TheHGB-constructionalgorithmisdenotedasHGBCand
+the generation of all high utility association rules from HGB is denoted as HARHGB. The execution time of each
+rule generation method is executed for a fixed minimum utility value and by varying the utility-confidence value.
+TherunningtimedoesnotcountthetimetakenbyHUCI-Miner. Althoughvariousexperimentsoneachdatasetare
+performed,wehaveplottedfortheFoodmartandChain-storedatasetsgiveninFigure9. IncaseofFoodmartdataset,
+HARHGBtakesmoretimeascomparedtothedirectmethod,DHAR.Theinferencemechanismconsumesmoretime
+oncheckingarulepresentinasetcurrentlydiscoverstherulessetornot. Moreover,thetimecomplexityofDHAR
+isafunctionofthenumberofHUIs,butthecomplexityofHARHGBisafunctionofthenumberofrulesdiscovered
+so far. In general,the numberofrulesis exponentialto thenumberof HUIs. Hence, itis notsurprisingto see that
+ittakesmoretimeascomparedtothetraditionalrulegenerationmethod. TherulescompressedbyHGBisdesigned
+to providefewer non-redundanthigh utility association rules. In Chain-store datasets, for the consideredminimum
+utilityvalue,DHARtakesmoretime. Inbothcases,HGBCconsumeslessexecutiontimeascomparedtothedirect
+generationmethod.
+33
+Table14:Numberofhighutilitycloseditemset(HUCI)ofdifferentdatasets
+Dataset min util #of #of #HG #of
+in(%) HUI HUCI HUCI
++
+HG
+0.07 637 605 22 627
+0.06 1487 771 304 1075
+Foodmart
+0.05 6276 1076 1581 2667
+0.04 20766 1762 4686 6448
+28 1982 1519 433 1952
+27 3874 2776 962 3738
+Chess
+26 7187 4910 1937 6847
+25 13331 8700 3811 12511
+8 28764 982 3254 4236
+7 51188 1470 5453 6923
+Mushroom
+6 108797 2216 10161 12377
+5 222742 3308 17303 20611
+0.009 93155 66467 9828 76226
+0.008 111754 76226 13166 89392
+T10I4D100K
+0.007 141382 90187 18851 109038
+0.006 192673 111544 28837 140381
+0.05 1876 1874 2 1876
+0.04 2810 2802 8 2810
+Retail
+0.03 4848 4828 20 4848
+0.02 9355 9303 52 9355
+0.08 118 118 - 118
+0.07 151 151 - 151
+Chain-store
+0.06 193 193 - 193
+0.05 260 260 - 260
+104
+102
+100
+10-2
+10 20 30 40 50 60 70
+)ceS(
+emiT
+120
+80
+40
+DHAR
+HGBC
+min_util = 0.04% HARHGB
+0
+4 6 8
+min_uconf (%)
+(a) ExecutiontimeonFoodmart
+)sm(
+emiT
+min_util=0.04% DHAR
+HGBC
+HARHGB
+min_uconf (%)
+(b) ExecutiontimeonChain-store
+Figure9:Evaluationofutility-basedassociationrulegenerationmethods
+7. Conclusion
+Association rule mining techniques are being studied exhaustively by researchers to discover the relationships
+betweenitemsetsusingstatistical measuresupportandconfidence. However,theydonotprovideanysemanticim-
+plicationbetween itemsets, such as relationshipwith respect to utility. To providea semantic relationshipbetween
+itemsets, we have used the utility-confidence framework to mine association rules in high utility itemset mining.
+34
+Table15:Numberofhighutilityassociationrules(HAR)andHGBofdifferentdatasets
+Dataset min uconf #of #of δ
+(min util(%)) in(%) HAR HGB in%)
+70 810488 11895 98.53
+50 811876 10630 98.69
+Foodmart(0.04)
+30 812353 7360 99.09
+10 851635 1599 99.81
+40 778056 1962 99.75
+30 827627 1574 99.81
+Mushroom(11)
+20 881346 1045 99.88
+10 881350 1041 99.88
+90 347346 58208 83.24
+80 1080743 92831 91.41
+Chess(25)
+70 1953364 108552 94.44
+60 2466563 84271 96.58
+9 230 213 7.39
+7 277 257 7.22
+Chain-store(0.03)
+5 348 313 10.06
+3 411 367 10.71
+We haveaddressedtheproblemofredundancyinassociationrulesextractedfromhighutility itemsetbyproposing
+a compactrepresentationof the rule set, called the high utility generic basis (HGB) containingrules with minimal
+antecedentand maximalconsequent. To the bestof our knowledge,this is the firststudy on miningnon-redundant
+associationrulesextractedfromthehighutilityitemsets. Thisisatwostepprocess: findingallhighutilityitemsets
+andthenextractingallvalidrules. Toextractthenon-redundantruleset,thehighutilitycloseditemsetandgenerator
+areminedfirstbytheproposedalgorithmHUCI-Minerthatidentifiesthehighutilityitemsets,highutilitycloseditem-
+sets and associates the high utility generatorsto the correspondingclosed itemset. We have proposedan algorithm
+to mine all non-redundantrules under this proposed framework. We have further proposedan inference algorithm
+to derive all valid association rules under this framework. We have then studied the performance of HUCI-Miner
+with UP-Growth, CHUD and FHM algorithmson variousdatasets and shown that FHIM and HUCI-Miner almost
+outperformsthanotherexistingapproaches.Furthermore,experimentalresultsshowsignificantlybetterachievement
+incompactnessoftheproposedruleminingalgorithms.
+In this work, we have addressed the importance of a utility-based association rule and their redundancies us-
+ing the semantic measure utility-confidence. However, there are other utility-based interestingness measures and
+subjective interesting measures (GengandHamilton, 2006), which are not incorporated in the high utility itemset
+mining. Incorporatingvariousinterestingmeasuresofassociationrulesinhighutilityitemsetminingwiththeinspi-
+ration of this work is an interesting future research direction. Furthermore, the proposed approach can be used in
+web-recommendationsystemsbyconsideringbothpageweightsandthenumberoftimesauservisitedtopageina
+stipulatedperiodofawebtransaction.Theproposedconceptsandframeworkcouldbeextendedfordiscoveringrules
+withnegativeitemutilitiesandconsideringthedifferenttypesofdatabasessuchastemporaldatabasesanddynamic
+databases.Inaddition,infutureweliketointegratetheproposedframeworktoassociativeclassificationmodels.
+Acknowledgements
+Theauthorswouldliketoacknowledgethemanyhelpfulsuggestionsoftheanonymousreviewers,theEditorand
+theEditor-in-Chief,Dr.BinshanLin,whichhaveimprovedsignificantlythecontentandthepresentationofthispaper.
+35
+References
+Agrawal, R., & Srikant, R. (1994). Fast algorithms for mining association rules in large databases. In Proceedings of the 20th International
+ConferenceonVeryLargeDataBases.VLDB’94(Vol.1215,pp.487–499).MorganKaufmannPublishersInc.
+Ahmed,C.,Tanbeer,S.,Jeong,B.-S.,&Lee,Y.-K.(2009).Efficienttreestructuresforhighutilitypatternmininginincrementaldatabases.IEEE
+TransactionsonKnowledgeandDataEngineering,21(12),1708–1721.
+Ahmed,C.F.,Tanbeer,S.K.,Jeong,B.-S.,&Lee,Y.-K.(2011).Huc-prune:anefficientcandidatepruningtechniquetominehighutilitypatterns.
+AppliedIntelligence,34(2),181–198.
+Alonso,F.,Martinez,L.,Perez,A.,&Valente,J.P.(2012).Cooperationbetweenexpertknowledgeanddataminingdiscoveredknowledge:Lessons
+learned.ExpertSystemswithApplications,39(8),7524–7535.
+Balca´zar,J.L.(2013).Formalandcomputationalpropertiesoftheconfidenceboostofassociationrules.ACMTransactionsonKnowledgeDis-
+coveryfromData,7(4),19:1–19:41.
+Barber,B.,&Hamilton,H.J.(2001).Parametricalgorithmsforminingsharefrequentitemsets.JournalofIntelligentInformationSystems,16(3),
+277–293.
+Barber,B.,&Hamilton,H.J.(2003).Extractingsharefrequentitemsetswithinfrequentsubsets.DataMiningandKnowledgeDiscovery,7(2),
+153–185.
+Cai,C.H.,Fu,A.-C.,Cheng,C.,&Kwong,W.W.(1998).Miningassociationruleswithweighteditems.InProceedingsofInternationalDatabase
+EngineeringandApplicationsSymposium(IDEAS’98)(pp.68–77).IEEE.
+Carter,C.,Hamilton,H.J.,&Cercone,N.(1997).Sharebasedmeasuresforitemsets.InPrinciplesofDataMiningandKnowledgeDiscovery.
+LectureNotesinComputerScience(Vol.1263,pp.14–24).SpringerBerlinHeidelberg.
+Chan,R.,Yang,Q.,&Shen,Y.-D.(2003).Mininghighutilityitemsets.InThirdIEEEInternationalConferenceonDataMining(ICDM2003)(pp.
+19–26).IEEE.
+Chen,Y.,Zhao,Y.,&Yao,Y.(2007).Aprofit-basedbusinessmodelforevaluating ruleinterestingness. InAdvancesinArtificialIntelligence.
+LectureNotesinComputerScience(Vol.4509,pp.296–307).SpringerBerlinHeidelberg.
+Cheng,J.,Ke,Y.,&Ng,W.(2008).Effectiveeliminationofredundantassociationrules.DataMiningandKnowledgeDiscovery,16(2),221–249.
+FIMI,2003.Fimi:Thefrequentitemsetminingdatasetrepository.AccessedonFebruary2012.<http://fimi.cs.helsinki.fi/data/>
+Fournier-Viger,P.,Gomariz,A.,Soltani,A.,&Gueniche,T.(2014a).SPMF:Open-SourceDataMiningLibrary.Availableathttp://www.philippe-
+fournier-viger.com/spmf/.AccessedonAugust2014.
+Fournier-Viger,P.,Wu,C.,&Tseng,V.S.(2012).Miningtop-kassociationrules.InAdvancesinArtificialIntelligence.LectureNotesinComputer
+Science(Vol.7310,pp.61–73).SpringerBerlinHeidelberg.
+Fournier-Viger,P.,Wu,C.,Zida,S.,&Tseng,V.S.(2014b).FHM:Fasterhigh-utilityitemsetminingusingestimatedutilityco-occurrencepruning.
+InFoundationsofIntelligentSystems.LectureNotesinComputerScience(Vol.8502,pp.83–92).SpringerInternationalPublishing.
+Fournier-Viger,P.,Wu,C.-W.,andTseng,V.(2014c).Novelconciserepresentationsofhighutilityitemsetsusinggeneratorpatterns.InAdvanced
+DataMiningandApplications.LectureNotesinComputerScience(Vol.8933,pp.30–43).SpringerInternationalPublishing.
+Geng,L.,&Hamilton,H.J.(2006).Interestingnessmeasuresfordatamining:Asurvey.ACMComputingSurveys,38(3),9.
+Han,J.,Pei,J.,Yin,&Y.(2000).Miningfrequentpatternswithoutcandidategeneration.SIGMODRecord,29(2),1–12.
+Hilderman,R.J.,Hamiliton,H.J.,Carter,C.L.,&Cercone,N.(1998).Miningassociationrulesfrommarketbasketdatausingsharemeasuresand
+characterizeditemsets.InternationalJournalonArtificialIntelligenceTools,07(02),189–220.
+Huynh-Thi-Le,Q.,Le,T.,Vo,B.,&Le,B.(2015).Anefficientandeffectivealgorithmforminingtop-rank-kfrequentpatterns.ExpertSystems
+withApplications,42(1),156–164.
+Kryszkiewicz,M.K.,(1998).Representativeassociationrules.InResearchandDevelopmentinKnowledgeDiscoveryandDataMining.Lecture
+NotesinComputerScience(Vol.1394,pp.198–209).SpringerBerlinHeidelberg.
+Lan,G.-C.,Hong,T.-P.,&Tseng,V.S.(2014).Anefficientprojection-basedindexingapproachformininghighutilityitemsets.Knowledgeand
+InformationSystems,38(1),85–107.
+Lee,D.,Park,S.-H.,Moon,S.(2013).Utility-basedassociationrulemining:Amarketingsolutionforcross-selling.ExpertSystemswithApplica-
+tions,40(7),2715–2725.
+Li,Y.-C.,Yeh,J.-S.,&Chang,C.-C.(2008).Isolateditemsdiscardingstrategyfordiscoveringhighutilityitemsets.Data&KnowledgeEngineering,
+64(1),198–217.
+Lin,C.-W.,Hong,T.-P.,&Lu,W.-H.(2011).Aneffectivetreestructureformininghighutilityitemsets.ExpertSystemswithApplications,38(6),
+7419–7424.
+Liu,M.,&Qu,J.(2012).Mininghighutilityitemsetswithoutcandidategeneration.InProceedingsofthe21stACMInternationalConferenceon
+InformationandKnowledgeManagement(CIKM’12)(pp.55–64).ACM.
+Liu,Y.,Liao,W.-K.,&Choudhary,A.(2005).Afasthighutilityitemsetsminingalgorithm.InProceedingsofthe1stInternationalWorkshopon
+Utility-basedDataMining(UBDM’05)(pp.90–99).ACM.
+Luna, J.M.,Romero, J.R., Romero, C.,&Ventura, S.(2014).Reducing gapsinquantitative association rules: Agenetic programmingfree-
+parameteralgorithm.IntegratedComputer-AidedEngineering,21(4),321–337.
+Luna,J.M.,Romero,J.R.,&Ventura,S.(2012).Designandbehaviorstudyofagrammar-guidedgeneticprogrammingalgorithmformining
+associationrules.Knowledgeandinformationsystems,32(1),53–76.
+Mata,J.,Alvarez,J.,&Riquelme,J.(2001).Miningnumericassociationrulesviaevolutionaryalgorithm.InProceedingsofthe5thinternational
+conferenceonartificialneuralnetworksandgeneticalgorithms(ICANNGA’01)(pp.264–267).
+Mishra,D.,Das,A.K.,&Mukhopadhyay,S.(2014).Asecureuseranonymity-preservingbiometric-basedmulti-serverauthenticatedkeyagree-
+mentschemeusingsmartcards.ExpertSystemswithApplications,41(18),8129–8143.
+Park,J.,Chen,M.-S.,&Yu,P.(1995).Aneffectivehash-basedalgorithmforminingassociationrules.SIGMODRecord.24(2),175–186.
+Pasquier,N.,Bastide,Y.,Taouil,R.,&Lakhal,L.(1999).Efficientminingofassociationrulesusingcloseditemsetlattices.InformationSystems,
+24(1),25–46.
+36
+Pasquier,N.,Taouil,R.,Bastide, Y.,Stumme,G.,&Lakhal,L.(2005).Generatingacondensedrepresentationforassociationrules.Journalof
+IntelligentInformationSystems.24(1),29–60.
+Pears,R.,Koh,Y.S.,Dobbie,G.,&Yeap,W.(2013).Weightedassociationruleminingviaagraphbasedconnectivitymodel.InformationSciences,
+218(0),61–84.
+Pei, J., Han, J., Lu, H., Nishio, S., Tang, S., &Yang, D. (2001). H-mine: Hyper-structure mining offrequent patterns inlarge databases. In
+Proceedingsofthe2001IEEEInternationalConferenceonDataMining(ICDM’01)(pp.441–448).IEEE.
+Pisharath,J.,Liu,Y.,Liao,W.K.,Choudhary,A.,Memik,G.,&Parhi,J.(2005).Nu-minebenchversion2.0datasetandtechnicalreport.Available
+athttp://cucis.ece.northwestern.edu/projects/DMS/MineBench.html.AccessedonJune2013.
+Ramkumar,G.D.,Ramkumar,S.,&Shalom,T.(1998).Weightedassociationrules:Modelandalgorithm.InProceedingsofFourthACMInterna-
+tionalConferenceonKnowledgeDiscoveryandDataMining(pp.661–666).
+Sadik,A.T.(2008).Premisesreductionofrulebasedexpertsystemsusingassociationrulestechnique.InternationalJournalofSoftComputing,
+3(3),195–200.
+Sahoo,J.,Das,A.K.,&Goswami,A.(2014).Aneffectiveassociationruleminingschemeusinganewgenericbasis.KnowledgeandInformation
+Systems,1–30.
+Salleb-Aouissi,A.,Vrain,C.,&Nortet,C.(2007).Quantminer: Ageneticalgorithmforminingquantitativeassociationrules.InProceedingsof
+the20thInternationalJointConferenceonArtificalIntelligence(IJCAI’07)(pp.1035–1040).MorganKaufmannPublishersInc.
+Shie,B.-E.,Tseng,V.S.,&Yu,P.S.(2010).Onlineminingoftemporalmaximalutilityitemsetsfromdatastreams.InProceedingsofthe2010
+ACMSymposiumonAppliedComputing(SAC’10)(pp.1622–1626).ACM.
+Shie,B.-E.,Yu,P.S.,&Tseng,V.S.(2012).Efficientalgorithmsforminingmaximalhighutilityitemsetsfromdatastreamswithdifferentmodels.
+ExpertSystemswithApplications,39(17),12947–12960.
+Shie,B.-E.,Yu,P.S.,&Tseng,V.S.(2013).Mininginterestinguserbehaviorpatternsinmobilecommerceenvironments.AppliedIntelligence,
+38(3),418–435.
+Song,W.,Liu,Y.,&Li,J.(2014).Mininghighutilityitemsetsbydynamicallypruningthetreestructure.AppliedIntelligence,40(1),29–43.
+Szathmary,L.,Napoli,A.,&Kuznetsov,S.(2007).Zart: Amultifunctional itemsetminingalgorithm.InProceedingsoftheFifthInternational
+ConferenceonConceptLatticesandTheirApplications(CLA’07)(pp.26–37).
+Szathmary,L.,Valtchev,P.,Napoli,A.,&Godin,R.(2009).Efficientverticalminingoffrequentclosuresandgenerators.InAdvancesinIntelligent
+DataAnalysisVIII(pp.393–404).SpringerBerlinHeidelberg.
+Szathmary,L.,Valtchev,P.,Napoli,A.,&Godin,R.,etal.(2008).Anefficienthybridalgorithmforminingfrequentclosuresandgenerators.In:
+6thInternationalConferenceonConceptLatticesandTheirApplications(CLA’08)(pp.47–58).
+Tao,F.,Murtagh,F.,&Farid,M.(2003).Weightedassociationruleminingusingweightedsupportandsignificanceframework.InProceedingsof
+theNinthACMSIGKDDInternationalConferenceonKnowledgeDiscoveryandDataMining(KDD’03)(pp.661–666).ACM.
+Tseng,V.S.,Shie,B.-E.,Wu,C.-W.,&Yu,P.S.(2013).Efficientalgorithmsformininghighutilityitemsetsfromtransactionaldatabases.IEEE
+TransactionsonKnowledgeandDataEngineering,25(8),1772–1786.
+Tseng,V.S.,Wu,C.-W.,Shie,B.-E.,&Yu,P.S.(2010).Up-growth:Anefficientalgorithmforhighutilityitemsetmining.InProceedingsofthe
+16thACMSIGKDDInternationalConferenceonKnowledgeDiscoveryandDataMining(KDD’10)(pp.253–262).ACM.
+Wang,K.,Zhou,S.,&Han,J.(2002).Profitmining:Frompatternstoactions.InAdvancesinDatabaseTechnology-EDBT2002.LectureNotes
+inComputerScience(Vol.2287,pp.70–87).SpringerBerlinHeidelberg.
+Wang,W.,Yang,J.,&Yu,P.S.(2000).Efficientminingofweightedassociationrules(war).InProceedingsoftheSixthACMSIGKDDInterna-
+tionalConferenceonKnowledgeDiscoveryandDataMining(KDD’00)(pp.270–274).ACM.
+Webb,G.,2006.Discoveringsignificantrules.InProceedingsoftheTwelfthACMSIGKDDInternationalConferenceonKnowledgeDiscovery
+andDataMining(KDD’06)(pp.434–443).ACM.
+Wu,C.W.,Fournier-Viger,P.,Yu,P.S.,&Tseng,V.S.(2011).Efficientminingofaconciseandlosslessrepresentationofhighutilityitemsets.In
+Proceedingsofthe2011IEEE11thInternationalConferenceonDataMining(ICDM’11)(pp.824–833).IEEE.
+Wu,C.W.,Fournier-Viger,P.,Yu,P.S.,&Tseng,V.S.(2014).Efficientalgorithmsforminingtheconciseandlosslessrepresentationofclosed+
+highutilityitemsets.IEEETransactionsonKnowledgeandDataEngineering99(PrePrints),1.
+Xu,Y.,Li,Y.,&Shaw,G.(2011).Reliablerepresentationsforassociationrules.Data&KnowledgeEngineering,70(6),555–575.
+Yahia,S.,Gasmi,G.,&Nguifo,E.(2009).Anewgenericbasisof“factual”and“implicative”associationrules.IntelligentDataAnalysis,13(4),
+633–656.
+Yan,L.andLi,C.(2006).Incorporatingpageviewweightintoanassociation-rule-based webrecommendationsystem.InAI2006: Advancesin
+ArtificialIntelligence(pp.577–586).SpringerBerlinHeidelberg.
+Yan,X.,Zhang,C.,&Zhang,S.(2005).Armga:Identifyinginterestingassociationruleswithgeneticalgorithms.AppliedArtificialIntelligence,
+19(7),677–689.
+Yao,H.,Hamilton,H.J.,&Butz,C.J.(2004).Afoundationalapproachtominingitemsetutilitiesfromdatabases.InProceedingsoftheFourth
+SIAMInternationalConferenceonDataMining(Vol.4,pp.215-221).
+Yao,H.,Hamilton,H.J.,&Geng,L.(2006).Aunifiedframeworkforutility-basedmeasuresforminingitemsets.InProceedingsofACMSIGKDD
+2ndWorkshoponUtility-BasedDataMining(pp.28–37).ACM.
+Yun,U.,2007.Efficientminingofweightedinterestingpatternswithastrongweightand/orsupportaffinity.InformationSciences,177(17),3477–
+3499.
+Yun,U.,Ryang,H.,&Ryu,K.H.(2014).Highutilityitemsetminingwithtechniquesforreducingoverestimatedutilitiesandpruningcandidates.
+ExpertSystemswithApplications,41(8),3861–3878.
+Zaki,M.(2004).Miningnon-redundantassociationrules.DataMiningandKnowledgeDiscovery,9(3),223–248.
+Zhang,H.,Padmanabhan,B.,&Tuzhilin,A.(2004).Onthediscoveryofsignificantstatisticalquantitativerules.InProceedingsoftheTenthACM
+SIGKDDInternationalConferenceonKnowledgeDiscoveryandDataMining(KDD’04)(pp.374–383).ACM.
+37
+* This paper addresses mining association rules from high utility itemsets.
+* Designed FHIM algorithm extracts all high utility itemsets effectively.
+* HUCI-Miner algorithm is used to derive itemsets with their generators efficiently.
+* Condensed representation of association rules in share-confidence model is proposed.
+* The method for extracting all rules from the compact representation is also proposed.
