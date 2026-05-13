@@ -1,0 +1,276 @@
+A More Efficient Algorithm to Mine Skyline
+Frequent-Utility Patterns
+Jerry Chun-Wei Lin, Lu Yang, Philippe Fournier-Viger, Siddharth Dawar,
+Vikram Goyal, Ashish Sureka, and Bay Vo
+Jerry Chun-Wei Lin
+2016-11-06
+1 http://ikelab.net
+Outline
+ Background
+ Motivation
+ Problem Definition
+ Proposed Approach
+ Utility-list structure
+ An umax array
+ Pruning strategy
+ Performance Evaluation
+ Conclusion
+2
+The role of data mining
+Data information
+Useful patterns
+Transaction data
+Data Mining
+Knowledge and
+Preprocess data
+strategy
+3
+Frequent-itemset mining
+ Proposed by Agrawal et al. in 1993
+ FIM is a fundamental research topic in data mining
+ E.g., market basket analysis
+Other factors such as interestingness, weight, importance…etc.
+4
+Problem
+ Frequency measure is not good in many applications
+5
+High-utility itemset mining (HUIM)
+ High-Utility Itemsets (HUIs)
+ Each item has a weight/unit profit and can appear more than once in
+each transaction (purchase quantity)
+ The utility of an itemset is measured by the unit profit and purchase
+quantity (e.g., profit of the itemset)
+ An itemset is a HUI if its utility is no less than a user-specified
+minimum utility threshold (priori knowledge)
+Transactional Database
+TID Transaction Item Profit High Utility Itemsets
+A 5 {BD}:30, {BCD}:34
+1 (A,1)(C,1)(D,1)
+B 2 minUtil = 30
+2 (A,1)(B,2)(C,1)(D,6)
+C 1
+3 (B,4)(C,3)(D,3)
+D 2
+4 (B,2)(C,2)
+6
+Problem of FIM and HUIM
+ Only one factor is considered whether in FIM or
+HUIM
+ Is it possible to consider both two/more factors
+together for decision-making?
+ Skyline query by Borzsonyi et al. in 2001
+ Return a set of points
+ Each point is non-dominated by others
+7
+An example
+price
+10 b e
+a
+8 c
+a dominates b
+d
+6
+g
+f
+4
+l
+h n
+2
+i
+m
+k
+0
+1 2 3 4 5 6 7 8 9 10
+distance
+8
+Problem statement
+Input Output
+• Transaction database (D) • The complete set of
+• profit table (ptable) SFUPs
+TID transaction PSFUP
+T1 (B, 1), (C, 2), (D, 1) ABCDE(1,18)
+T2 (A, 4), (B, 1), (C, 3), (D, 1), (E, 1) ABDE(2,37)
+T3 (A, 4), (C, 1), (D, 1) AD(3,28)
+T4 (C, 2), (E, 1) A,B(4,16)
+T5 (A, 5), (B, 2), (D, 1), (E, 2) D(5,25)
+T6 (A, 3), (B, 4), (C, 1)
+T7 (D, 1)
+SFUP
+item A B C D E
+ABDE(2,37)
+profit 1 2 1 5 4
+AD(3,28)
+9 D(5,25)
+SKYMINE
+ It was presented to mine the set of itemsets by
+considering both utility and frequency factors
+ Based on the UP-tree structure
+ Find the set of SKYLINE points
+10
+Motivation
+ It takes computations to build a UP-tree structure
+ HUI-Miner is the state-of-the-art algorithm for mining
+high-utility itemsets (HUIs)
+ Build the utility-list structure
+ Simple join operation to find the supersets of the processed
+itemset
+11
+In this paper
+ An efficient algorithm to faster discover the set of
+skyline high frequency-utility itemsets (SFUIs)
+ Using depth-first search
+ Based on the utility-list to perform the simple join
+operation for generating the supersets
+ A pruning strategy is designed to early prune the unpromising
+candidates
+ An umax array is set to keep the maximal utility of the
+frequencies to efficiently reveal the skyline points
+12
+An example
+ Calculate the twu values of 1-items
+i umax(i)
+ Build the utility-list structure
+1 0
+2 0
+3 0
+4 0
+5 0
+twu(e) < twu(c) < twu(b) < twu(A) < twu(D)
+13
+STEPs
+E(3,16,46)
+• 16≥ 𝑢𝑚𝑎𝑥 3 = 0 i umax(i)
+PSFUPs:
+1 0
+• {E(3,16)}
+• 𝑢𝑚𝑎𝑥 3 → 16
+2 0
+3 0→ 16
+• 46>𝑢𝑚𝑎𝑥 3
+4 0
+• Append {C} to {E}
+5 0
+• Let X be an itemset, and let the extensions of X by appending an item Y to X as (X∪Y )
+such that X⊳Y . If the sum of iutil and rutil values in the utility-list of X is less than
+umax(r), r = f(X), then all the extensions of X are not SFUPs.
+14
+STEPs
+EC
+tid iutil rutil
+2 7 11
+4 6 0
+• 13≥ 𝑢𝑚𝑎𝑥 2 = 0 i umax(i)
+EC(2,13,24)
+1 0
+• 𝑢𝑚𝑎𝑥 2 → 13
+2 0→ 13
+3 16
+• 24>𝑢𝑚𝑎𝑥 2
+4 0
+• Append {B} to {EC} 5 0
+PSFUPs:
+• {E(3,16)}
+• {EC(2,13)}
+15
+STEPs
+ECB
+tid iutil rutil
+2 9 9
+ECB(1,9,18)
+• 9≥ 𝑢𝑚𝑎𝑥 1 = 0 i umax(i)
+1 0→ 9
+• 𝑢𝑚𝑎𝑥 1 → 9
+2 13
+3 16
+PSFUPs: • 18>𝑢𝑚𝑎𝑥 1
+• {E(3,16)} 4 0
+• {EC(2,13)} • Append {A} to {ECB} 5 0
+• {ECB(1,9)}
+16
+STEPs
+ECBA
+tid iutil rutil
+2 13 5
+ECBA(1,13,18)
+i umax(i)
+• 13 ≥ 𝑢𝑚𝑎𝑥 1 = 9
+1 9→ 13
+• 𝑢𝑚𝑎𝑥 1 → 13
+2 13
+PSFUPs: 3 16
+• 18>𝑢𝑚𝑎𝑥 1
+• {E(3,16)}
+4 0
+• {EC(2,13)}
+5 0
+• Append {D} to {ECBA}
+• {ECBA(1,13)}
+• {ECB(1,9)}
+17
+STEPs
+ECBAD
+tid iutil rutil
+2 18 0
+ECBAD(1,18,18)
+i umax(i)
+• 18 ≥ 𝑢𝑚𝑎𝑥 1 = 13
+1 13 → 18
+• 𝑢𝑚𝑎𝑥 1 → 18 2 13
+PSFUPs:
+3 16
+• {E(3,16)}
+• {EC(2,13)} 4 0
+• {ECBAD(1,18)}
+5 0
+18
+Final results
+PSFUP
+ABCDE(1,18) SFUP
+ABDE(2,37) ABDE(2,37)
+AD(3,28) AD(3,28)
+A,B(4,16) D(5,25)
+D(5,25)
+19
+Final results
+PSFUP
+ABCDE(1,18) SFUP
+ABDE(2,37) ABDE(2,37)
+AD(3,28) AD(3,28)
+A,B(4,16) D(5,25)
+D(5,25)
+20
+Efficiency of pruning strategy
+21
+Experiments
+ Datasets
+ Four real chess, mushroom, foodmart and retail datasets
+ One synthetic T10I4N4KDXK dataset
+ Compare to the state-of-the-art SKYMINE algorithm
+ Source code: SPMF project
+ http://www.philippe-fournier-viger.com/spmf/
+22
+Evaluation
+ Runtime
+ Memory usage
+23
+Scalability
+Proposed algorithm
+SKYMINE
+Proposed algorithm
+SKYMINE
+24
+Conclusion
+ Present an efficient algorithm to find the set of skyline
+points
+ Considering both frequency and utility factors
+ Three mechanisms
+ Adopt the utility-list to perform the simple operation for finding
+the supersets of the itemsets
+ An umax array is used to keep the maximal utility of frequencies
+ A pruning strategy is used to reduce the search space based on the
+utility-list
+ Better performance than the state-of-the-art SKYMINE algorithm
+25
+Thank you
+IKE lab: http://ikelab.net
+Source code: http://www.philippe-fournier-viger.com/spmf/

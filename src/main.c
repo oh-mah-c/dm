@@ -96,7 +96,19 @@
 #include "algorithms/huim_sa.h"
 #include "algorithms/huim_bpso_tree.h"
 #include "algorithms/bio_huif.h"
+#include "algorithms/huim_afsa.h"
+#include "algorithms/huim_abc.h"
+#include "algorithms/skyline_miner.h"
+#include "algorithms/thui.h"
+#include "algorithms/tku_ce.h"
+#include "algorithms/tku_ce_plus.h"
 #include "algorithms/fhn.h"
+#include "algorithms/fhmds.h"
+#include "algorithms/haui_miner.h"
+#include "algorithms/ehaupm.h"
+#include "algorithms/hauim_gmu.h"
+#include "algorithms/nam_hep.h"
+#include "algorithms/memu.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -104,11 +116,35 @@
 extern DM_Algorithm bio_huif_ga_algo;
 extern DM_Algorithm bio_huif_pso_algo;
 extern DM_Algorithm bio_huif_ba_algo;
+extern DM_Algorithm huim_afsa_algo;
+extern DM_Algorithm huim_abc_algo;
+extern DM_Algorithm skyline_miner_algo;
+extern DM_Algorithm thui_algo;
+extern DM_Algorithm tku_ce_algo;
+extern DM_Algorithm tku_ce_plus_algo;
+extern DM_Algorithm fhmds_algo;
+extern DM_Algorithm haui_miner_algo;
+extern DM_Algorithm ehaupm_algo;
+extern DM_Algorithm hauim_gmu_algo;
+extern DM_Algorithm nam_hep_algo;
+extern DM_Algorithm memu_algo;
 
 int main(int argc, char **argv) {
     dm_register_algorithm(&bio_huif_ga_algo);
     dm_register_algorithm(&bio_huif_pso_algo);
     dm_register_algorithm(&bio_huif_ba_algo);
+    dm_register_algorithm(&huim_afsa_algo);
+    dm_register_algorithm(&huim_abc_algo);
+    dm_register_algorithm(&skyline_miner_algo);
+    dm_register_algorithm(&thui_algo);
+    dm_register_algorithm(&tku_ce_algo);
+    dm_register_algorithm(&tku_ce_plus_algo);
+    dm_register_algorithm(&fhmds_algo);
+    dm_register_algorithm(&haui_miner_algo);
+    dm_register_algorithm(&ehaupm_algo);
+    dm_register_algorithm(&hauim_gmu_algo);
+    dm_register_algorithm(&nam_hep_algo);
+    dm_register_algorithm(&memu_algo);
 
     if (argc < 3) {
         printf("Usage: %s <algo_id> <dataset_path> [type_id] [min_support]\n", argv[0]);
@@ -172,7 +208,19 @@ int main(int argc, char **argv) {
     DM_HUIM_SA_Params huim_sa_params;
     DM_HUIM_BPSO_Tree_Params huim_bpso_tree_params;
     DM_BioHUIF_Params bio_huif_params;
+    DM_HUIM_AFSA_Params afsa_params;
+    DM_HUIM_ABC_Params abc_params;
+    DM_Skyline_Miner_Params skyline_miner_params;
+    DM_THUI_Params thui_params;
+    DM_TKU_CE_Params tku_ce_params;
+    DM_TKU_CE_Plus_Params tku_ce_plus_params;
     DM_FHN_Params fhn_params;
+    DM_FHMDS_Params fhmds_params;
+    DM_HAUI_Miner_Params haui_miner_params;
+    DM_EHAUPM_Params ehaupm_params;
+    DM_HAUIM_GMU_Params hauim_gmu_params;
+    DM_NAM_HEP_Params nam_hep_params;
+    DM_MEMU_Params memu_params;
     DM_FIN_Params fin_params;
     DM_FINPLUS_Params finplus_params;
     DM_NEGFIN_Params negfin_params;
@@ -604,6 +652,67 @@ int main(int argc, char **argv) {
         bio_huif_params.pop_size = (argc >= 6) ? atoi(argv[5]) : 30;
         bio_huif_params.max_iter = (argc >= 7) ? atoi(argv[6]) : 1000;
         params = &bio_huif_params;
+    } else if (strcmp(algo_id, "huim_afsa") == 0) {
+        afsa_params.min_utility = min_support;
+        afsa_params.pop_size = (argc >= 6) ? atoi(argv[5]) : 30;
+        afsa_params.max_iter = (argc >= 7) ? atoi(argv[6]) : 1000;
+        afsa_params.visual = (argc >= 8) ? atoi(argv[7]) : 10;
+        afsa_params.step = (argc >= 9) ? atoi(argv[8]) : 2;
+        afsa_params.try_number = (argc >= 10) ? atoi(argv[9]) : 5;
+        afsa_params.delta = (argc >= 11) ? atof(argv[10]) : 0.618;
+        params = &afsa_params;
+    } else if (strcmp(algo_id, "huim_abc") == 0) {
+        abc_params.min_utility = min_support;
+        abc_params.pop_size = (argc >= 6) ? atoi(argv[5]) : 30;
+        abc_params.max_iter = (argc >= 7) ? atoi(argv[6]) : 1000;
+        abc_params.limit = (argc >= 8) ? atoi(argv[7]) : 100;
+        abc_params.step = (argc >= 9) ? atoi(argv[8]) : 2;
+        params = &abc_params;
+    } else if (strcmp(algo_id, "skyline_miner") == 0) {
+        skyline_miner_params.min_utility = min_support;
+        skyline_miner_params.min_support = (argc >= 6) ? atoi(argv[5]) : 0;
+        params = &skyline_miner_params;
+    } else if (strcmp(algo_id, "thui") == 0) {
+        thui_params.k = (argc >= 5) ? atoi(argv[4]) : 10;
+        params = &thui_params;
+    } else if (strcmp(algo_id, "tku_ce") == 0) {
+        tku_ce_params.k = (argc >= 5) ? atoi(argv[4]) : 10;
+        tku_ce_params.n = (argc >= 6) ? atoi(argv[5]) : 2000;
+        tku_ce_params.rho = (argc >= 7) ? atof(argv[6]) : 0.2;
+        tku_ce_params.max_iter = (argc >= 8) ? atoi(argv[7]) : 2000;
+        params = &tku_ce_params;
+    } else if (strcmp(algo_id, "tku_ce_plus") == 0) {
+        tku_ce_plus_params.k = (argc >= 5) ? atoi(argv[4]) : 10;
+        tku_ce_plus_params.n = (argc >= 6) ? atoi(argv[5]) : 2000;
+        tku_ce_plus_params.rho = (argc >= 7) ? atof(argv[6]) : 0.2;
+        tku_ce_plus_params.max_iter = (argc >= 8) ? atoi(argv[7]) : 2000;
+        params = &tku_ce_plus_params;
+    } else if (strcmp(algo_id, "fhmds") == 0) {
+        fhmds_params.k = (argc >= 5) ? atoi(argv[4]) : 10;
+        fhmds_params.batch_size = (argc >= 6) ? atoi(argv[5]) : 1000;
+        fhmds_params.window_size = (argc >= 7) ? atoi(argv[6]) : 5;
+        params = &fhmds_params;
+    } else if (strcmp(algo_id, "haui_miner") == 0) {
+        haui_miner_params.min_utility_ratio = min_support; // use min_support flag as ratio
+        params = &haui_miner_params;
+    } else if (strcmp(algo_id, "ehaupm") == 0) {
+        ehaupm_params.min_utility_ratio = min_support;
+        params = &ehaupm_params;
+    } else if (strcmp(algo_id, "hauim_gmu") == 0) {
+        hauim_gmu_params.min_utility_ratio = min_support;
+        params = &hauim_gmu_params;
+    } else if (strcmp(algo_id, "nam_hep") == 0) {
+        nam_hep_params.support_threshold = (argc >= 5) ? atof(argv[4]) : -1.0;
+        nam_hep_params.occupancy_threshold = (argc >= 6) ? atof(argv[5]) : -1.0;
+        params = &nam_hep_params;
+    } else if (strcmp(algo_id, "memu") == 0) {
+        double glmau = (argc >= 5) ? atof(argv[4]) : 1000.0;
+        memu_params.item_count = ds->max_id + 1;
+        memu_params.mau_table = malloc(sizeof(double) * memu_params.item_count);
+        for(uint32_t i=0; i < memu_params.item_count; i++) {
+            memu_params.mau_table[i] = glmau;
+        }
+        params = &memu_params;
     }
 
 

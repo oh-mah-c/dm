@@ -1,0 +1,663 @@
+2014 IEEE International Conference on Granular Computing (GrC)
+Efficient Vertical Mining of High Utility Quantitative Itemsets
+Chia Hua Li ,Cheng-Wei Wu, Vincent S. Tseng
+Departement of Computer Science and Information Engineering,
+National Cheng Kung University, Taiwan, ROC
+brandnew0426@idb.csie.ncku.edu.tw, silvemoonfox@hotmail.com, tsengsm@mail.ncku.edu.tw
+Abstract—High utility quantitative itemset mining refers to because the downward closure property [1, 4, 12] does not
+discovering sets of items that carry not only high utilities (e.g.,
+hold for the utility of q-itemsets. Second, it may pose the large
+high profits) but also quantitative attributes. Although this topic
+search space problem especially when database contains a
+is very important to many applications, it has not been deeply
+explored and existing algorithms for mining high utility large amount of q-items. The combination explosion of q-
+quantitative itemsets remain computationally expensive. To items causes the mining task to suffer from long execution
+address this problem, we propose a novel algorithm named time and huge memory consumption. To generate more useful
+VHUQI (Vertical mining of High Utility Quantitative Itemsets)
+information, quantities of some items in q-itemsets need to be
+for efficiently mining high utility quantitative itemsets in
+databases. VHUQI adopts a vertical representation to maintain combined to some ranges. Therefore, the third challenge is to
+the utility information of itemsets in databases with several develop an appropriate combining method that allows to
+effective strategies integrated to prune the search space. The generating useful information and reducing the computational
+experimental results on both real and synthetic datasets show
+costs.
+that VHUQI outperforms the state-of-the-art algorithms
+To mine high utility quantitative itemsets from databases,
+substantially in terms of both execution time and memory
+consumption. Yen et al. proposed an algorithm named HUQA [21]. Because
+a superset of a low utility q-itemset can be high utility, they
+Keywords—Quantitative itemset mining; high utility itemset propose the concept of weak utility q-itemset (abbreviated as
+mining; high utility quantitative itemset mining; utility mining; WUQI) to facilitate the mining process. Weak utility q-
+itemsets are those q-itemsets that can be extend to generate
+I. INTRODUCTION HUQIs by joining with the some q-items. HUQA is a
+Discovering interesting high utility patterns in different recursive algorithm consist of two main steps. In the first step,
+kinds of databases is an important task in utility mining. it constructs conditional database for each HUQI and WUQI
+Extensive studies have been proposed for mining various of length k. In the second step, HUQI and WUQI of length
+types of high utility patterns, such as high utility itemsets [3, 5, (k+1) are generated from the constructed conditional
+6, 7, 8, 9, 10, 11, 15], top-k high utility itemsets [19], closed+ databases. Although HUQA is the first algorithm for mining
+high utility itemsets [18] and high utility episodes [17]. High HUQIs, it may produce a large number of conditional
+utility itemset mining is probably the most popular research databases during the mining process, which degrades the
+topic among them. In contrast to traditional frequent itemset execution time and occupies lots of memory space.
+mining, the importance of items and quantity attribute of items To address the issue mentioned above, we propose in this
+are considered in the framework of high utility itemset mining. paper a vertical mining algorithm named VHUQI (Vertical
+Therefore, it can be used to discover itemsets carrying with mining of High Utility Quantitative Itemsets) for efficiently
+high utilities (e.g., high profits). Although extensive studies mining the complete set of high utility quantitative itemsets in
+have been proposed for high utility itemset mining, a critical the database. It converts a horizontal database into a special
+limitation of these studies is that they ignore the quantity vertical representation named utility-list to facilitate the
+attribute of items in discovered high utility itemsets. However, mining process. In VHUQI, each q-itemset is associated with a
+such information can be very useful and valuable in many utility-list, which indicates the utility information of the q-
+applications. itemset in the database. The main merit of the utility-list
+In view of this, the concept of high utility quantitative structure integrated in VHUQI is that it allows to efficiently
+itemset (abbreviated as HUQI) mining is emerged [16, 21]. In generate HUQIs and their utilities in memory without
+the framework of HUQI mining, an item may have different scanning the original database. Experimental results on both
+quantities in the database and each item carrying with different real and synthetic datasets show that VHUQI outperforms the
+quantity is regarded as quantitative item (abbreviated as q- state-of-the-art algorithm HUQA in both execution time and
+items) [13, 14]. An itemset consisting of q-items is called q- space. Particularly, VHUQI is faster than HUQA over two
+itemset. A q-itemset is called high utility quantitative itemset if orders of magnitude.
+its utility is no less than a user-specified minimum utility The rest of the paper is organized as follows. Section II
+threshold. Otherwise, it is called low utility quantitative introduces the background of HUQI mining. Section III
+itemset.
+describes the proposed VHUQI algorithm. Section IV presents
+Mining HUQIs is not an easy task and faces the following the experimental study. Section V draws the conclusion.
+challenges. First, the search space of HUQI mining cannot be
+effective pruned as it is done in frequent pattern mining
+978-1-4799-5464-3/14/$31.00 ©2014 IEEE 155
+II. BACKGROUND Definition 6 (The utility of a q-itemset in the database). The
+absolute utility of a q-itemset X in the database D is defined as
+In this section, we define the problem of HUQI mining
+au(X) = ∑ (cid:1853)(cid:1873)(cid:4666)(cid:1850),(cid:1846) (cid:4667) The relative utility of X (or
+and then introduce related studies of HUQI mining. (cid:3025)(cid:1603)(cid:3021)(cid:3279)(cid:1512)(cid:3021)(cid:3279)(cid:1488)(cid:3005) (cid:3031) .
+simply called utility of X) is denoted as u(X) and defined as
+A. Problem Definition au(X)/TotalU.
+Let I* = {I , I , …, I} be a finite set of items. Each item I
+∈ I* has a posit 1 ive 2 numb N er p(I) called its external utility (e.g., au({ F ( o A r ,2 e ) x ( a D m ,1 p ) l } e , , T au ) ( { = ( A 6 , + 2) 6 (D = ,1 1 )} 2 ) . a = u ( a { u ( ( A { , ( 2 A )( ,2 B ) , ( 5 D ,6 ,1 )( ) D }, , 1 T )} 1 ) ) = +
+t u r n a i n t s a p c r t o io fi n t) s . , w A h e d r a e t a e b a a c s h e tr D an s = a c { ti T o 1 n , T T d 2 , ∈ … D , , T (1 M } ≤ d is ≤ a M s ) e t i s o a f au({(A,2)(B,5)(D,1 4 )}, T 1 ) + au({(A,2)(B,6)(D,1)}, T 4 ) = 27.
+subset of I* and has an unique identifier d, called TID. Each Definition 7 (Combining constraint proposed by [15]).
+item I in the transaction T d has an positive internal utility q(I, Given a user-specified minimum absolute utility threshold
+T ) (e.g., quantity). A quantitative item x (abbreviated as q- min_abs_util (0 < min_abs_util ≤ TotalU), a quantitative
+d
+item) is a triple (I, L, U), where I is an item, L and U are related coefficient qrc (qrc ≥ 1), and two low utility q-itemsets
+respectively lower bound and upper bound of it quantity. If L X = {(I 1 , L 1 , U 1 ) (I 2 , L 2 , U 2 )…(I k , L k , U k )} and Y = {(I 1 , L 1 , U 1 )
+= U, x is denoted as (I, L). A quantitative itemset (abbreviated (I 2 , L 2 , U 2 )…(I k , L k ’)}, if (1) L k ’ = (U k + 1) and (2) au(X) and
+as q-itemset) X is a set of k distinct items {I , I , …, I}, where au(Y) are no less than (min_util / qrc), then X can be combined
+∈ 1 2 k
+I j I*, 1 ≤ j ≤ k, and k is the length of X. A q-itemset of with Y to form a q-itemset {(I 1 , L 1 , U 1 ) (I 2 , L 2 , U 2 )…(I k , L k ,
+length k is called k-q-itemset. Let Table I be an example L k ’)}.
+database of this paper. Each row in Table I represents a
+Definition 8 (High utility q-itemset). A q-itemset X is called
+transaction, where each letter represents an item and has a
+high utility q-itemset (abbreviated as HUQI) iff au(X) is no
+quantity. Table II shows the external utility (e.g., unit profit)
+less than min_abs_util. Otherwise, X is called low utility q-
+of each item.
+itemset. An equivalent definition is that X is high utility iff u(X)
+Definition 1 (The support count of a q-item). The support ≥ min_util (0 < min_util < TotalU), where min_util =
+count of a q-item x = (I, L, U) is denoted as SC(x) and defined min_abs_util / TotalU.
+as ∑(cid:3022) (cid:1845)(cid:1829)(cid:4666)(cid:1835),(cid:1862)(cid:4667)
+(cid:3037)(cid:2880)(cid:3013) . Problem Statement. Given a database D, a user-specified
+Definition 2 (The support count of a q-itemset). The absolute minimum utility threshold min_abs_util and a
+support count of a q-itemset X = {(I , L , U ) (I , L , U ) …(I, quantitative related coefficient qrc, the problem of HUQI
+1 1 1 2 2 2 k
+L, U)} is denoted as SC(X) and defined as mining is to discover all q-itemsets having a utility no less
+k k
+∑(cid:3022) (cid:3037)(cid:3117) (cid:3117) (cid:2880)(cid:3013)(cid:3117) …∑(cid:3022) (cid:3037)(cid:3286) (cid:3286) (cid:2880)(cid:3013)(cid:3260) (cid:1845)(cid:1829)(cid:4666)(cid:4668)(cid:4666)(cid:1835) (cid:2869) ,(cid:1838) (cid:2869) ,(cid:1847) (cid:2869) (cid:4667)(cid:4666)(cid:1835) (cid:2870) ,(cid:1838) (cid:2870) ,(cid:1847) (cid:2870) (cid:4667)…(cid:4666)(cid:1835) (cid:3012) ,(cid:1838) (cid:3012) ,(cid:1847) (cid:3012) (cid:4667)(cid:4669)(cid:4667) . than min_abs_util.
+For example, SC((B,4,5)) = SC((B,4)) + SC((B,5)) = 1 + 1 B. Related Work
+= 2. SC({(A,2)(B,5,6)}) = SC({(A,2)(B,5)}) + SC({(A,2)
+Extensive studies have been proposed for mining high
+(B,6)}) = 1 + 1 = 2.
+utility itemsets, including Two-Phase [8], IHUP [2], IIDS [11],
+Definition 3 (The absolute utility of a q-item in a UP-Growth+ [15] and HUI-Miner [9]. The former four
+transaction). The absolute utility of a q-item x = (I, L) in the algorithms are two-phase algorithms. A drawback of two-
+transaction T is defined as au(x, T ) = p(I) × q(I, T ). phase algorithms is that they may produce too many
+d d d
+candidates during the mining process, which seriously
+Definition 4. (The absolute utility of a q-itemset) The
+degrades their performance. To avoid this drawback, a novel
+absolute utility of a q-itemset X = {x 1 , x 2 ,…,x k } in the algorithm named HUI-Miner was recently proposed. HUI-
+transaction T d is defined as au(X, T d ) = ∑ (cid:3051)(cid:1488)(cid:3025)(cid:1663)(cid:3025)(cid:1603)(cid:3021)(cid:3279) (cid:1853)(cid:1873)(cid:4666)(cid:1876),(cid:1846) (cid:3031) (cid:4667) . Miner is a one-phase algorithm, which adopts a novel vertical
+representation named utility-list to facilitate the mining
+For example, au((A,2), T ) = p(A) × q(A, T ) = 3 × 2 = 6.
+1 1 process. Though the above algorithms may perform well in
+au({(A,2)(B,5)(C,2)}, T 1 ) = au((A,2), T 1 ) + au((B,5), T 1 ) + some applications, they are not developed for mining HUQIs.
+au((C,6), T 1 ) = 6 + 5 + 4 = 15. The topic of HUQI mining was first introduced by Yen et al.
+[21]. They proposed an algorithm named HUQA for mining
+Definition 5 (Total utility of the database). The Total utility
+HUQIs in horizontal databases. In their proposed framework,
+of the database D is defined as TotalU =
+a combining method (Definition 7) based on the idea of
+∑ ∑ (cid:1853)(cid:1873)(cid:4666)(cid:1850),(cid:1846) (cid:4667)
+(cid:3021)(cid:3279)(cid:1488)(cid:3005) (cid:3051)(cid:1488)(cid:3021)(cid:3279) (cid:3031) . quantitative related coefficient is proposed for generating
+useful HUQIs. Although HUQA is the first algorithm for
+TABLE I. AN EXAMPLE DATABASE
+mining HUQI, it may produce too many conditional databases
+TID Transaction during the mining process, which degrades its execution time
+T 1 (A,2) (B,5) (C,2) (D,1) and space requirement (e.g., disk and memory). Wang et al.
+T 2 (B,4) (C,3) proposed the concept of fuzzy high utility quantitative itemsets
+T 3 (A,2) (C,2) (abbreviated as FHUQI) and an efficient algorithm for mining
+T 4 (A,2) (B,6) (D,1) FHUQIs [16]. However, FHUQIs are difficult to be
+interpreted or comprehended by users. From the above
+TABLE II. PROFIT TABLE literature review, we can see that the topic of HUQI mining
+Item A B C D has not been deeply explored and there is ample room for
+Profit 3 1 2 2 improving the performance of HUQA.
+156
+{(A,2)} {(C,2)} {(A,2)(C,2)}
+T1 6 11 T1 4 22 T1 10 2
+T3 6 4 T3 4 00 T3 10 0
+T4 6 8
+Figure1. Initial utility-lists Figure 3. An example for construucting utility-list of 2-q-itemset
+{(B,4)} {(B,5)} {(B,5)(B,6)} {(A,2)(C,2)} {(A,2)(D,1)} {(A,2)(C,2)(D,1)}
+T2 4 0 T1 5 6 T1 5 6 T1 10 2 T1 8 0 T1 12 0
+T4 6 2 T3 10 0 T4 8 0
+Figure 2. An example for combing two utility-lists Figure 4. An example for construucting utility-list of k-q-itemset
+III. THE PROPOSED METHOOD
+PROCEDURE: HUQI-Searcch
+In this section, we first introduce utilityy-list structure [9]
+and then present the proposed VHUQI (VVertical mining of
+Input:
+(1){(cid:1842)}-ULs: utility-lists of q-iitemsets w.r.t. prefix {(cid:1842)};
+High Utility Quantitative Itemsets) algorithmm.
+(2){(cid:1842)}-QL: a list of q-itemsetss w.r.t prefix {(cid:1842)};
+A. Utility-list Structure (3) min_abs_util: minimum abbsolute utility threshold;
+(4) qrc: related quantitative cooefficient;
+In this subsection, we introduce the uutility-list structure Output: the complete set of hiigh utility quantitative itemsets;
+and its related properties. For more details abbout the utility-list,
+readers can refer to [9]. In VHUQI, eachh q-item(set) X is 01 For each X (cid:1488){(cid:1842)}-QL do
+associated with a utility-list denoted as UL(XX). The utility-lists 02 { If(UL(X).SumEutils (cid:3410) mmin_abs_util)
+03 { H := H (cid:1515) X and Ouutput X; }
+of q-items are also called initial utility-lists. The initial utility- 04 else
+lists can be constructed by scanning the original database 05 { If (UL(X).SC) (cid:3410) K--SupportBound(X))
+twice. In the first database scan, the absolutee utility of each q- 06 { W := W (cid:1515) X; }}
+07 If(UL(X).SumEutilss(cid:3410) (min_abs_util / rqc))
+item is calculated. In the second database scaan, q-items in each
+08 { C := C (cid:1515) X; }
+transaction are sorted in descending order oof absolute utility.
+09 }
+Each transaction containing the q-item x is converted to a 10 }
+tuple of UL(x). After scanning all transactioons in the original 11 (HC, CULs) := Combine(CC, {(cid:1842)}-ULs, {(cid:1842)}-QL);
+database, the initial utility-lists are constructeed. 12 JoinList := Sort(H (cid:1515) W (cid:1515) HHC);
+13 {(cid:1842)}-ULs := {(cid:1842)}-ULs (cid:1515) CUULs;
+Figure 1 shows initial utility-lists for the database of Table
+1. The utility-list of a q-item(set) X is commposed of several 1 15 4 { F o r S e e a t c { h X X } - = U L { s x 1 : , = x 2 (cid:1486) , … an , d x { kk= X } (I - k Q , L L k , : U = k (cid:1486) )} ; (cid:1488) JoinList do
+tuples. Each tuple represents the utility inforrmation of X in the 16 For each Y = {y 1, y 2, ……, y k= (I k’, L k’)} (cid:1488) JoinList
+transaction T d and has three fields: Tid, Euutil and Rutil. The 17 such that I k = I k’ and Y(cid:1591)(cid:1591) X do
+Tid field indicates the Tid of the transaction T . The Eutil field 18 { Z = X (cid:1515)Y;
+d 19 Construct UL(Z);
+indicates the absolute utility of X in T , whhich is denoted as
+d 20 If (UL(Z) (cid:3405) (cid:1486))
+EU(X, T d ). In the utility-list of X, the sum of all its Eutil values 21 { {X}-ULs := {X}}-ULs (cid:1515) UL(Z);
+is the absolute utility of X in the database. Thhe sum of its Eutil 22 {(cid:1850)}-QL := {X}--QL (cid:1515) Z;
+values is denoted as SumEutil(X). The Rutil field indicates the 23 }
+24 }
+remaining utility of X in T [9]. The remainning utility of X in
+d 25 HUQI-Search({X}-ULLs, {X}-QL, min_abs_utility, qrc);
+T d is denoted as RU(X, T d ) and defined aas the sum of the 26}
+absolute utility of each q-item after the lastt q-item of X. The
+Pseudo Code 1. The HHUQI-Search procedure
+remaining utility of X will be used later for ppruning low utility
+q-itemsets. C. The HUQI-Search Proceedure
+B. The VHUQI Algorithm The pseudo code of the HUUQI-Search procedure is shown
+in Pseudo Code 1, which iis performed as follows. The
+In this subsection, we present the VVHUQI algorithm.
+procedure uses recursive deptth-first exploration to discover
+VHUQI takes as input a database D with intternal and external
+HUQIs. It takes as input a seet of utility-lists w.r.t. prefix P
+utilities, a minimum absolute utility threshhold min_abs_util,
+(denoted as {P}-ULs), a QList w.r.t. prefix P (denoted as {P}-
+and a quantitative related coefficient qrc aand it outputs the
+QL), a minimum absolute utilitty threshold min_abs_util, and a
+complete set of HQUIs in D. If a horizontal database has been
+quantitative related coefficientt qrc and outputs the complete
+converted into initial utility-lists, VHUQI ccan directly use it
+set of HQUIs in D.
+for mining QHUIs. VHUQI is performed as follows. First, the
+For each q-itemset X in {{P}-QL, if its absolute utility is
+algorithm scans D twice to construct initiall utility-lists { ∅ }-
+no less than min_abs_util, the algorithm outputs X as a HUQI
+ULs. All q-items are collected into an ordered list named QList,
+and collects X into a set H (linee 2-3). The set H is used to store
+which is denoted as { ∅ }-QL. In QList, q-ittems are stored in
+HQUIs whose prefixes are P. Otherwise, X is a low utility q-
+descending order of their absolute utillities. Then, the itemset. If X is low utility and its support count is no less than
+algorithm calls the HUQI-Search procedurre with four input its K-SupportBound [21], X is a weak utility q-itemset (WUQI)
+parameters { ∅ }-ULs, { ∅ }-QL, min_abs__util and qrc for
+(line 5-6). A WUQI is a low uutility q-itemset but its superset
+searching HUQIs. may be high utility. The K-suppport bound of X is denoted as
+KSB(X) and defined as:
+157
+(cid:3040)(cid:3036)(cid:3041)_(cid:3028)(cid:3029)(cid:3046)_(cid:3048)(cid:3047)(cid:3036)(cid:3039)(cid:3400)(cid:3021)(cid:3042)(cid:3047)(cid:3028)(cid:3039)(cid:3022)
+(cid:4690) (cid:4691), PROCEDURE: Combine
+(cid:3006)(cid:3048)(cid:3047)(cid:3036)(cid:3039)(cid:4666)(cid:3025)(cid:4667)(cid:2878)(cid:3014)(cid:3028)(cid:3051)(cid:4666)(cid:3019)(cid:3048)(cid:3047)(cid:3036)(cid:3039)(cid:4666)(cid:3025)(cid:4667)(cid:4667)
+Input:
+where Max(Rutil(X)) means the maximum remaining utility of (1) {(cid:1842)}-CQL: a list of q-itemsets w.r.t prefix {(cid:1842)};
+X in database D. Because Max(Rutil(X)) can be easily obtained (2) {(cid:1842)}-ULs: utility-lists of q-itemsets w.r.t. prefix {(cid:1842)};
+from UL(X), KSB(X) can be easily calculated. (3) {(cid:1842)}-QL: a list of q-itemsets w.r.t prefix {(cid:1842)};
+Return:
+If the absolute utility of X is no less than min_abs_util/qrc,
+(1) {P}-HC: a set of high utility q-itemsets w.r.t. prefix {P};
+the algorithm adds X to a set C (line 7-8). The set C is used to (2) {P}-CUL: a set of utility-lists w.r.t. prefix {P};
+store q-itemsets whose absolute utilities are no less than
+min_abs_util/qrc. After processing each itemset in {P}-UL 01 Set {P}-HC := (cid:1486); {P}-CUL := (cid:1486);
+(line 10), the algorithm calls the Combine procedure with 02 For each X = {p 1, p 2, …, p k-1, (xI k, xL k, xU k)} (cid:1488) {(cid:1842)}-CQL do
+three input parameters C, { ∅ }-ULs and { ∅ }-QL (line 11). The 03 { Set Z := (cid:1486); UL(Z) := (cid:1486);
+04 For each Y = {p 1, p 2, …, p k-1, (yI k, yL k)} (cid:1488) {(cid:1842)}-CQL
+Combine procedure applies Definition 7 to combine low utility 05 and Y (cid:1591) X do
+q-itemset in C and returns HC and CULs, where HC is the set 06 { If(Z == (cid:1486) and xI k == yI k and xU k + 1 = yL k)
+of HUQIs that are generated by combining q-itemsets in C and 07 { Z := { p 1, p 2, …, p k-1, (xI k, xL k, yL k)};
+CULs is the set of utility-lists of HUQIs in HC. Then, the 08 UL(Z) := MergeUtilityList(UL(X), UL(Y)); }
+09 else
+algorithm collects all q-itemsets in sets H, W and HC and put
+these q-itemsets in an ordered list called JoinList (line 12). 1 11 0 { S If u (z p I p k = os = e y Z I k = a n {p d 1 z , U p 2 k , + … 1 , = p k - y 1, L ( k z ) I k, zL k, zU k);
+The utility-lists CULs is added to the {P}-UL (line 13). 12 { Z := {p 1, p 2, …, p k-1, (zI k, zL k, yL k)};
+For each q-itemset X = {x , x , …, x} in JoinList, the 13 UL(Z) := MergeUtilityList(UL(Z),UL(Y)); }
+1 2 k
+algorithm performs as follows (line 14-26). First, {X}-ULs and 14 }
+{X}-QL are initialized to ∅ (line 15), where {X}-ULs is used 15 If(UL(Z).SumEutils (cid:3410) min_abs_util)
+16 { {P}-HC := {P}-HC (cid:1515) Z;
+to store utility-lists of q-itemsets w.r.t. prefix X and {X}-QL is 17 {P}-CUL := {P}-CUL (cid:1515) UL(Z);
+used to store q-itemsets whose prefixes are X. Suppose that the 18 break; }
+last q-items respectively in X and Y are x = (I, L, U) and y 19 }
+k k k k k
+= (I’, L’, U’) . Then, for each q-itemset Y = {y , y , …, y} 20 } Return {P}-HC and {P}-CUL;
+k k k 1 2 k
+appearing after X in JoinList (line 14-17), if I = I ’ the
+k k Pseudo Code 2. The Combine procedure
+algorithm generates a q-itemset Z by joining X and Y and
+constructs its utility-list UL(Z) (line 18-19). If UL(Z) is not E. Constructing Utilit-lists of Q-itemsets
+empty, UL(Z) and Z are respectively added to UL(Z) and {X}- Given two itemsets X and Y and their prefix P, the utility-
+QL (line 20-23). After traversing each q-itemset appearing list of the itemset Z = X ∪ Y can be constructed as follows.
+after X, the procedure HUI-Search is recursive called for
+Constructing utility-lists of 2-q-itemsets. Let X = —x˝ and
+exploring the search space of HUQIs whose prefixes are X 1
+Y = —y˝ be two q-items, where x appears after y in { ∅ }-
+(line 25). The algorithm continues searching for other HUQIs 1 1 1
+until no HUQIs is found. QL. Let Z = X ∪ Y = —x 1 , y 1 ˝ be a 2-q-itemset obtained by
+concatenating X with y. The utility-list of Z is obtained by the
+1
+D. The Combine Procedure following process. For each transaction T d containing both x 1
+and y, a tuple ¡T , EU(Z, T ), RU(Z, T )¿ is created in
+The pseudo code of the Combine procedure is shown in 1 d d d
+UL(Z), where EU(Z, T) is the sum of the Eutil values in
+Pseudo Code 2, which is performed as follows. It takes as tuples associated with d T in UL(X) and UL(Y), and
+d
+input a list of q-itemsets storing in C (denoted as {P}-CQL), a where RU(Z, T) is Rutil value associated with T in
+set of utility-lists of q-itemsets w.r.t. prefix P (denoted as {P}- UL(Y). That is, d EU(Z, T) = EU(x, T) + EU(y, d T)
+d 1 d 1 d
+ULs), a QList consisting of q-itemsets w.r.t prefix P (denoted and RU(Z, T) = EU(y, T). Figure 3 shows an example
+d 1 d
+as {P}-QL). Initially, two variables {P}-HC and {P}-CUL are for constructing utility-lists of 2-q-itemsets.
+set to ∅ (line 1). For each q-itemset X = {p 1 , p 2 , …, p k-1 , (xI k , Constructing utility-lists of k-q-itemsets (k≥3). Let X = —x,
+xL, xU)} in {P}-CQL, the algorithm performs as follows 1
+k k x, (cid:31), x ˝ and Y =—y, y, (cid:31), y ˝ be two (k-1)-q-
+(line 2-20). First, a q-itemset Z and its UL(Z) are initialized to 2 k-1 1 2 k-1
+∅ (line 3). Then, the algorithm traverses each q-itemset itemsets, where x i = y i (1 ≤ i ≤ k-1) and y k-1 appears after x k-
+a
+q
+p
+-i
+p
+te
+e
+m
+ar
+s
+in
+et
+g
+Y
+a f
+=
+te r
+{ p
+X
+,
+i n
+p
+{
+,
+P
+…
+}-
+,
+C
+p
+QL
+, (
+(
+y
+li
+I
+ne
+, y
+4
+L
+-1
+,
+9
+)}
+)
+,
+.
+i
+F
+f
+o
+(
+r
+1
+e
+)
+a
+x
+c
+I
+h
+=
+tr a
+y
+v
+I
+e
+,
+r s
+(
+e
+2
+d
+)
+1
+o
+.
+b t
+L
+a
+e
+in
+t
+e
+Z
+d
+=
+by
+X
+c o
+∪
+n c
+Y
+at e
+=
+n a
+—
+ti
+x
+n
+1
+g
+,
+X
+x 2 ,
+w
+(cid:31)
+ith
+, x
+y
+k-1 ,
+. L
+y k
+e
+-
+t
+1 ˝
+P
+b
+=
+e
+X
+a
+∩
+k- q
+Y
+-i t
+b
+e
+e
+m
+t
+s
+h
+e
+e
+t
+1 2 k-1 k k k k k-1
+xU+1 = yL and (3) Z = ∅ , the algorithm generates a q- common prefix of X and Y. Given the utility-lists UL(X), UL(Y)
+k k
+itemset Z = {p , p , …, p , (xI, xL, yL)} by combining X and UL(P), the utility-list of Z is obtained by the following
+1 2 k-1 k k k
+and Y (line 6-7). Besides, the algorithm merges utility-lists of process. For each transaction T containing both X and Y, a
+d
+X and Y to form the utility-list of Z (i.e.,UL(Z)) (line 8). tuple ¡T , EU(Z, T ), RU(Z, T )¿ is created in UL(Z), where
+d d d
+Otherwise, if Z = {p , p , …, p , (zI, zL, zU), yI=zI and EU(Z, T) is the sum of the Eutil values in tuples
+1 2 k-1 k k k k k d
+yL = zU + 1, Z is combined with Y and UL(Z) is merged with associated with Tin UL(X) and UL(Y) minus the Eutil
+k k d
+UL(Y) (line 9-14). After that, if the absolute utility of Z is no value of the tuple associated with T in UL(P), and
+d
+less than min_abs_util, Z is added to {P}-HC and UL(Z) is where RU(Z, T d ) is the Rutil value associated with Td in
+added to {P}-CUL (line 15-18). After processing all q- UL(Y). That is, EU(Z, T d ) = EU(X, T d ) + EU(Y, T d ) (cid:31)
+EU(P, T) and RU(Z, T) = EU(Y, T). Figure 4 shows
+itemsets in {P}-CQL, the algorithm returns {P}-HC and {P}- d d d
+CUL (line 20).
+158
+an example for constructing utility-lists of k-q-itemsets (k≥ 3).
+10000 HUQA
+VHUQI
+1000
+100
+10
+1 0.1 0.3 0.5 0.7 0.9 2 4 6 8 10
+(a) Mushroom (b) Connect (c) Foodmart (d) Retail
+Figure 5. Execution time on different types of datasets
+(a) Mushroom (b) Connect (c) Foodmart (d) Retail
+Figure 6. Memory consumption on different types of datasets
+IV. EXPERIMENTAL RESULTS
+A. Experiments on Dense Datasets
+In this section, we evaluate the performance of the
+proposed algorithm VHUQI with the state-of-the-art algorithm The execution times of the algorithms on Mushroom and
+HUQA [15]. The input parameters and output results of Connect datasets are respectively show in Figure 5(a) and
+VHUQI are the same as that of HUQA. Both algorithms were Figure 5(b). Mushroom and Connect are dense datasets. A
+implemented in Java. Experiments were performed on a characteristic of dense dataset is that it consists of long
+desktop computer with an Intel® Core 2 Quad Core Processor transactions and contains a large number of HUQIs even when
+@ 2.66 GHz running Windows XP and 2 GB of RAM. the minimum utility threshold is high. In Figure 5(a) and
+Different types of datasets were used to evaluate the Figure 5(b), the execution time of HUQA is slower than
+performance of the algorithms. Mushroom, Connect and Retail VHUQI about 10 times. The reason is that both Mushroom
+datasets were real-life datasets obtained from FIMI Repository. and Connect datasets contain a large amount of HUQIs, which
+Foodmart is a real-life dataset obtained from the Microsoft leads HUQA to generating too many conditional databases for
+Foodmart 2000 database, which contains real external and HUQIs and intermediate weak utility q-itemsets. Generating
+internal utilities. For Mushroom, Connect and Retail datasets, conditional database of q-itemset takes lots of time because it
+the quantity of each item is randomly generated from 1 to 5 involves expensive I/O operation. In contrast to HUQA, HUI-
+and the external utility of each item is randomly generated Miner uses utility-list to directly calculate the utility of HUQIs
+from 0.01 to 10.00. The external utility follows a log normal and WUQIs in memory, which is more efficient than
+distribution. Table III shows the characteristics of the above generating conditional databases. For example, when
+datasets. Table IV shows the descriptions of parameters in min_abs_util = 1%, HUQA takes 6,692 seconds, while
+Table III. In all experiments, the quantitative related VHUQI only takes 506 seconds.
+coefficient is set to 3.
+B. Experiments on Sparse Datasets
+TABLE III. CHARACTERISTICS OF THE DATASETS The execution time of the algorithms on Foodmart
+dataset is shown in Figure 5(c). The minimum utility threshold
+Dataset D T N Q NQ Type
+for this experiment is varied from 0.1% to 0.01%. The
+Mushroom 8,124 23 119 5 585 Dense
+Foodmart dataset is a real-life spare dataset. When the
+Connect 67,557 43 130 5 639 Dense
+minimum utility threshold is high (e.g., min_abs_util = 0.1%),
+Foodmart 4,141 4.4 1,559 5 5,305 Sparse
+Retail 88,162 10.3 1,6470 5 61,191 Sparse both HUQA and HUQI achieves good performance. When the
+threshold decreases, the number of HUQIs dramatically
+TABLE IV. PARAMETER DESCRIPTIONS increases due to the combination explosion of q-items. In this
+scenario, HUQA suffers from very long execution time. For
+Parameter Descriptions
+D Total number of transactions example, when min_abs_util = 0.01%, HUQA takes 12,293
+T Average length per transaction seconds, while VHUQI only takes 15 seconds. The
+N Number of distinct items performance of VHUQI is over 800 times faster than HUQA.
+Q Maximum number of purchased items in transactions From this experimental result, we can observe that VHUQI
+NQ Number of distinct q-items outperforms HUQA substantially, particularly for databases
+containing many q-items.
+).ces(emiTnoitucexE
+10000 HUQA
+VHUQI
+1000
+100
+10 1 2 3 4 5 6 7 8 9 10
+Minimum Utility Threshold (%)
+).ces(emiT
+noitucexE
+100000 HUQA
+VHUQI
+10000
+1000
+100
+10
+1 0.010.020.03 0.04 0.050.060.070.080.09 0.1
+Minimum Utility Threshold (%)
+).ces(emiT
+noitucexE
+10000 HUQA
+VHUQI
+1000
+100 0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1
+Minimum Utility Threshold (%)
+).ces(emiT
+noitucexE
+Minimum Utility Threshold (%)
+6000 HUQA
+VHUQI 5000
+4000
+3000
+2000
+1000
+0
+0.1 0.3 0.5 0.7 0.9 2 4 6 8 10
+).BM(
+egasU
+yromeM
+6000 HUQA
+VHUQI 5000
+4000
+3000
+2000
+1000
+1 2 3 4 5 6 7 8 9 10
+Minimum Utility Threshold (%)
+).BM(
+egasU
+yromeM
+6000
+5000
+4000
+3000
+2000
+1000 HUQA
+VHUQI 0
+0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1
+Minimum Utility Threshold (%)
+).BM(
+egasU
+yromeM
+6000
+5000
+4000
+3000
+2000
+1000 HUQA
+VHUQI 0
+0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1
+Minimum Utility Threshold (%)
+).BM(
+egasU
+yromeM
+Minimum Utility Threshold (%)
+159
+C. Experiments on Large Amount of Q-items [6] C.-W. Lin, T.-P. Hong, W.-H. Lu, “An Effective Tree Structure for
+Mining High Utility Itemsets,” Expert Systems with Applications, pp.
+The execution time of the algorithms on Retail dataset is
+7419-7424, 2011.
+shown in Figure 5(d). The minimum utility threshold for this
+[7] G.-C. Lan, T.-P. Hong, V. S. Tseng, “An Efficient Projection-based
+experiment is varied from 0.1% to 0.01%. The Retail dataset is Indexing Approach for Mining High Utility Itemsets,” Knowledge and
+a sparse dataset consisting of a large amount of q-items. When Information System, vol. 38, pp. 85-107, 2014.
+the minimum utility threshold is higher than 0.1%, the [8] Y. Liu, W. Liao, and A. Choudhary, “A fast high utility itemsets mining
+performance of HUQA and HUQI is similar. When the algorithm,” in Proc. of the 1st Int’l Workshop on Utility-Based Data
+Mining, pp. 90-99, August 21-21, 2005, Chicago, Illinois, USA.
+threshold decreases, the number of HUQIs increases and thus
+the more execution time is required for both algorithms. [9] M. Liu, and J. Qu, “Mining high utility itemsets without candidate
+generation,” in Proc. of the 21st ACM SIGKDD Int’l Conf. on
+However, VHUQI remains runs faster than HUQA. The
+Knowledge Management, pp. 55-64, October 29-November 02, 2012,
+reason why the performance gap between HUQA and VHUQI Maui, Hawaii, USA.
+is smaller for sparse dataset than for dense dataset is because
+[10] J. Liu, K. Wang, and B. Fung, “Direct Discovery of High Utility
+sparse dataset typically contains much fewer q-itemsets than Itemsets without Candidate Generation,” in Proc.of the 2012 IEEE 12th
+dense dataset. Int’l Conf. on Data Mining, pp. 984-989, December 10-13, 2012.
+[11] Y. Li, J. Yeh, and C. Chang, “Isolated items discarding strategy for
+D. Memory Usage discovering high utility itemsets,” Data & Knowledge Engineering, vol.
+We measure the maximum memory usage of HUQA and 64, no. 1, pp. 198-217, January, 2008.
+VHUQI by using the Java API. Figure 6 shows the memory [12] J. Pei, J. Han, H. Lu, S. Nishio, S. Tang, and D. Yang, “H-mine: Fast and
+Space-Preserving Frequent Pattern Mining in Large Databases,” IIE
+consumption of the algorithms on different types of datasets.
+Transactions, vol. 39, no. 6, pp. 593-605, June, 2007.
+In general, HUQA uses much more memory than VHUQI
+[13] R. Srikant, and R. Agrawal, “Mining quantitative association rules in
+because the former needs to construct a huge size of horizontal large relational tables,” in Proc. of the 1996 ACM SIGMOD Int'l Conf.
+conditional databases, while the latter uses vertical on Management of Data, pp. 1-12, June, 1996, Montreal, Canada.
+representation utility-lists. [14] P. S. M. Tsai, and C.-M. Chen, “Mining quantitative association rules in
+a large database of sales transactions,” Journal of Information Science
+V. CONCLUSION and Engineering, pp. 667-681, 2001.
+In this paper, we have presented a novel high utility [15] V. S. Tseng, C.-W. Wu, B.-E. Shie, and P. S. Yu, “UP-Growth: an
+efficient algorithm for high utility itemset mining,” in Proc. of 16th ACM
+quantitative itemset mining algorithm named VHUQI (Vertical
+SIGKDD Int’l Conf. on Knowledge Discovery and Data Mining, pp. 253-
+mining of High Utility Quantitative Itemsets). It adopts the 262, July 25-28, 2010, Washington, DC, USA.
+idea of utility-list to directly calculate the utility of q-itemsets
+[16] C. Wang, S. Cheng, and Y. Huang, “A fuzzy approach for mining high
+in memory and uses k-support bound estimation to effectively utility quantitative itemsets,” in Proc. of IEEE Int’l Conf. on Fuzzy
+prune the search space. An experimental study on both System, pp. 1909-1913, 2009.
+synthetic and real datasets shows that VHUQI is up to three [17] C.-W. Wu,Y.-F. Lin, P. S. Yu, and V. S. Tseng, “Mining high utility
+orders of magnitude faster than HUQA, the state-of-art episodes in complex event sequences,” in Proc. of 19th ACM SIGKDD
+Int’l Conf. on Knowledge Discovery and Data Mining, pp. 536-544,
+algorithm for high utility quantitative itemset mining.
+August 11-14, 2013, Chicago, Illinois, USA.
+Meanwhile, it consumes less memory than HUQA as well.
+[18] C.-W. Wu, P. Fournier-Viger, P. S. Yu, and V. S. Tseng, “Efficient
+Particularly, VHUQI outperforms HUQA substantially when
+mining of a concise and lossless representation of high utility itemsets,”
+the database contains a large amount of q-items. in Proc. of 11th IEEE Int’l Conf. on Data Mining, pp. 824-833,
+December 11-14, 2011, Vancouver, BC.
+[19] C.-W. Wu, B.E. Shie, V. S. Tseng, and P. S. Yu, “Mining Top-k high
+ACKNOWLEDGEMENT
+utility itemsets,” in Proc. of 18th ACM SIGKDD Int’l Conf. on
+This research was partially supported by Ministry of Knowledge Discovery and Data Mining, pp. 78-86, August 12-16, 2012,
+Beijing, China.
+Science and Technology, Taiwan, R.O.C. under grant no. 101-
+[20] H. Yao, and H. J. Hamilton, “Mining itemset utilities from transaction
+2221-E-006-255-MY3.
+databases,” Data & Knowledge Engineering, vol. 59, no. 3, pp. 603-626,
+2006.
+REFERENCES
+[21] S.-J. Yen, and Y.-S. Lee, “Mining high utility quantitative association
+[1] R. Agrawal, and R. Srikant, “Fast Algorithms for Mining Association Rules,” in rules,” in Proc. of the 9th Int’l Conf. on Data Warehousing and
+Proc. of the 20th Int'l Conf. on Very Large Data Bases, pp. 487-499, September 12- Knowledge Discovery, pp. 283-292, September 03-07, 2007,
+15, 1994. Regensburg, Germany.
+[2] C. F. Ahmed, S. K. Tanbeer, B.-S. Jeong, and Y.-K. Lee, “Efficient tree
+structures for high utility pattern mining in incremental databases,” IEEE
+Transactions on Knowledge and Data Engineering, vol. 21, no.12, pp.
+1708-1721, 2009.
+[3] R. Chan, Q. Yang, and Y. Shen, “Mining High Utility Itemsets,” in Proc. of the 3rd
+IEEE Int'l Conf. on Data Mining, pp. 19, November 19-22, 2003.
+[4] J. Han, J. Pei, and Y. Yin, “Mining frequent patterns without candidate
+generation,” in Proc. of the 2000 ACM SIGMOD Int’l Conf. on
+Management of Data, pp. 1-12, May 15-18, 2000, Dallas, Texas, USA.
+[5] H.-F. Li, H.-Y. Huang, Y.-C. Chen, Y.-J. Liu, and S.-Y. Lee, “Fast and
+Memory Efficient Mining of High Utility Itemsets in Data Streams,” in
+Proc. of the 2008 8th IEEE Int'l Conf. on Data Mining, pp. 881-886,
+December 15-19, 2008.
+160
