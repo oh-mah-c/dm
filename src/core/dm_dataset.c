@@ -17,6 +17,12 @@ static void free_trans_utility(void *payload, size_t count) {
     free(data);
 }
 
+static void free_trans_quantity(void *payload, size_t count) {
+    DM_Trans_Quantity *data = (DM_Trans_Quantity *)payload;
+    for (size_t i = 0; i < count; i++) free(data[i].items);
+    free(data);
+}
+
 DM_Dataset* dm_dataset_load(const char *path, DM_DatasetType type) {
     FILE *file = fopen(path, "r");
     if (!file) return NULL;
@@ -37,6 +43,9 @@ DM_Dataset* dm_dataset_load(const char *path, DM_DatasetType type) {
     } else if (type == DM_TYPE_UTILITY) {
         ds->payload = malloc(sizeof(DM_Trans_Utility) * capacity);
         ds->free_payload = free_trans_utility;
+    } else if (type == DM_TYPE_QUANTITY) {
+        ds->payload = malloc(sizeof(DM_Trans_Quantity) * capacity);
+        ds->free_payload = free_trans_quantity;
     } else {
         free(ds); fclose(file); return NULL;
     }
@@ -44,7 +53,9 @@ DM_Dataset* dm_dataset_load(const char *path, DM_DatasetType type) {
     while (fgets(line, sizeof(line), file)) {
         if (ds->count >= capacity) {
             capacity *= 2;
-            size_t sz = (type == DM_TYPE_TRANSACTIONAL) ? sizeof(DM_Trans_Simple) : sizeof(DM_Trans_Utility);
+            size_t sz = sizeof(DM_Trans_Utility);
+            if (type == DM_TYPE_TRANSACTIONAL) sz = sizeof(DM_Trans_Simple);
+            else if (type == DM_TYPE_QUANTITY) sz = sizeof(DM_Trans_Quantity);
             ds->payload = realloc(ds->payload, sz * capacity);
         }
 
@@ -63,6 +74,31 @@ DM_Dataset* dm_dataset_load(const char *path, DM_DatasetType type) {
                 uint32_t id = (uint32_t)atoi(token);
                 tr->items[tr->count++] = id;
                 if (id > ds->max_id) ds->max_id = id;
+                token = strtok(NULL, " \t\n\r");
+            }
+            if (tr->count > 0) ds->count++;
+            else free(tr->items);
+        } else if (type == DM_TYPE_QUANTITY) {
+            DM_Trans_Quantity *tr = &((DM_Trans_Quantity*)ds->payload)[ds->count];
+            size_t tr_cap = 8;
+            tr->items = malloc(sizeof(DM_Quantity_Item) * tr_cap);
+            tr->count = 0;
+
+            char *token = strtok(line, " \t\n\r");
+            while (token) {
+                char *comma = strchr(token, ',');
+                if (comma) {
+                    *comma = '\0';
+                    if (tr->count >= tr_cap) {
+                        tr_cap *= 2;
+                        tr->items = realloc(tr->items, sizeof(DM_Quantity_Item) * tr_cap);
+                    }
+                    uint32_t id = (uint32_t)atoi(token);
+                    tr->items[tr->count].id = id;
+                    tr->items[tr->count].quantity = atof(comma + 1);
+                    if (id > ds->max_id) ds->max_id = id;
+                    tr->count++;
+                }
                 token = strtok(NULL, " \t\n\r");
             }
             if (tr->count > 0) ds->count++;

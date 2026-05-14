@@ -31,6 +31,20 @@ typedef struct {
 } DM_Trans_Utility;
 
 /**
+ * @brief Quantity transaction (Items with purchased quantities)
+ * Used by: HUQIM algorithms requiring separate quantities and external utilities.
+ */
+typedef struct {
+    uint32_t id;
+    double quantity;
+} DM_Quantity_Item;
+
+typedef struct {
+    DM_Quantity_Item *items;
+    size_t count;
+} DM_Trans_Quantity;
+
+/**
  * @brief Matrix row (Array of doubles)
  * Used by: Clustering, Classification, PCA, etc.
  */

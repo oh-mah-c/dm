@@ -1,0 +1,789 @@
+TKQ: Top-K Quantitative High Utility Itemset
+Mining
+Mourad Nouioua1,5, Philippe Fournier-Viger1[0000−0002−7680−9899],
+Wensheng Gan2, Youxi Wu3, Jerry Chun-Wei Lin4, and Farid Nouioua5
+1 Harbin Institute of Technology (Shenzhen), Shenzhen, China
+2 Jinan University, Guangzhou, China
+3 Hebei University of Technology, Tianjin, China
+4 Western Norway University of Applied Sciences (HVL), Bergen, Norway
+5 University of Bordj Bou Arreridj, Bordj Bou Arreridj, Algeria
+mouradnouioua@gmail.com,philfv@hit.edu.cn,wsgan001@gmail.com,
+wuc567@163.com,jerrylin@ieee.org, faridnouioua@gmail.com
+Abstract. High utility itemset mining is a well-studied data mining
+task for analyzing customer transactions. It consists of finding the sets
+of items purchased together that yield a profit that is greater than a
+minutil threshold, set by the user. To find more precise patterns with
+purchase quantities, that task was recently generalized as high utility
+quantitative itemset mining. But an important drawback of current al-
+gorithms is that finding an appropriate minutil value is not intuitive
+and can greatly influence the output. A too small minutil value may
+lead to very long runtimes and finding millions of patterns, while a too
+high value, may result in missing many important patterns. To address
+this issue, this paper redefines the task as top-k quantitative high util-
+ityitemsetminingandproposesanovelalgorithmnamedTKQ(TopK
+Quantitativeitemsetminer),whichlettheuserdirectlyspecifythenum-
+berk ofpatternstobefound.Thealgorithmincludesthreestrategiesto
+improveitsperformance.Experimentsonbenchmarkdatasetsshowthat
+TKQ has excellent performance.
+Keywords: Highutilityitemsetmining·Quantitativeitemsets·Top-k
+Pattern mining.
+1 Introduction
+Nowadays, a large amount of data is collected about customer purchases in on-
+line stores, brick and mortar stores. To analyze the behavior of customers and
+gaininsightsintotheirhabits,apopulardataminingtaskishighutilityitemset
+mining(HUIM) [3,6,15]. The objective ofthat task isto enumerate allthe high
+utility itemsets. A high utility itemset (HUI) is a set of items (products) that
+yield a profit that is greater or equal to a parameter called the minimum utility
+threshold (minutil). Finding HUIs in transactions is useful to understand cus-
+tomerhabits.Forinstance,itcanrevealthatcustomersbuying{chocolate,cake}
+2 Nouioua et al.
+togetherishighlyprofitable.However,amajorproblemisthatHUIsdonotpro-
+videinformationaboutthepurchasequantitiesofitems(e.g.howmanychocolate
+bars a customer may purchase with how many cakes).
+To give more detailed information about HUIs to users, HUIM was recently
+generalized as the task of high utility quantitative itemset mining (HUQIM) [8,
+7,11,14]. The goal is to find patterns called high utility quantitative itemsets
+(HUQIs)thatareprofitableandalsoincludethequantityinformation.Forexam-
+ple, a HUQI is “chocolate:2, cake:4-6”, which indicates that buying 2 chocolate
+bars with 4 to 6 cakes yields a high profit. HUQIs are more informative than
+HUIs. The added information about quantities can be useful for marketing [7,
+8,11]. But finding HUQIs is much more difficult than mining HUIs. The reason
+is that not only different items must be combined together to form HUQIs but
+also different quantities may be considered.
+Several algorithms have been developed to mine HUQIs such as HUQA [14],
+VHUQI [8], HUQI-Miner [7], and FHUQI-Miner [11]. These algorithms adopt
+various data structures and strategies to reduce the search space and find all
+HUQIs. However, an important drawback of those algorithms is that finding an
+appropriate minutil value is not intuitive and can greatly influence the output.
+If the user chooses a too small minutil value, then an algorithm may run for
+hoursandfindmillionsofpatterns.Butifminutil istoohigh,fewpatternsmay
+bediscovered.Hence,userstypicallysetthisparameterbytrialanderror,which
+is time-consuming.
+To address this issue, this paper redefines the task of HUQIM as top-k
+HUQIM and proposes a novel algorithm named TKQ (Top K Quantitative
+itemset miner), which let the user directly specify the desired number k of pat-
+terns to be found without having to define minutil before starting the mining
+process. The algorithm then finds exactly k patterns, and relies on three strate-
+gies to improve its performance. Experiments on benchmark datasets show that
+TKQhasexcellentperformanceandcanbeasuitablealternativetofindHUQIs
+giving only the desired number of HUQIs k.
+Therestofthispaperisorganizedasfollows.Section2describesrelatedwork.
+Section3presentspreliminariesandtheproblemdefinition.Section4introduces
+the designed TKQ algorithm. Section 5 reports results from the experimental
+evaluation. Finally, Section 6 presents the conclusion.
+2 Related Work
+Research on pattern mining algorithms has started almost three decades ago
+by initially focusing on finding patterns that appear frequently in data such as
+frequent itemsets [4]. To efficiently find frequent itemsets in transactions, the
+property that the support is anti-monotonic is widely used. It says that the
+support (occurrence frequency) of an itemset cannot be greater than that of its
+supersets.
+Though, frequent itemset mining (FIM) is useful, frequent itemsets are not
+always the most important for users. To find patterns that meet other interest-
+TKQ: Top-K Quantitative High Utility Itemset Mining 3
+ingness criteria such as the profit, FIM was generalized as the problem of high
+utility itemset mining (HUIM) [5,10,12] where both quantities and unit profits
+aretakenintoaccount.HUIMisharderthanFIMbecausetheutilityfunctionfor
+selectingpatternsisneithermonotonicnoranti-monotonic.Asasolution,HUIM
+algorithmsapplyvariousupperboundsontheutilitythatareanti-monotonicto
+reduce the search space such as the TWU [10] and the remaining utility upper
+bound [9].
+To address the problem that HUIs do not provide information about quanti-
+ties,HUIMwasextendedasHUQIM.HUQAisthefirstHUQIMalgorithm[14].
+It introduced the concept of candidate quantitative itemsets as well as a search
+spacepruningpropertybasedonak-supportboundmeasure.Then,amoreeffi-
+cient algorithm named VHUQI was designed [8], it relies on a vertical database
+representationtoreducethecostofdatabasescans.Thereafter,tofurtherreduce
+the search space, the HUQI-Miner algorithm was designed [7], which relies on
+botharemaining utility andaTWU-basedupperboundtoeliminatelowutility
+quantitative itemsets (LUQIs). Recently, an improved version of this algorithm
+named FHUQI-Miner was proposed [11]. Besides, additional search space prun-
+ing strategies were introduced to reduce the search space. FHUQI-Miner is the
+state-of-the-art HUQIM algorithm [11].
+3 Preliminaries and Problem Definition
+ThissectionfirstintroducestheproblemofHUQIM,andthenthenovelproblem
+of top-k HUQIM is presented.
+Let there be a finite set of N distinct items (products), I ={I ,I ,...,l }.
+1 2 N
+A positive number p is assigned to each item i∈I called external utility, which
+i
+represents its unit profit. A quantitative transaction database is a finite set of
+transactions,D ={T ,T ,...,T }.EachtransactionT ∈D(1≤d≤M)hasa
+1 2 M d
+unique identifier d and it contains a set of exact Q-items, T ={x ,x ,...,x }.
+d 1 2 k
+An exact Q-item x is a pair (i,q) indicating that q units of item i ∈ I have
+been purchased. For example, Table 1 shows a transaction database with four
+transactions(T toT )andfouritems(AtoD).ThetransactionT containstwo
+1 4 2
+exact Q-items (B,4) and (C,3), which indicates that a customer has purchased
+four units of item B and three units of C. Table 2 gives the external utility
+values of items. For example, p =3 indicates that a profit (external utility) of
+A
+3$ per unit is gained by selling product A. The transaction database presented
+in Table 1 will be used as a running example in the rest of this paper.
+HUQIM contains two kinds of Q-items, exact Q-items and range Q-items.
+Range Q-items do not exist explicitly in the database but they are obtained
+usingthecombinationprocess.Arange Q-item isatriple(i,l,u)indicatingthat
+anitemiispurchasedwithaquantitythatisatleastl andnomorethanu.The
+interval size of (i,l,u) is calculated as u−l+1 and it is called a Q-interval. For
+instance, (B,4,6) is a range Q-item with a Q-interval of size 3. Note that, any
+exact Q-item, (i,q), can be expressed as a range Q-item as (i,q,q). A set X of
+Q-items is called a Q-itemset. A Q-itemset with k items is called a k-Q-itemset.
+4 Nouioua et al.
+Table 1: A transaction database Table 2: External utility of items
+T Transaction Item ABCD
+id
+T (A,2) (B,5) (C,2) (D,1) Profit 3 1 2 2
+1
+T (B,4) (C,3)
+2
+T (A,2) (C,2)
+3
+T (A,2) (B,6) (D,1)
+4
+AQ-itemsetcontainingatleastoneQ-itemwithaQ-intervalsizegreaterthan1
+is called a range Q-itemset. For example, [(B,5)(C,5,7)] is a range 2-Q-itemset.
+A range Q-item y =(j,l,u) contains an exact Q-item x=(i,q) if i=j and
+q ∈[l,u]. Furthermore, y contains a range Q-item z =(j(cid:48),l(cid:48),u(cid:48)) if j(cid:48) =j, l ≤l(cid:48)
+and u ≥ u(cid:48). As example, the range Q-item (B,2,4) contains the exact Q-item
+(B,3) and the range Q-item (B,2,3).
+An exact Q-item x occurs in a transaction T if x ∈ T . A range Q-item y
+d d
+occurs in a transaction T if a Q-item from T is contained in y. For instance,
+d d
+(A,2) occurs in T , and (B,4,5) occurs in T and T .
+1 1 2
+A Q-itemset X occurs in a transaction T if for all x ∈ X, x occurs in T .
+d d
+The set of transactions where a Q-itemset X appears is called its occurrence-
+set and is denoted as OCC(X). The occurrence frequency or support of a Q-
+itemset X is defined as SC(X) = |OCC(X)|. For instance, the occurrence-set
+of X =[(A,2),(C,2)] is OCC(X)={T ,T }. Thus, SC(X)=2.
+1 3
+The goal of HUQIM is to find all Q-itemsets that have a high utility (e.g.
+yield a high profit) [8]. The utility of an exact Q-item x=(i,q) in a transaction
+T isdefinedanddenotedasu(x,T )= p ×q.TheutilityofarangeQ-item x=
+d d i
+(i,l,u) in a transaction T is defined as u(x,T )=
+(cid:80)u
+u((i,j),T ). The utility
+d d j=l d
+(cid:80)
+ofaQ-itemset X inatransaction T isdefinedasu(X,T )= u(x,T ).For
+d d x∈X d
+instance,u((B,4),T )=1×4=4,u((B,3,4),T )=u((B,3),T )+u((B,4),T )=
+2 2 2 2
+0+4=4 and u([(A,2)(B,6)],T )=6+6=12.
+4
+TheutilityofaQ-itemsetX inadatabaseD isdenotedanddefinedasu(X)
+(cid:80)
+= u(X, T ) [8]. For instance, u([(B,4,5)(C, 2,3)]) = u([(B,4,5)
+Td∈OCC(X) d
+(C,2,3)], T ) +u([(B,4,5) (C,2,3)],T ) = 9+10=19 and u([(B,5) (D,1)]) =
+1 2
+u([(B,5)(D,1)],T ) =5+2=7.
+1
+(cid:80)
+The utility of a transaction T is TU(T ) = u(y,T ), that is the
+d d y∈Td d
+sum of the utility of its Q-items. The total utility of a database D is defined
+(cid:80)
+as σ = TU(T ), that is the sum of the utility of its transactions. For
+Td∈D d
+instance TU(T )=u((A,2),T )+u((C,2),T )=6+4=10 and σ =TU(T )+
+3 2 2 1
+TU(T )+TU(T )+TU(T )=17+10+10+14=51.
+2 3 4
+Thetaskof HighUtilityQuantitativeItemsetMining(HUQIM)aims
+to find all the high utility quantitative itemsets (HUQIs) in a database D given
+some user-defined minimum utility threshold (0≤minutil≤σ). A Q-itemset X
+is a HUQI if u(X)≥minutil. Otherwise, X is a low utility quantitative itemset
+(LUQI) [8]. For example, if minutil=13, the Q-itemset [(A,2)(B,5)(C,2)] is a
+HUQI because u([(A,2)(B,5)(C,2)])=15≥13.
+TKQ: Top-K Quantitative High Utility Itemset Mining 5
+HUQIM is a hard problem for three reasons: First, the utility function is
+neither anti-monotonic nor monotonic, i.e, a Q-itemset may have a utility that
+is greater, smaller or equal to that of its supersets [8]. Hence, the utility cannot
+be directly used to reduce the search space and other strategies must be used.
+Second,oneiteminHUIMcanformseveralQ-itemsinHUQIM.Forexample,the
+item B in Table 1 has three different quantities. Thus, we have three distinct Q-
+items(B,4),(B,5)and(B,6).Third,fromeachitemset,manyrangeQ-itemsets
+may be formed which makes the search space larger than the case of HUIM.
+HUQIM algorithms adopt two main operations, namely join operation and
+mergeoperation[7,11].Thejoinoperationstartsfromsmallitemsetsandrecur-
+sively adds items to these itemsets to find larger itemsets. The merge operation
+is used to find range Q-itemsets which are produced by combining a set of Q-
+items that have consecutive quantities. For example, Q-items (B,5) and (C,2)
+can be joined to obtain the 2-Q-itemset [(B,5)(C,2)] while Q-items (B,4) and
+(B,5) can be merged to obtain the range Q-itemset [(B,4,5)]. It is important
+to note that in HUQIM, some pairs of LUQIs may be combined to obtain a
+range HUQI. But the combination process is limited with a parameter called
+(qrc > 0) (Quantitative Related Coefficient). The qrc controls Q-intervals of
+produced range Q-itemsets to avoid obtaining range Q-itemsets having large
+Q-intervals. More precisely, two Q-itemsets X = [(x ,l ,u ), (x ,l ,u ),...,
+1 1 1 2 2 2
+(x ,l ,u )] and Y =[(y , l(cid:48), u(cid:48)), (y ,l(cid:48),u(cid:48)),...,(y ,l(cid:48),u(cid:48))] can be combined to
+k k k 1 1 1 2 2 2 k k k
+generate a range Q-itemset Z = [(i ,l ,u ), (i ,l ,u ), ..., (i ,l ,u(cid:48))] if four
+1 1 1 2 2 2 k k k
+conditions are satisfied [7]:
+(1) X and Y are candidate Q-itemsets, i.e. minutil ≤ u(X) ≤ minutil and
+qrc
+minutil ≤u(Y)≤minutil.
+qrc
+(2) X and Y have the same prefix. i.e, the first (k−1) Q-items in X and Y are
+the same. Formally, ∀(1≤i≤k−1): x =y , l =l(cid:48) and u =u(cid:48).
+i j i j i j
+(3) For the last Q-item, x =y and l(cid:48) =(u +1).
+k k k k
+(4) The Q-interval of the last Q-item to be generated should be less than or
+equal to qrc, i.e, u(cid:48) −l ≤qrc.
+k k
+The combination of Q-itemsets can be done using three methods, named
+Combine Min, Combine Max and Combine All [2,7]. Due to the space lim-
+itation, only the Combine All method is described. The Combine All method
+aimstofindallpossiblerangeHUQIsthatcanbemadebycombiningcandidate
+Q-itemsets,orcandidateQ-itemsetswithrangeQ-itemsets[7].Forinstance,con-
+sider a set of candidate Q-itemsets {[(A,2)(C,4)], [(A,2)(C,5)], [(A,2)(C,6)]}.
+The Combine All method will generate three range Q-itemsets: [(A,2)(C,4,5)],
+[(A,2)(C,5,6)] and [(A,2)(C,4,6)]. Then, the method will keep only HUQIs
+from the set of generated Q-itemsets. To see more details about the join and
+combining operations, the reader is refered to [7,11].
+Though several HUQIM algorithms have been designed, setting the minutil
+parameterisdifficultandtime-consumingforusers.Settingittoolowmayresult
+intoomanypatternsandverylongruntimes,whilesettingittoohighmayresult
+intoofewpatterns.Toaddressthisissue,thetaskoftop-KHUQIMisproposed.
+6 Nouioua et al.
+Top-k High Utility Quantitative Itemset Mining (Top-k HUQIM).
+Top-k HUQIM consists of finding a set γ of k Q-itemsets such that there are
+no other Q-itemsets not in γ that have a higher utility. For example, the top-3
+HUQIs found in the database of the running example are: [(A,2)(C,2)], [(A,2)]
+and [(A,2)(B,5)(C,2)(D,1)] with utilities 20, 18 and 17, respectively.
+4 The TKQ algorithm
+To efficiently perform the task of top-k HUQIM, a novel algorithm is designed,
+called TKQ (Top-K Quantitative itemset miner).
+In contrast with traditional HUQIM where the user has to set the minutil
+threshold before starting the mining process, the minutil value is unknown in
+top-kHUQIM.Thus,minutilisinitiallysettozero.However,itisimpracticable
+to start the itemset search with minutil = 0 because this may lead to consider
+many Q-itemsets that are not promising which will negatively affect the perfor-
+mance of the algorithm. To overcome this problem, it is desirable to apply some
+effective threshold raising strategies to raise minutil to higher values without
+missing any top-k HUQIs. For this purpose, TKQ adopts three effective thresh-
+oldraisingstrategies.Thefirsttworaisingstrategies,namedRIUandCUD,are
+adapted from strategies used for top-k HUIM [13,1] so as to be used for top-k
+HUQIM. These strategies are applied before starting a depth-first search. The
+thirdraisingstrategyisusedduringthedepth-firstsearchtoraiseminutilbased
+onthecurrentlistoftop-kHUQIs.Inthefollowing,theQ-itemutility-liststruc-
+ture is first introduced and then the pruning strategies used by TKQ to reduce
+the search space. Finally, the TKQ algorithm is described, integrating the three
+raising strategies, to find HUQIs.
+Q-items utility-lists.AsforFHUQI-Miner,TKQisalsoautility-listbased
+algorithm. A utility-list is a structure that is used to represent each pattern (Q-
+itemset) of the mining problem. The utility-list allows to quickly calculate the
+utility of its associated Q-itemset without requiring to scan the database [9,11].
+Let there be a database D and a total order relation ≺ on distinct Q-items
+in D, the utility-list of a Q-itemset X, denoted as UL(X), is composed of a
+set of tuples that have the form (T ,Eutil,Rutil). Each tuple stores the utility
+d
+informationofaQ-itemsetX inatransactionT suchasT ∈OCC(X).disthe
+d d
+identifier of transaction T , Eutil is the utility of X in T , i.e, Eutil(X,T ) =
+d d d
+u(X,T ), and Rutil is the remaining utility of X in transaction T . Formally,
+d d
+(cid:80)
+Rutil(X,T ) = u(i,T ) where T /X contains the set of all Q-items
+d i∈Td/X d d
+that come after Q-items of X according to the order ≺. In addition to these tu-
+ples,UL(X)havealsotwoadditionalrecords,namedSumEutil andSumRutil.
+SumEutil is the sum of all Eutil values and it represents the exact utility of
+X in D, i.e, u(X). Whereas, SumRutil gives the sum of all Rutil values which
+can be used to prune unpromising Q-itemsets and their extensions during the
+mining process using the remaining utility pruning strategy.
+Fortherunningexample,let’sassumethattheorder≺ofQ-itemsis:(A,2)≺
+(B,4) ≺ (B,5) ≺ (B,6) ≺ (C,2) ≺ (C,3) ≺ (D,1). The utility-list of Q-itemset
+TKQ: Top-K Quantitative High Utility Itemset Mining 7
+[(A,2)(C,2)] has two tuples (T ,10,2) and (T ,10,0) with SumEutil = 20 and
+1 3
+SumRutil = 2. Utility-lists allow to easily calculate the utilities of different Q-
+itemsetswithoutscanningthedatabase.However,itisimpracticabletoperform
+an exhaustive search by considering all possible Q-itemsets, especially when the
+number of Q-items is large. Therefore, it is necessary to apply some pruning
+strategies during the search for patterns to eliminate unpromising Q-itemsets
+with all their transitive extensions that are unpromising as well.
+Pruning Strategies. TKQ adopts three pruning strategies to efficiently
+mine HUQIs:
+TWU Pruning Strategy. The transaction weighted utility of a Q-itemset X,
+denoted as TWU(X), is the sum of all transaction utilities where X appears.
+(cid:80)
+Formally, TWU(X)= TU(T ).
+Td∈OCC(X) d
+The TWU measure is anti-monotonic and it has two important properties:
+First, the TWU is an upper bound on the utility of Q-itemsets and their super-
+sets. More precisely, ∀X ∈D, TWU(X)≥u(X). Second, for two Q-itemsets X
+and Y, if X ⊆ Y then TWU(X) ≥ TWU(Y). Based on these properties, the
+TWU is used to prune unpromising Q-itemsets using property 1.
+Property1(TWUPruningStrategy).GivenaQ-itemsetX,theTWUpruning
+strategy states that if TWU(X)< minutil, then the Q-itemset X is not promis-
+qrc
+ing.Thus,X canbeeliminatedwithallitstransitiveextensions.Otherwise,X is
+apromisingQ-itemset.Backtoourexample,TWU([(B,4)(C,3)])=u(T )=10.If
+2
+minutil = 30 and qrc = 2, then TWU([(B,4)(C,3)]) < 30. Thus, [(B,4)(C,3)]
+2
+can be pruned with all its extensions because they are not promising.
+Remaining utility pruning strategy. The second pruning strategy adopted by
+TKQisbasedontheremainingutilityofQ-itemsets(SumRutil)storedintheir
+utility-lists.
+Property 2 (SumRutil Pruning Strategy). The SumRutil pruning strategy
+states that for a Q-itemset X, if SumEutil(X)+SumRutil(X)<minutil then
+Q-itemsetX andallitstransitiveextensionsareLUQIs.Forinstance,SumEutil
+([(A,2)(C,2)])=20andSumRutil([(A,2)(C,2)])=2.Ifminutil=30,then[(A,2)
+(C,2)] is pruned with all its extensions.
+Co-occurrence pruning strategy. In addition to the above pruning strategies,
+TKQ also adopts another pruning strategy that allows to eliminate LUQIs with
+their transitive extensions without even the need to construct their utility-lists.
+Theco-occurrencepruningstrategyisbasedonthe TQCS structure.TheTQCS
+structure (TWU of Q-items Co-occurrence based Structure) is constructed dur-
+ing the second database’s scan and it contains all pairs of Q-items that have co-
+occured in the database with their utility information. More precisely, in TKQ,
+the TQCS structure is a set of tuples that have the form (a,b,c,d) where a and
+b are two Q-items that co-occurred in the database, and c is the TWU of the
+Q-itemset [ab] that resulted from their concatenation. Formally, c=TWU([ab])
+and d is the exact utility of Q-itemset [ab], i.e, d = u([ab]). Based on the
+TQCS, there exist two pruning strategies, namely Exact Q-items Co-occurrence
+Pruning Strategy (EQCPS) and Range Q-items Co-occurrence Pruning Strategy
+(RQCPS).EQCPSisusedtopruneunpromisingexactQ-itemsetswhileRQCPS
+8 Nouioua et al.
+is used for pruning unpromising range Q-itemsets. The reader is referred to [11]
+for a detailed explanation of the TQCS structure and its corresponding pruning
+strategies with illustrative examples.
+The Algorithm. This section describes the main steps of TKQ to find top-
+k HUQIs including the raising strategies that are used. The TKQ algorithm
+(Algorithm 1) takes four parameters as input: (1) The transaction database D,
+(2)Theuser-selectednumberofpatternsk,(3)ThecombiningmethodCM and
+(4) The quantitative related coefficient qrc. TKQ outputs the top-k HUQIs in
+D. TKQ starts by scanning the database to calculate the TWU and the exact
+utilityofeachQ-iteminD (line1).Then,TKQappliesthefirstraisingstrategy
+based on the exact utilities of Q-items using the RIU raising strategy (line 2).
+Algorithm 1: The TKQ algorithm
+Input :D:Thequantitativetransactiondatabase,k:Thedesirednumberofpatterns,
+CM:Thecombiningmethod(CombineMin,CombineMaxorCombineAll),
+qrc:Thequantitativerelatedcoefficient.
+Output:Thetop-kHUQIs.
+1 FirstdatabasescantocalculatetheTWU andutilityofeachQ-item;
+2 Raiseminutiltothekth largestutilityvalue;// RIU raising strategy
+3 CreateinitialsetofpromisingQ-itemsP∗ suchthat∀x∈P∗:TWU(x)≥ mi q n r u c til and
+discardunpromisingQ-itemsets;// TWU pruning strategy
+4
+Seconddatabasescantocreateutility-listsofpromisingQ-itemsULs(P∗)andbuildthe
+TQCSstructure;
+5 Raiseminutiltothekth largestutilityvalueinTQCS;// CUD strategy
+6 Createapriorityqueuetostorethetop-kQ-itemsets;
+7 foreachx∈P∗ do
+8 if UL(x).SumEutil≥minutilthen
+9 Q=UpdateQueue(Q,x);
+10 H=H∪x;
+11 else
+12 if UL(x).SumEutil+UL(x).SumRutil≥minutilthen E=E∪x;
+13 if mi q n r u c til ≤ UL(x).SumEutil ≤ minutilthen C=C∪x;
+14 DiscoverHighUtilityrangeQ-itemsets(HR)usingCM andC;
+15 foreachx∈HRdo
+16 Q=UpdateQueue(Q,x);
+17 QIs ← sort(H ∪ E ∪ HR);
+18
+RecursiveMiningSearch(∅,QIs,ULs(QIs),P∗,qrc,CM,k,Q,minutil);
+RealItemsUtilitiesThresholdRaisingStrategy(RIU).TheRIUraisingstrat-
+egyisbasedontheutilitycalculationofallQ-itemsinthedatabase.Letq ={q ,
+1
+q , ..., q } be a set of n Q-items in the database D, and L = {u(q ),u(q ),
+2 n 1 1 2
+..., u(q )} be the list of utilities of Q-items in q. If n ≥ k, then minutil can
+n
+be raised to the kth largest value in L . In the running example, if k = 5, then
+1
+minutil is raised to the 5th largest utility which is u(B,5)=5.
+Based on the raised minutil and using the TWU pruning strategy (property
+1),TKQidentifiespromisingQ-itemsandremoveunpromisingQ-itemstoreduce
+the search space (line 3). Then, TKQ scans again the database to construct the
+utility-listsofpromisingQ-itemsandtobuildtheTQCSstructure(line4)which
+will be used not only to reduce the search space during the recursive search for
+patterns, but also to raise again the minutil threshold to a higher value using
+the CUD raising strategy (line 5).
+TKQ: Top-K Quantitative High Utility Itemset Mining 9
+Co-occurrence Threshold Raising Strategy (CUD). The CUD raising strat-
+egy uses the utilities of 2-Q-itemsets stored in TQCS to raise minutil. Note
+that, utilities of 2-Q-itemsets are easily calculated during the second database
+scan. Formally, suppose that the TQCS structure contains h tuples of the form
+(a ,b ,c ,d ) where 1 ≤ i ≤ h. From these tuples, the list L = {d ,d , ..., d ,
+i i i i 2 1 2 k
+...,d }iscreatedwhichcontainstheutilitiesofall2-Q-itemsetsthatco-occurred
+h
+inthedatabase.The utilities ofthesepatternsaresorted in descendingorder.If
+h≥k and if the kth largest utility in L , denoted as d , is larger than the cur-
+2 k
+rent minutil then minutil is raised directly to d . Continuing with the previous
+k
+example, the CUD raising strategy raises minutil to u[(B,4)(C,3)]=10 which
+is the 5th largest utility in L .
+2
+After applying the CUD raising strategy, TKQ creates a priority queue Q
+thatisusedtostorethetop-kHUQIs(line6).Moreover,TKQcheckstheutility
+of each promising Q-item. If the utility of the current Q-item is not less than
+minutil, this Q-item is inserted in Q using the Update Queue procedure which
+will be presented later (lines 8-10). Otherwise, TKQ performs two tests to put
+thisQ-itemeitherinthesetofcandidateQ-items(C)orthesetofQ-itemstobe
+explored(E)(lines11-13).IfthecandidatesetC isnotempty,TKQwillperform
+thecombinationprocess(line14).Atthispoint,TKQcallstherecursivemining
+search procedure (line 18) which is illustrated in Algorithm 2.
+Algorithm 2: Recursive Mining Search
+Input :P:TheprefixQ-itemset,QIs:TheQ-itemsetslist,ULs(QIs):Utilitylistsof
+Q-itemsets,P∗:ThelistofpromisingQ-itemsets,qrc:Thequantitativerelated
+coefficient,CM:Thecombiningmethod,k:Thedesirednumberofpatterns,Q:
+ApriorityqueueofkQ-itemsetssortedbyascendingutility,minutil:The
+internalminimumutilitythreshold
+Output:ThesetofHUQIswithrespecttoprefixP.
+1 foreach[Px]suchthatx∈QIs do
+2
+QIs←∅;P∗←∅;
+3 foreach[Py]suchthaty∈P∗ andy(cid:31)xdo
+4 ApplyEQCPSorRQCPSpruningstrategies.
+5 Z←[Pxy];UL(Z)=Construct(x,y,P);
+6 if U ≥ mi q n r u c til then
+7
+P∗=P∗∪Z;
+8 if UL(Z).SumEutil≥minutilthen
+9 Q=UpdateQueue(Q,x);
+10 E=E∪Z;
+11 else
+12 if UL(Z).SumEutil+UL(Z).SumRutil≥minutilthen E=E∪Z;
+13 if mi q n r u c til ≤ UL(Z).SumEutil ≤ minutilthen C=C∪Z;
+14 DiscoverHighUtilityrangeQ-itemsetsHRusingCM andC;
+15 foreachx∈HRdo
+16 Q=UpdateQueue(Q,x);
+17 QIs ← (H ∪ E ∪ HR);
+18
+RecursiveMiningSearch(Px,QIs,ULs(QIs),P∗,qrc,CM,k,Q,minutil);
+TheTKQrecursivesearchalgorithmisadepth-firstsearchalgorithmwhichis
+similartothatusedinFHUQI-Miner[11]withchangestofindthetop-kHUQIs.
+Note that, the reason for choosing FHUQI-Miner as a basis for TKQ is that
+FHUQI-Miner is the most efficient HUQIM algorithm [11]. The TKQ recursive
+search procedure has two more parameters which are the desired number of
+10 Nouioua et al.
+patterns k and the priority queue Q that will contain the top-k HUQIs. TKQ
+differs from FHUQI-Miner in that minutil in TKQ is not fixed. In fact, TKQ
+gradually raises the minutil value based on the HUQIs found during the depth-
+first search (line 9 and line 16). This raising process is done using the third
+raising strategy (Update Queue) which is illustrated in Algorithm 3.
+Algorithm 3: Update Queue
+Input :Q:ApriorityqueueofkQ-itemsetssortedbyascendingutility,x:AQ-itemset
+tobeinsertedinQ.
+Output:Qwithxinserted.
+1 InsertxintoQ;
+2 if |Q|>kthen
+3 Raiseminutiltothekth largestvalueinQ;
+4 RemoveallQ-itemsetshavingautilitylessthanminutil;
+Besides, TKQ maintains the queue Q of the k Q-itemsets that have the
+highestutilityuntilnow.Moreprecisely,onceanewHUQIisfound,itisinserted
+in Q (line 1). Then, minutil is raised to the new kth highest value in Q (line 3).
+Finally, each Q-itemset in Q having a utility less than minutil is deleted from
+Q (line 4). As more HUQIs are found, the internal minutil threshold is raised
+based on Q, which allows to reduce the search space. When no more patterns
+can be generated, the top-k HUQIs are returned to the user.
+5 Experiments
+Experiments have been carried out to evaluate the performance of TKQ. They
+were done on a workstation having an Intel(R) i7-8700 processor, 16 GB RAM,
+and the Windows 7 operating system. The performance of TKQ was compared
+with FHUQI-Miner, and both were implemented in Java.
+Datasets.Fourbenchmarkdatasetswereutilized,whichwereobtainedfrom
+the SPMF data mining library [2]. These datasets are often used in the HUQIM
+literature to evaluate algorithms, and have various characteristics. Foodmart is
+a sparse dataset with 4,141 transactions and 1,559 distinct items. Retail is a
+sparsedatasethaving88,162transactionsand16,470items.Mushroom isadense
+dataset with 8,416 transactions and 128 items. Lastly, BMS is a sparse dataset
+with7,751transactionand23,340items.Thefirstdatasethasrealutilityvalues,
+while the three others have synthetic values [11].
+Influence of the RIU and CUD strategies on the runtime. A first
+experimentwasdonetoevaluatethebenefitsofusingthedesignedraisingstrate-
+gies in TKQ. TKQ was compared with two modified versions named TKQ-RIU
+andTKQ-CUD,whereonlytheRIUandCUDstrategieswereused,respectively.
+The runtimes of the three algorithms for k values ranging from 10 to 5,000 are
+showninFig.1.Itcanbeobservedthat,generallyTKQisfasterthanTKQ-RIU
+andTKQ-CUDonthefourdatasets.ForRetail,itcanbeclearlyseenthat,TKQ
+isfasterthanthetwootheralgorithmsespeciallywhenk isincreased.Moreover,
+it can be seen also from Fig. 1 that, for small k values, the runtime of TKQ and
+TKQ: Top-K Quantitative High Utility Itemset Mining 11
+TKQ-RIUisquitesimilar.However,ask isincreased,TKQbecomesfasterthan
+both the TKQ-RIU and TKQ-CUD algorithms.
+3
+2,5
+2
+1,5
+1
+0,5
+0
+10 50 100 500 1000 1500 3000 5000
+)s( emitnuR
+Foodmart 100
+90
+TKQ 80
+70 TKQ-RIU
+60 TKQ-CUD
+50
+40
+30
+20
+10
+0
+10 50 100 500 1000 1500 3000 5000
+k
+)s( emitnuR
+Retail
+TKQ
+TKQ-RIU
+TKQ-CUD
+k
+12
+10
+8
+6
+4
+2
+0
+10 50 100 500 1000 1500 3000 5000
+)s(
+emitnuR
+Mushroom 12
+10
+TKQ
+TKQ-RIU 8
+TKQ-CUD
+6
+4
+2
+0
+10 50 100 500 1000 1500 3000 5000
+k
+)s(
+emitnuR
+BMS
+TKQ
+TKQ-RIU
+TKQ-CUD
+k
+Fig.1: Influence of the CUD and RIU strategies on runtime
+Togainmoreinsightsintotheeffectivenessofeachstrategy,Fig.2showshow
+much each strategy raised the minutil threshold as a percentage of the optimal
+minutil value. It is found that for small k values, RIU can raise minutil more
+thanCUD.However,forlargerk values,CUDcanraiseminutilmorethanRIU.
+Hence, it is desirable to jointly use the two strategies to raise minutil.
+Runtime comparison with FHUQI-Miner for the optimal minutil
+threshold.Inasecondexperiment,TKQ’sperformancewascomparedwiththe
+state-of-the-art FHUQI-Miner HUQIM algorithm. To be able to compare both
+algorithms,FHUQI-Minerwassetwithanoptimalminutil valuethatresultsin
+obtainingthesamek patternsasTKQ.Itshouldbenotedthat,thiscomparison
+is unfair as TKQ has to start searching from minutil = 0 while FHUQI-Miner
+directlyknowstheoptimalminutil valueandusethisinformationtoreducethe
+search space. However, this comparison is still interesting to see how close the
+performance of TKQ can be to that of FHUQI-Miner.
+Tables 3 and 4 compare the runtimes of TKQ and FHUQI-Miner for differ-
+ent k values on the four datasets. FHUQI-Miner is generally faster than TKQ.
+ThiswasexpectedasFHUQI-Minerdirectlyusestheoptimalminutilthreshold.
+However, it can be found that the performance of TKQ is very close to that of
+12 Nouioua et al.
+80
+70
+60
+50
+40
+30
+20
+10
+0
+10 50 100 500 1000 1500 3000 5000
+)%(
+gnisiaR
+Foodmart 70
+TKQ-RIU 60
+TKQ-CUD 50
+40
+30
+20
+10
+0
+10 50 100 500 1000 1500 3000 5000
+k
+)%(
+gnisiaR
+Retail
+TKQ-RIU
+TKQ-CUD
+k
+70
+60
+50
+40
+30
+20
+10
+0
+10 50 100 500 1000 1500 3000 5000
+)%(
+gnisiaR
+Mushroom 70
+TKQ-RIU 60
+TKQ-CUD 50
+40
+30
+20
+10
+0
+10 50 100 500 1000 1500 3000 5000
+k
+)%(
+gnisiaR
+BMS
+TKQ-RIU
+TKQ-CUD
+k
+Fig.2:ComparisonofRIUandCUD’seffectivenesstoraisetheminutilthreshold
+FHUQI-Miner. This indicates that, TKQ is efficient as the added cost for using
+the k parameter is generally small. Moreover, this is a good result considering
+that in real-life, the user is unlikely to set the optimal minutil threshold for
+FHUQI-Miner to obtain a given number of patterns as it will be demonstrated
+in the next experiment. From Table 3, it can be seen that the results of both
+algorithms on the Foodmart dataset are very close. For Retail, the difference
+between FHUQI-Miner and TKQ increases for large values of k. This result is
+expectedsincethetaskoftop-kHUQIMbecomesharderask isincreased,espe-
+cially for large datasets such as Retail. However, it is worth noticing that, this
+differenceissmallandtheperformanceofthetwoalgorithmsremainsclose.The
+results in Table 4 for the Mushroom and BMS datasets confirm again that the
+performance of TKQ is very close to the performance of FHUQI-Miner.
+BenefitsofusingTKQinsteadofFHUQI-Miner.Thethirdexperiment
+is performed to illustrate the benefits of using TKQ instead of FHUQI-Miner.
+Generally, if a user wants to find k patterns using FHUQI-Miner, the user must
+guess a minutil threshold value to find k HUQIs. But the user does not know
+beforehandhowmanypatterns(HUQIs)willbefoundforagivenminutilvalue.
+If the user sets minutil lower than the optimal minutil value, a very large
+number of patterns will be found, and runtime may be very long. Conversely,
+if the user sets minutil higher than the optimal minutil value, none or few
+patterns may be found. This experiment is designed to assess how likely a user
+TKQ: Top-K Quantitative High Utility Itemset Mining 13
+Table 3: Comparison of TKQ with FHUQI-Miner on Foodmart and Retail
+k Foodmart Retail
+minutil TKQ FHUQI-Miner minutil TKQ FHUQI-Miner
+10 26908 0.159 0.146 9781812 1.337 1.298
+50 22725 0.236 0.237 2589300 2.485 1.549
+100 22051 0.268 0.187 1603476 2.788 1.964
+500 19843 0.644 0.358 445120 9.726 6.625
+1000 18767 1.185 0.24 299264 14.869 10.791
+1500 18015 0.945 0.255 230398 19.276 14.442
+3000 16546 1.324 0.315 148950 32.713 25.82
+5000 15422 1.222 0.348 117991 43.737 35.572
+Table 4: Comparison of TKQ with FHUQI-Miner on BMS and Mushroom
+k BMS Mushroom
+minutil TKQ FHUQI-Miner minutil TKQ FHUQI-Miner
+10 1227600 0.75 0.713 3345705 1.073 1.045
+50 735335 1.089 0.995 1645875 1.695 1.675
+100 491940 1.375 1.257 1254574 2.104 2.066
+500 246822 3.152 2.324 779980 3.196 2.821
+1000 246723 3.898 2.291 617934 3.72 3.345
+1500 246678 4.282 2.671 524151 4.078 4.045
+3000 246606 5.328 2.585 389360 5.344 4.738
+5000 246554 5.845 2.502 307956 6.206 5.559
+14 Nouioua et al.
+is to select the optimal minutil value using FHUQI-Miner to get exactly the
+desirednumberofpatternsk.Toevaluatethis,TKQwasrunfordifferentvalues
+of k on the four datasets, and the optimal minutil values were recorded. Based
+on the recorded minutil values, the average size between the minutil values for
+eachpairofconsecutivek values[k ,k ]wascalculated.Giventhattheusercan
+1 2
+chooseminutilfromtherange[0,totalutility],theintervalsizeisthepercentage
+of the difference between optimal minutil values for obtaining k and k versus
+1 2
+the total utility of the database (σ). The average sizes for the four datasets are
+presented in Table 5. Note that, due to the space limitation, only the interval
+sizes are shown without giving the optimal minutil for each value of k.
+Table 5: Probability to find HUQIs between k1 and k2
+k -k Interval size(%)
+1 2
+Foodmart Retail BMS Mushroom
+10-50 0,015 0,515 0,316 0,588
+50-100 0,002 0,070 0,072 0,135
+100-500 0,008 0,082 0,088 0,164
+500-1000 0,003 0,010 0,030 0,056
+1000-1500 0,002 0,004 0,017 0,032
+1500-3000 0,005 0,005 0,025 0,046
+3000-5000 0,004 0,002 0,015 0,028
+Itcanbeseenthattheintervalsizesareverysmallwhichshowsthedifficulty
+of selecting the optimal minutil. For example, the optimal minutil to find 50
+HUQI for Foodmart is 22725 while the optimal minutil for 100 HUQI is 22051.
+The difference between these thresholds is thus 674, that is only 0.002% of the
+wholerangeofselectionwhichisfrom0tothetotalutility(σ),i.e,[0,27027840].
+ThismeansthatusingFHUQI-Miner,toobtaintop-kHUQIswherek ∈[50,100],
+theusershouldselectminutilinaverysmallintervalthatrepresentsonly0.002%
+from the whole range of selection. Thus, the selection of an optimal threshold
+for FHUQI-Miner is unlikely. It can be seen also that for some datasets such as
+Mushroom and Retail, the interval size decreases as k and k are increased.
+1 2
+From these results, it is concluded that, although FHUQI-Miner is slightly
+faster than TKQ, it is strongly recommended to use TKQ instead of FHUQI-
+Miner to obtain a desired number of HUQIs. Using TKQ allows the user to
+avoid spending time on fine-tuning the minutil threshold to find just enough
+patterns. And the runtime difference between TKQ and FHUQI-Miner is very
+small considering that users may need to run FHUQI-Miner multiple times to
+find an optimal minutil value.
+6 Conclusion
+To address the difficulty of setting the minutil threshold in HUQIM, this paper
+hasredefinedthetaskastop-kHUQIM.AnalgorithmnamedTKQwasdesigned
+TKQ: Top-K Quantitative High Utility Itemset Mining 15
+toefficientlydiscoverthetop-kHUQIs.Thealgorithmadoptsadepth-firstsearch
+andintegratesseveralpruningandraisingstrategiestoimproveitsperformance.
+AnexperimentalevaluationwithseveraldatasetshasshownthatTKQisefficient
+and has a performance that is generally close to the state-of-the-art HUQIM
+algorithm knowing that TKQ addresses a more difficult problem.
+Infuturework,otheroptimizationswillbedeveloped.Moreover,itisplanned
+todevelopadistributedversionofTKQtominepatternsinverylargedatasets.
+References
+1. Duong, Q.H., Liao, B., Fournier-Viger, P., Dam, T.L.: An efficient algorithm for
+mining the top-k high utility itemsets, using novel threshold raising and pruning
+strategies. Knowledge-Based Systems 104, 106–122 (2016)
+2. Fournier-Viger,P.,Gomariz,A.,Gueniche,T.,Soltani,A.,Wu,C.W.,Tseng,V.S.:
+Spmf:ajavaopen-sourcepatternmininglibrary.TheJournalofMachineLearning
+Research 15(1), 3389–3393 (2014)
+3. Fournier-Viger, P., Lin, J.C.W., Truong-Chi, T., Nkambou, R.: A survey of high
+utility itemset mining. In: High-Utility Pattern Mining, pp. 1–45. Springer (2019)
+4. Fournier-Viger, P., Lin, J.C.W., Vo, B., Chi, T.T., Zhang, J., Le, H.B.: A survey
+of itemset mining. Wiley Interdisciplinary Reviews: Data Mining and Knowledge
+Discovery 7(4), e1207 (2017)
+5. Fournier-Viger,P.,Wu,C.W.,Zida,S.,Tseng,V.S.:Fhm:Fasterhigh-utilityitem-
+setminingusingestimatedutilityco-occurrencepruning.In:Internationalsympo-
+sium on methodologies for intelligent systems. pp. 83–92. Springer (2014)
+6. Gan, W., Lin, J.C.W., Fournier-Viger, P., Chao, H.C., Tseng, V.S., Yu, P.S.: A
+survey of utility-oriented pattern mining. arXiv preprint arXiv:1805.10511 (2018)
+7. Li,C.H.,Wu,C.W.,Huang,J.,Tseng,V.S.:Anefficientalgorithmformininghigh
+utility quantitative itemsets. In: 2019 International Conference on Data Mining
+Workshops (ICDMW). pp. 1005–1012. IEEE (2019)
+8. Li, C.H., Wu, C.W., Tseng, V.S.: Efficient vertical mining of high utility quanti-
+tative itemsets. In: 2014 IEEE International Conference on Granular Computing
+(GrC). pp. 155–160. IEEE (2014)
+9. Liu,M.,Qu,J.:Mininghighutilityitemsetswithoutcandidategeneration.In:Pro-
+ceedings of the 21st ACM international conference on Information and knowledge
+management. pp. 55–64 (2012)
+10. Liu, Y., Liao, W.k., Choudhary, A.: A two-phase algorithm for fast discovery of
+highutilityitemsets.In:Pacific-AsiaConferenceonKnowledgeDiscoveryandData
+Mining. pp. 689–695. Springer (2005)
+11. Nouioua, M., Fournier-Viger, P., Lin, J.C.W., Gan, W.: Fhuqi-miner: Fast high
+utility quantitative itemset mining. Applied Intelligence (2021)
+12. Peng, A.Y., Koh, Y.S., Riddle, P.: mhuiminer: A fast high utility itemset mining
+algorithmforsparsedatasets.In:Pacific-AsiaConferenceonKnowledgeDiscovery
+and Data Mining. pp. 196–207. Springer (2017)
+13. Ryang, H., Yun, U.: Top-k high utility pattern mining with effective threshold
+raising strategies. Knowledge-Based Systems 76, 109–126 (2015)
+14. Yen, S.J., Lee, Y.S.: Mining high utility quantitative association rules. In: Inter-
+nationalConferenceonDataWarehousingandKnowledgeDiscovery.pp.283–292.
+Springer (2007)
+15. Zhang, C., Han, M., Sun, R., Du, S., Shen, M.: A survey of key technologies for
+high utility patterns mining. IEEE Access 8, 55798–55814 (2020)

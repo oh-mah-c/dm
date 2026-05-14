@@ -1,0 +1,1 @@
+The following transaction databases that can be used with high-utility itemset mining algorithms such as EFIM, FHM, HUI-Miner, IHUP, UPGrowth and Two-Phase. For information about the format of these files, see the examples in the documentation of EFIM, FHM, HUI-Miner or Two-Phase.

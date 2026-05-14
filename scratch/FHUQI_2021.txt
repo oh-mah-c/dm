@@ -1,0 +1,2204 @@
+Noname manuscript No.
+(will be inserted by the editor)
+FHUQI-Miner: Fast High Utility Quantitative Itemset
+Mining
+Mourad Nouioua · Philippe Fournier-Viger ·
+Cheng-Wei Wu · Jerry Chun-Wei Lin ·
+Wensheng Gan
+Received:date/Accepted:date
+Abstract High utility itemset mining is a popular pattern mining task, which
+aimsatrevealingallsetsofitemsthatyieldahighprofitinatransactiondatabase.
+Although this task is useful to understand customer behavior, an important limi-
+tation is that high utility itemsets do not provide information about the purchase
+quantities of items. Recently, some algorithms were designed to address this issue
+by finding quantitative high utility itemsets but they can have very long exe-
+cution times due to the larger search space. This paper addresses this issue by
+proposing a novel efficient algorithm for high utility quantitative itemset mining,
+called FHUQI-Miner (Fast High Utility Quantitative Itemset Miner). It performs
+adepth-firstsearchandadoptstwonovelsearchspacereductionstrategies,named
+ExactQ-itemsCo-occurrencePruningStrategy(EQCPS)andRangeQ-itemsCo-
+occurrence Pruning Strategy (RQCPS). Experimental results show that the pro-
+posed algorithm is much faster than the state-of-art HUQI-Miner algorithm on
+sparse datasets.
+MouradNouioua
+School of Humanities and Social Sciences, Harbin Institute of Technology (Shenzhen), Shen-
+zhen,China
+UniversityofBordjBouArreridj,Algeria
+E-mail:mouradnouioua@gmail.com
+P.Fournier-Viger
+School of Humanities and Social Sciences, Harbin Institute of Technology (Shenzhen), Shen-
+zhen,China
+E-mail:philfv8@yahoo.com
+C.-W.Wu
+DepartmentofComputerScienceandInformationEngineering,NationalIlanUniversity,Yilan
+City,Taiwan
+E-mail:wucw@niu.edu.tw
+J.C.-W.Lin
+DepartmentofComputing,MathematicsandPhysics,WesternNorwayUniversityofApplied
+Sciences(HVL),Bergen,Norway
+E-mail:jerrylin@ieee.org
+W.Gan
+CollegeofInformationScienceandTechnology,JinanUniversity,Guangzhou,China
+E-mail:wsgan001@gmail.com
+2 Nouiouaetal.
+1 Introduction
+Dataminingtechniquescanbegenerallydescribedasdescriptiveorpredictive[14].
+The former are used to perform predictions, while the latter can summarize data
+or reveal interesting information from it to help users to understand the data.
+One of the main types of descriptive data mining is pattern mining, which aims
+atrevealinginteresting,usefulorunexpectedpatternsindatabases.Manypattern
+mining algorithms have been designed to find various types of patterns such as
+frequent itemsets [25], association rules [36] and frequent sequential patterns [13].
+Earlystudiesonpatternmininghavemainlyfocusedonfindingfrequentpatterns,
+with the assumption that frequent patterns are interesting to users.
+In recent years, motivated by the need to analyze more complex data and find
+more useful patterns, high utility pattern mining has emerged as a key pattern
+miningtask.Thegoalistofindpatternsthathaveahighimportanceasmeasured
+by a numeric utility function [8]. The utility can be used to measure the occur-
+rence frequency but also other more interesting criteria. For example, to study
+purchasing habits in a customer transaction database, the utility of a pattern (a
+set of items) can be measured in terms of profit that it yields, while for analyzing
+click-streamdata,utilitycanrepresentthetimespentonwebpages.Varioustypes
+of high utility patterns have been studied such as high utility itemsets (HUIs)
+[8, 12, 35], high utility sequential patterns [1, 28, 31], high utility periodic pat-
+terns [4, 7] and high utility episodes [11, 21, 32]. Among these different kinds of
+patterns, High Utility Itemset Mining (HUIM) is the most studied problem.
+The goal of HUIM is to enumerate all sets of items that have a utility that
+is no less than a user-defined minimum utility threshold (e.g. all sets of products
+purchased together that yield a high profit). The input database format of HUIM
+is a database of transactions with weight and quantities. This format can be used
+to model data from many domains and it is richer than the format used for the
+traditional problem of Frequent Itemset Mining (FIM) [9, 25]. More precisely, the
+input database in FIM is a table where each transaction (row) is described using
+binaryattributes(items)suchthateachitemcanappearnomorethanonceineach
+transaction, and all items are considered as equally important. In HUIM, these
+restrictions are lifted. Each item can appear more than once in each transaction,
+andeachitemcanhaveautilityvalue(aweight)indicatingitsrelativeimportance
+in terms of factors such as profit, cost, and time [8, 12, 17, 35].
+HUIM has numerous applications. However, a critical limitation of traditional
+HUIMalgorithmsisthatthediscoveredpatternsdonotprovideinformationabout
+quantities to the user, even though quantities are encoded in the input database.
+To address this limitation, High Utility Quantitative Itemset Mining (HUQIM) was
+proposed as an extension of HUIM. The objective of HUQIM is to discover all
+sets of items that have a high utility while also providing information about item
+quantitiesthatledtothisutility[18,19,30,33].Theadditionalinformationabout
+item quantities can be very useful as illustrated by the following example. Con-
+sidertheanalysisofacostumertransactiondatabase.ApplyingtraditionalHUIM
+algorithms on this data will identify sets of items (itemsets) such as “coffee, cook-
+ies” that yield a high profit. This information is interesting for purposes such as
+marketing as these items could be co-promoted to increase sales. However, this
+kindofpatternsdoesnotinformtheuserabouthowmanyboxesofcoffeesorhow
+many cookies a customer typically buy. HUQIM algorithms addresses this issue
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 3
+by discovering high utility itemsets that also indicate quantities, which is more
+accurate and thus more useful for taking decisions and understanding customer
+behaviors [33]. For instance, a HUQIM algorithm could discover a quantitative
+high utility itemset “coffee:3, cookies:2, eggs:6”, indicating that buying 3 boxes of
+coffee with 2 cookies, and 6 eggs yields a high profit. Note that HUQIM is not
+restricted to finding patterns with single quantities. It can also find patterns con-
+tainingrangeofquantities.Forexample,apattern“cheese:3-6,juice:5-7” indicates
+that buying 3 to 6 pieces of cheese with 5 to 7 bottles of juice generates a high
+profit.Itcanbeseenfromthisexample,thatpatternsfoundbyHUQIMaremore
+informative than those found by HUIM since quantity information is provided.
+This information can help decision makers to take more accurate decisions. For
+example,bydesigningtailoredpromotionssuchasofferingadiscounttocustomers
+that buy at least 7 bottles of juice with 5 pieces of cheese.
+Hence,HUQIMcanbeviewedasmoreusefulthanHUIM.However,HUQIMis
+muchmoredifficultthanHUIM.ThereasonisthatwhileHUIMdoesnotconsider
+item quantities in patterns, HUQIM associates a quantity or range of quantities
+to each item. Then, the same item with two different quantities can be viewed as
+distinct quantitative items (Q-items). As a result, the search space of HUQIM is
+much larger than that of HUIM. An itemset that is composed of a set of quanti-
+tative items is called a quantitative itemset (Q-itemset). A Q-itemset is said to be a
+high utility quantitative itemset if its utility is no less than a user-specified minimum
+utility threshold θ.
+Despite the proposal of several HUQIM algorithms [18, 19], a major issue is
+that they can still have very long runtimes due to the very large search space.
+This is inconvenient for users who must often wait a long time to obtain results.
+Hence, it is desirable to propose more efficient algorithms based on novel search
+space pruning strategies to efficiently reduce the search space and therefore make
+the task of HUQIM faster.
+This paper addresses this issue by proposing a novel algorithm called FHUQI-
+Miner(FastHighUtilityQuantitativeItemsetMiner).Itisbasedontwonovelsearch
+space pruning strategies, namely the Exact Q-items Co-occurrence Pruning Strat-
+egy (EQCPS) and Range Q-items Co-occurrence Pruning Strategy (RQCPS). These
+strategies allows to eliminate unpromising itemsets early from the search space.
+This paper also describes an extensive experimental evaluation to compare the
+performance of FHUQI-Miner with the previous state-of-the-art HUQI-Miner al-
+gorithm. Results show that FHUQI-Miner outperforms HUQI-Miner on sparse
+datasets.
+The rest of this paper is organized as follows: The next section presents a
+review of the main approaches for mining high utility itemsets and high utility
+quantitative itemsets. Section 3 introduces the background related to HUQIM.
+Section 4 describes the utility-list structure and how it can be used in HUQIM.
+Section 5 presents the proposed FHUQI-Miner algorithm and its proposed prun-
+ing strategies. Section 6 presents the experimental evaluation of FHUQI-Miner.
+Finally, a conclusion is drawn and some research opportunities are discussed in
+Section 7.
+4 Nouiouaetal.
+2 Related Work
+FIM [9, 25] is a fundamental data mining task, which aims at finding all sets
+of items that appear at least some minimum number of times in a transaction
+database. Finding frequent itemsets is useful but is based on the assumption that
+frequentpatternsareinteresting.Forsomeapplications,otherimportancecriteria
+are more appropriate than the frequency such as the amount of profit obtained
+by the sales of item. Besides, another limitation of FIM is that items have binary
+quantities (presence or absence of each item) in transactions and all items are
+treated as equally important. Several FIM algorithms have been proposed [2, 9,
+15]. They take advantage of the anti-monotonicity of the support (occurrence
+frequency)toreducethesearchspace.Thispropertystatesthatanitemsetcannot
+haveasupportgreaterthanthatofitssubsets.Hence,allsupersetsofaninfrequent
+itemset do not need to be considered, which speeds up the discovery of frequent
+itemsets.
+FIM was extended as HUIM to address its aforementioned limitations [3, 23,
+24, 29]. In HUIM, each item can have non binary quantities in transactions (e.g.
+a customer may purchase five breads and three apples), called internal utility.
+Moreover, each item can have a numeric value, called external utility, indicating
+itsrelativeimportance(e.g.sellingoneappleyielda1$profitwhilesellingabread
+yield a 2$ profit). The goal of HUIM is then to find all sets of items that have a
+utility that is not less than some minimum utility threshold specified by the user.
+In HUIM, the utility is a numeric function that assesses the importance or value
+of a set of items. For applications such as market basket analysis, it can represent
+theamountofprofitgeneratedbythesaleofitems,butHUIMcanalsobeapplied
+in other contexts such as web click-stream analytics where utility could measure
+other aspects such as the amount of time spent on a website. HUIM can reveal
+interesting insights in real data such as itemsets that yield a high profit but are
+infrequent, which are ignored by FIM. However, finding high utility itemsets is
+more difficult than mining frequent itemsets because the utility function typically
+consideredinHUIMisneithermonotonicnoranti-monotonic.Inotherwords,the
+utility of an itemset may be greater than that of its subsets or supersets. For
+that reason, strategies used to efficiently mine frequent itemsets are not directly
+applicable to solve the HUIM problem.
+Inrecentyears,severalHUIMalgorithmswereproposed.Thesealgorithmscan
+beroughlyclassifiedintwocategories:Two-phasebasedapproachesandone-phase
+based approaches. As indicated in its name, two-phase based approaches discover
+HUIsintwophases.Toreducethesearchspace,theyrelyonupperboundsonthe
+utility that are anti-monotonic such as the Transaction-Weighted Utility (TWU)
+upper bound [24]. In the first phase, a set of candidate HUIs are generated by
+overestimating the utility of itemsets, and thus these candidates may contain low
+utilityitemsets(LUIs).However,thefirstphasedoesnotunderestimatetheutility
+of high utility itemsets. Hence, some LUIs are selected in the set of candidates
+during the first phase. Then, the second phase consists of calculating the exact
+utilityofcandidateitemsetstofilteroutLUIs.Thefirsttwo-phasebasedalgorithm,
+abbreviatedasTP,wasproposedbyLiuetal.[24].Then,othermoreefficienttwo-
+phase-based algorithms were designed such as IHUP [20], UP-Growth [29] and
+HUP-Growth [34].
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 5
+A fundamental problem of two-phase based algorithms is the generation of a
+very large number of candidate itemsets in the first phase, especially for large
+databasesordatabaseswithlongtransactions.Consequently,thecostofscanning
+thedatabasetocalculatetheexactutilityofeachcandidateitemsetinthesecond
+phase can also be very high. Hence, two-phase based algorithms may have long
+runtimes and may consume much memory.
+To address this problem, one-phase based algorithms were introduced. They
+immediately identify low and high utility itemsets in only one phase without gen-
+erating candidate itemsets. Moreover, another improvement of one phase based
+algorithms is that they use tighter upper bounds on the utility of itemsets that
+are based on the exact utilities of itemsets.
+HUI-Miner is the first one-phase based algorithm [23]. It is based on a novel
+data-structurecalledUtility-List (UL).Theutility-listofanitemsetstoresallnec-
+essary information to quickly calculate the itemset’s utility without reading the
+database.Moreover,usingUtility-Lists(ULs ),HUI-Minercandirectlycalculatean
+upperboundontheutilityofanitemsetandallitsextensionstoreducethesearch
+space. This upper bound is based on a concept of remaining utility, representing
+the utility that could be used when extending an itemset with additional items.
+HUI-Miner starts by constructing utility-lists of itemsets having a single item (1-
+itemsets). Then, HUI-Miner recursively builds utility-lists of larger itemsets by
+joining utility-lists of their subsets. Despite the fact that, HUI-Miner was shown
+to outperform the state-of-the-art two-phase based algorithms, it was observed
+thatthejoinoperationusedtoobtainutility-listsoflargeritemsetsremainscostly
+in terms of running time. To deal with this problem, another efficient algorithm
+called Faster High-Utility Itemset Mining Algorithm (FHM) has been proposed
+[10].
+FHMwasdesignedwiththegoalofreducingasmuchaspossiblethenumberof
+joinoperations.Tothisend,anadditionalpruningstrategy,calledEstimatedUtility
+Co-occurrencePruning (EUCP),isadoptedthatcanprunesomelowutilityitemsets
+without performing the join operation. The proposed strategy first calculates the
+TWU measure of all pairs of items that co-occur in the database. Then, during
+the recursive pattern mining process, low TWU itemsets (LTWUIs), i.e, itemsets
+having TWU values that are less than the pre-defined minimum utility value θ,
+are eliminated early as well as all their supersets. It was shown that, this strategy
+can greatly reduce the search space as FHM was found to be much faster than
+HUI-Miner.
+Using similar approaches, several other one phase based algorithms have been
+proposed such as: mHUIMiner [26], d2HUP [22], EFIM [37], HMiner [16], HUI-
+Miner* [27] and ULB-Miner [5]. In those studies, it was observed that one-phase
+basedalgorithmsgenerallyoutperformtwo-phasebasedalgorithms.However,both
+typesofalgorithmsonlydiscoverpatternsthatgenerateahighprofitindatabases
+without giving information to the user about item quantities. To overcome this
+limitation, HUQIM algorithms came into play where both utilities and quanti-
+ties of itemsets are taken into account. The first algorithm for mining high util-
+ity quantitative itemsets is HUQA [33]. HUQA introduced the concept of weak
+utility quantitative itemsets to efficiently discover High Utility Quantitative Itemsets
+(HUQIs). Weak utility quantitative itemsets are itemsets that can be extended
+to get high utility quantitative itemsets. To prune unpromising Q-itemsets, the
+k-support bound measure is used.
+6 Nouiouaetal.
+Motivatedbythesuccessofutility-listbasedalgorithms,averticalbasedalgo-
+rithm(VHUQI)forHUQIMwasproposed[19].Itutilizesavariationoftheutility-
+liststructure.ExperimentalresultshaveshownthatVHUQIoutperformsHUQA.
+However, a key problem with these two algorithms is that they only adopt the
+k-supportboundtoeliminateLowUtilityQuantitativeItemsets(LUQIs)whichis
+insufficient to reduce the search space.
+To address this problem, Li et al. [18] have recently proposed a novel algo-
+rithm, named HUQI-Miner (High Utility Quantitative Itemsets Miner), where both
+theTWUandaremainingutility-basedupperboundareusedtoquicklyeliminate
+LUQIs.
+AlthoughHUQI-Minerwasfoundtooutperformpreviousalgorithms,therun-
+time of HUQI-Miner is still very long due to the huge number of join operations
+thatareperformedduringtheminingprocess.Areasonisthatthesameitemwith
+two different quantities is regarded as two different Q-items in HUQIM. Accord-
+ingly, the search space in HUQIM is much larger than the search space in HUIM.
+Asaresult,thenumberofjoinoperationsforHUQIMcanbemuchlargerthanin
+HUIM.
+To overcome this limitation, this paper proposes a novel improved algorithm
+named FHUQI-Miner where the EUCP strategy [10] utilized in traditional HUIM
+is modified and extended to deal with Q-itemsets in HUQIM. More precisely, two
+new pruning strategies, EQCPS and RQCPS, are proposed and used for mining
+HUQIs.
+3 Background
+This section first describes preliminary concepts of HUQIM. Then, the combining
+operation of HUQIM is presented. After that, the formulation of the HUQIM
+problem is given. Finally, the TWU pruning strategy is introduced.
+3.1 Preliminaries
+Let I = {I ,I ,...,l } be a set of N distinct items, a quantitative transaction
+1 2 N
+database D is composed of a set of transactions, denoted as D = {T ,T ,...,T },
+1 2 M
+where each transaction Tq ∈ D (1 ≤ q ≤ M) has a unique identifier called T
+id
+(Transaction Identifier) and each transaction is a subset of I. Besides, every item
+i∈I thatappearsinatransactionTq hasapositivenumberq(i,Tq ),calledinternal
+utility, which represents the quantity of item i in Tq . Moreover, each item i has a
+profit p (a positive number) called external utility.
+i
+Table1presentsanexampleofaquantitativetransactiondatabaseD,whichis
+composed of four transactions, T to T . Moreover, Table 2 presents the external
+1 4
+utilitiesofitemsinD.ThedatabaseDwillbeusedasexamplethroughthissection
+to illustrate the different concepts of HUQIM. Taking item A as example, we can
+seeinTable2thattheprofitofitemAis3,andinTable1thattheinternalutility
+of A in T (resp. T , T , T ) is 2 (resp. 0, 2, 2).
+1 2 3 4
+InHUQIM,therearetwokindsofquantitativeitems:Exactquantitativeitems,
+alsocalledExactQ-items,andrangequantitativeitems,alsonamedRangeQ-items.
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 7
+Table 1: An example of a transaction database
+T Transaction
+id
+T1 (A,2)(B,5)(C,2)(D,1)
+T2 (B,4)(C,3)
+T3 (A,2)(C,2)
+T4 (A,2)(B,6)(D,1)
+Table 2: Profit table
+Item A B C D
+Profit 3 1 2 2
+An exact Q-item x is defined as a pair (i,q) where i ∈ I and q is the quantity
+of item i. Thus, each transaction Tq ∈ D is composed of a set of exact Q-items,
+Tq ={x
+1
+,x
+2
+,...,x
+k
+}.
+For example, the transaction of T in Table 1 is composed of exact Q-items
+1
+(A,2), (B,5), (C,2) and (D,1).
+A range Q-item is another type of Q-items where the quantity of the corre-
+sponding item has not a unique value but it is defined as a range. Range Q-items
+do not exist explicitly in the database but they are obtained by combining exact
+Q-items. A range Q-item x is defined as a triple (i,l,u) where i ∈ I, l (resp. u)
+representsthelower (resp.upper)bound ofthequantityofitemi.Theintervalsize
+ofarangeQ-item,calledaQ-interval,isdefinedas(u−l+1).Notethat,anexact
+Q-item (i,q) can be formulated as a range Q-item (i,l,u) where q=l=u.
+For example, (A,5,7) is a range Q-item that has a Q-interval of size 3.
+A quantitative itemset X, denoted as Q-itemset X, is a set of Q-items. A k-Q-
+itemset is a Q-itemset consisting of k distinct Q-items, X = [x ,x ,...,x ]. If X
+1 2 k
+is composed only of exact Q-items, X is an exact Q-itemset. If there is at least one
+range Q-item, X is a range Q-itemset.
+For example, [(A,5), (B,6), (D,3)] is an exact Q-itemset. Or more precisely,
+an exact 3-Q-itemset. [(B,6), (D,3,5)] is a range Q-itemset. More precisely, it is a
+range 2-Q-itemset.
+Definition 1 (Inclusion of Q-items). Given an exact Q-item x=(i,q) and a
+range Q-item y = (j,l,u), we say that y includes x, or x is included in y, if i = j
+and l≤q≤u.
+Given two range Q-items, x = (i,l,u) and y = (i(cid:48),l(cid:48),u(cid:48)), y includes x, or x is
+included in y, if i=j, l≥l(cid:48) and u≤u(cid:48).
+For example, the exact Q-item (A,3) is included in the range Q-item (A,1,5).
+Definition 2 (Occurrence of a Q-item). An exact Q-itemx=(i,q) occurs in
+a transaction T ={y ,y ,...,y } if x∈T .
+d 1 2 k d
+A range Q-item x = (i,l,u) occurs in a transaction T = {y ,y ,...,y } if
+d 1 2 k
+one of its included exact Q-items occurs in this transaction. Formally, x occurs
+in transaction T if there exists a Q-item y = (j,q(cid:48)) ∈ T such that i = j and
+d d
+l≤q(cid:48) ≤u.
+For example, (B,4) appears in T , while (B,4,6) appears in transactions T , T
+2 1 2
+and T .
+4
+8 Nouiouaetal.
+Definition 3 (OccurrenceofaQ-itemset).AQ-itemsetX ={x ,x ,... x }
+1 2 k
+occurs in a transaction T if ∀x∈X, x occurs in T .
+d d
+For example, we can observe that Q-item (A,2) occurs in transactions T , T
+1 3
+and T and that the Q-itemset [(A,2),(D,1)] occurs in transactions T and T .
+4 1 4
+Definition 4 (Occurrence-set of a Q-itemset). The occurrence-set of a Q-
+itemset X, denoted as OCC(X), it the set of transactions where X appears.
+For example, OCC([(A,2),(C,2)])={T ,T }.
+1 3
+Definition 5 (Support count of a Q-itemset). Given a Q-itemset X, the
+support count of X, denoted as SC(X), is defined as the number of transactions
+where X appears, i.e., SC(X)=|OCC(X)| [19].
+For example, SC([(A,2),(C,2)])=|{T ,T }|=2.
+1 3
+Definition6 (UtilityofaQ-iteminatransaction).TheutilityofanexactQ-
+itemx=(i,q)inatransactionT ,denotedasu(x,T ),isdefinedasu(x,T )= p ×q
+d d d i
+[19].
+TheutilityofarangeQ-itemx=(i,l,u)inatransactionT isthesumofutilities
+d
+of all exact Q-items that are included in x. Formally, u(x,T )=(cid:80)u u((i,j),T )
+d j=l d
+[19].
+Forexample,u((A,2),T )=3×2=6.Moreover,u((A,2,3),T )=u((A,2),T )+
+1 3 3
+u((A,3),T )=6+0=6
+3
+Definition 7 (Utility of a Q-itemset in a transaction / in the database).
+GivenaQ-itemsetX =[x ,x ,...,x ],theutility of a Q-itemset X in a transaction
+1 2 k
+T , denoted as u(X,T ), is the sum of utilities of Q-items from X in T . Formally,
+d d d
+u(X,T )=(cid:80)k u(x ,T ) [19].
+d j=1 j d
+TheutilityofaQ-itemsetX inadatabaseD,denotedasu(X),isthesumofutil-
+ities of X in all transaction where X occurs. Formally, u(X)=(cid:80) u(X,
+Td∈OCC(X)
+T ) [19].
+d
+Forinstance,u([(A,2,3)(C,2,3)],T )=u((A,2,3),T )+u((C,2,3),T )=6+4=
+1 1 1
+10. Similarly, u([(A,2)(C,2)])=u((A,2)(C,2),T )+u((A,2)(C,2),T )=10+10=
+1 3
+20.
+Definition 8 (Utility of a transaction). The utility of a transaction T =
+d
+{y ,y ,...,y }, denoted as TU(T ), is the sum of utilities of all Q-items that
+1 2 k d
+occurred in T , that is TU(T )=(cid:80)k u(y ,T ) [19].
+d d i=1 i d
+For example, TU(T )=u((B,4),T )+u((C,3),T )=4+6=10
+2 2 2
+Definition 9 (Total utility of a database). The total utility of a database D,
+denoted as σ, is the sum of its transaction utilities. Formally, σ=(cid:80) TU(T )
+Td∈D d
+[19].
+Forexample,thetotalutilityofthedatabaseDgiveninTable1isσ=TU(T )+
+1
+TU(T )+TU(T )+TU(T )=17+10+10+14=51.
+2 3 4
+Definition10 (Highutilityquantitativeitemset).Givenauser-definedmin-
+imumutilitythresholdθ(0≤θ≤σ)andaQ-itemsetX,X isahighutilityquantitative
+itemset, abbreviated as HUQI, if the utility of X is no less than θ. Otherwise, X is
+a low utility quantitative itemset, abbreviated as LUQI [19].
+Forexample,iftheminimumutilitythresholdθissetto15,thentheQ-itemset
+[(A,2), (C,2)] is a HUQI because u([(A,2),(C,2)])=20>15.
+Similarly to HUIM [23], the utility function of HUQIM is also not monotonic
+noranti-monotonic.Inotherwords,theutilityofaQ-itemsetmaybeless,greater,
+or equal to the utility of its supersets. Accordingly, alternative pruning strategies
+arenecessarytopruneunpromisingitemsets.BeforepresentingtheTWUpruning
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 9
+strategy, we first introduce some concepts and definitions that are related to the
+combination process of Q-itemsets.
+3.2 Q-itemsets Combination
+As mentioned above, range Q-itemsets do not explicitly exist in the database,
+but they are produced by combining exact Q-itemsets. In fact, mining range Q-
+itemsets in addition to exact Q-itemsets is more advantageous since it gives the
+opportunity to discover more interesting patterns by providing quantity range
+information within the discovered patterns.
+The combination operation is performed by merging Q-itemsets that have Q-
+itemswithconsecutivequantities.Toapplythecombinationprocess,itisrequired
+to define: (1) The combining method to be applied.
+(2) The set of candidate Q-itemsets to be possibly combined.
+(3) A quantitative related coefficient (qrc) [33].
+Three combining methods have been proposed for HUQIM, namely Combine
+Max, Combine Min and Combine All [6, 18]. In the next section, an explanation
+of each combining method is given with illustrative examples.
+Candidate Q-itemsets are a set of LUQIs that may be used to perform the
+combination process. It is worth noticing that, not all LUQIs are selected to be
+candidate Q-itemsets but only those having utility values that are high enough.
+The selection of candidate Q-itemsets for combination is done based on the ober-
+vation that although some Q-itemsets are LUQIs, they have a utility values that
+are close to that required for HUQIs. Therefore, it is highly probable that some
+combinations of these Q-itemsets will produce high utility range Q-itemsets.
+TheqrccoefficientwasintroducedtoavoidcontinuouslycombiningQ-itemsets
+with adjacent quantities, which may produce range Q-itemsets with very large
+Q-intervals [33]. Such kind of range Q-itemsets are undesirable since their in-
+terpretation may be meaningless. Therefore, the combination process should be
+stopped if the Q-interval of a generated Q-itemset is larger than qrc. Moreover,
+qrc is also used to avoid combining LUQIs and considering only some Q-itemsets
+that may lead to produce HUQIs.
+Formally, candidate Q-itemsets and the combining constraint are respectively
+defined as follows:
+Definition 11 (The candidate quantitative itemset). Given a user-defined
+minimum utility threshold θ where 0 ≤ θ ≤ σ and a quantitative related coefficient
+(qrc>0), a Q-itemset X is a candidate Q-itemset if θ ≤u(X)≤θ.
+qrc
+Definition 12 (Last Q-items combining constraint). Given a quantitative
+related coefficient (qrc > 0) and two Q-itemsets X = [(x ,l ,u ), (x ,l ,u ),...,
+1 1 1 2 2 2
+(x ,l ,u )] and Y =[(y ,l(cid:48),u(cid:48)), (y ,l(cid:48),u(cid:48)),...,(y ,l(cid:48),u(cid:48))].
+k k k 1 1 1 2 2 2 k k k
+X and Y can be combined together to form a range Q-itemset Z =[(i ,l ,u ),
+1 1 1
+(i ,l ,u ), ..., (i ,l ,u(cid:48))], if the following conditions hold [18]:
+2 2 2 k k k
+(1) X and Y are both candidate Q-itemsets.
+(2)X andY havethesameprefix.i.e,thefirst(k−1)Q-itemsinX andY are
+the same. Formally, ∀(1≤i≤k−1): x =y , l =l(cid:48) and u =u(cid:48).
+i j i j i j
+(3) For the last Q-item, x =y and l(cid:48) =(u +1).
+k k k k
+(4) The Q-interval of the last Q-item to be generated should be less than qrc,
+i.e, u(cid:48) −l ≤qrc.
+k k
+10 Nouiouaetal.
+Itcanbeseenthat,thecombinationprocessisalwaysperformedonthelastQ-
+itemoftwoQ-itemsetsthathaveasameprefixandquantitiesoftheirlastQ-items
+are consecutive.
+For example, suppose that qrc=3 and that there are 4 candidate Q-itemsets
+X =[(A,2), (B,3), (C,5)], X =[(A,2), (B,3), (C,6)], X =[(A,2), (B,3), (C,7)] and
+1 2 3
+X =[(A,2),(B,3),(C,8)].X canbecombinedwithX becausethefourconditions
+4 1 2
+of the combining constraint are verified (Definition 12). The result of combining
+X and X is Y =[(A,2), (B,3), (C,5,6)]. Again, Y can be combined with X to
+1 2 1 1 3
+form Q-itemset Y =[(A,2), (B,3), (C,5,7)]. However, Y cannot be combined with
+2 2
+X because the Q-interval of the last Q-item in the generated Q-itemset [(A,2),
+4
+(B,3), (C,5,8)] is larger than qrc.
+3.2.1 Combining Methods
+Based on the combining constraint presented in Definition 12, there exist three
+combiningmethodsinHUQIM,namelyCombine Max,Combine MinandCombine
+All.Thesemethodsdifferfromeachotheronhowthecombiningconstraintisused
+[6, 18]. Basically, candidate Q-itemsets have the same prefix and they differ only
+on the last Q-item. Thus, Q-itemsets are first ordered according to the last Q-
+item. Then, the combining method continuously combines each Q-itemset with
+Q-itemsets that come after according to a processing order. This process is re-
+peated until traversing all candidate Q-itemsets.
+A. Combine All Method
+The Combine All method outputs all possible high utility range Q-itemsets
+that can be generated by either combining candidate Q-itemsets or by combining
+candidate Q-itemsets with range Q-itemsets [18].
+To better illustrate the Combine All method, let’s assume that there is a
+sorted set C of 6 candidate Q-itemsets {[(A,2),(B,6)], [(A,2),(C,4)], [(A,2), (C,5)],
+[(A,2),(C,6)], [(A,2),(C,7)], [(A,2),(C,9)]} and qrc=4. The combining process on
+C using the Combine All method is illustrated in Figure 1.
+(A,2)(B,6) (A,2)(C,4) (A,2)(C,5) (A,2)(C,6) (A,2)(C,7) (A,2)(C,9)
+11 11 44 44 66 66
+(A,2)(C,4,5) (A,2)(C,5,6) (A,2)(C,6,7)
+(A,2)(C,4,6) (A,2)(C,5,7)
+(A,2)(C,4,7)
+Fig. 1: Example of combining process
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 11
+Besides,arrowsarelabeledwithnumbersthatindicatetheorderofgeneration
+of range Q-itemsets. Moreover, colors are used to show range Q-itemsets that can
+begeneratedaftertraversingonecandidateQ-itemset.Themethodfirstgenerates
+Q-itemsetsinrectangleswithroundedcorners,followedbyQ-itemsetsinrectangles
+with sharp corners, and then Q-itemsets in Parallelograms.
+The method tries to combine each Q-itemset in C with all Q-itemsets that
+come after this current Q-itemset. Back to our example, the method tries to com-
+bine the first Q-itemset in C which is [(A,2),(B,6)] with the second Q-itemset
+[(A,2),(C,4)]. However, since the 3rd condition of the combining constraint (Defi-
+nition12)isnotvalid,themethodpassesdirectlytothesecondQ-itemset.Thesec-
+ondQ-itemset[(A,2),(C,4)]canbecombinedwiththethirdQ-itemset[(A,2),(C,5)]
+because all conditions of the combining constraint are verified. The resulting Q-
+itemset is [(A,2),(C,4,5)]. Similarly, this range q-itemsets is combined with the
+next Q-itemset in C which is [(A,2),(C,6)] and Q-itemset [(A,2),(C,4,6)] is gener-
+ated. Once again, the method combines [(A,2),(C,4,6)] with [(A,2),(C,7)] to gen-
+erate[(A,2),(C,4,7)].MovingtothenextQ-itemset,themethoddoesnotcombine
+[(A,2),(C,4,7)] with [(A,2),(C,9)] because the 3rd condition of the combining con-
+straint presented in definition 12 is not satisfied. After traversing the Q-itemset
+[(A,2), (C,4)], three range Q-itemsets are generated which are [(A,2), (C,4,5)],
+[(A,2), (C,4,6)] and [(A,2), (C,4,7)].
+At this point, the method passes to the next Q-itemset in C, [(A,2),(C,5)]
+and repeats the above process by trying to combine this Q-itemset with the
+rest of Q-itemsets that come after it. As a result, Q-itemsets [(A,2),(C,5,6)] and
+[(A,2),(C,5,7)] are generated. The above process is repeated with the rest of Q-
+itemsets until traversing all Q-itemsets.
+It is worth noticing that, at each generation of a new range Q-itemset, the
+methodchecksitsutilitytokeeponlyrangeQ-itemsetshavinghighutilities.More
+precisely, the method will keep only HUQIs from the set of generated Q-itemsets
+{[(A,2),(C,4,5)], [(A,2),(C,4,6)], [(A,2), (C,4,7)], [(A,2),(C,5,6)], [(A,2),(C,5,7)],
+[(A,2),(C,6,7)]}.
+B. Combine Min Method
+The Combine Min method differs from Combine All method in the fact than
+it only outputs high utility range Q-itemsets with minimal Q-intervals.
+More precisely, the Combine Min method follows the same traversing pro-
+cess of the Combine All method. However, after generating a range HUQI, the
+Combine MinmethodwillimmediatelystopcombiningthecurrentQ-itemsetwith
+the rest of Q-itemsets and it will directly pass to the next candidate Q-itemset in
+C.
+Back to our example presented in Figure 1, after generating [(A,2),(C,4,5)],
+there are two cases, if this Q-itemset is not a HUQI, the Combine Min method
+continues with this Q-itemset by combining it with [(A,2),(C,6)] as the Combine
+Allmethoddoes.However,if[(A,2),(C,4,5)]isaHUQI,theCombine Minmethod
+willmovedirectlytocombinethenextQ-itemset[(A,2),(C,5)]with[(A,2),(C,6)]to
+generate [(A,2),(C,5,6)] without producing the remaining Q-itemsets presented in
+rectangles with rounded corners, i.e, Q-itemsets {[(A,2),(C,4,6)], [(A,2),(C,4,7)]}.
+Similarly,if[(A,2),(C,5,6)]isnotaHUQI,themethodcombinesitwith[(A,2),(C,7)]
+and generates [(A,2),(C,5,7)]. If [(A,2),(C,5,6)] is a HUQI, the method moves di-
+rectlytocombine[(A,2),(C,6)]with[(A,2),(C,7)]withoutgenerating[(A,2),(C,5,6)].
+12 Nouiouaetal.
+AftertraversingallcandidateQ-itemsets,themethodperformstheminimalQ-
+intervalcheckingtokeeponlyrangeQ-itemsetswithminimalQ-intervals.Suppose
+that HUQIs resulting from the above process are: [(A,2),(C,4,6)], [(A,2), (C,5,6)]
+and[(A,2),(C,6,7)].AfterperformingtheminimalQ-intervalchecking,themethod
+will keep {[(A,2),(C,5,6)], [(A,2),(C,6,7)]} while Q-itemset [(A,2),(C,4,6)] will be
+discarded because the Q-interval of its last Q-item (C,4,6) is larger than the Q-
+interval of the last Q-item in [(A,2),(C,5,6)].
+C. Combine Max Method
+The Combine Max method does the contrary of the Combine Min method. It
+outputsonlyhighutilityrangeQ-itemsetshavingmaximalQ-intervals.Morepre-
+cisely, for each traversed candidate Q-itemset, the Combine Max method keeps
+combining Q-itemsets as long as the conditions of the combining constraint pre-
+sented in Definition 12 are verified. Following the same example depicted in Fig-
+ure 1, the method first combines [(A,2),(C,4)] with [(A,2),(C,5)] and Q-itemset
+[(A,2),(C,4,5)] is generated. Then, [(A,2),(C,4,5)] is combined with [(A,2),(C,6)]
+and [(A,2),(C,4,6)] is generated. Once again, [(A,2),(C,4,6)] is combined with
+[(A,2),(C,7)] to generate [(A,2),(C,4,7)]. The method does not combine [(A,2),
+(C,4,7)]with[(A,2),(C,4,9)]becausethe3rd conditionofthecombiningconstraint
+is not satisfied. After traversing the Q-itemset [(A,2),(C,4)], only one range Q-
+itemset is generated which is [(A,2),(C,4,7)].
+At this point, the method moves to the next Q-itemset [(A,2),(C,5)] and re-
+peats the above process. As a result, the Q-itemset [(A,2),(C,5,7)] is generated.
+The method then moves to [(A,2),(C,6)] and so on until all Q-itemsets have been
+traversed. Similarly to Combine Min, Combine Max checks the utility of the re-
+sulting Q-itemsets to keep only HUQIs. Moreover, after traversing all candidate
+Q-itemsets, the method performs the maximal Q-interval checking to keep only
+Q-itemsets with maximal Q-intervals.
+Following our example, Q-itemsets generated by the traversing process using
+Combine Max method are: [(A,2), (C,4,7)], [(A,2),(C,5,7)] and [(A,2), (C,6,7)].
+By supposing that all generated Q-itemsets are HUQIs, the maximal Q-interval
+checking process will retain only Q-itemset [(A,2),(C,4,7)] which has the maximal
+Q-interval and other range Q-itemsets are eliminated.
+Insummary,theCombine Allmethodreturnsallpossiblepatterns.Themethod
+Combine Max allows identifying general patterns which can be seen as summa-
+rizing HUQIs generated by the Combine All method. Whereas, Combine Min
+provides small patterns which can be obtained by decomposing the patterns gen-
+erated by the Combine Max method.
+3.3 Problem Statement
+Based on the previous definitions, the high utility quantitative itemset mining
+(HUQIM) problem is defined as follows:
+Given a set of items I ={I ,I ,...,l } and a quantitative transaction database
+1 2 N
+D that is composed of items from I, a user-defined minimum utility threshold θ and
+a quantitative related coefficient qrc, the problem of HUQIM is to find all exact
+Q-itemsets having a utility that is no less that θ as well as all range Q-itemsets
+thatsatisfyauser-selectedcombiningconstraintandhaveautilitynolessthanθ.
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 13
+Formally, HUIM aims to find a set H that contains both high utility exact
+Q-itemsets,denotedasH ,andhighutilityrangeQ-itemsets,denotedasH .The
+1 2
+set H is defined by the following equation:
+(cid:40)
+H ={X/X∪I and u(X)≥θ}
+H =H ∪H such that 1
+1 2
+H ={Y/Y =Combine(CM,C,qrc) and u(Y)≥θ}
+2
+(1)
+where Combine(CM,C,qrc) is a function that combines candidate Q-itemsets
+in C using one of the three combining methods (Combine All, Combine Min or
+Combine Max)andqrcisaparameterforthecombinationconstraint.Thereader
+can refer to Subsection 3.2 to see how range q-itemsets are generated.
+3.4 TWU Pruning Strategy for Q-itemsets
+The TWU pruning strategy can be used to prune unpromising Q-itemsets during
+theminingprocess[18].Thisstrategyisbasedonthecalculationofthetransaction
+weighted utility (TWU) measure of Q-itemsets.
+Definition 12 (TWUofaQ-itemset).Thetransactionweightedutility(TWU)
+ofaQ-itemsetX,denotedasTWU(X),isthesumofutilitiesoftransactionswhere
+X appears, that is TWU(X)=(cid:80) TU(T ).
+Td∈OCC(X) d
+One important specificity of the TWU measure in HUQIM is that it is anti-
+monotonic.Moreprecisely,giventwoQ-itemsetsXandY,ifX ⊆Y thenTWU(X)≥
+TWU(Y). Moreover, the TWU measure is an upper bound on the utility of Q-
+itemsets. In other words, ∀ (X ∈ D), TWU(X)≥u(X). Therefore, TWU can be
+used to prune unpromising Q-itemsets with their supersets.
+Definition 13 (Promising Q-itemsets). Given a user-defined minimum utility
+threshold θ (0≤θ ≤σ), a quantitative related coefficient (qrc>0) and a Q-itemset
+X,X isapromisingQ-itemset,ifTWU(X) ≥ θ .Otherwise,X isanunpromising
+qrc
+Q-itemset.
+Property 1 (The TWU pruning strategy). TWU pruning strategy for Q-
+itemsetsstatesthatifaQ-itemsetXisunpromising,thenXislowutilityQ-itemset
+as well as all its extensions.
+4 Q-itemset Utility-Lists
+This section introduces the utility-list structure, which is used by the proposed
+algorithm.Autility-list(UL)isastructureusedtorepresentapattern(Q-itemset
+in our case) and additional information about this pattern that is relevant for the
+pattern mining problem. A utility-list allows to quickly calculate the utility of its
+associated Q-itemset without the need to scan the database. Utility-lists (ULs)
+were initially used to mine high utility itemsets [23], and later have also been
+adopted for HUQIM [18, 19].
+Utility-listusesanupperboundbasedonafunctioncalledremainingutilityto
+prune the search space. Before calculating the remaining utility, Q-items in each
+transaction are first sorted according to the pre-defined total order relation ≺.
+Moreprecisely,Q-itemsarefirstsortedaccordingtotheirutilitiesinadescending
+14 Nouiouaetal.
+order as suggested in [18, 19]. Then the remaining utility is calculated using the
+following definition.
+Definition 14 (Remaining utility of a Q-itemset in transaction/ in the
+database). Let there be a set of distinct Q-items Q∗ extracted from a database
+and sorted in each transaction according to a processing order ≺. The remaining
+utility of a Q-itemset X in a transaction T ∈OCC(X), denoted as Rutil(X,T ),
+d d
+isthesumofutilitiesofQ-itemsthatcomeafterallQ-itemsinX accordingtothe
+≺ order. Formally, Rutil(X,T )=(cid:80) u(x,T )
+d x∈Td/X d
+Here, T /X denotes the set of all Q-items that appear after all Q-items of X
+d
+according to the ≺ order in T .
+d
+The remaining utility of a Q-itemset X in a database D is the sum of the re-
+mainingutilitiesofX inalltransactionsofitsoccurrenceset.Formally,Rutil(X)=
+(cid:80) Rutil(X,T ).
+Td∈OCC(X) d
+ConsideringthedatabaseD presentedinTable1,itisfoundthatRutil({(A,2)
+(B,5)}, T ) =u((C,2),T )+u((D,1),T ) = 4+2= 6.
+1 1 1
+Definition 15 (Utility-list of a Q-itemset). The utility-list of a Q-itemset
+X, denoted as UL(X), is composed of | OCC(X) | tuples. Each tuple contains
+the utility information of X in one transaction in which X has appeared. Tuples
+have the form (cid:104)T , Eutil, Rutil(cid:105), where T is the identifier of the transaction
+id id
+T , Eutil(X,T ) is the utility of X in T , i.e., u(X,T ), and Rutil(X,T ) is the
+d d d d d
+remaining utility of X in T .
+d
+In addition to the list of tuples, the utility-list of a Q-itemset also stores the
+sum of all Eutil values, denoted as SumEutil, which represents the exact utility
+of the Q-itemsetand the sum of allRutil values, denotedas SumRutil, which will
+be used to prune low utility Q-itemsets.
+Figure 2 shows the initial utility-lists for Q-items of the database presented in
+Table 1.
+(A,2) TWU: 41 (B,4) TWU: 10 (C,2) TWU: 27 (D,1) TWU :31
+Tid Eutil Rutil Tid Eutil Rutil Tid Eutil Rutil Tid Eutil Rutil
+1 6 11 2 4 6 1 4 2 1 2 0
+3 6 4 Sums 4 6 3 4 0 4 2 0
+4 6 8 Sums 8 2 Sums 4 0
+Sums 18 23 (B,5) TWU: 17
+Tid Eutil Rutil (C,3) TWU: 10
+1 5 6 Tid Eutil Rutil
+Sums 5 6 2 6 0
+Sums 6 0
+(B,6) TWU: 14
+Tid Eutil Rutil
+4 6 2
+Sums 6 2
+Fig. 2: Initial utility-lists for Q-items of database presented in Table 1
+Usingutility-listsallowstonotonlyquicklycalculatetheutilitiesofQ-itemsets
+butalsotoprunemoreefficientlythesearchspaceusingtighterpruningstrategies
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 15
+compared with the TWU pruning strategy. More precisely, pruning the search
+space is performed by the following properties.
+Property 2 (SumEutil property).Givena Q-itemsetX,SumEutil inUL(X)
+represents the exact utility of X, i.e, u(X). Therefore, if (SumEutil <θ), then X
+is a low utility Q-itemset.
+Property3 (SumRutilpruningstrategy).GivenaQ-itemsetX,if(SumEutil+
+SumRutil<θ), X and all its extensions are low utility Q-itemsets.
+There are two fundamental operations that can be performed on utility-lists:
+The join operation and the merge operation. In the next subsections, these oper-
+ations are presented.
+4.1 Join Utility-Lists Operation
+The join operation is used to obtain utility-lists of larger Q-itemsets from smaller
+utility-lists. The initial case is to construct utility-lists of 2-Q-itemsets from those
+of initial Q-items (Definition 16). The general case is to construct utility-lists of
+(k+1)-Q-itemsets from utility-lists of k-Q-itemsets where k>2 (Definition 17).
+Definition 16 (Construction of the utility-lists of a 2-Q-itemset). Given
+two Q-items x and y where x is before y according to the ≺ order (x ≺ y), the
+utility-list of Q-itemset [xy] can be constructed from the intersection of tuples in
+UL(x) with UL(y). More precisely, common transactions are identified, i.e. com-
+mon T , in UL(x) and UL(y). For each common transaction T , a new tuple E is
+id d
+addedtoUL([xy])whereT ofE isthecommonT ,Eutil([xy],T )=Eutil(x,T )
+id id d d
++ Eutil(y,T ) and Rutil([xy],T ) = Rutil(y,T ).
+d d d
+Figure 3 shows an example of this operation where the utility-list of the Q-
+itemset [(A,2),(D,1)] is constructed from the utility-lists of Q-items (A,2) and
+(D,1).
+(A,2) TWU: 41 (D,1) TWU: 31 ((A,2),(D,1)) TWU: 31
+Tid Eutil Rutil Tid Eutil Rutil Tid Eutil Rutil
+1 6 11 1 2 0 1 8 0
+3 6 4 4 2 0 4 8 0
+4 6 8 Sums 4 0 Sums 16 0
+Sums 18 23
+Fig. 3: Constructing the utility-list of the 2-Q-itemset [(A,2),(D,1)]
+Definition 17 (Construction of the utility-list of a (k+1)-Q-itemset).Let
+therebetwok-Q-itemsetsX,Y whereX =[(i ,l ,u ),(i ,l ,u ),...,(i ,l ,u ),
+1 1 1 2 2 2 k−1 k−1 k−1
+(i k ,l k ,u k )] and Y = [(i 1 ,l 1 ,u 1 ), (i 2 ,l 2 ,u 2 ),..., (i k−1 , l k−1 , u k−1 ), (i k(cid:48) ,l k(cid:48) ,u k(cid:48) )].
+If X and Y have the same prefix P = [(i ,l ,u ), (i , l ,u ),..., (i ,l ,
+1 1 1 2 2 2 k−1 k−1
+u k−1 )] and the last Q-item (i k ,l k ,u k ) ≺ (i k(cid:48),l k(cid:48),u k(cid:48) ). The utility-list of [XY] =
+[(i 1 ,l 1 ,u 1 ),(i 2 ,l 2 ,u 2 ),...,(i k ,l k ,u k ),(i k(cid:48),l k(cid:48),u k(cid:48) )]canbeconstructedfromUL(X),
+UL(Y) and UL(P). Besides, for each common transaction T in X and Y, a
+d
+new tuple E is added into UL([XY]) where the T of E is the identifier T
+id id
+16 Nouiouaetal.
+of transaction T , util([XY],T ) = Eutil(X,T )+Eutil(Y,T )−Eutil(P,T ) and
+d d d d d
+Rutil([XY],T )=Rutil(Y,T ).
+d d
+Figure 4 shows an example where the utility-list of [(A,2),(C,2),(D,1)] is con-
+structed from the utility-list of Q-itemset [(A,2),(C,2)], [(A,2),(D,1)] and that of
+the prefix [(A,2)].
+((A,2),(C,2)) TWU: 40 ((A,2),(D,1)) TWU: 31 ((A,2),(C,2),(D,1)) TWU: 17
+Tid Eutil Rutil Tid Eutil Rutil Tid Eutil Rutil
+1 10 2 1 8 0 1 12 0
+3 10 0 4 8 0 Sums 12 0
+Sums 20 2 Sums 16 0
+Fig. 4: Constructing the utility-list of the k-Q-itemset [(A,2),(C,2),(D,1)]
+4.2 Merge Utility-Lists Operation
+The merge operation is performed to obtain the utility-list of a range Q-itemset.
+Definition18 (Constructingutility-listsofrangeQ-itemsets).Lettherebe
+two k-Q-itemsets X =[(i ,l , u ), (i , l ,u ), ...,(i ,l ,u )] and Y =[(i(cid:48),l(cid:48),u(cid:48)),
+1 1 1 2 2 2 k k k 1 1 1
+(i(cid:48),l(cid:48), u(cid:48)), ...,(i(cid:48),l(cid:48),u(cid:48))]. If the following conditions hold:
+2 2 2 k k k
+(1) X and Y have the same prefix, i.e, ∀j ∈ [1,k−1], i = i(cid:48), l = l(cid:48) and
+j j j j
+u =u(cid:48).
+j j
+(2) For the last Q-item, i =i(cid:48) and u =l(cid:48) +1.
+k k k k
+Then, X and Y can be merged to form a range Q-itemset Z = [(i ,l ,u ),
+1 1 1
+(i ,l ,u ),..., (i ,l ,u(cid:48))]. The utility-list UL(Z) is obtained by merging tuples of
+2 2 2 k k k
+UL(X) and UL(Y).
+Figure5showstheUL([B,4,5]]resultingfrommergingUL([B,4])withUL([B,5]).
+(B,4) TWU: 10 (B,5) TWU: 17 (B,4,5) TWU: 27
+Tid Eutil Rutil Tid Eutil Rutil Tid Eutil Rutil
+2 4 6 1 5 6 1 5 6
+Sums 4 6 Sums 5 6 2 4 6
+Sums 9 12
+Fig. 5: Constructing the utility-list of [(B,4,5)] by merging (B,4) and (B,5)
+5 Proposed Algorithm
+ThissectiondescribestheproposedFHUQI-Mineralgorithm.Butfirst,thesection
+introducesanovelstructurenamedTQCS(TWUofQ-itemsCo-occurrencebased
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 17
+Structure) and the proposed search space pruning strategies that are based on
+TQCS.
+5.1 The TQCS Structure
+TheTQCSstructureiscomposedofasetoftupleshavingtheform(a,b,c)wherea
+andbaretwoQ-itemsthathaveco-occurredinthedatabaseandc∈IRistheTWU
+of the 2-Q-itemset obtained by their concatenation. i.e, c=TWU([ab]). TQCS is
+created by reading the database one time and similarly to the EUCS structure
+of FHM [10], TQCS is not represented as a matrix that contains the TWU of all
+possible2-Q-itemsets.Alternatively,TQCScontainsonlyTWUofall2-Q-itemsets
+that really co-occur in the database. To this end, TQCS is composed of a set of
+tuples (a,b,c) such that c(cid:54)=0. The reader can refer to the illustrative example of
+Section 5.4. Besides, Table 6 provides an example of the TQCS’s construction for
+Q-items of the database presented in Table 3.
+5.2 Proposed Pruning Strategies
+The main advantage of the proposed FHUQI-Miner algorithm compared with the
+previous utility-list based algorithms [18, 19] is that FHUQI-Miner does not di-
+rectly perform the join operation to form larger Q-itemsets. Alternatively, based
+on the TQCS, FHUQI-Miner adopts new pruning mechanisms that allow elimi-
+nating low-utility Q-itemsets with their extensions without the need to construct
+their utility-lists.
+IncontrastwiththeEUCSofFHMwherethereexistsonlyonetypeofitemsets
+[10], the proposed TQCS deals with both exact and range Q-itemsets based on
+the following properties:
+Property 4 (Exact Q-items Co-occurrence Pruning Strategy (EQCPS)).
+Given two Q-items x and y, EQCPS states that, if there is no tuple (a,b,c) such
+that x = a, y = b and c ≥ θ , then the Q-itemset [xy] is not a high utility
+qrc
+Q-itemset and also all its extensions.
+Forexample,wecanseefromthelastrowofTable6thatTWU([(C,8),(A,3)])=
+620. If the minimum utility threshold θ is set to 1400 and qrc=2, then Q-itemset
+[(C,8),(A,3)] is pruned with all its extensions because TWU([(C,8),(A,3)]) <
+(1400).
+2
+A limitation of this property is that, it is applicable only when Q-items x and
+y arebothexactQ-items.However,inthecaseofrangeQ-items,Property4never
+returnsanytuplebecauseTQCScontainsonlytuplesofexactQ-items.Therefore,
+another pruning strategy is designed to consider range Q-items.
+IfxisarangeQ-item,weneedtotakeintoconsiderationallexactQ-itemsthat
+are included in x (Definition 1). More precisely, the proposed strategy identifies
+TWUvaluesofallQ-itemsetsresultingfromthecombinationofeachexactQ-item
+included in x with Q-item y. TWU values can be easily found using the TQCS
+structure. According to the sum of TWU values, we can decide to consider or to
+prune the Q-itemset [xy] using the following property.
+Property 5 (RangeQ-itemsCo-occurrencePruningStrategy(RQCPS)).
+GivenarangeQ-itemx=(i,l,u)andanexactQ-itemy,letx =(i,q)beanexact
+i
+18 Nouiouaetal.
+Q-item extracted from x with quantity q where l≤q ≤u and let c be the TWU
+i
+value of Q-itemset [x y] taken from the TQCS structure. If (cid:80)u c < θ , then
+i i=l i qrc
+Q-itemset [xy] is a low utility Q-itemset as well as all its extensions.
+Forexample,TWU([(C,7,8),(H,4)])=TWU([(C,7),(H,4)])+TWU([(C,8),(H,4)])
+= 2840+0=2840. If θ = 1400 and qrc = 2, then Q-itemset [(C,7,8),(H,4)] is not
+pruned because TWU([(C,7,8),(H,4)])≥ 1400.
+2
+5.3 FHUQI-Miner Algorithm
+This section presents the proposed FHUQI-Miner algorithm. The proposed algo-
+rithm follows the same procedure as algorithms proposed in [18, 19]. However,
+FHUQI-Miner adopts additional punning strategies to explore the search space
+more efficiently. FHUQI-Miner takes as input four parameters: (1) The transac-
+tiondatabaseDwithquantitiesofitemsindifferenttransactions(internalutilities)
+andprofitsofdifferentitems(externalutilities),(2)Thepre-definedminimumutil-
+ity threshold (θ), (3) The Combining Method (CM) to be applied and (4) The
+quantitativerelatedcoefficient(qrc).TheoutputisthesetofallQ-itemsetshaving
+a high utility.
+Algorithm 1: The FHUQI-Miner algorithm
+Input :D:Thequantitativetransactiondatabase,θ:Theuser-definedminimum
+utilitythreshold,CM:Thecombiningmethod(Combine Min,
+Combine MaxorCombine All),qrc:Thequantitativerelatedcoefficient.
+Output:ThecompletesetofHUQIs.
+1 FirstdatabasescantocalculatetheTWU ofeachQ-item;
+2 CreateinitialsetofpromisingQ-itemsP∗ suchthat∀x∈P∗:TWU(x)≥ q θ rc ;
+3
+Seconddatabasescantocreateutility-listsofpromisingQ-itemsULs(P∗)andbuild
+theTQCSstructure;
+4 foreachx∈P∗ do
+5 if UL(x).SumEutil≥θ then
+6 H=H∪x;
+7 Outputx;
+8 end
+9 else
+10 if UL(x).SumEutil+UL(x).SumRutil≥θ then
+11 E=E∪x;
+12 end
+13 if q θ rc ≤ UL(x).SumEutil ≤ θ then
+14 C=C∪x;
+15 end
+16 end
+17 end
+18 DiscoverHighUtilityrangeQ-itemsets(HR)usingCM andC;
+19 QIs ← sort(H ∪ E ∪ HR);
+20 Recursive Mining Search(∅,QIs,ULs(QIs),P∗,qrc,CM,θ);
+FHUQI-MinerstartsbyscanningthedatabaseD forthefirsttimetocalculate
+the TWU values of initial Q-items using Definition 12 (line 1). Based on TWU
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 19
+values,theTWUpruningstrategy(Property1)isappliedtopruneunpromisingQ-
+itemsearlyandtokeeponlypromisingQ-itemswhoseextensionsandcombinations
+maybeHUQIs(Definition13).AllpromisingQ-itemsarestoredinthesetP∗ (line
+2). After that, a total order relation ≺ on Q-items of P∗ is established where ≺ is
+thedescendingorderofQ-itemsutilitiesassuggestedin[18,19].Aseconddatabase
+scan is then performed. Besides, promising Q-items in each transaction are first
+reorderedaccordingtothe≺order.Then,theutility-listofeachpromisingQ-item
+is built. Moreover, the TQCS is built for Q-items of P∗ (line 3).
+After the construction of the TQCS, FHUQI-Miner first checks the utility of
+Q-items in P∗ (lines 4 to 17). For each Q-item x in P∗, if u(x)≥θ, x is outputted
+as it is a HUQI and it is put in the set H which contains HUQIs (Definition 10).
+Otherwise, FHUQI-Miner performs two tests: (1) If θ ≤u(x)≤θ, x is put in C
+qrc
+setwhereC containscandidateQ-itemsetsthatcanbecombinedtogethertoform
+high utility range Q-itemsets (definition 11). (2) if u(x)+UL(x).SumRutil≥θ, x
+is put in the set E which contains all Q-itemsets that should be explored because
+one or more than one of their extensions may have high utilities (Property 3).
+If the C set is not empty, the CM combining method is applied (line 18). The
+CM methodtriestocombineQ-itemsetsofC toproduceHRandULs(HR)where
+HR is the set of high utility range Q-itemsets that are generated by combining
+candidate Q-items of C (Definition 12) and ULs(HR) are their corresponding
+utility-lists. Then, FHUQI-Miner creates the set QIs which is composed of the
+union of Q-items in sets H, E and HR. Q-items in QIs are reordered according to
+≺ order (line 19).
+At this point, FHUQI-Miner calls the Recursive Mining Search procedure
+(line 20). The main steps of this procedure are illustrated in Algorithm 2.
+TheRecursive Mining Searchprocedureisarecursivedepth-firstsearchalgo-
+rithm that takes as input the following parameters: (1) The prefix Q-itemset P,
+(2) The set of Q-itemsets QIs , (3) Utility-lists of Q-itemsets ULs (QIs ), (4) The
+list of promising Q-itemsets P∗ (5) The quantitative related coefficient (qrc), (6)
+The combining method CM and (7) The minimum utility threshold (θ).
+At the first call of the algorithm, the prefix Q-itemset P is ∅ and QIs contains
+exact and range Q-items that are identified in Algorithm 1.
+The Recursive Mining Search algorithm operates as follows: For each exten-
+sion [Px] of P where x ∈ QIs , the algorithm traverses all extensions [Py] of P
+where y∈P∗ and y(cid:31)x to explore extensions of the form [Pxy] (lines 1 to 3).
+For each extension [Pxy], the algorithm performs a pruning check based on
+TQCSstructuretodecidewhethertoconsiderQ-itemset[Pxy]ortodirectlyprune
+this Q-itemset without spending time on creating its utility-list (lines 4 to 15).
+There are two cases:
+(1) Both Q-items x and y are exact Q-items (lines 4 to 9). In this case, prop-
+erty 4 is applied. More precisely, the algorithm searches the tuple (X,Y,c) in the
+TQCS structure. If c = ∅ or c < θ , the algorithm will pass directly to the next
+qrc
+extension Py without constructing UL([Pxy]) because the Q-itemset [Pxy] with
+all its extensions are LUQIs (line 7).
+(2) If x is a range Q-item (lines 10 to 15), then the algorithm applies property
+5 to look for tuples in the TQCS structure that correspond to each exact Q-
+item included in x with Q-item y. If the sum of obtained TWU values, i.e, sum
+20 Nouiouaetal.
+of extracted c values, of these tuples is less than θ , the algorithm prunes the
+qrc
+combination[Pxy]withoutconstructingitsutility-listasinthefirstcase(line13).
+For both cases, if TWU([xy]) ≥ θ , the algorithm performs the join process
+qrc
+to build UL([Pxy]) from UL(P), UL([Px]) and UL([Py]) (line 16).
+Based on UL([Pxy]), if [Pxy] is not promising, [Pxy] is pruned and the algo-
+rithm will pass directly to another extension [Py]. Otherwise, the extension [Pxy]
+is put in a new list of promising Q-itemsets P∗ (line 18) and the algorithm per-
+forms similar tests as in Algorithm 1 to check if [Pxy] is a HUQI (belongs to the
+H set), [Pxy] is to be explored (belongs to the E set) or [Pxy] is a candidate
+Q-itemset (belongs to the C set) (lines 18 to 28).
+After traversing all extensions [Py], the combination process is performed to
+extracthighutilityrangeQ-itemsets(HR)usingtheCM method(line31).Then,
+the new set QIs is formed from the union of H, E and HR (line 32).
+Atthispoint,theRecursive Mining Searchalgorithmisrecursivelycalledwith
+new prefix [Px] and new QIs and P∗ with respect to prefix [Px] (line 33). Since
+the algorithm starts from single Q-items and then recursively explores the search
+space by appending these single Q-items, the algorithm is able to discover the
+complete set of HUQIs.
+5.4 An Illustrative Example
+In this section, we give an example to illustrate how the designed FHUQI-Miner
+algorithm is applied. Consider the database presented in Table 3 with external
+utilities of different items shown in Table 4 and suppose that the Combine All
+method is selected with qrc = 5 and θ=25%. Accordingly, the minimum utility
+threshold value is (TU x 0.25 = 5376 x 0.25 = 1344).
+First, the database is scanned to calculate TWU values of the different Q-
+items.BasedonTWUvalues,promisingQ-itemsareidentified.TWUvaluesofall
+Q-items are presented in Table 5. We can see from Table 5 that, all Q-items are
+promising because their TWU values are greater than θ (Definition 13). Thus,
+qrc
+all Q-items should be considered during the recursive mining process. The second
+databasescanisthenperformedtoconstructutility-listsofallpromisingQ-items.
+Moreover,thealgorithmalsoconstructstheTQCSstructure.TheTQCSstructure
+for this example is given in Table 6.
+Afterthat,promisingQ-itemsareorderedbasedontheirutilitiesindescending
+order.TheorderedlistofQ-itemsisP∗ ={(I,9),(C,9),(G,8),(C,8),(G,7),(C,7),
+(D,5), (H,5), (H,4), (F,1), (A,3), (A,2), (B,2), (B,1), (E,1)}. At this point, the
+algorithm traverses Q-items of P∗ to check the utility of each initial Q-item using
+its corresponding utility-list. Based on their utilities, Q-items are put in the set
+of HUQIs (H), the set of candidates Q-itemsets (C), or the set of Q-itemsets to
+be explored (E). After traversing all Q-items in P∗, E ={(I,9), (C,9), (C,7)}, C =
+{(I,9),(C,9),(G,8),(C,8),(G,7),(C,7),(D,5),(H,4)}whileH setisemptybecause
+all Q-items in P∗ are LUQIs.
+FHQUI-Miner then tries to form high utility range Q-items with their utility-
+listsfromthesetC usingtheCombine Allmethod.FromQ-items(C,7),(C,8)and
+(C,9), three range Q-items are generated which are (C,7,8), (C,8,9) and (C,7,9).
+Moreover, from Q-items (G,7) and (G,8), one range Q-item is generated which is
+(G,7,8). The utility of (C,7,8) (resp. (C,8,9), (C,7,9), (G,7,9)) is 1540 (resp. 1190,
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 21
+Algorithm 2: Recursive Mining SearchAlgorithm
+Input :P:TheprefixQ-itemset,QIs:TheQ-itemsetslist,ULs(QIs):Utilitylists
+ofQ-itemsets,P∗:ThelistofpromisingQ-itemsets,qrc:Thequantitative
+relatedcoefficient,CM:Thecombiningmethod,θ:Thepre-defined
+minimumutilitythreshold
+Output:ThesetofHUQIswithrespecttoprefixP.
+1 foreach[Px] such that x∈QIs do
+2
+QIs←∅;P∗←∅
+3 foreach[Py] such that y∈P∗ and y(cid:31)xdo
+4 if [Px] is an exact Q−itemsetthen
+5 c←TQCS(x,y);
+6 if (c==Null Or c< q θ rc )then
+7 Gotonext[Py];
+8 end
+9 end
+10 else
+11 c←(cid:80)u q=l TQCS(xi,y);
+12 if c< q θ rc then
+13 Gotonext[Py];
+14 end
+15 end
+16 Z←[Pxy];UL(Z)=Construct(x,y,P);
+17 if UL(Z)!=Null and TWU(Z)>= q θ rc then
+18 P∗=P∗∪Z;if UL(Z).SumEutil≥θ then
+19 H=H∪Z;OutputZ;
+20 end
+21 else
+22 if UL(Z).SumEutil+UL(Z).SumRutil≥θ then
+23 E=E∪Z;
+24 end
+25 if q θ rc ≤ UL(Z).SumEutil ≤ θ then
+26 C=C∪Z;
+27 end
+28 end
+29 end
+30 end
+31 DiscoverHighUtilityrangeQ-itemsetsHRusingCM andC;
+32 QIs ← (H ∪ E ∪ HR);
+33 Recursive Mining Search(Px,QIs,ULs(QIs),P∗,qrc,CM,θ);
+34 end
+2170, 1125). Thus, the algorithm outputs and keeps only high utility Q-items
+(C,7,8) and (C,7,9) while Q-items (G,7,8) and (C,8,9) are discarded. Accordingly,
+HR={(C,7,8), (C,7,9)}.
+After performing the combination process, the algorithm forms the QIs set
+fromtheunionofH andE andHR.Inthisexample,QIs ={(I,9),(C,7,9),(C,9),
+(G,8), (C,7,8)}.
+At this point, the Recursive Mining Search procedure is invoked to perform
+thedepth-firstsearch.Theprocedurerecursivelyexploresthesearchspacestarting
+from the first Q-item in QIs until reaching the last Q-item. Besides, the join
+operation is used to form larger Q-itemsets. However, before joining Q-itemsets,
+22 Nouiouaetal.
+Table 3: An example of a transaction database
+T Transaction
+id
+T1 (A,2)(C,7)(H,4)(I,9)
+T2 (A,3)(C,8)
+T3 (A,2)(B,1)(C,7)(G,7)(H,4)
+T4 (B,2)(C,9)(G,8)(H,5)
+T5 (A,2)(D,5)(E,1)(F,1)
+Table 4: Profit table
+Item A B C D E F G H I
+Profit 20 15 70 54 11 100 75 47 96
+Table 5: Promising items
+Q-item TWU Q-item TWU
+(A,2) 3261 (B,1) 1258
+(C,7) 2840 (G,7) 1258
+(H,4) 2840 (A,3) 620
+(I,9) 1582 (C,8) 620
+(B,2) 1495 (D,5) 421
+(C,9) 1495 (E,1) 421
+(G,8) 1495 (F,1) 421
+(H,5) 1495
+Table 6: TQCS structure for Q-items of the database presented in Table 3
+a b c a b c
+(A,2) 2840 (E,1) 421
+(C,7) (B,1) 1258 (D,5) (A,2) 421
+(H,4) 2840 (F,1) 421
+(A,3) φ φ (B,2) φ φ
+(A,2) (E,1) 421 (G,8) (B,2) 1495
+(B,1) 1258 (H,5) 1495
+(A,2) 1582 (A,2) 1285
+(I,9) (C.7) 1582 (G,7) (C,7) 1285
+(H,4) 1582 (B,1) 1285
+(B,1) φ φ (H,4) 1285
+(H,5) (B,2) 1495 (E,1) φ φ
+(H,4) (A,2) 2840 (G,8) 1495
+(B,1) 1258 (C,9) (B,2) 1495
+(F,1) (E,1) 421 (B,5) 1495
+(A,2) 421 (C,8) (A,3) 620
+thealgorithmfirstappliestheproposedEQCPSandRQCPStoavoidconsidering
+unpromising Q-itemsets.
+Back to our example, the extension Px=(I,9) is processed with all extensions
+Py such that y ∈ P∗. (I,9) is first processed with extension Py =(C,9). From
+Table 6, we can see that there is no tuple (a,b,c) ∈ TQCS such that a=(I,9),
+b=(C,9) and c ≥ ( θ ). Thus, Q-itemset [(I,9), (C,9)] is directly ignored and the
+qrc
+algorithm will pass to the next Q-item y∈P∗ to test a new extension Py without
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 23
+constructingUL([(I,9),(C,9)]).Similarly,thealgorithmpassesdirectlyextensions
+Py=(G,8), Py=(C,8) and Py=(G,7) until reaching Py=(C,7). From Table 6, we
+can see that TWU([(I,9),(C,7)]) = 1582 ≥ θ . Thus, Q-items (I,9) and (C,7)
+qrc
+are joined to form [(I,9),(C,7)] and UL([(I,9),(C,7)]) is constructed. Once a new
+larger Q-itemset is constructed, the algorithm puts this Q-itemset in the P∗ set
+and tests its utility to see if this Q-itemset is a HUQI (belongs to H set), is
+to be explored (belongs to E set) or to be combined (belongs to C set). Since
+u([(I,9),(C,7)])=1354, The Q-itemset [(I,9), (C,7)] is outputted and it is put in
+the H set. The algorithm continues traversing extensions Py. After traversing all
+extensions, H ={(C,7)}, C ={[(H,4),(A,2)]} and E =∅.
+ThecombinationprocessisthenperformedoncandidateQ-itemsetsofC.Since
+thetwoQ-itemsinC cannotbecombined,thecombiningprocessdoesnotproduce
+any range Q-itemset and HR = ∅. At this point, the new QIs is created, QIs =
+{H ∪E ∪HR} = {(C,7) ∪∅∪∅} ={(C,7)}. Moreover, the new list of promising
+items is P∗ = {(C,7), (H,4), (A,2)}.
+At this point, the procedure is recursively called to explore larger Q-itemsets
+withnewprefixP =(I,9),QIs ={(C,7)},P∗ ={(C,7),(H,4),(A,2)}.Theprocedure
+continue in the same way until all HUQIs are found. The set of all HUQIs are
+presented in Table 7.
+Table 7: HUQIs for θ=25%
+Q-itemset Utility
+[(C,7,8)] 1540
+[(C,7,9)] 2170
+[(I,9),(C,7)] 1354
+[(I,9),(C,7),(H,4)] 1542
+[(I,9),(C,7),(A,2)] 1394
+[(I,9),(C,7),(H,4),(A,2)] 1582
+[(C,7,9),(H,4)] 1356
+[(C,7,9),(A,2,3)] 1680
+[(C,7,9),(G,8),(H,5)] 1465
+[(C,7,9),(G,8),(H,5),(B,2)] 1495
+[(C,7,9),(H,4),(A,2)] 1436
+[(C,9),(G,8),(H,5)] 1465
+[(C,9),(G,8),(H,5),(B,2)] 1495
+[(C,7,8),(H,4)] 1356
+[(C,7,8),(A,2,3)] 1680
+[(C,7,8),(H,4),(A,2)] 1436
+[(C,7),(H,4)] 1356
+[(C,7),(H,4),(A,2)] 1436
+5.5 Complexity Analysis
+Lastly, this section discusses the complexity of the FHUQI-Miner algorithm. Let
+M and N be respectively the number of transactions and the number of distinct
+Q-items in the database. The algorithm starts by performing two database scans,
+the first scan is to calculate the TWU of Q-items. Besides, all transactions are
+24 Nouiouaetal.
+scanned once where each transaction contains at most N Q-items. Thus, the first
+scan requires O(MN) time.
+The second database scan is performed to create initial utility-lists and the
+TQCS structure. To create initial-utility lists, a sort is performed on each trans-
+action. This process has complexity O(MNlog(MN)). Moreover, to create the
+TQCS structure, it is necessary to check all co-occurrences in each transaction
+which requires O(MN2). Thus, the complexity of the two first database scans is
+O(MN +MNlog(MN)+MN2) = O(MN2+MNlog(MN)).
+The algorithm then checks the utility of each 1-Q-itemset which requires only
+O(P∗). In the worst case, the complexity of this checking process is O(N). After
+that, the algorithm performs the combining operation on candidate 1-Q-itemsets.
+The combining operation is performed on the set C of candidate Q-itemsets. Be-
+sides,Q-itemsetsarefirstsortedbasedontheirnames.Then,allpairsofQ-itemsets
+in C are compared with each other. Thus, the complexity of the combining op-
+eration is O(|C|2 +|C|log(|C|)) =O(|C|2). The complexity of the combining op-
+eration depends on the number of candidate Q-itemsets in C. The worst case
+corresponds to the situation where all 1-Q-itemsets are treated as candidates
+Q-itemsets. In that case, the complexity of the combining operation is O(N2).
+Hence, the total complexity before performing the recursive mining search is
+O(MN2+MNlog(MN)+N2)=O(MN2+MNlog(MN)).
+During the recursive search for patterns, FHUQI-Miner performs two main
+operations, the join operation and the combining operation.
+Thejoinoperationisperformedbyrecursivelyintersectingutility-listsofsmaller
+Q-itemsetstogetutility-listsoflargerQ-itemsets.GivenaprefixQ-itemsetP and
+two extensions Px and Py such that x≺y, the complexity of performing the join
+operation on Px and Py to obtain Pxy is O((|Px|+|Py|)|P|) where |P|, |Px| and
+|Py| are the number of transactions in UL(P), UL(Px) and UL(Py), respectively.
+In the worst case, the number of transactions in P, Px and Py is M. Accordingly,
+the complexity is O(M2).
+The number of join operations to be performed depends on the pruning strat-
+egy that is utilized. Mathematically, the number of join operations is exactly the
+number of Q-itemsets that have not been pruned which equals the number of
+all possible Q-itemsets (2N) minus the number of Q-itemset extensions that are
+pruned during the search for itemsets. Given that the number of Q-itemsets that
+are not pruned during the mining search is l , the overall complexity of join oper-
+1
+ations during the recursive search procedure is O(l M2).
+1
+As mentioned above, the combination operation has a complexity O(N2) in
+the worst case. By assuming that the number of combining operations during the
+recursive mining search is l , the overall complexity of the combining process is
+2
+O(l N2).
+2
+Insummary,thecomplexityofFHUQI-MinerisO(MN2+MNlog(MN)+N2+
+l M2+l N2) = (MN2+MNlog(MN)+l M2+l N2).
+1 2 1 2
+It is worth noticing that pruning strategies that are integrated in the pro-
+posed algorithm are sufficiently effective to prune a large number of unpromising
+Q-itemsetswhencomparedwithHUQI-Miner.Infact,althoughHUQI-Minerand
+FHUQI-Miner theoretically have the same complexity, the number l in our algo-
+1
+rithmFHUQI-Minerismuchsmallerthanl inHUQI-MinerwhichmakesFHUQI-
+1
+Miner more efficient than the former algorithms as it will be demonstrated in the
+experimental evaluation of this paper.
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 25
+6 Experimental Results
+This section describes experiments that were carried out to evaluate the perfor-
+mance of the proposed FHUQI-Miner algorithm. FHUQI-Miner is compared with
+the current state-of-art HUQIM algorithm, which is HUQI-Miner.
+All experiments were performed on a PC equipped with an Intel(R) i7-8700
+processor, 16 GB RAM and running the Windows7 operating system. The com-
+pared algorithms were implemented in Java by extending the SPMF Java open
+source data mining library [6].
+Algorithms were tested using six different datasets, namely Foodmart, Retail,
+BMSWebView2, Pumsb, Mushroom and Connect. These datasets have various
+characteristics and they are commonly used to evaluate HUIM algorithms. All
+datasetsweredownloadedfromtheSPMFlibrary[6].However,exceptFoodmart,
+other datasets cannot be directly used for HUQIM since they provide utilities of
+itemswithoutgivingtheirquantities.Thus,quantitiesandprofitsofdifferentitems
+were generated using the transaction database generator of SPMF [6]. Besides,
+profitsofitemsweregeneratedrandomlybetween1and10000usingalog-normal
+distribution while quantities were randomly generated from a pre-defined range
+for each dataset. The description of different parameters are presented in Table 8
+while characteristics of each dataset based on these parameters are given in Table
+9.
+Table 8: Parameters description
+Parametersdescription
+M Thenumberoftransactions
+N Thenumberofitems
+Q Quantitiesrange
+Table 9: Characteristics of datasets
+Dataset M N Q Type
+Foodmart 4141 1559 1-10 Sparse
+Retail 88162 16470 1-10 Sparse
+BMSWebView2 77512 3340 1-10 Sparse
+Mushroom 8416 128 1-10 Dense
+Connect 67557 129 1-5 Dense
+Pumsb 49046 2113 1-10 Dense
+6.1 Execution Time
+In the first experiment, the execution time of FHUQI-Miner was compared with
+HUQI-Minerwithdifferentcombiningmethods.Weranthetwoalgorithmsoneach
+26 Nouiouaetal.
+dataset with different values of θ. Results for both algorithms using Combine All,
+Combine Min and Combine Max are provided in Figures 6, 7 and 8, respectively.
+Results with Combine All. For the Combine All method, it is observed in
+Figure 6 that FHUQI-Miner clearly outperforms HUQI-Miner on four out of the
+six datasets used in these experiments. FHUQI-Miner is faster than HUQI-Miner
+for the Foodmart, Retail, BMSWebView2 and Pumsb datasets while the results
+are equivalent with a slight advantage for FHUQI-Miner for the Mushroom and
+Connect datasets.
+For Retail, BMSWebView2, Foodmart and Pumsb, FHUQI-Miner is up to
+22.18, 8.31, 4.79, 1.98 times faster than HUQI-Miner. On average, FHUQI-Miner
+is 12.21, 6.16, 3.39 and 1.58 faster than HUQI-Miner.
+For the Mushroom and Connect datasets, the two algorithms have similar
+running time. However, FHUQI-Miner still outperforms HUQI-Miner in most of
+the cases. Globally, for the Mushroom and Connect datasets, FHUQI-Miner is on
+average 1.08 and 1.05 times faster than HUQI-Miner.
+ResultswithCombine Min.ItisobservedinFigure7thatwhentheCombine
+Min method is used, FHUQI-Miner is faster than HUQI-Miner on all datasets.
+Moreprecisely,forRetail,BMSWebView2,Foodmart,Pumsb,ConnectandMush-
+room, FHUQI-Miner is up to 33.95, 14.72, 5.07, 2.05, 1.24 and 1.36 faster than
+HUQI-Miner. On average, FHUQI-Miner is 23.47, 12.53, 3.27, 1.83, 1.20 and 1.17
+faster than HUQI-Miner.
+ResultswithCombine Max.ItisfoundinFigure8thatwhenutilizingCombine
+Max, FHUQI-Miner has better runtimes than HUQI-Miner on all datasets, and
+especially for Retail and BMSWebView2. In terms of results, FHUQI-Miner is up
+to 41.23, 18.77, 7.17 faster than HUQI-Miner for sparse datasets Retail, BMSWe-
+bView2 and Foodmart, respectively. For dense datasets Pumsb, Mushroom and
+Connect, FHUQI-Miner is respectively up to 2,95, 1,58, 1,37 times faster than
+HUQI-Miner.
+It is worth noticing that as θ is set to smaller values, more patterns may
+need to be evaluated by the algorithm. Thus, the search space becomes larger.
+In Figures 6, 7 and 8, it can be observed that the difference between the two
+algorithms is bigger for small θ values. More precisely, the smaller the value of
+θ is, the faster FHUQI-Miner is compared to HUQI-Miner. Therefore, we can
+conclude that FHUQI-Miner is more efficient than HUQI-Miner when the search
+space becomes larger. This result will be further confirmed in next experiments.
+6.2 Join Operations
+The search space of HUQIM can be represented as a graph in where a depth-
+first search algorithm os applied. Besides, the join operation which is performed
+to obtain larger Q-itemsets, can be viewed as visiting a new node in the search
+space. Accordingly, an efficient algorithm should perform as less join operation as
+possible to avoid visiting nodes that correspond to unpromising Q-itemsets.
+Inthisexperiment,thenumberofjoinoperationsforeachdatasetwithdifferent
+settings of θ was recorded.
+TheobtainedresultswithCombine All,Combine MinandCombine Maxmeth-
+ods are respectively presented in Figures 9, 10 and 11. Generally, it can be seen
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 27
+45 Foodmart 3500 Retail
+40 3000 HUQI-Miner
+35 HUQI-Miner 2500 FHUQI-Miner
+)s(
+em 2
+3
+5
+0 FHUQI-Miner )s(
+em 2000
+itnuR1 2
+5
+0 itnuR 1500
+1000
+10
+5 500
+0 0
+0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1 0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1
+Minimum utility threshold (%) Minimum utility threshold (%)
+(a) (b)
+250 BMSWebView2 6000 Pumsb
+200 5000
+HUQI-Miner HUQI-Miner
+)s(
+em
+150 FHUQI-Miner )s(
+em
+3
+4
+0
+0
+0
+0
+0
+0 FHUQI-Miner
+itnuR
+100
+itnuR2000
+50 1000
+0 0
+0.05 0.06 0.07 0.08 0.09 0.1 0.11 0.12 0.13 0.14 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95
+Minimum utility threshold (%) Minimum utility threshold (%)
+(c) (d)
+1600 Mushroom 1200 Connect
+1400
+HUQI-Miner 1000 HUQI-Miner
+)s(
+em
+1 1 0 2
+8
+0 0
+00
+0 0 FHUQI-Miner )s(
+em
+6
+8
+0
+0
+0
+0 FHUQI-Miner
+itnuR
+600
+itnuR
+400
+400
+200
+200
+0 0
+0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1 2.9 3 3.1 3.2 3.3 3.4 3.5 3.6 3.7 3.8
+Minimum utility threshold (%) Minimum utility threshold (%)
+(e) (f)
+Fig. 6: Runtime with the Combine All method
+from these figures that for all combining methods, FHUQI-Miner performs much
+less join operations than HUQI-Miner for all datasets, especially sparse datasets.
+Forsparsedatasets,thedifferencebetweenthenumberofjoinoperationsofthe
+two algorithms is huge especially with low values of θ. For example, on the Retail
+dataset with the Combine All method and threshold θ = 0.01, HUQI-Miner per-
+forms 1979170399 join operations while FHUQI-Miner performs only 135424988
+join operations. This means that HUQI-Miner processes 1843745411 unpromising
+Q-itemset which will be directly pruned by FHUQI-Miner without constructing
+their utility-lists. Similarly for Foodmart and a threshold 0.01, HUQI-Miner per-
+28 Nouiouaetal.
+40 Foodmart 1800 Retail
+35 1600 HUQI-Miner
+30 HUQI-Miner 1400 FHUQI-Miner
+)s(
+em
+2
+2
+0
+5 FHUQI-Miner )s(
+em 1
+12
+0
+0
+00
+0
+itnuR15 itnuR
+6
+8
+0
+0
+0
+0
+10 400
+5 200
+0 0
+0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1 0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1
+Minimum utility threshold (%) Minimum utility threshold (%)
+(a) (b)
+120 BMSWebView2 600 Pumsb
+100 500
+HUQI-Miner HUQI-Miner
+)s(
+em
+6
+8
+0
+0 FHUQI-Miner )s(
+em
+3
+4
+0
+0
+0
+0 FHUQI-Miner
+itnuR
+40
+itnuR200
+20 100
+0 0
+0.05 0.06 0.07 0.08 0.09 0.1 0.11 0.12 0.13 0.14 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95
+Minimum utility threshold (%) Minimum utility threshold (%)
+(c) (d)
+23 Mushroom 70 Connect
+60
+18 HUQI-Miner HUQI-Miner
+FHUQI-Miner 50 FHUQI-Miner
+)s(
+em itnuR
+1
+8
+3
+)s(
+em
+itnuR
+2
+3
+40
+0
+0
+3 10
+0
+-2 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1 2.9 3 3.1 3.2 3.3 3.4 3.5 3.6 3.7 3.8
+Minimum utility threshold (%) Minimum utility threshold (%)
+(e) (f)
+Fig. 7: Runtime with the Combine Min method
+forms 60170299 join operations while FHUQI-Miner performs only 267979. The
+difference between the two algorithms is huge (59902320).
+Similarly to when the Combine All method is used, the number of join op-
+erations performed by FHUQI-Miner is much lower than HUQI-Miner when the
+Combine Min and Combine Max methods are applied. For instance, using the
+Combine Min method, the difference between the number of join operations for
+BMSWebView2withthresholdθ=0.05is50412766(Figure10-(c)).Forthesame
+dataset, when Combine Max is applied, the difference is 78732 (Figure 11-(c)).
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 29
+35 Foodmart 1400 Retail
+30 1200 HUQI-Miner
+25 HUQI-Miner 1000 FHUQI-Miner
+)s(
+em 20
+FHUQI-Miner )s(
+em 800
+itnuR 15 itnuR 600
+10 400
+5 200
+0 0
+0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1 0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1
+Minimum utility threshold (%) Minimum utility threshold (%)
+(a) (b)
+90 BMSWebView2 250 Pumsb
+80
+70 200
+HUQI-Miner HUQI-Miner
+)s(
+em 5
+6
+0
+0 FHUQI-Miner )s(
+em 150
+FHUQI-Miner
+itnuR3 4
+0
+0 itnuR
+100
+20 50
+10
+0 0
+0.05 0.06 0.07 0.08 0.09 0.1 0.11 0.12 0.13 0.14 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95
+Minimum utility threshold (%) Minimum utility threshold (%)
+(c) (d)
+8 Mushroom Connect
+14
+7
+HUQI-Miner 12
+6 FHUQI-Miner
+)s(
+em 4
+5 )s(
+em
+1
+8
+0
+itnuR3 itnuR 6 H
+FH
+U
+U
+Q
+Q
+I-
+I
+M
+-M
+in
+in
+e
+e
+r
+r
+2 4
+1 2
+0 0
+0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1 2.9 3 3.1 3.2 3.3 3.4 3.5 3.6 3.7 3.8
+Minimum utility threshold (%) Minimum utility threshold (%)
+(e) (f)
+Fig. 8: Runtime with the Combine Max method
+For dense datasets, FHUQI-Miner also performs less join operations than
+HUQI-Miner. However, the gap between the two algorithms is not as large as
+for sparse datasets. Moreover, the performance of FHUQI-Miner on Pumsb is
+clearlybetterthanitsperformanceonthetwootherdatasets,MushroomandCon-
+nect. Starting with the Combine All method, Pumsb and θ = 0.5 (Figure 9-(d)),
+HUQI-Miner performs 136344145 join operations while FHUQI-Miner only per-
+forms93051302.Takingthesameexample,thedifferenceofjoinoperationsforthe
+Combine Min and Combine Max methods is respectively 6214571 and 3994845.
+30 Nouiouaetal.
+noitarepo
+nioJ
+snoilliM
+2
+3
+4
+5
+6
+7
+0
+0
+0
+0
+0
+0 Foodmart
+H FH U U Q Q I- I M -M in in e e r r noitarepo
+nioJ
+snoilliM
+1
+1
+1 1 1
+1
+1 2
+0
+1
+3 5
+7
+8 0
+4
+4
+6
+7
+8
+2
+6
+0 8
+2
+6 0
+0
+4
+8
+4
+6
+0
+0
+0
+0
+0
+0
+0
+0 0
+0
+0 0 Retail
+H FH U Q Q U I- I M -M in in e e r r
+10 320
+180
+0 40
+0,010,020,030,040,050,060,070,080,09 0,1 -100 0.010.020.030.040.050.060.070.080.09 0.1
+Minimum utility threshold (%) Minimum utility threshold (%)
+(a) (b)
+noitarepo
+nioJ
+snoilliM 1 11 0
+3
+4
+5
+6
+7
+8 9
+0 0
+0
+0
+0
+0
+0
+0 0
+BMSWebView2
+H
+FH
+U
+U
+Q
+Q
+I-
+I
+M
+-M
+in
+in
+e
+e
+r
+r noitarepo
+nioJ
+snoilliM
+1
+1 1
+1 1 1
+0
+1 2
+3 4 5
+4
+5 6
+7
+8
+9 0
+0 0
+0 0 0
+0
+0 0
+0
+0
+0
+Pumsb
+H
+FH
+U
+U
+Q
+Q
+I-
+I
+M
+-M
+in
+in
+e
+e
+r
+r
+20 30
+10 1 2 0 0
+0 0
+0.050.060.070.080.09 0.1 0.110.120.130.14 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95
+Minimum utility threshold (%) Minimum utility threshold (%)
+(c) (d)
+snoilliM 10
+8
+9
+0
+0
+0
+0
+0
+0 Mushroom
+HUQI-Miner
+snoilliM
+5
+6 Connect
+HUQI-Miner
+noitarepo
+nioJ 3 4
+5
+6
+7
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+FHUQI-Miner noitarepO
+nioJ 2
+3
+4 FHUQI-Miner
+200 1
+100
+0 0
+0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1 2.9 3 3.1 3.2 3.3 3.4 3.5 3.6 3.7 3.8
+Minimum utility threshold (%) Minimum utility threshold (%)
+(e) (f)
+Fig. 9: Number of join operations with the Combine All method
+To clarify and summarize the obtained results, the average of differences be-
+tween the two algorithms in terms of number of join operations for each dataset
+is calculated.
+WhenadoptingtheCombine All method,thedifferencebetweenthetwocom-
+paredalgorithmsis27068382.1(resp.329932650.6,42762584.2,15639851.3,21429504)
+for Foodmart (resp. Retail, BMSWebView2, Pumsb, Mushroom, Connect).
+UsingtheCombine Minmethod,thedifferenceis19633675,5(resp.197506293,
+21884389,9, 3604549,5, 517312,1, 39730,5) for Foodmart (resp. Retail, BMSWeb-
+View2,Pumsb,Mushroom,Connect).Finally,withtheCombine Maxmethod,the
+difference between the two compared algorithms is 15279436 (resp. 154308832,6,
+15437347,8, 1574647,6, 332387,7, 17026,6) for Foodmart (resp. Retail, BMSWeb-
+View2, Pumsb, Mushroom, Connect).
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 31
+noitarepo
+nioJ
+snoilliM
+2
+3
+4
+5
+0
+0
+0
+0 Foodmart
+H FH U U Q Q I- I M -M in in e e r r noitarepo
+nioJ
+snoilliM 10
+4
+6
+8
+0
+0
+0
+0
+0
+0
+0
+0 Retail
+H
+FH
+U
+Q
+Q
+U
+I-
+I
+M
+-M
+in
+in
+e
+e
+r
+r
+10 200
+0 0
+0,010,020,030,040,050,060,070,080,09 0,1 0.010.020.030.040.050.060.070.080.09 0.1
+Minimum utility threshold (%) Minimum utility threshold (%)
+(a) (b)
+noitarepo
+nioJ
+snoilliM
+2
+3
+4
+5
+0
+0
+0
+0
+BMSWebView2
+H FH U U Q Q I- I M -M in in e e r r noitarepo
+nioJ
+snoilliM
+1
+1 1
+1
+1
+1
+3 5
+7
+9
+5
+7
+9
+.
+. .
+.
+.
+.
+.
+.
+1
+1
+1
+1
+1 1
+1
+1 Pumsb
+H FH U U Q Q I- I M -M in in e e r r
+10 3.1
+1.1
+0
+0.05 0.06 0.07 0.08 0.09 0.1 0.11 0.12 0.13 0.14 -0.9 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95
+Minimum utility threshold (%) Minimum utility threshold (%)
+(c) (d)
+noitarepo
+nioJ
+snoilliM
+1
+1
+1
+3
+3
+5
+7
+9 .
+.
+.
+.
+.
+.
+5
+5
+5
+5 5
+5 Mushroom
+H FH U U Q Q I- I M -M in in e e r r noitarepO
+nioJ
+snoilliM
+0
+0 0
+.
+. .
+0
+0
+0
+0
+1
+2 3
+.
+.
+.
+.
+1
+2
+3
+4
+5
+5
+5
+Connect
+H FH U U Q Q I- I M -M in in e e r r
+1.5 0.05
+-0.5 0
+0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1 2.9 3 3.1 3.2 3.3 3.4 3.5 3.6 3.7 3.8
+Minimum utility threshold (%) Minimum utility threshold (%)
+(e) (f)
+Fig. 10: Number of join operations with the Combine Min method
+6.3 Pruning Strategies Effectiveness
+Todemonstratetheeffectivenessoftheproposedpruningstrategies,Tables10and
+11 indicate the percentages of candidate Q-itemsets that FHUQI-Miner is able to
+directly prune that HUQI-Miner does not prune. These percentages are called
+pruning rates and they are calculated for different values of θ for both sparse and
+dense datasets.
+Forsparsedatasets,itisclearfromTable10thatFHUQI-Minerisabletoprune
+a large amount of unpromising candidate Q-itemsets when using all combining
+methods thanks to the proposed EQCPS and RQCPS pruning strategies, used
+during the search for patterns. More precisely, with the Combine All method,
+FHUQI-Minerprunesupto99.72%,96.17%and93.15%ofunpromisingQ-itemsets
+32 Nouiouaetal.
+snoilliM4 5
+0
+0 Foodmart
+HUQI-Miner
+snoilliM
+7
+8
+0
+0
+0
+0 Retail
+noitarepo
+nioJ 2
+3
+0
+0
+FHUQI-Miner noitarepo
+nioJ 3
+4
+5
+6
+0
+0
+0
+0
+0
+0
+0
+0 H
+FH
+U
+Q
+Q
+U
+I-
+I
+M
+-M
+in
+in
+e
+e
+r
+r
+10 200
+100
+0 0
+0,010,020,030,040,050,060,070,080,09 0,1 0.010.020.030.040.050.060.070.080.09 0.1
+Minimum utility threshold (%) Minimum utility threshold (%)
+(a) (b)
+snoilliM
+3
+4
+0
+0 BMSWebView2
+HUQI-Miner
+snoilliM 1
+8
+9
+0 Pumsb
+HUQI-Miner
+noitarepo
+nioJ
+1
+2
+0
+0
+FHUQI-Miner noitarepo
+nioJ
+3
+4
+5
+6
+7 FHUQI-Miner
+2
+1
+0 0
+0.050.060.070.080.09 0.1 0.110.120.130.14 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95
+Minimum utility threshold (%) Minimum utility threshold (%)
+(c) (d)
+noitarepo
+nioJ
+snoilliM
+2
+3
+4 5
+6 Mushroom
+H FH U U Q Q I- I M -M in in e e r r noitarepO
+nioJ
+snoilliM
+0
+0
+0
+0
+0
+.
+.
+.
+.
+.
+0
+0
+0
+0
+0
+2
+3
+4
+5
+6 Connect
+H FH U U Q Q I- I M -M in in e e r r
+1 0.01
+0 0
+0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1 2.9 3 3.1 3.2 3.3 3.4 3.5 3.6 3.7 3.8
+Minimum utility threshold (%) Minimum utility threshold (%)
+(e) (f)
+Fig. 11: Number of join operations with the Combine Max method
+for the Foodmart, Retail and BMSWebView2 datasets, respectively. Using the
+Combine Min method, FHUQI-Miner prunes up to 99.77%, 99.07% and 98.22%
+of candidate Q-itemsets for the Foodmart, Retail and BMSWebView2 datasets,
+respectively.Finally,withtheCombine Maxmethod,FHUQI-Minerprunesupto
+99.82%,99.43%and98.88%ofcandidateQ-itemsetsfortheFoodmart,Retailand
+BMSWebView2 datasets.
+By comparing the average pruning rates on different datasets with each com-
+bining method, it is found that, the largest average pruning rates are obtained
+on Foodmart, which is known as a very sparse dataset. On that dataset, 99.64%,
+99.68%,and99.69%ofcandidatesareprunedwhenusingtheCombine All,Combine
+MinandCombine Maxmethod,respectively.Retailistheseconddatasetinwhich
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 33
+Table 10: Percentage of candidate itemsets pruned by FHUQI-Miner for sparse
+datasets
+Foodmart Retail BMSWebView2
+θ All Min Max θ All Min Max θ All Min Max
+(%) (%) (%) (%) (%) (%) (%) (%) (%) (%) (%) (%)
+0.01 99.55 99.54 99.52 0.01 93.15 98.35 98.88 0.05 93.15 98.11 98.59
+0.02 99.50 99.52 99.48 0.02 91.58 98.30 98.83 0.06 91.84 98.05 98.55
+0.03 99.55 99.58 99.54 0.03 90.92 98.43 98.89 0.07 89.88 97.99 98.53
+0.04 99.61 99.64 99.63 0.04 91.49 98.59 98.99 0.08 89.52 97.97 98.55
+0.05 99.67 99.71 99.71 0.05 92.94 98.76 99.11 0.09 89.72 97.99 98.57
+0.06 99.70 99.75 99.76 0.06 93.27 98.86 99.18 0.1 84.33 98.01 98.61
+0.07 99.70 99.76 99.80 0.07 94.36 98.98 99.29 0.11 87.00 98.04 98.67
+0.08 99.71 99.76 99.81 0.08 94.86 99.03 99.34 0.12 89.09 98.12 98.74
+0.09 99.72 99.77 99.82 0.09 95.82 99.05 99.40 0.13 91.05 98.15 98.80
+0.1 99.72 99.76 99.82 0.1 96.17 99.07 99.43 0.14 92.18 98.22 98.88
+Avg 99,64 99,68 99,69 Avg 93,46 98,74 99,13 Avg 89,78 98,07 98,65
+pruningaveragesarelarge.Overall,theobtainedresultsdemonstratetheeffective-
+ness of FHUQI-Miner on sparse datasets.
+Pruning rates of FHUQI-Miner on dense datasets are given in Table 11. The
+highestpruningratesareobtainedonPumsbonwhichFHUQI-Minercanpruneon
+average40.43%,39.23%,and52.45%ofcandidateQ-itemsetswiththeCombine All,
+Combine Min and Combine Max respectively. On the Connect dataset, FHUQI-
+Minerisabletoprune1,87%,18,73%and36,93%ofcandidatesusingCombine All,
+Combine MinandCombine Maxrespectively.Finally,onMushroomdataset,FHUQI-
+Minercanpruneonaverage8,64%,28,74%and48,13%withCombine All,Combine
+Min and Combine Max, respectively.
+Table 11: Percentage of candidate solutions pruned by FHUQI-Miner for dense
+datasets
+Pumsb Connect Mushroom
+θ All Min Max θ All Min Max θ All Min Max
+(%) (%) (%) (%) (%) (%) (%) (%) (%) (%) (%) (%)
+0.5 31.75 32.60 40.30 2.9 9.14 15.03 30.10 0.1 8.89 18.61 22.90
+0.55 34.47 18.91 8.63 3 9.18 15.80 32.70 0.2 9.08 18.50 28.96
+0.6 36.31 23.23 7.88 3.1 9.36 16.63 33.82 0.3 8.46 20.81 36.93
+0.65 37.92 38.27 45.56 3.2 9.55 17.30 36.12 0.4 8.86 24.11 44.78
+0.7 39.44 40.57 54.74 3.3 10.59 17.37 37.14 0.5 8.73 27.65 51.12
+0.75 40.53 42.18 62.11 3.4 11.15 17.01 38.08 0.6 8.68 29.85 52.71
+0.8 41.89 44.08 67.42 3.5 11.85 17.62 39.46 0.7 8.43 31.43 55.55
+0.85 43.18 45.40 70.83 3.6 13.29 20.06 40.01 0.8 8.35 35.67 60.14
+0.9 44.51 47.04 72.71 3.7 16.30 24.30 40.44 0.9 8.38 39.00 63.15
+0.95 46.52 48.92 73.35 3.8 18.28 26.22 41.42 1 8.55 41.73 65.05
+Avg 40,43 39,23 52,45 Avg 11,87 18,73 36,93 Avg 8,64 28,74 48,13
+Fromtheobtainedresultsintermsofrunningtimeandpruningeffectiveness,a
+naturalquestionarises:WhytheperformanceofFHUQI-Mineronsparsedatasets
+is higher than its performance on dense datasets?
+The major reason behind that is the characteristics of these datasets. Sparse
+datasets contain transactions that have few similarities. Accordingly, discovered
+34 Nouiouaetal.
+HUQIs are not similar to each other. Moreover, the number of HUQIs is low and
+it is close to the number of distinct Q-items. For example, on Retail dataset and
+θ = 0.01, the number of distinct Q-items is 101546 while the number of HUQIs
+is 89459. On BMSWebView2 with θ = 0.05, the number of distinct Q-items is
+101546 while the number of HUQIs is 89459. Therefore, a large part of Q-items
+combinations, i.e, Q-itemsets, are unpromising and they will be pruned during
+the recursive search for patterns (Algorithm 1) using the proposed EQCPS and
+RQCPS strategies. Consequently, the runtime is reduced, less join operations are
+performed, and more candidate itemsets are pruned.
+Ontheotherhand,transactionsindensedatasetsaresimilarandthenumberof
+HUQIs is very high comparing with the number of distinct Q-items. For instance,
+in Mushroom with threshold θ = 0.1, the number of HUQIs is 8199402 while
+the number of distinct Q-items is only 1161. Due to this fact, many candidate
+Q-itemsets obtained by joining different Q-items during the recursive search for
+patterns are HUQIs. Accordingly, the frequency of successfully applying pruning
+strategies in dense datasets is lower than that for sparse datasets. As a result,
+the pruning rate of FHUQI-Miner on dense datasets is not as large as that for
+sparse datasets and the running time of the two algorithms is quite similar with
+an advantage for the proposed FHUQI-Miner algorithm.
+It is worth noticing that, the high performance of FHUQI-Miner on sparse
+datasets is more advantageous since sparse datasets are more valuable and more
+commonthandensedatasets.Infact,mostofrealworldproblemssuchascustomer
+behavior analysis have data sparsity. Therefore, obtaining better performance for
+mining patterns in sparse datasets is often viewed as more important than for
+dense datasets.
+7 Conclusion
+Inthispaper,wehavepresentedanewalgorithmforhighutilityquantitativeitem-
+set mining named FHUQI-Miner (Faster High Utility Quantitative Itemset Min-
+ing). It relies on two new pruning strategies, named EQCPS (Exact Q-items Co-
+occurrence Pruning Strategy) and RQCPS (Range Q-items Co-occurrence Prun-
+ing Strategy). The proposed strategies can greatly reduce the number of join op-
+erations during the search for patterns which allows to improve the efficiency
+of HUQIM in terms of execution time. An extensive experimental study was
+performed on various datasets. Results have demonstrated the efficiency of the
+adopted pruning strategies especially for sparse datasets where the proposed al-
+gorithm is up to 41.23 times faster than HUQI-Miner. Moreover, the proposed
+algorithm can prune up to 99.82% of the search space.
+There are many possibilities for extending this research in future work. First,
+weplantoproposenewtighterupperboundsthatcanfurtherimprovetheprocess
+ofminingquantitativeitemsets.Second,weplantoalsointegrateadditionalopti-
+mizationstospeeduptheprocessingoftheexistingcombiningmethodswhichwill
+make them faster. Third, another interesting orientation is to propose new com-
+bining methods that allow to discover more meaningful patterns in a database.
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 35
+References
+1. Ahmed, C.F., Tanbeer, S.K., Jeong, B.S.: A novel approach for mining high-
+utilitysequentialpatternsinsequencedatabases.ETRIjournal32(5),676–686
+(2010)
+2. Aryabarzan, N., Minaei-Bidgoli, B., Teshnehlab, M.: negfin: An efficient al-
+gorithm for fast mining frequent itemsets. Expert Systems with Applications
+105, 129–143 (2018)
+3. Chan,R.,Yang,Q.,Shen,Y.D.: Mininghighutilityitemsets. In:Proc. ofthe
+3rdIEEEinternationalconferenceondatamining,pp.19–19.IEEEComputer
+Society (2003)
+4. Dinh,D.T.,Le,B.,Fournier-Viger,P.,Huynh,V.N.:Anefficientalgorithmfor
+mining periodic high-utility sequential patterns. Applied Intelligence 48(12),
+4694–4714 (2018)
+5. Duong, Q.H., Fournier-Viger, P., Ramampiaro, H., Nørv˚ag, K., Dam, T.L.:
+Efficienthighutilityitemsetminingusingbufferedutility-lists. AppliedIntel-
+ligence 48(7), 1859–1877 (2018)
+6. Fournier-Viger, P., Gomariz, A., Gueniche, T., Soltani, A., Wu, C.W., Tseng,
+V.S.:Spmf:ajavaopen-sourcepatternmininglibrary. TheJournalofMachine
+Learning Research 15(1), 3389–3393 (2014)
+7. Fournier-Viger, P., Lin, J.C.W., Duong, Q.H., Dam, T.L.: Phm: mining peri-
+odichigh-utilityitemsets. In:Industrialconferenceondatamining,pp.64–79.
+Springer (2016)
+8. Fournier-Viger, P., Lin, J.C.W., Truong-Chi, T., Nkambou, R.: A survey of
+highutilityitemsetmining.In:High-UtilityPatternMining,pp.1–45.Springer
+(2019)
+9. Fournier-Viger, P., Lin, J.C.W., Vo, B., Chi, T.T., Zhang, J., Le, H.B.: A
+survey of itemset mining. Wiley Interdisciplinary Reviews: Data Mining and
+Knowledge Discovery 7(4), e1207 (2017)
+10. Fournier-Viger, P., Wu, C.W., Zida, S., Tseng, V.S.: Fhm: Faster high-utility
+itemset mining using estimated utility co-occurrence pruning. In: Interna-
+tionalsymposiumonmethodologiesforintelligentsystems,pp.83–92.Springer
+(2014)
+11. Fournier-Viger,P.,Yang,P.,Lin,J.C.W.,Yun,U.:Hue-span:fasthighutility
+episode mining. In: International Conference on Advanced Data Mining and
+Applications, pp. 169–184. Springer (2019)
+12. Gan, W., Lin, J.C.W., Fournier-Viger, P., Chao, H.C., Tseng, V.S., Yu, P.S.:
+A survey of utility-oriented pattern mining. arXiv preprint arXiv:1805.10511
+(2018)
+13. Gomariz, A., Campos, M., Marin, R., Goethals, B.: Clasp: An efficient algo-
+rithm for mining frequent closed sequences. In: Pacific-Asia Conference on
+Knowledge Discovery and Data Mining, pp. 50–61. Springer (2013)
+14. Han, J., Pei, J., Kamber, M.: Data mining: concepts and techniques. Elsevier
+(2011)
+15. Han,X.,Liu,X.,Chen,J.,Lai,G.,Gao,H.,Li,J.:Efficientlyminingfrequent
+itemsets on massive data. IEEE Access 7, 31,409–31,421 (2019)
+16. Krishnamoorthy, S.: Hminer: Efficiently mining high utility itemsets. Expert
+Systems with Applications 90, 168–183 (2017)
+36 Nouiouaetal.
+17. Lee, J., Yun, U., Lee, G., Yoon, E.: Efficient incremental high utility pat-
+ternminingbasedonpre-largeconcept. EngineeringApplicationsofArtificial
+Intelligence 72, 111–123 (2018)
+18. Li,C.H.,Wu,C.W.,Huang,J.,Tseng,V.S.:Anefficientalgorithmformining
+high utility quantitative itemsets. In: 2019 International Conference on Data
+Mining Workshops (ICDMW), pp. 1005–1012. IEEE (2019)
+19. Li,C.H.,Wu,C.W.,Tseng,V.S.:Efficientverticalminingofhighutilityquan-
+titative itemsets. In: 2014 IEEE International Conference on Granular Com-
+puting (GrC), pp. 155–160. IEEE (2014)
+20. Lin, C.W., Hong, T.P., Lu, W.H.: An effective tree structure for mining high
+utility itemsets. Expert Systems with Applications 38(6), 7419–7424 (2011)
+21. Lin, Y.F., Wu, C.W., Huang, C.F., Tseng, V.S.: Discovering utility-based
+episode rules in complex event sequences. Expert Systems with Applications
+42(12), 5303–5314 (2015)
+22. Liu,J.,Wang,K.,Fung,B.C.:Directdiscoveryofhighutilityitemsetswithout
+candidate generation. In: 2012 IEEE 12th international conference on data
+mining, pp. 984–989. IEEE (2012)
+23. Liu, M., Qu, J.: Mining high utility itemsets without candidate generation.
+In:Proceedingsofthe21stACMinternationalconferenceonInformationand
+knowledge management, pp. 55–64 (2012)
+24. Liu, Y., Liao, W.k., Choudhary, A.: A two-phase algorithm for fast discovery
+of high utility itemsets. In: Pacific-Asia Conference on Knowledge Discovery
+and Data Mining, pp. 689–695. Springer (2005)
+25. Luna, J.M., Fournier-Viger, P., Ventura, S.: Frequent itemset mining: A 25
+years review. Wiley Interdisciplinary Reviews: Data Mining and Knowledge
+Discovery 9(6), e1329 (2019)
+26. Peng,A.Y.,Koh,Y.S.,Riddle,P.:mhuiminer:Afasthighutilityitemsetmin-
+ing algorithm for sparse datasets. In: Pacific-Asia Conference on Knowledge
+Discovery and Data Mining, pp. 196–207. Springer (2017)
+27. Qu,J.F.,Liu,M.,Fournier-Viger,P.:Efficientalgorithmsforhighutilityitem-
+setminingwithoutcandidategeneration. In:High-UtilityPatternMining,pp.
+131–160. Springer (2019)
+28. Truong-Chi,T.,Fournier-Viger,P.:Asurveyofhighutilitysequentialpattern
+mining. In: High-Utility Pattern Mining, pp. 97–129. Springer (2019)
+29. Tseng,V.S.,Wu,C.W.,Shie,B.E.,Yu,P.S.:Up-growth:anefficientalgorithm
+for high utility itemset mining. In: Proceedings of the 16th ACM SIGKDD
+internationalconferenceonKnowledgediscoveryanddatamining,pp.253–262
+(2010)
+30. Wang, C.M., Chen, S.H., Huang, Y.F.: A fuzzy approach for mining high
+utilityquantitativeitemsets.In:2009IEEEInternationalConferenceonFuzzy
+Systems, pp. 1909–1913. IEEE (2009)
+31. Wang, J.Z., Huang, J.L., Chen, Y.C.: On efficiently mining high utility se-
+quentialpatterns. KnowledgeandInformationSystems49(2),597–627(2016)
+32. Wu, C.W., Lin, Y.F., Yu, P.S., Tseng, V.S.: Mining high utility episodes in
+complex event sequences. In: Proceedings of the 19th ACM SIGKDD inter-
+national conference on Knowledge discovery and data mining, pp. 536–544
+(2013)
+33. Yen, S.J., Lee, Y.S.: Mining high utility quantitative association rules. In:
+InternationalConferenceonDataWarehousingandKnowledgeDiscovery,pp.
+FHUQI-Miner:FastHighUtilityQuantitativeItemsetMining 37
+283–292. Springer (2007)
+34. Yun, U., Ryang, H., Ryu, K.H.: High utility itemset mining with techniques
+for reducing overestimated utilities and pruning candidates. Expert Systems
+with Applications 41(8), 3861–3878 (2014)
+35. Zhang, C., Han, M., Sun, R., Du, S., Shen, M.: A survey of key technologies
+for high utility patterns mining. IEEE Access 8, 55,798–55,814 (2020)
+36. Zhang, S., Wu, X.: Fundamentals of association rules in data mining and
+knowledge discovery. Wiley Interdisciplinary Reviews: Data Mining and
+Knowledge Discovery 1(2), 97–116 (2011)
+37. Zida,S.,Fournier-Viger,P.,Lin,J.C.W.,Wu,C.W.,Tseng,V.S.:Efim:afast
+and memory efficient algorithm for high-utility itemset mining. Knowledge
+and Information Systems 51(2), 595–625 (2017)

@@ -1,0 +1,1 @@
+Here are a few transaction databases in SPMF format for high-utility itemset mining with negative unit profit values. Those datasets have been generated to be used in the FHN paper (Fournier-Viger et al., 2014) and can be used with the FHN and HUINIV-Mine algorithms. See the FHN paper for details.

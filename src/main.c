@@ -58,6 +58,9 @@
 #include "algorithms/slim.h"
 #include "algorithms/two_phase.h"
 #include "algorithms/fhm.h"
+#include "algorithms/vhuqi.h"
+#include "algorithms/fhuqi_miner.h"
+#include "algorithms/tkq.h"
 #include "algorithms/efim.h"
 #include "algorithms/hui_miner.h"
 #include "algorithms/up_growth.h"
@@ -148,7 +151,7 @@ int main(int argc, char **argv) {
 
     if (argc < 3) {
         printf("Usage: %s <algo_id> <dataset_path> [type_id] [min_support]\n", argv[0]);
-        printf("Types: 0=Transactional, 1=Utility, 2=Matrix\n");
+        printf("Types: 0=Transactional, 1=Utility, 2=Matrix, 4=Quantity\n");
         dm_list_algorithms();
         return 1;
     }
@@ -254,6 +257,9 @@ int main(int argc, char **argv) {
     DM_SLIM_Params slim_params;
     DM_Two_Phase_Params twophase_params;
     DM_FHM_Params fhm_params;
+    DM_VHUQI_Params vhuqi_params;
+    DM_FHUQI_Miner_Params fhuqi_miner_params;
+    DM_TKQ_Params tkq_params;
     DM_EFIM_Params efim_params;
     DM_HUI_Miner_Params huiminer_params;
     DM_UP_Growth_Params upgrowth_params;
@@ -319,6 +325,30 @@ int main(int argc, char **argv) {
     } else if (strcmp(algo_id, "fhm") == 0) {
         fhm_params.min_utility = min_support;
         params = &fhm_params;
+    } else if (strcmp(algo_id, "vhuqi") == 0) {
+        vhuqi_params.min_abs_utility = min_support;
+        vhuqi_params.qrc = (argc >= 6) ? atof(argv[5]) : 3.0;
+        params = &vhuqi_params;
+    } else if (strcmp(algo_id, "fhuqi_miner") == 0) {
+        fhuqi_miner_params.min_utility = min_support;
+        fhuqi_miner_params.qrc = (argc >= 6) ? atof(argv[5]) : 3.0;
+        fhuqi_miner_params.combine_method = DM_FHUQI_COMBINE_ALL;
+        if (argc >= 7) {
+            if (strcmp(argv[6], "min") == 0) fhuqi_miner_params.combine_method = DM_FHUQI_COMBINE_MIN;
+            else if (strcmp(argv[6], "max") == 0) fhuqi_miner_params.combine_method = DM_FHUQI_COMBINE_MAX;
+        }
+        fhuqi_miner_params.profit_path = (argc >= 8) ? argv[7] : NULL;
+        params = &fhuqi_miner_params;
+    } else if (strcmp(algo_id, "tkq") == 0) {
+        tkq_params.k = (size_t)min_support;
+        tkq_params.qrc = (argc >= 6) ? atof(argv[5]) : 3.0;
+        tkq_params.combine_method = DM_FHUQI_COMBINE_ALL;
+        if (argc >= 7) {
+            if (strcmp(argv[6], "min") == 0) tkq_params.combine_method = DM_FHUQI_COMBINE_MIN;
+            else if (strcmp(argv[6], "max") == 0) tkq_params.combine_method = DM_FHUQI_COMBINE_MAX;
+        }
+        tkq_params.profit_path = (argc >= 8) ? argv[7] : NULL;
+        params = &tkq_params;
     } else if (strcmp(algo_id, "efim") == 0) {
         efim_params.min_utility = min_support;
         params = &efim_params;
@@ -752,4 +782,3 @@ int main(int argc, char **argv) {
     dm_bench_print_report(algo->name, path);
     return 0;
 }
-

@@ -8,7 +8,8 @@ typedef enum {
     DM_TYPE_TRANSACTIONAL, 
     DM_TYPE_UTILITY,       
     DM_TYPE_MATRIX,
-    DM_TYPE_SEQUENCE_UTILITY
+    DM_TYPE_SEQUENCE_UTILITY,
+    DM_TYPE_QUANTITY
 } DM_DatasetType;
 
 /**
