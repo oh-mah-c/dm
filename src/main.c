@@ -22,6 +22,9 @@
 #include "algorithms/hep.h"
 #include "algorithms/dfhoi.h"
 #include "algorithms/fhoi.h"
+#include "algorithms/mfhoi.h"
+#include "algorithms/mhoui.h"
+#include "algorithms/vifp.h"
 #include "algorithms/tkhoim.h"
 #include "algorithms/hoimto.h"
 #include "algorithms/cfi_stream.h"
@@ -62,6 +65,7 @@
 #include "algorithms/fhuqi_miner.h"
 #include "algorithms/tkq.h"
 #include "algorithms/efim.h"
+#include "algorithms/dphim.h"
 #include "algorithms/hui_miner.h"
 #include "algorithms/up_growth.h"
 #include "algorithms/ihup.h"
@@ -92,6 +96,7 @@
 #include "algorithms/sfu_ce.h"
 #include "algorithms/uspan.h"
 #include "algorithms/hupspm.h"
+#include "algorithms/hup_miner.h"
 #include "algorithms/huim_bpso.h"
 #include "algorithms/hupe_garm.h"
 #include "algorithms/huim_aco.h"
@@ -112,6 +117,9 @@
 #include "algorithms/hauim_gmu.h"
 #include "algorithms/nam_hep.h"
 #include "algorithms/memu.h"
+#include "algorithms/mheinu.h"
+#include "algorithms/closed_fhuim_kinana.h"
+#include "algorithms/regular_mine.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -131,6 +139,13 @@ extern DM_Algorithm ehaupm_algo;
 extern DM_Algorithm hauim_gmu_algo;
 extern DM_Algorithm nam_hep_algo;
 extern DM_Algorithm memu_algo;
+extern DM_Algorithm mheinu_algo;
+extern DM_Algorithm dphim_algo;
+extern DM_Algorithm closed_fhuim_kinana_algo;
+extern DM_Algorithm hup_miner_algo;
+extern DM_Algorithm regular_mine_algo;
+extern DM_Algorithm mhoui_algo;
+extern DM_Algorithm vifp_algo;
 
 int main(int argc, char **argv) {
     dm_register_algorithm(&bio_huif_ga_algo);
@@ -148,10 +163,25 @@ int main(int argc, char **argv) {
     dm_register_algorithm(&hauim_gmu_algo);
     dm_register_algorithm(&nam_hep_algo);
     dm_register_algorithm(&memu_algo);
+    dm_register_algorithm(&mheinu_algo);
+    dm_register_algorithm(&dphim_algo);
+    dm_register_algorithm(&closed_fhuim_kinana_algo);
+    dm_register_algorithm(&hup_miner_algo);
+    dm_register_algorithm(&regular_mine_algo);
+    dm_register_algorithm(&mhoui_algo);
+    dm_register_algorithm(&vifp_algo);
 
     if (argc < 3) {
         printf("Usage: %s <algo_id> <dataset_path> [type_id] [min_support]\n", argv[0]);
-        printf("Types: 0=Transactional, 1=Utility, 2=Matrix, 4=Quantity\n");
+        printf("MFHOI: %s mfhoi <dataset_path> 0 <min_support> <min_occupancy> [strong:0|1]\n", argv[0]);
+        printf("MHOUI: %s mhoui <utility_dataset> 1 <min_support> <min_occupancy> <min_utility> [strong:0|1] [direct:0|1]\n", argv[0]);
+        printf("MHEINU: %s mheinu <utility_dataset> 1 <min_efficiency> [investment_file]\n", argv[0]);
+        printf("DPHIM: %s dphim <utility_dataset> 1 <min_utility> [threads]\n", argv[0]);
+        printf("Closed-FHUIM-Kinana: %s closed_fhuim_kinana <utility_dataset> 1 <min_utility> <min_support> [min_owl]\n", argv[0]);
+        printf("HUP-Miner: %s hup_miner <sequence_utility_dataset> 3 <min_average_utility> [max_length] [max_candidates]\n", argv[0]);
+        printf("RegularMine: %s regular_mine <transactional_dataset> 0 <min_support>\n", argv[0]);
+        printf("VIFP: %s vifp <transactional_dataset> 0 <min_support> [mode:plaintext|smpc|fhe]\n", argv[0]);
+        printf("Types: 0=Transactional, 1=Utility, 2=Matrix, 3=SequenceUtility, 4=Quantity\n");
         dm_list_algorithms();
         return 1;
     }
@@ -205,6 +235,9 @@ int main(int argc, char **argv) {
     DM_HEP_Params hep_params;
     DM_DFHOI_Params dfhoi_params;
     DM_FHOI_Params fhoi_params;
+    DM_MFHOI_Params mfhoi_params;
+    DM_MHOUI_Params mhoui_params;
+    DM_VIFP_Params vifp_params;
     DM_TKHOIM_Params tkhoim_params;
     DM_HOIMTO_Params hoimto_params;
     DM_CFI_STREAM_Params cfi_stream_params;
@@ -218,12 +251,16 @@ int main(int argc, char **argv) {
     DM_TKU_CE_Params tku_ce_params;
     DM_TKU_CE_Plus_Params tku_ce_plus_params;
     DM_FHN_Params fhn_params;
+    DM_DPHIM_Params dphim_params;
     DM_FHMDS_Params fhmds_params;
     DM_HAUI_Miner_Params haui_miner_params;
     DM_EHAUPM_Params ehaupm_params;
     DM_HAUIM_GMU_Params hauim_gmu_params;
     DM_NAM_HEP_Params nam_hep_params;
     DM_MEMU_Params memu_params;
+    DM_MHEINU_Params mheinu_params;
+    DM_ClosedFHUIMKinana_Params closed_fhuim_kinana_params;
+    DM_REGULAR_MINE_Params regular_mine_params;
     DM_FIN_Params fin_params;
     DM_FINPLUS_Params finplus_params;
     DM_NEGFIN_Params negfin_params;
@@ -291,6 +328,7 @@ int main(int argc, char **argv) {
     static DM_SFU_CE_Params sfu_ce_params = { .sample_size = 1000, .max_iterations = 100, .quantile = 0.1, .mutation_factor = 0.2 };
     static DM_USPAN_Params uspan_params;
     static DM_HUPSPM_Params hupspm_params;
+    static DM_HUP_Miner_Params hup_miner_params;
     static DM_HUIM_BPSO_Params huim_bpso_params;
     static DM_HUPE_GARM_Params hupe_garm_params;
     static DM_HUIM_ACO_Params huim_aco_params;
@@ -352,6 +390,26 @@ int main(int argc, char **argv) {
     } else if (strcmp(algo_id, "efim") == 0) {
         efim_params.min_utility = min_support;
         params = &efim_params;
+    } else if (strcmp(algo_id, "dphim") == 0) {
+        dphim_params.min_utility = min_support;
+        dphim_params.threads = (argc >= 6) ? atoi(argv[5]) : 0;
+        params = &dphim_params;
+    } else if (strcmp(algo_id, "closed_fhuim_kinana") == 0) {
+        closed_fhuim_kinana_params.min_utility = min_support;
+        closed_fhuim_kinana_params.min_support = (argc >= 6) ? atoi(argv[5]) : 20;
+        closed_fhuim_kinana_params.min_owl = (argc >= 7) ? atof(argv[6]) : 0.0;
+        params = &closed_fhuim_kinana_params;
+    } else if (strcmp(algo_id, "regular_mine") == 0) {
+        regular_mine_params.min_support = min_support;
+        params = &regular_mine_params;
+    } else if (strcmp(algo_id, "vifp") == 0) {
+        vifp_params.min_support = min_support;
+        if (vifp_parse_mode((argc >= 6) ? argv[5] : "plaintext", &vifp_params.mode) != 0) {
+            vifp_params.mode = VIFP_MODE_PLAINTEXT;
+        }
+        vifp_params.max_itemsets = 0;
+        vifp_params.max_seconds = 0.0;
+        params = &vifp_params;
     } else if (strcmp(algo_id, "huiminer") == 0) {
         huiminer_params.min_utility = min_support;
         params = &huiminer_params;
@@ -445,6 +503,43 @@ int main(int argc, char **argv) {
     } else if (strcmp(algo_id, "fhoi") == 0) {
         fhoi_params.min_occupancy = min_support;
         params = &fhoi_params;
+    } else if (strcmp(algo_id, "fhoi_miner") == 0) {
+        mfhoi_params.min_support = min_support;
+        mfhoi_params.min_occupancy = (argc >= 6) ? atof(argv[5]) : 0.3;
+        mfhoi_params.strong = false;
+        mfhoi_params.output_algorithm = MFHOI_ALGO_FHOI;
+        params = &mfhoi_params;
+    } else if (strcmp(algo_id, "weak_mfhoi_miner") == 0) {
+        mfhoi_params.min_support = min_support;
+        mfhoi_params.min_occupancy = (argc >= 6) ? atof(argv[5]) : 0.3;
+        mfhoi_params.strong = false;
+        mfhoi_params.output_algorithm = MFHOI_ALGO_WEAK;
+        params = &mfhoi_params;
+    } else if (strcmp(algo_id, "strong_mfhoi_miner") == 0) {
+        mfhoi_params.min_support = min_support;
+        mfhoi_params.min_occupancy = (argc >= 6) ? atof(argv[5]) : 0.3;
+        mfhoi_params.strong = true;
+        mfhoi_params.output_algorithm = MFHOI_ALGO_STRONG;
+        params = &mfhoi_params;
+    } else if (strcmp(algo_id, "mfhoi") == 0) {
+        mfhoi_params.min_support = min_support;
+        mfhoi_params.min_occupancy = (argc >= 6) ? atof(argv[5]) : 0.3;
+        mfhoi_params.strong = (argc >= 7) ? (atoi(argv[6]) != 0) : false;
+        mfhoi_params.output_algorithm = mfhoi_params.strong ? MFHOI_ALGO_STRONG : MFHOI_ALGO_WEAK;
+        params = &mfhoi_params;
+    } else if (strcmp(algo_id, "houi_miner") == 0 || strcmp(algo_id, "weak_mhoui_miner") == 0 || strcmp(algo_id, "strong_mhoui_miner") == 0 || strcmp(algo_id, "direct_mhoui_miner") == 0 || strcmp(algo_id, "mhoui") == 0) {
+        mhoui_params.min_support = min_support;
+        mhoui_params.min_occupancy = (argc >= 6) ? atof(argv[5]) : 0.4;
+        mhoui_params.min_utility = (argc >= 7) ? atof(argv[6]) : 1000.0;
+        mhoui_params.strong = (argc >= 8) ? (atoi(argv[7]) != 0) : 1;
+        mhoui_params.direct = (argc >= 9) ? (atoi(argv[8]) != 0) : (strcmp(algo_id, "direct_mhoui_miner") == 0);
+        mhoui_params.max_patterns = 200000;
+        mhoui_params.max_seconds = 0.0;
+        if (strcmp(algo_id, "houi_miner") == 0) mhoui_params.output_algorithm = MHOUI_ALGO_HOUI;
+        else if (strcmp(algo_id, "weak_mhoui_miner") == 0) mhoui_params.output_algorithm = MHOUI_ALGO_WEAK;
+        else if (strcmp(algo_id, "strong_mhoui_miner") == 0) mhoui_params.output_algorithm = MHOUI_ALGO_STRONG;
+        else mhoui_params.output_algorithm = mhoui_params.strong ? MHOUI_ALGO_DIRECT_STRONG : MHOUI_ALGO_DIRECT_WEAK;
+        params = &mhoui_params;
     } else if (strcmp(algo_id, "tkhoim") == 0) {
         tkhoim_params.k = (size_t)min_support;
         params = &tkhoim_params;
@@ -632,6 +727,11 @@ int main(int argc, char **argv) {
         hupspm_params.min_utility = min_support;
         hupspm_params.min_probability = (argc >= 6) ? atof(argv[5]) : 0.5;
         params = &hupspm_params;
+    } else if (strcmp(algo_id, "hup_miner") == 0) {
+        hup_miner_params.min_average_utility = min_support;
+        hup_miner_params.max_pattern_length = (argc >= 6) ? (size_t)atoi(argv[5]) : 3;
+        hup_miner_params.max_candidates = (argc >= 7) ? (size_t)atoll(argv[6]) : 200000;
+        params = &hup_miner_params;
     } else if (strcmp(algo_id, "huim_bpso") == 0) {
         huim_bpso_params.min_utility = min_support;
         huim_bpso_params.pop_size = 20;
@@ -735,6 +835,10 @@ int main(int argc, char **argv) {
         nam_hep_params.support_threshold = (argc >= 5) ? atof(argv[4]) : -1.0;
         nam_hep_params.occupancy_threshold = (argc >= 6) ? atof(argv[5]) : -1.0;
         params = &nam_hep_params;
+    } else if (strcmp(algo_id, "mheinu") == 0) {
+        mheinu_params.min_efficiency = min_support;
+        mheinu_params.investment_path = (argc >= 6) ? argv[5] : NULL;
+        params = &mheinu_params;
     } else if (strcmp(algo_id, "memu") == 0) {
         double glmau = (argc >= 5) ? atof(argv[4]) : 1000.0;
         memu_params.item_count = ds->max_id + 1;
