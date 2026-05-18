@@ -1,0 +1,40 @@
+label=mhoui
+dataset=foodmart
+command=/home/autocookie/pomaieco/dm/bin/dm.exe mhoui /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt 1 0.005 0.10 500
+timeout=90s
+----- output -----
+Loading dataset (1): /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt
+Executing MHOUI-Miner...
+[MHOUI] Complete. HOUI=12 Weak=12 Strong=12 Output=12
+[MHOUI] visited=12 candidates=78 pruned_support=66 pruned_twu=0 pruned_uub=0 pruned_oub1=0 pruned_oub2=0 pruned_dom=0
+
+============================================================
+                  DATA MINING BENCHMARK REPORT              
+============================================================
+ Algorithm   : MHOUI-Miner
+ Dataset     : /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt
+------------------------------------------------------------
+ [1] TIMING (High-Res)
+     - I/O Load Data    :      5.112 ms
+     - Algorithm Core   :      1.601 ms
+     - Write Results    :      0.000 ms
+     - TOTAL WALL TIME  :      7.183 ms
+------------------------------------------------------------
+ [2] CPU UTILIZATION
+     - User Mode (CPU)  :      0.783 ms
+     - Kernel Mode (SYS):      0.818 ms
+     - Threading Score  :      100.0 %
+------------------------------------------------------------
+ [3] MEMORY PROFILING
+     - Peak RAM (VmHWM) :       3.63 MB  (3720 KB)
+------------------------------------------------------------
+ [4] STORAGE FOOTPRINT (Result Set)
+     - RAM Occupied     :       0.00 MB  (336 Bytes)
+     - Est. Disk (.txt) :       0.00 MB  (156 Bytes)
+------------------------------------------------------------
+ [5] MINING RESULTS
+     - Frequent Itemsets: 12
+     - Total Items      : 12
+============================================================
+
+runner_status=OK

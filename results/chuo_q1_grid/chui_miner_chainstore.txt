@@ -1,0 +1,15 @@
+===== algorithm=chui_miner dataset=chainstore minutil=25000 minsup=0.0075 minocc=0.15 =====
+command=/home/autocookie/pomaieco/dm/bin/dm.exe chui_miner /home/autocookie/pomaieco/dm/datasets/utilities/chainstore.txt 1 25000
+timeout=60s
+runner_status=TIMEOUT
+
+===== algorithm=chui_miner dataset=chainstore minutil=50000 minsup=0.0100 minocc=0.20 =====
+command=/home/autocookie/pomaieco/dm/bin/dm.exe chui_miner /home/autocookie/pomaieco/dm/datasets/utilities/chainstore.txt 1 50000
+timeout=60s
+runner_status=TIMEOUT
+
+===== algorithm=chui_miner dataset=chainstore minutil=100000 minsup=0.0150 minocc=0.25 =====
+command=/home/autocookie/pomaieco/dm/bin/dm.exe chui_miner /home/autocookie/pomaieco/dm/datasets/utilities/chainstore.txt 1 100000
+timeout=60s
+runner_status=TIMEOUT
+

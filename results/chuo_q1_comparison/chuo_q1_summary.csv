@@ -1,0 +1,16 @@
+dataset,algorithm,closed_or_hybrid,runner_status,runtime_sec,total_sec,peak_ram_mb,output_count,total_output_items,result_ram_bytes,result_disk_est_bytes,visited_nodes,pruned_support,pruned_utility,pruned_occupancy,raw_houi_count,weak_count,strong_count,algorithm_name,log
+chainstore,chuo_miner,closed_hybrid,OK,2.856309,4.755773,435.796875,45,45,3780,6840,45,990,0,0,,,,,chuo_miner_chainstore.log
+chainstore,mhoui,hybrid_not_closed,OK,0.773231,2.3540259999999997,551.14,45,45,1260,585,45,990,0,0,45,45,45,MHOUI-Miner,mhoui_chainstore.log
+chainstore,chui_miner,closed_utility,TIMEOUT,,,,,,,,,,,,,,,,chui_miner_chainstore.log
+chainstore,efim_closed,closed_utility,TIMEOUT,,,,,,,,,,,,,,,,efim_closed_chainstore.log
+chainstore,efim,utility,TIMEOUT,,,,,,,,,,,,,,,,efim_chainstore.log
+foodmart,chuo_miner,closed_hybrid,OK,0.001610,0.006821,3.117188,12,12,1008,1824,12,66,0,0,,,,,chuo_miner_foodmart.log
+foodmart,mhoui,hybrid_not_closed,OK,0.001601,0.007183,3.63,12,12,336,156,12,66,0,0,12,12,12,MHOUI-Miner,mhoui_foodmart.log
+foodmart,chui_miner,closed_utility,OK,2.9423760000000003,2.947804,3.82,30479,0,731496,243832,,,,,,,,CHUI-Miner,chui_miner_foodmart.log
+foodmart,efim_closed,closed_utility,OK,0.209977,0.21394200000000002,3.62,73659,0,1767816,589272,,,,,,,,EFIM-Closed Algorithm,efim_closed_foodmart.log
+foodmart,efim,utility,OK,0.2591,0.263149,3.74,231904,967051,9433900,6690487,,,,,,,,EFIM Algorithm,efim_foodmart.log
+liquor_11,chuo_miner,closed_hybrid,OK,2.267397,2.368625,57.507812,28,66,3416,5776,167,4375,0,5,,,,,chuo_miner_liquor_11.log
+liquor_11,mhoui,hybrid_not_closed,OK,0.149618,0.259957,41.04,26,61,868,513,172,4358,0,14,28,26,26,MHOUI-Miner,mhoui_liquor_11.log
+liquor_11,chui_miner,closed_utility,OK,14.145315,14.263771,34.12,6866,0,164784,54928,,,,,,,,CHUI-Miner,chui_miner_liquor_11.log
+liquor_11,efim_closed,closed_utility,OK,45.680295,45.783063,92.27,29073,0,697752,232584,,,,,,,,EFIM-Closed Algorithm,efim_closed_liquor_11.log
+liquor_11,efim,utility,OK,23.987299999999998,24.099239,68.49,56447,270734,2437664,1805246,,,,,,,,EFIM Algorithm,efim_liquor_11.log

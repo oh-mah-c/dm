@@ -1,0 +1,6 @@
+label=chui_miner
+dataset=chainstore
+command=/home/autocookie/pomaieco/dm/bin/dm.exe chui_miner /home/autocookie/pomaieco/dm/datasets/utilities/chainstore.txt 1 50000
+timeout=90s
+----- output -----
+runner_status=TIMEOUT

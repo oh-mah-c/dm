@@ -1,0 +1,40 @@
+label=chui_miner
+dataset=foodmart
+command=/home/autocookie/pomaieco/dm/bin/dm.exe chui_miner /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt 1 500
+timeout=90s
+----- output -----
+Loading dataset (1): /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt
+Executing CHUI-Miner...
+[CHUI-Miner] MinUtil: 500.00
+[CHUI-Miner] Found 30479 Closed High Utility Itemsets.
+
+============================================================
+                  DATA MINING BENCHMARK REPORT              
+============================================================
+ Algorithm   : CHUI-Miner
+ Dataset     : /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt
+------------------------------------------------------------
+ [1] TIMING (High-Res)
+     - I/O Load Data    :      5.076 ms
+     - Algorithm Core   :   2942.376 ms
+     - Write Results    :      0.000 ms
+     - TOTAL WALL TIME  :   2947.804 ms
+------------------------------------------------------------
+ [2] CPU UTILIZATION
+     - User Mode (CPU)  :   2939.601 ms
+     - Kernel Mode (SYS):      0.936 ms
+     - Threading Score  :       99.9 %
+------------------------------------------------------------
+ [3] MEMORY PROFILING
+     - Peak RAM (VmHWM) :       3.82 MB  (3916 KB)
+------------------------------------------------------------
+ [4] STORAGE FOOTPRINT (Result Set)
+     - RAM Occupied     :       0.70 MB  (731496 Bytes)
+     - Est. Disk (.txt) :       0.23 MB  (243832 Bytes)
+------------------------------------------------------------
+ [5] MINING RESULTS
+     - Frequent Itemsets: 30479
+     - Total Items      : 0
+============================================================
+
+runner_status=OK

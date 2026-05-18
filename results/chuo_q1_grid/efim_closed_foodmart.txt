@@ -1,0 +1,114 @@
+===== algorithm=efim_closed dataset=foodmart minutil=500 minsup=0.005 minocc=0.10 =====
+command=/home/autocookie/pomaieco/dm/bin/dm.exe efim_closed /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt 1 500
+timeout=60s
+Loading dataset (1): /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt
+Executing EFIM-Closed Algorithm...
+[EFIM-Closed] Found 73659 Closed High Utility Itemsets.
+
+============================================================
+                  DATA MINING BENCHMARK REPORT              
+============================================================
+ Algorithm   : EFIM-Closed Algorithm
+ Dataset     : /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt
+------------------------------------------------------------
+ [1] TIMING (High-Res)
+     - I/O Load Data    :      4.013 ms
+     - Algorithm Core   :    198.771 ms
+     - Write Results    :      0.000 ms
+     - TOTAL WALL TIME  :    203.028 ms
+------------------------------------------------------------
+ [2] CPU UTILIZATION
+     - User Mode (CPU)  :    196.184 ms
+     - Kernel Mode (SYS):      0.955 ms
+     - Threading Score  :       99.2 %
+------------------------------------------------------------
+ [3] MEMORY PROFILING
+     - Peak RAM (VmHWM) :       3.62 MB  (3712 KB)
+------------------------------------------------------------
+ [4] STORAGE FOOTPRINT (Result Set)
+     - RAM Occupied     :       1.69 MB  (1767816 Bytes)
+     - Est. Disk (.txt) :       0.56 MB  (589272 Bytes)
+------------------------------------------------------------
+ [5] MINING RESULTS
+     - Frequent Itemsets: 73659
+     - Total Items      : 0
+============================================================
+
+runner_status=OK
+
+===== algorithm=efim_closed dataset=foodmart minutil=750 minsup=0.006 minocc=0.15 =====
+command=/home/autocookie/pomaieco/dm/bin/dm.exe efim_closed /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt 1 750
+timeout=60s
+Loading dataset (1): /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt
+Executing EFIM-Closed Algorithm...
+[EFIM-Closed] Found 72341 Closed High Utility Itemsets.
+
+============================================================
+                  DATA MINING BENCHMARK REPORT              
+============================================================
+ Algorithm   : EFIM-Closed Algorithm
+ Dataset     : /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt
+------------------------------------------------------------
+ [1] TIMING (High-Res)
+     - I/O Load Data    :      4.069 ms
+     - Algorithm Core   :    223.989 ms
+     - Write Results    :      0.000 ms
+     - TOTAL WALL TIME  :    228.229 ms
+------------------------------------------------------------
+ [2] CPU UTILIZATION
+     - User Mode (CPU)  :    222.983 ms
+     - Kernel Mode (SYS):      0.952 ms
+     - Threading Score  :      100.0 %
+------------------------------------------------------------
+ [3] MEMORY PROFILING
+     - Peak RAM (VmHWM) :       3.63 MB  (3720 KB)
+------------------------------------------------------------
+ [4] STORAGE FOOTPRINT (Result Set)
+     - RAM Occupied     :       1.66 MB  (1736184 Bytes)
+     - Est. Disk (.txt) :       0.55 MB  (578728 Bytes)
+------------------------------------------------------------
+ [5] MINING RESULTS
+     - Frequent Itemsets: 72341
+     - Total Items      : 0
+============================================================
+
+runner_status=OK
+
+===== algorithm=efim_closed dataset=foodmart minutil=1000 minsup=0.0075 minocc=0.20 =====
+command=/home/autocookie/pomaieco/dm/bin/dm.exe efim_closed /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt 1 1000
+timeout=60s
+Loading dataset (1): /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt
+Executing EFIM-Closed Algorithm...
+[EFIM-Closed] Found 69546 Closed High Utility Itemsets.
+
+============================================================
+                  DATA MINING BENCHMARK REPORT              
+============================================================
+ Algorithm   : EFIM-Closed Algorithm
+ Dataset     : /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt
+------------------------------------------------------------
+ [1] TIMING (High-Res)
+     - I/O Load Data    :      4.154 ms
+     - Algorithm Core   :    290.161 ms
+     - Write Results    :      0.000 ms
+     - TOTAL WALL TIME  :    294.517 ms
+------------------------------------------------------------
+ [2] CPU UTILIZATION
+     - User Mode (CPU)  :    288.309 ms
+     - Kernel Mode (SYS):      0.000 ms
+     - Threading Score  :       99.4 %
+------------------------------------------------------------
+ [3] MEMORY PROFILING
+     - Peak RAM (VmHWM) :       3.62 MB  (3704 KB)
+------------------------------------------------------------
+ [4] STORAGE FOOTPRINT (Result Set)
+     - RAM Occupied     :       1.59 MB  (1669104 Bytes)
+     - Est. Disk (.txt) :       0.53 MB  (556368 Bytes)
+------------------------------------------------------------
+ [5] MINING RESULTS
+     - Frequent Itemsets: 69546
+     - Total Items      : 0
+============================================================
+
+runner_status=OK
+

@@ -1,0 +1,81 @@
+===== algorithm=efim_closed dataset=liquor_11 minutil=2500 minsup=0.015 minocc=0.25 =====
+command=/home/autocookie/pomaieco/dm/bin/dm.exe efim_closed /home/autocookie/pomaieco/dm/datasets/utilities/liquor_11.txt 1 2500
+timeout=60s
+runner_status=TIMEOUT
+
+===== algorithm=efim_closed dataset=liquor_11 minutil=5000 minsup=0.020 minocc=0.30 =====
+command=/home/autocookie/pomaieco/dm/bin/dm.exe efim_closed /home/autocookie/pomaieco/dm/datasets/utilities/liquor_11.txt 1 5000
+timeout=60s
+Loading dataset (1): /home/autocookie/pomaieco/dm/datasets/utilities/liquor_11.txt
+Executing EFIM-Closed Algorithm...
+[EFIM-Closed] Found 29073 Closed High Utility Itemsets.
+
+============================================================
+                  DATA MINING BENCHMARK REPORT              
+============================================================
+ Algorithm   : EFIM-Closed Algorithm
+ Dataset     : /home/autocookie/pomaieco/dm/datasets/utilities/liquor_11.txt
+------------------------------------------------------------
+ [1] TIMING (High-Res)
+     - I/O Load Data    :    169.561 ms
+     - Algorithm Core   :  46107.480 ms
+     - Write Results    :      0.000 ms
+     - TOTAL WALL TIME  :  46279.510 ms
+------------------------------------------------------------
+ [2] CPU UTILIZATION
+     - User Mode (CPU)  :  43044.896 ms
+     - Kernel Mode (SYS):   2975.592 ms
+     - Threading Score  :       99.8 %
+------------------------------------------------------------
+ [3] MEMORY PROFILING
+     - Peak RAM (VmHWM) :      92.23 MB  (94448 KB)
+------------------------------------------------------------
+ [4] STORAGE FOOTPRINT (Result Set)
+     - RAM Occupied     :       0.67 MB  (697752 Bytes)
+     - Est. Disk (.txt) :       0.22 MB  (232584 Bytes)
+------------------------------------------------------------
+ [5] MINING RESULTS
+     - Frequent Itemsets: 29073
+     - Total Items      : 0
+============================================================
+
+runner_status=OK
+
+===== algorithm=efim_closed dataset=liquor_11 minutil=10000 minsup=0.030 minocc=0.35 =====
+command=/home/autocookie/pomaieco/dm/bin/dm.exe efim_closed /home/autocookie/pomaieco/dm/datasets/utilities/liquor_11.txt 1 10000
+timeout=60s
+Loading dataset (1): /home/autocookie/pomaieco/dm/datasets/utilities/liquor_11.txt
+Executing EFIM-Closed Algorithm...
+[EFIM-Closed] Found 9608 Closed High Utility Itemsets.
+
+============================================================
+                  DATA MINING BENCHMARK REPORT              
+============================================================
+ Algorithm   : EFIM-Closed Algorithm
+ Dataset     : /home/autocookie/pomaieco/dm/datasets/utilities/liquor_11.txt
+------------------------------------------------------------
+ [1] TIMING (High-Res)
+     - I/O Load Data    :    106.830 ms
+     - Algorithm Core   :  15871.908 ms
+     - Write Results    :      0.000 ms
+     - TOTAL WALL TIME  :  15980.749 ms
+------------------------------------------------------------
+ [2] CPU UTILIZATION
+     - User Mode (CPU)  :  15059.046 ms
+     - Kernel Mode (SYS):    807.847 ms
+     - Threading Score  :      100.0 %
+------------------------------------------------------------
+ [3] MEMORY PROFILING
+     - Peak RAM (VmHWM) :      91.67 MB  (93872 KB)
+------------------------------------------------------------
+ [4] STORAGE FOOTPRINT (Result Set)
+     - RAM Occupied     :       0.22 MB  (230592 Bytes)
+     - Est. Disk (.txt) :       0.07 MB  (76864 Bytes)
+------------------------------------------------------------
+ [5] MINING RESULTS
+     - Frequent Itemsets: 9608
+     - Total Items      : 0
+============================================================
+
+runner_status=OK
+

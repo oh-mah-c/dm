@@ -1,0 +1,40 @@
+label=mhoui
+dataset=chainstore
+command=/home/autocookie/pomaieco/dm/bin/dm.exe mhoui /home/autocookie/pomaieco/dm/datasets/utilities/chainstore.txt 1 0.01 0.20 50000
+timeout=90s
+----- output -----
+Loading dataset (1): /home/autocookie/pomaieco/dm/datasets/utilities/chainstore.txt
+Executing MHOUI-Miner...
+[MHOUI] Complete. HOUI=45 Weak=45 Strong=45 Output=45
+[MHOUI] visited=45 candidates=1035 pruned_support=990 pruned_twu=0 pruned_uub=0 pruned_oub1=0 pruned_oub2=0 pruned_dom=0
+
+============================================================
+                  DATA MINING BENCHMARK REPORT              
+============================================================
+ Algorithm   : MHOUI-Miner
+ Dataset     : /home/autocookie/pomaieco/dm/datasets/utilities/chainstore.txt
+------------------------------------------------------------
+ [1] TIMING (High-Res)
+     - I/O Load Data    :   1531.454 ms
+     - Algorithm Core   :    773.231 ms
+     - Write Results    :      0.000 ms
+     - TOTAL WALL TIME  :   2354.026 ms
+------------------------------------------------------------
+ [2] CPU UTILIZATION
+     - User Mode (CPU)  :    621.093 ms
+     - Kernel Mode (SYS):    151.936 ms
+     - Threading Score  :      100.0 %
+------------------------------------------------------------
+ [3] MEMORY PROFILING
+     - Peak RAM (VmHWM) :     551.14 MB  (564368 KB)
+------------------------------------------------------------
+ [4] STORAGE FOOTPRINT (Result Set)
+     - RAM Occupied     :       0.00 MB  (1260 Bytes)
+     - Est. Disk (.txt) :       0.00 MB  (585 Bytes)
+------------------------------------------------------------
+ [5] MINING RESULTS
+     - Frequent Itemsets: 45
+     - Total Items      : 45
+============================================================
+
+runner_status=OK

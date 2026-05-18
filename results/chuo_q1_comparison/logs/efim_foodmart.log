@@ -1,0 +1,39 @@
+label=efim
+dataset=foodmart
+command=/home/autocookie/pomaieco/dm/bin/dm.exe efim /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt 1 500
+timeout=90s
+----- output -----
+Loading dataset (1): /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt
+Executing EFIM Algorithm...
+[EFIM] Found 231904 High Utility Itemsets.
+
+============================================================
+                  DATA MINING BENCHMARK REPORT              
+============================================================
+ Algorithm   : EFIM Algorithm
+ Dataset     : /home/autocookie/pomaieco/dm/datasets/utilities/foodmart.txt
+------------------------------------------------------------
+ [1] TIMING (High-Res)
+     - I/O Load Data    :      3.874 ms
+     - Algorithm Core   :    259.100 ms
+     - Write Results    :      0.000 ms
+     - TOTAL WALL TIME  :    263.149 ms
+------------------------------------------------------------
+ [2] CPU UTILIZATION
+     - User Mode (CPU)  :    251.884 ms
+     - Kernel Mode (SYS):      7.095 ms
+     - Threading Score  :      100.0 %
+------------------------------------------------------------
+ [3] MEMORY PROFILING
+     - Peak RAM (VmHWM) :       3.74 MB  (3832 KB)
+------------------------------------------------------------
+ [4] STORAGE FOOTPRINT (Result Set)
+     - RAM Occupied     :       9.00 MB  (9433900 Bytes)
+     - Est. Disk (.txt) :       6.38 MB  (6690487 Bytes)
+------------------------------------------------------------
+ [5] MINING RESULTS
+     - Frequent Itemsets: 231904
+     - Total Items      : 967051
+============================================================
+
+runner_status=OK
