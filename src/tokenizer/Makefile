@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -O3 -Wall -Wextra -std=c99 -I../../include
 TARGET = bin/tokenizer_miner
 
-SRCS = faro_tokenizer.c main.c
+SRCS = faro_tokenizer.c tokenizer_variants.c main.c
 OBJS = $(SRCS:%.c=obj/%.o)
 
 .PHONY: all clean run test

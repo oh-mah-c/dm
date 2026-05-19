@@ -33,6 +33,8 @@ static long get_peak_rss_kb(void) {
     return 0;
 }
 
+int output_json = 0;
+
 int main(int argc, char **argv) {
     char *input_path = NULL;
     char *output_path = NULL;
@@ -57,8 +59,11 @@ int main(int argc, char **argv) {
             algo_str = argv[++i];
         } else if (strcmp(argv[i], "--benchmark") == 0) {
             run_benchmark = 1;
+        } else if (strcmp(argv[i], "--json") == 0) {
+            output_json = 1;
         }
     }
+
     
     if (!input_path) {
         fprintf(stderr, "Usage: %s -i <input_file> [-o <output_file>] [-m <doc|sentence|sliding>] [-w <window_size>] [-s <stride>] [--algo <faro|...>] [--benchmark]\n", argv[0]);
@@ -74,12 +79,21 @@ int main(int argc, char **argv) {
     
     /* Create selected tokenizer */
     Tokenizer *tok = NULL;
-    if (strcmp(algo_str, "faro") == 0) {
-        tok = faro_tokenizer_create(65536);
+    if (strcmp(algo_str, "lp-raw") == 0) {
+        tok = lp_raw_tokenizer_create(65536);
+    } else if (strcmp(algo_str, "lp-fp") == 0) {
+        tok = lp_fp_tokenizer_create(65536);
+    } else if (strcmp(algo_str, "rh-fp") == 0) {
+        tok = rh_fp_tokenizer_create(65536);
+    } else if (strcmp(algo_str, "rh-arena") == 0 || strcmp(algo_str, "faro") == 0) {
+        tok = rh_arena_tokenizer_create(65536);
+    } else if (strcmp(algo_str, "rh-borrow") == 0) {
+        tok = rh_borrow_tokenizer_create(65536);
     } else {
-        fprintf(stderr, "Error: Unknown algorithm '%s'. Currently supported: 'faro'\n", algo_str);
+        fprintf(stderr, "Error: Unknown algorithm '%s'. Supported: lp-raw, lp-fp, rh-fp, rh-arena, rh-borrow\n", algo_str);
         return 1;
     }
+
     
     if (!tok) {
         fprintf(stderr, "Error: Failed to initialize tokenizer '%s'\n", algo_str);

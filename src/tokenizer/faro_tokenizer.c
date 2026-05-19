@@ -251,12 +251,13 @@ static uint32_t faro_get_or_create_impl(FaroTokenizerImpl *tok, const char *toke
     }
 }
 
-static void faro_tokenize_buffer_impl(FaroTokenizerImpl *tok, 
-                                      const unsigned char *S, size_t B, 
-                                      TransactionMode mode, 
-                                      uint32_t window_size, uint32_t stride,
-                                      void (*emit_callback)(const uint32_t *tokens, size_t count, void *user_data), 
-                                      void *user_data) {
+void faro_tokenize_buffer_polymorphic(Tokenizer *self, 
+                                             const unsigned char *S, size_t B, 
+                                             TransactionMode mode, 
+                                             uint32_t window_size, uint32_t stride,
+                                             void (*emit_callback)(const uint32_t *tokens, size_t count, void *user_data), 
+                                             void *user_data) {
+    self->base_address = S;
     char token_buf[4096];
     size_t token_len = 0;
     
@@ -271,7 +272,7 @@ static void faro_tokenize_buffer_impl(FaroTokenizerImpl *tok,
     #define FINALIZE_TOKEN() do { \
         if (token_len > 0) { \
             uint64_t hash_val = faro_hash(token_buf, token_len); \
-            uint32_t tid = faro_get_or_create_impl(tok, token_buf, token_len, hash_val); \
+            uint32_t tid = self->get_or_create(self, token_buf, token_len, hash_val); \
             if (mode == MODE_SLIDING) { \
                 if (global_count >= global_capacity) { \
                     global_capacity = global_capacity * 2 + 128; \
@@ -404,7 +405,7 @@ static void faro_tokenize_buffer_wrapper(Tokenizer *self,
                                          uint32_t window_size, uint32_t stride,
                                          void (*emit_callback)(const uint32_t *tokens, size_t count, void *user_data), 
                                          void *user_data) {
-    faro_tokenize_buffer_impl((FaroTokenizerImpl *)self->impl, S, B, mode, window_size, stride, emit_callback, user_data);
+    faro_tokenize_buffer_polymorphic(self, S, B, mode, window_size, stride, emit_callback, user_data);
 }
 
 static void faro_free_wrapper(Tokenizer *self) {
@@ -418,6 +419,8 @@ static void faro_free_wrapper(Tokenizer *self) {
         free(self);
     }
 }
+
+extern int output_json;
 
 static void faro_print_stats_wrapper(Tokenizer *self, const char *input_path, size_t file_size, double elapsed_sec, size_t tx_count, long peak_rss) {
     FaroTokenizerImpl *tok = (FaroTokenizerImpl *)self->impl;
@@ -445,32 +448,16 @@ static void faro_print_stats_wrapper(Tokenizer *self, const char *input_path, si
     double collision_rate = occupied_count ? (double)collision_count / occupied_count : 0.0;
     double load_factor = (double)tok->unique_tokens / tok->capacity;
     
-    double slot_mb = (double)(tok->capacity * sizeof(FaroSlot)) / (1024.0 * 1024.0);
-    double arena_mb = (double)tok->arena_size / (1024.0 * 1024.0);
-    
-    printf("\n==================================================\n");
-    printf("         FARO-TOKENIZER EXPERIMENT BENCHMARK      \n");
-    printf("==================================================\n");
-    printf("Input File          : %s\n", input_path);
-    printf("Input Size          : %.2f MiB (%zu bytes)\n", mib_processed, file_size);
-    printf("Elapsed Time        : %.6f seconds\n", elapsed_sec);
-    printf("Throughput          : %.2f MiB/s\n", throughput);
-    printf("Transactions Emitted: %zu\n", tx_count);
-    printf("--------------------------------------------------\n");
-    printf("Dictionary Capacity : %u\n", tok->capacity);
-    printf("Unique Tokens (U)   : %u\n", tok->unique_tokens);
-    printf("Load Factor (alpha) : %.4f\n", load_factor);
-    printf("Slot Memory         : %.2f MiB\n", slot_mb);
-    printf("Arena Memory        : %.2f MiB\n", arena_mb);
-    printf("--------------------------------------------------\n");
-    printf("Average Probe Length: %.4f\n", avg_probe);
-    printf("Maximum Probe Length: %u\n", max_dib + 1);
-    printf("Collision Rate      : %.4f (DIB > 0)\n", collision_rate);
-    printf("Peak RSS            : %ld KB\n", peak_rss);
-    printf("==================================================\n\n");
+    if (output_json) {
+        printf("{\"variant\":\"RH-Arena\",\"throughput_mib\":%.4f,\"unique_tokens\":%u,\"load_factor\":%.6f,\"avg_probe\":%.6f,\"max_probe\":%u,\"collision_rate\":%.6f,\"peak_rss_kb\":%ld}\n",
+               throughput, tok->unique_tokens, load_factor, avg_probe, max_dib + 1, collision_rate, peak_rss);
+    } else {
+        printf("RH-Arena\t%.2f MiB/s\t%u unique\tPeak RSS: %ld KB\n", throughput, tok->unique_tokens, peak_rss);
+    }
 }
 
-Tokenizer *faro_tokenizer_create(uint32_t initial_capacity) {
+
+Tokenizer *rh_arena_tokenizer_create(uint32_t initial_capacity) {
     uint32_t cap = 16;
     while (cap < initial_capacity) {
         cap *= 2;
@@ -499,8 +486,9 @@ Tokenizer *faro_tokenizer_create(uint32_t initial_capacity) {
         return NULL;
     }
     
-    self->name = "FARO-Tokenizer";
+    self->name = "RH-Arena";
     self->impl = tok;
+    self->base_address = NULL;
     self->get_or_create = faro_get_or_create_wrapper;
     self->tokenize_buffer = faro_tokenize_buffer_wrapper;
     self->free = faro_free_wrapper;
@@ -508,3 +496,4 @@ Tokenizer *faro_tokenizer_create(uint32_t initial_capacity) {
     
     return self;
 }
+
