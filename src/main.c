@@ -120,11 +120,13 @@
 #include "algorithms/mheinu.h"
 #include "algorithms/closed_fhuim_kinana.h"
 #include "algorithms/regular_mine.h"
+#include "algorithms/tmku.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
 extern DM_Algorithm bio_huif_ga_algo;
+extern DM_Algorithm tmku_algo;
 extern DM_Algorithm bio_huif_pso_algo;
 extern DM_Algorithm bio_huif_ba_algo;
 extern DM_Algorithm huim_afsa_algo;
@@ -170,6 +172,7 @@ int main(int argc, char **argv) {
     dm_register_algorithm(&regular_mine_algo);
     dm_register_algorithm(&mhoui_algo);
     dm_register_algorithm(&vifp_algo);
+    dm_register_algorithm(&tmku_algo);
 
     if (argc < 3) {
         printf("Usage: %s <algo_id> <dataset_path> [type_id] [min_support]\n", argv[0]);
@@ -181,6 +184,7 @@ int main(int argc, char **argv) {
         printf("HUP-Miner: %s hup_miner <sequence_utility_dataset> 3 <min_average_utility> [max_length] [max_candidates]\n", argv[0]);
         printf("RegularMine: %s regular_mine <transactional_dataset> 0 <min_support>\n", argv[0]);
         printf("VIFP: %s vifp <transactional_dataset> 0 <min_support> [mode:plaintext|smpc|fhe]\n", argv[0]);
+        printf("TMKU: %s tmku <utility_dataset> 1 [k] [min_utility] [target_pattern]\n", argv[0]);
         printf("Types: 0=Transactional, 1=Utility, 2=Matrix, 3=SequenceUtility, 4=Quantity\n");
         dm_list_algorithms();
         return 1;
@@ -242,6 +246,7 @@ int main(int argc, char **argv) {
     DM_HOIMTO_Params hoimto_params;
     DM_CFI_STREAM_Params cfi_stream_params;
     DM_HUIM_SA_Params huim_sa_params;
+    DM_TMKU_Params tmku_params;
     DM_HUIM_BPSO_Tree_Params huim_bpso_tree_params;
     DM_BioHUIF_Params bio_huif_params;
     DM_HUIM_AFSA_Params afsa_params;
@@ -847,6 +852,28 @@ int main(int argc, char **argv) {
             memu_params.mau_table[i] = glmau;
         }
         params = &memu_params;
+    } else if (strcmp(algo_id, "tmku") == 0) {
+        tmku_params.k = (argc >= 5) ? (size_t)atoi(argv[4]) : 10;
+        tmku_params.min_utility = (argc >= 6) ? atof(argv[5]) : 0.0;
+        tmku_params.max_seconds = 0.0;
+        const char *t_str = (argc >= 7) ? argv[6] : "";
+        size_t commas = 0;
+        for (size_t i = 0; t_str[i] != '\0'; i++) {
+            if (t_str[i] == ',') commas++;
+        }
+        tmku_params.target_len = 0;
+        tmku_params.target_pattern = NULL;
+        if (strlen(t_str) > 0) {
+            tmku_params.target_pattern = malloc(sizeof(uint32_t) * (commas + 1));
+            char *str_copy = strdup(t_str);
+            char *tok = strtok(str_copy, ",");
+            while (tok != NULL) {
+                tmku_params.target_pattern[tmku_params.target_len++] = (uint32_t)strtoul(tok, NULL, 10);
+                tok = strtok(NULL, ",");
+            }
+            free(str_copy);
+        }
+        params = &tmku_params;
     }
 
 
