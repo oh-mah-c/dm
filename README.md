@@ -162,6 +162,10 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 ### Classification Rule Mining
 62. **PSO Classifier** - Particle Swarm based classification-rule discovery using continuous CPSO, TP/TN rule quality, rule pruning, covering, default rules, rule-set cleaning, and tenfold cross-validation.
 
+### Subword Tokenization Algorithms
+63. **FARO Tokenizer** - Frequency-Aware Robust Out-of-vocabulary Subword Tokenizer that dynamically merges high-frequency subword structures while managing vocabulary size.
+64. **HUST-Tokenize** - High-Utility Subword Tokenization engine that integrates downstream pattern utility metrics into the subword tokenization and merging process.
+
 ---
 
 ## 🚀 Getting Started
@@ -406,15 +410,15 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 
 **[96]** S. Ruggieri, "Frequent Regular Itemset Mining," in *Proc. 16th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD '10)*, 2010, pp. 263-272. https://doi.org/10.1145/1835804.1835840 *(RegularMine)*
 
-**[97]** Q. Van, "MFHOI-Miner: An Efficient Method for Mining Maximal Frequent High-Occupancy Itemsets," local project paper, `docs/mfhoi.pdf`, 2026. *(MFHOI / Strong MFHOI-Miner)*
+**[97]** Q. Van, "MFHOI-Miner: An Efficient Method for Mining Maximal Frequent High-Occupancy Itemsets," local project paper, `docs/core/mfhoi.pdf`, 2026. *(MFHOI / Strong MFHOI-Miner)*
 
-**[98]** Q. Van, "HUPP-Miner: High-Utility Prompt Pattern Mining for Cost-Aware and Accuracy-Preserving Generative AI Systems," local project paper, `docs/hupp.pdf`, 2026. *(HUPP-Miner)*
+**[98]** Q. Van, "HUPP-Miner: High-Utility Prompt Pattern Mining for Cost-Aware and Accuracy-Preserving Generative AI Systems," local project paper, `docs/core/hupp.pdf`, 2026. *(HUPP-Miner)*
 
-**[99]** Q. Van, "Closed High-Utility Occupancy Itemset Mining," local project paper, `docs/chuim.tex` and `docs/chuim.pdf`, 2026. *(CHUO-Miner)*
+**[99]** Q. Van, "Closed High-Utility Occupancy Itemset Mining," local project paper, `docs/core/chuim.pdf`, 2026. *(CHUO-Miner)*
 
-**[100]** Q. Van, "MHOUI-Miner: Mining High-Occupancy Utility Itemsets," local project paper, `docs/mhoui.tex` and `docs/mhoui.pdf`, 2026. *(MHOUI-Miner)*
+**[100]** Q. Van, "MHOUI-Miner: Mining High-Occupancy Utility Itemsets," local project paper, `docs/core/mhoui.pdf`, 2026. *(MHOUI-Miner)*
 
-**[101]** Q. Van, "VIFP: Verifiable/Privacy-Preserving Frequent Pattern Mining," local project paper, `docs/vifp.tex` and `docs/vifp.pdf`, 2026. *(VIFP-Miner)*
+**[101]** Q. Van, "VIFP: Verifiable/Privacy-Preserving Frequent Pattern Mining," local project paper, `docs/core/vifp.pdf`, 2026. *(VIFP-Miner)*
 
 **[102]** T. Sousa, A. Silva, and A. Neves, "Particle Swarm based Data Mining Algorithms for classification tasks," *Parallel Computing*, vol. 30, no. 5-6, pp. 767-783, 2004. https://doi.org/10.1016/j.parco.2003.12.015 *(PSO Classifier)*
 
@@ -430,7 +434,11 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 
 **[108]** S. Carstensen and J. C.-W. Lin, "TKU-PSO: An Efficient Particle Swarm Optimization Model for Top-k High-Utility Itemset Mining," *International Journal of Interactive Multimedia and Artificial Intelligence*, vol. 9, no. 4, pp. 70-81, 2025. https://doi.org/10.9781/ijimai.2024.01.002 *(TKU-PSO)*
 
-**[109]** Q. Van, "HIEP-Miner: High-Information Entropy Pattern Mining for Embedded Text Streams," local project paper, `docs/core/hiep.tex`, 2026. *(HIEP-Miner)*
+**[109]** Q. Van, "HIEP-Miner: High-Information Entropy Pattern Mining for Embedded Text Streams," local project paper, `docs/core/hiep.pdf`, 2026. *(HIEP-Miner)*
+
+**[110]** Q. Van, "FARO: Frequency-Aware Robust Out-of-vocabulary Subword Tokenizer," local project paper, `docs/core/faro_tokenizer_fixed.pdf`, 2026. *(FARO Tokenizer)*
+
+**[111]** Jane Doe, "HUST: Mining-Driven Subword Tokenization for High-Utility Pattern Mining," local project paper, `docs/core/hust.tex` and `docs/core/hust.pdf`, 2026. *(HUST-Tokenize)*
 
 ---
 

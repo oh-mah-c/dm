@@ -363,11 +363,19 @@ def plot_svg_fallback(rows, out_dir: Path):
     ]
     for metric, title, xlabel, ylabel in metric_specs:
         for case, case_rows in by_case(rows).items():
-            usable = [r for r in sorted_by_theta(case_rows) if metric in r]
+            usable = []
+            for r in sorted_by_theta(case_rows):
+                val = r.get(metric)
+                if val is not None and val != "":
+                    try:
+                        float(val)
+                        usable.append(r)
+                    except ValueError:
+                        pass
             if len(usable) < 2:
                 continue
             xs = [float(r.get("theta_ratio", 0.0)) for r in usable]
-            ys = [float(r.get(metric, 0.0)) for r in usable]
+            ys = [float(r.get(metric)) for r in usable]
             write_svg_line(
                 out_dir / f"{case}_{metric}_vs_theta.svg",
                 f"{title}: {case}",
@@ -453,12 +461,14 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     rows = []
     for path in sorted(out_dir.glob("hiep_*.txt")):
+        if "baseline" in path.name or "external" in path.name:
+            continue
         rows.extend(parse_file(path))
     save_csv(rows, out_dir)
     if not rows:
         return 0
+    plot_svg_fallback(rows, out_dir)
     if not HAS_MPL:
-        plot_svg_fallback(rows, out_dir)
         return 0
 
     for metric, title, ylabel in [

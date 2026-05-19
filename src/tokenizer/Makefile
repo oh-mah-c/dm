@@ -1,17 +1,22 @@
 CC = gcc
 CFLAGS = -O3 -Wall -Wextra -std=c99 -I../../include
 TARGET = bin/tokenizer_miner
+HUST_TARGET = bin/hust_tokenize
 
 SRCS = faro_tokenizer.c tokenizer_variants.c main.c
 OBJS = $(SRCS:%.c=obj/%.o)
 
 .PHONY: all clean run test
 
-all: $(TARGET)
+all: $(TARGET) $(HUST_TARGET)
 
 $(TARGET): $(OBJS)
 	@mkdir -p bin
 	$(CC) $(CFLAGS) -o $@ $^
+
+$(HUST_TARGET): hust_tokenize.c
+	@mkdir -p bin
+	$(CC) $(CFLAGS) -o $@ $< -lm
 
 obj/%.o: %.c
 	@mkdir -p obj
@@ -19,6 +24,7 @@ obj/%.o: %.c
 
 clean:
 	rm -rf obj bin test_out.txt test_input.txt
+
 
 run: all
 	@echo "Running FARO-Tokenizer on Adware dataset..."

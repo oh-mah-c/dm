@@ -313,7 +313,7 @@ static void fpmax_recursive(FPTree *tree, uint32_t *head, uint32_t head_len, MFI
                 node = tree->header[i].head;
                 while (node) {
                     uint32_t weight = node->count;
-                    uint32_t *path = malloc(ctx->max_id * sizeof(uint32_t));
+                    uint32_t *path = malloc((ctx->max_id + 1) * sizeof(uint32_t));
                     uint32_t path_len = 0;
                     FPNode *p = node->parent;
                     while (p && p->item != ROOT_ITEM) {
