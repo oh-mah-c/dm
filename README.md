@@ -73,9 +73,11 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 43. **HUIM-AFSA** - Artificial Fish Swarm Algorithm for mining high-utility itemsets with PEV pruning (Song et al. 2021).
 44. **HUIM-ABC** - Artificial Bee Colony algorithm for high-utility itemset mining with bitmap-based utility calculation (Song & Huang 2018).
 45. **THUI** - Mining top-k high utility itemsets with effective threshold raising strategies using LIU structure (Krishnamoorthy 2019).
-46. **TKU-CE** - Cross-Entropy Method for Mining Top-K High Utility Itemsets (Song et al. 2021).
-47. **TKU-CE+** - Improved Cross-Entropy Method for Top-K HUIM with CUV pruning and smoothing mutation (Song et al. 2021).
-48. **DPHIM** - Dynamic parallel high-utility itemset mining using utility-list subtasks and pthread workers (Kimura et al. 2026).
+46. **TKU-Miner** - Mines exact top-k high-utility itemsets without a user-specified minimum utility threshold, following the TKU top-k threshold-raising framework (Wu et al. 2012).
+47. **TIPN-HOUI-Miner** - Mines top-k high-on-shelf-utility itemsets with positive/negative utilities using TIPN/TIUL tables, interval occurrence bitmaps, TWUGC pruning, RLC pruning, TIO pruning, and RPRU/RRU threshold raising (Chang et al. 2025).
+48. **TKU-CE** - Cross-Entropy Method for Mining Top-K High Utility Itemsets (Song et al. 2021).
+49. **TKU-CE+** - Improved Cross-Entropy Method for Top-K HUIM with CUV pruning and smoothing mutation (Song et al. 2021).
+50. **DPHIM** - Dynamic parallel high-utility itemset mining using utility-list subtasks and pthread workers (Kimura et al. 2026).
 
 49. **HAUI-Miner** - Mining High Average-Utility Itemsets using AU-lists and transaction-maximum utility downward closure (Lin et al. 2016).
 49. **EHAUPM** - Efficient High Average-Utility Pattern Mining with Tighter Upper Bounds and co-occurrence matrix (Lin et al. 2017).
@@ -89,6 +91,9 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 55. **USpan** - High utility sequential pattern mining using projected databases and sequence-weighted utility pruning.
 56. **HUPSPM** - High utility-probability sequential pattern mining for uncertain sequence utility databases.
 57. **HUP-Miner** - Mines high average utility nonoverlapping patterns from sequence utility databases using nonoverlapping SPC-style support, HUBP upper-bound pruning, and pattern join candidate generation (Geng et al. 2026).
+
+### Top-K Closed Sequential Pattern Mining
+58. **KCloTreeMiner** - Mines top-K closed sequential patterns over SPMF sequence datasets using SP-Tree-style projection, max-support candidate ordering, closed coverage, pattern absorption, and generic/group/redundancy-aware modes (Rizvee et al. 2025).
 
 ### Frequent Closed Itemset Mining (FCIM)
 14. **A-Close** - Uses frequent itemset generators to derive closed itemsets.
@@ -151,6 +156,9 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 ### Closed High-Utility Occupancy Mining
 60. **CHUO-Miner** - Mines Closed High-Utility Occupancy Itemsets from positive utility datasets using COU-lists, RUU utility pruning, OUB occupancy-envelope pruning, backward closure pruning, forward closure jumping, and CHUO-signatures.
 
+### Classification Rule Mining
+61. **PSO Classifier** - Particle Swarm based classification-rule discovery using continuous CPSO, TP/TN rule quality, rule pruning, covering, default rules, rule-set cleaning, and tenfold cross-validation.
+
 ---
 
 ## 🚀 Getting Started
@@ -183,6 +191,12 @@ gcc -Iinclude -Iinclude/core -Wall -Wextra -O2 src/main.c src/core/*.c src/algor
 * **`mhoui`**, **`houi_miner`**, **`weak_mhoui_miner`**, **`strong_mhoui_miner`**, and **`direct_mhoui_miner`** require utility format `1`: `./bin/dm.exe mhoui <utility_dataset> 1 <min_support> <min_occupancy> <min_utility> [strong] [direct]`.
 * **`hupp_miner`** is a standalone prompt-log miner: `./bin/hupp_miner --input <prompt_jsonl> --dataset-type auto|dolly|code_feedback --minsup <ratio|count> --minutil-ratio <value> --minalign <value>`. The companion script `scripts/run_hupp_experiments.sh` runs the full prompt benchmark and generates charts.
 * **`chuo_miner`** is a standalone utility-dataset miner: `./bin/chuo_miner --input <utility_dataset> --minutil <value> --minsup <ratio|count> --minocc <value>`. The companion script `scripts/run_chuo_experiments.sh` runs Foodmart, Liquor, and Chainstore CHUO benchmarks and generates charts.
+* **`pso_classifier`** is a standalone supervised classification-rule miner: `./bin/pso_classifier --input <spmf_class_folder> --particles <N> --threshold <T> --radius <R>`. The companion script `scripts/run_pso_classifier_experiments.sh` runs the malware-family classification benchmark and prints statistics only.
+* **`tku_miner`** is a standalone top-k utility miner: `./bin/tku_miner --input <utility_dataset> --k <N> [--max-depth N] [--max-seconds S]`. The companion script `scripts/run_tku_experiments.sh` runs Foodmart and Liquor TKU benchmarks and prints statistics only.
+* **`kclotree_miner`** is a standalone top-k closed sequential-pattern miner: `./bin/kclotree_miner --input <spmf_sequence_file_or_folder> --k <N> --type generic|group|redundancy_aware`. The companion script `scripts/run_kclotree_experiments.sh` runs the malware-sequence benchmark and prints statistics only.
+* **`tipn_houi_miner`** is a standalone top-k high-on-shelf utility miner for positive/negative utility datasets: `./bin/tipn_houi_miner --input <negative_utility_dataset> --k <N> --intervals <N>`. The companion script `scripts/run_tipn_houi_experiments.sh` runs bounded Retail/Mushroom negative-utility benchmarks and prints statistics only.
+* **`htk_miner`** is a standalone top-k frequent itemset miner using the paper's vertical BSN representation, top-k singleton initialization with ties, equivalence-class joins, and Q-Heap threshold raising: `./bin/htk_miner --input <transaction_dataset> --k <N> [--mode bsn]`. The companion script `scripts/run_htk_experiments.sh` runs transactional FIMI-style benchmarks and prints statistics only.
+* **`topkphm_miner`** is a standalone top-k periodic high-utility itemset miner using periodic utility-lists, dynamic top-k utility thresholding, and EUSCS pruning: `./bin/topkphm_miner --input <utility_dataset> --k <N> --maxper <N> --maxavg <N>`. The companion script `scripts/run_topkphm_experiments.sh` runs statistics-only utility benchmarks.
 * **`<dataset_path>`**: Path to your transactional dataset (e.g., `datasets/chess.txt`).
 * **`<format>`**: Usually `0` for raw space-separated transactions; use `1` for SPMF-style utility datasets, `3` for sequence utility datasets, and `4` for `item,quantity` HUQIM datasets.
 * **`<min_support>`**: Support threshold as a fraction (e.g., `0.005` for 0.5%) or absolute count (e.g., `500`). For `tkhoim`, this is `k`.
@@ -350,29 +364,64 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 **[77]** J. C.-W. Lin, L. Yang, P. Fournier-Viger, T.-P. Hong, and M. Voznak, "A binary PSO approach to mine high-utility itemsets," *Soft Computing*, vol. 20, no. 1, pp. 1–13, 2016. *(HUIM-BPSO-tree)*
 
 **[78]** W. Song and C. Huang, "Mining High Utility Itemsets Using Bio-Inspired Algorithms: A Diverse Optimal Value Framework," *IEEE Access*, vol. 6, pp. 19568–19582, 2018. *(Bio-HUIF)*
+
 **[79]** W. Song, J. Li, and C. Huang, "Artificial Fish Swarm Algorithm for Mining High Utility Itemsets," in *Proc. 12th International Conference on Advances in Swarm Intelligence (ICSI)*, 2021, pp. 407–419. *(HUIM-AFSA)*
+
 **[80]** W. Song and C. Huang, "Discovering High-Utility Itemsets Based on the Artificial Bee Colony Algorithm," in *Proc. 22nd Pacific-Asia Conference on Knowledge Discovery and Data Mining (PAKDD)*, 2018, pp. 240–252. *(HUIM-ABC)*
+
 **[81]** S. Krishnamoorthy, "Mining top-k high utility itemsets with effective threshold raising strategies," *Expert Systems with Applications*, vol. 117, pp. 148–165, 2019. *(THUI)*
+
 **[82]** W. Song, C. Zheng, C. Huang, and L. Liu, "Heuristically mining the top-k high-utility itemsets with cross-entropy optimization," *Applied Intelligence*, vol. 51, no. 12, pp. 8864–8881, 2021. *(TKU-CE/CE+)*
+
 **[83]** S. Dawar, V. Sharma, and V. Goyal, "Mining top-k high-utility itemsets from a data stream under sliding window model," *Applied Intelligence*, vol. 47, no. 4, pp. 1240–1255, 2017. *(FHMDS)*
+
 **[84]** J. C.-W. Lin, T. Li, P. Fournier-Viger, T.-P. Hong, J. Zhan, and M. Voznak, "An efficient algorithm to mine high average-utility itemsets," *Advanced Engineering Informatics*, vol. 30, no. 2, pp. 233–243, 2016. *(HAUI-Miner)*
+
 **[85]** J. C.-W. Lin, S. Ren, P. Fournier-Viger, and T.-P. Hong, "EHAUPM: Efficient High Average-Utility Pattern Mining With Tighter Upper Bounds," *IEEE Access*, vol. 5, pp. 12927–12940, 2017. *(EHAUPM)*
+
 **[86]** W. Song, L. Liu, and C. Huang, "Generalized maximal utility for mining high average-utility itemsets," *Knowledge and Information Systems*, vol. 63, no. 11, pp. 2947–2967, 2021. *(HAUIM-GMU)*
+
 **[87]** T.-N. Tran, V. T. Hoang, T.-C. Truong, and M. Voznak, "A hierarchical set-enumeration tree enabling high occupancy item set mining and the use of an adaptive occupancy threshold," *Applied Intelligence*, vol. 55, no. 2, pp. 205–225, 2025. *(NAM-HEP)*
+
 **[88]** J. C.-W. Lin, S. Ren, and P. Fournier-Viger, "MEMU: More Efficient Algorithm to Mine High Average-Utility Patterns With Multiple Minimum Average-Utility Thresholds," *IEEE Access*, vol. 6, pp. 7593–7609, 2018. *(MEMU)*
+
 **[89]** C. H. Li, C.-W. Wu, and V. S. Tseng, "Efficient Vertical Mining of High Utility Quantitative Itemsets," in *Proc. IEEE International Conference on Granular Computing (GrC)*, 2014, pp. 155–160. *(VHUQI)*
+
 **[90]** M. Nouioua, P. Fournier-Viger, C.-W. Wu, J. C.-W. Lin, and W. Gan, "FHUQI-Miner: Fast High Utility Quantitative Itemset Mining," *Applied Intelligence*, 2021. *(FHUQI-Miner)*
+
 **[91]** M. Nouioua, P. Fournier-Viger, W. Gan, Y. Wu, J. C.-W. Lin, and F. Nouioua, "TKQ: Top-K Quantitative High Utility Itemset Mining." *(TKQ)*
+
 **[92]** I. Yildirim, "Mining High-Efficiency Itemsets with Negative Utilities," *Mathematics*, vol. 13, no. 4, article 659, 2025. https://doi.org/10.3390/math13040659 *(MHEINU)*
+
 **[93]** G. Kimura, Y. Hayamizu, R. U. Kiran, M. Kitsuregawa, and K. Goda, "DPHIM: Efficient Parallel Mining of High-Utility Itemsets on Multicore Processors and Its Evaluation," *IEEE Transactions on Knowledge and Data Engineering*, vol. 38, no. 5, pp. 2714-2730, 2026. https://doi.org/10.1109/TKDE.2026.3666851 *(DPHIM)*
+
 **[94]** K. S. Sulanjari and C. Fatichah, "Optimized Closed Frequent High Utility Itemset Mining Using OSR, OWL, And MSU Pruning On Retail Transaction Data," *JUTI: Jurnal Ilmiah Teknologi Informasi*, vol. 24, no. 1, pp. 1-15, 2026. https://doi.org/10.12962/j24068535.v24i1.a1311 *(Closed-FHUIM-Kinana)*
+
 **[95]** M. Geng, Y. Wu, Y. Li, J. Liu, L. Guo, X. Zhu, and X. Wu, "Mining High Average Utility Nonoverlapping Patterns from Sequential Database," *ACM Transactions on Intelligent Systems and Technology*, vol. 17, no. 1, article 15, 2026. https://doi.org/10.1145/3773899 *(HUP-Miner)*
+
 **[96]** S. Ruggieri, "Frequent Regular Itemset Mining," in *Proc. 16th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD '10)*, 2010, pp. 263-272. https://doi.org/10.1145/1835804.1835840 *(RegularMine)*
+
 **[97]** Q. Van, "MFHOI-Miner: An Efficient Method for Mining Maximal Frequent High-Occupancy Itemsets," local project paper, `docs/mfhoi.pdf`, 2026. *(MFHOI / Strong MFHOI-Miner)*
 
 **[98]** Q. Van, "HUPP-Miner: High-Utility Prompt Pattern Mining for Cost-Aware and Accuracy-Preserving Generative AI Systems," local project paper, `docs/hupp.pdf`, 2026. *(HUPP-Miner)*
 
-**[99]** Q. Van, "Closed High-Utility Occupancy Itemset Mining," local project specification, `docs/CHUIM.md`, 2026. *(CHUO-Miner)*
+**[99]** Q. Van, "Closed High-Utility Occupancy Itemset Mining," local project paper, `docs/chuim.tex` and `docs/chuim.pdf`, 2026. *(CHUO-Miner)*
+
+**[100]** Q. Van, "MHOUI-Miner: Mining High-Occupancy Utility Itemsets," local project paper, `docs/mhoui.tex` and `docs/mhoui.pdf`, 2026. *(MHOUI-Miner)*
+
+**[101]** Q. Van, "VIFP: Verifiable/Privacy-Preserving Frequent Pattern Mining," local project paper, `docs/vifp.tex` and `docs/vifp.pdf`, 2026. *(VIFP-Miner)*
+
+**[102]** T. Sousa, A. Silva, and A. Neves, "Particle Swarm based Data Mining Algorithms for classification tasks," *Parallel Computing*, vol. 30, no. 5-6, pp. 767-783, 2004. https://doi.org/10.1016/j.parco.2003.12.015 *(PSO Classifier)*
+
+**[103]** C.-W. Wu, B.-E. Shie, P. S. Yu, and V. S. Tseng, "Mining top-k high utility itemsets," in *Proc. 18th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD '12)*, 2012, pp. 78-86. https://doi.org/10.1145/2339530.2339546 *(TKU-Miner)*
+
+**[104]** R. A. Rizvee, C. F. Ahmed, and C. K. Leung, "A tree-based framework to mine top-K closed sequential patterns," *Applied Intelligence*, vol. 55, article 221, 2025. https://doi.org/10.1007/s10489-024-06137-y *(KCloTreeMiner)*
+
+**[105]** Y.-I. Chang, P.-C. Chuang, Y.-H. Liao, P.-Y. Hu, and T.-W. Chen, "An Efficient Algorithm for Mining Top-k High-On-Shelf-Utility Itemsets with Positive/Negative Profits of Local/Global Minimum Count," *Engineering Proceedings*, vol. 108, no. 1, article 45, 2025. https://doi.org/10.3390/engproc2025108045 *(TIPN-HOUI-Miner)*
+
+**[106]** K. Malliaridis and S. Ougiaroglou, "Efficient techniques for retrieving top-K frequent itemsets," *Expert Systems With Applications*, vol. 311, article 131250, 2026. https://doi.org/10.1016/j.eswa.2026.131250 *(HTK-Miner / HTK-negFIN)*
+
+**[107]** X. Zhang, B. Liu, J. Chen, S. Yang, Z. Gu, Z. Liu, and S. Xu, "TOPKPHM: Periodic Patterns Mining of Top-K High Utility Itemsets," in *Proc. 2025 International Conference on Trustworthy Big Data and Artificial Intelligence (ICTBAI)*, 2025. https://doi.org/10.1109/ICTBAI68361.2025.00009 *(TOPKPHM)*
 
 ---
 
