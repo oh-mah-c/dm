@@ -1,6 +1,0 @@
-label=efim_closed
-dataset=chainstore
-command=/home/autocookie/pomaieco/dm/bin/dm.exe efim_closed /home/autocookie/pomaieco/dm/datasets/utilities/chainstore.txt 1 50000
-timeout=90s
------ output -----
-runner_status=TIMEOUT

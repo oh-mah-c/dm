@@ -53,3 +53,8 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Custom project ignores
+bin/
+__pycache__/
+datasets/

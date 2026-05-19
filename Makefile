@@ -32,6 +32,7 @@ KCLOTREE_MINER_TARGET = $(BIN_DIR)/kclotree_miner
 TIPN_HOUI_MINER_TARGET = $(BIN_DIR)/tipn_houi_miner
 HTK_MINER_TARGET = $(BIN_DIR)/htk_miner
 TOPKPHM_MINER_TARGET = $(BIN_DIR)/topkphm_miner
+TKU_PSO_MINER_TARGET = $(BIN_DIR)/tku_pso_miner
 EXPERIMENT_TARGET = $(BIN_DIR)/run_mfhoi_experiments
 ITEMSET_BENCH_TARGET = $(BIN_DIR)/itemset_mining_bench
 MFHOI_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/mfhoi_miner.c $(MFHOI_COMMON_SOURCES))
@@ -45,6 +46,7 @@ KCLOTREE_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/t
 TIPN_HOUI_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/tipn_houi_miner.c $(SRC_DIR)/algorithms/tipn_houi.c $(SRC_DIR)/core/dm_benchmark.c)
 HTK_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/htk_miner.c $(SRC_DIR)/algorithms/htk_miner.c $(SRC_DIR)/core/dm_benchmark.c)
 TOPKPHM_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/topkphm_miner.c $(SRC_DIR)/algorithms/topkphm.c $(SRC_DIR)/core/dm_benchmark.c)
+TKU_PSO_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/tku_pso_miner.c $(SRC_DIR)/algorithms/tku_pso.c $(SRC_DIR)/core/dm_dataset.c $(SRC_DIR)/core/dm_benchmark.c)
 EXPERIMENT_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/experiments/run_mfhoi_experiments.c $(MFHOI_COMMON_SOURCES))
 ITEMSET_BENCH_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/itemset_mining_bench.c)
 
@@ -53,7 +55,7 @@ ifeq ($(OS),Windows_NT)
     LDFLAGS += -lpsapi
 endif
 
-all: $(TARGET) $(MFHOI_MINER_TARGET) $(MHOUI_MINER_TARGET) $(VIFP_MINER_TARGET) $(HUPP_MINER_TARGET) $(CHUO_MINER_TARGET) $(PSO_CLASSIFIER_TARGET) $(TKU_MINER_TARGET) $(KCLOTREE_MINER_TARGET) $(TIPN_HOUI_MINER_TARGET) $(HTK_MINER_TARGET) $(TOPKPHM_MINER_TARGET) $(EXPERIMENT_TARGET) $(ITEMSET_BENCH_TARGET)
+all: $(TARGET) $(MFHOI_MINER_TARGET) $(MHOUI_MINER_TARGET) $(VIFP_MINER_TARGET) $(HUPP_MINER_TARGET) $(CHUO_MINER_TARGET) $(PSO_CLASSIFIER_TARGET) $(TKU_MINER_TARGET) $(KCLOTREE_MINER_TARGET) $(TIPN_HOUI_MINER_TARGET) $(HTK_MINER_TARGET) $(TOPKPHM_MINER_TARGET) $(TKU_PSO_MINER_TARGET) $(EXPERIMENT_TARGET) $(ITEMSET_BENCH_TARGET)
 
 $(TARGET): $(OBJECTS)
 	@mkdir -p $(BIN_DIR)
@@ -102,6 +104,10 @@ $(HTK_MINER_TARGET): $(HTK_MINER_OBJECTS)
 $(TOPKPHM_MINER_TARGET): $(TOPKPHM_MINER_OBJECTS)
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(TOPKPHM_MINER_OBJECTS) -o $@ $(LDFLAGS)
+
+$(TKU_PSO_MINER_TARGET): $(TKU_PSO_MINER_OBJECTS)
+	@mkdir -p $(BIN_DIR)
+	$(CC) $(TKU_PSO_MINER_OBJECTS) -o $@ $(LDFLAGS)
 
 $(EXPERIMENT_TARGET): $(EXPERIMENT_OBJECTS)
 	@mkdir -p $(BIN_DIR)
