@@ -121,9 +121,14 @@
 #include "algorithms/closed_fhuim_kinana.h"
 #include "algorithms/regular_mine.h"
 #include "algorithms/tmku.h"
+#include "algorithms/hiep.h"
+#include "tokenizer/tokenizer.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
+
+int output_json = 0;
 
 extern DM_Algorithm bio_huif_ga_algo;
 extern DM_Algorithm tmku_algo;
@@ -149,6 +154,207 @@ extern DM_Algorithm regular_mine_algo;
 extern DM_Algorithm mhoui_algo;
 extern DM_Algorithm vifp_algo;
 
+static const char *arg_value_from(int argc, char **argv, int start, const char *key, const char *fallback) {
+    for (int i = start; i + 1 < argc; i++) {
+        if (strcmp(argv[i], key) == 0) return argv[i + 1];
+    }
+    return fallback;
+}
+
+static int has_flag_from(int argc, char **argv, int start, const char *key) {
+    for (int i = start; i < argc; i++) {
+        if (strcmp(argv[i], key) == 0) return 1;
+    }
+    return 0;
+}
+
+static void print_hiep_usage(const char *prog) {
+    printf("HIEP: %s hiep --input <text_or_transactions> [--input-type text|transactions] [--mode itemset|sequence]\n", prog);
+    printf("      [--window N] [--stride N] [--theta value] [--theta-ratio value]\n");
+    printf("      [--minsup ratio|count] [--alpha value] [--gamma value]\n");
+    printf("      [--max-depth N] [--max-patterns N] [--max-transactions N]\n");
+    printf("      [--max-tokens N] [--max-bytes N] [--max-seconds S]\n");
+    printf("      [--tokenizer %s] [--output patterns.tsv]\n", dm_tokenizer_supported_names());
+    printf("      [--no-tiub] [--no-iwru] [--uniform-weights] [--no-compactness]\n");
+    printf("HIEP positional: %s hiep <input> [text|transactions] [minsup] [itemset|sequence] [theta_ratio] [window] [stride] [max_depth] [tokenizer]\n", prog);
+}
+
+static void parse_hiep_minsup(HIEPParams *params, const char *value) {
+    if (!params || !value) return;
+    double v = atof(value);
+    if (v > 0.0 && v < 1.0) {
+        params->min_support_ratio = v;
+    } else if (v >= 1.0) {
+        params->min_support = (uint32_t)strtoul(value, NULL, 10);
+        params->min_support_ratio = 0.0;
+    }
+}
+
+static int parse_hiep_positional(int argc, char **argv, HIEPParams *params, const char **input) {
+    if (argc < 3 || argv[2][0] == '-') return 0;
+    *input = argv[2];
+    if (argc >= 4) {
+        if (strcmp(argv[3], "0") == 0) {
+            params->input_type = HIEP_INPUT_TRANSACTIONS;
+        } else if (hiep_parse_input_type(argv[3], &params->input_type) != 0) {
+            fprintf(stderr, "Unknown HIEP input type: %s\n", argv[3]);
+            return -1;
+        }
+    }
+    if (argc >= 5) parse_hiep_minsup(params, argv[4]);
+    if (argc >= 6 && hiep_parse_mode(argv[5], &params->mode) != 0) {
+        fprintf(stderr, "Unknown HIEP mode: %s\n", argv[5]);
+        return -1;
+    }
+    if (argc >= 7) params->theta_ratio = atof(argv[6]);
+    if (argc >= 8) params->window_length = (size_t)strtoull(argv[7], NULL, 10);
+    if (argc >= 9) params->stride = (size_t)strtoull(argv[8], NULL, 10);
+    if (argc >= 10) params->max_depth = (size_t)strtoull(argv[9], NULL, 10);
+    if (argc >= 11) params->tokenizer_name = argv[10];
+    return 0;
+}
+
+static int run_hiep_cli(DM_Algorithm *algo, int argc, char **argv) {
+    if (has_flag_from(argc, argv, 2, "--help") || has_flag_from(argc, argv, 2, "-h")) {
+        print_hiep_usage(argv[0]);
+        return 0;
+    }
+
+    HIEPStats stats;
+    HIEPRunConfig cfg;
+    memset(&stats, 0, sizeof(stats));
+    memset(&cfg, 0, sizeof(cfg));
+    cfg.params = hiep_default_params();
+    cfg.stats = &stats;
+
+    const char *input = NULL;
+    if (parse_hiep_positional(argc, argv, &cfg.params, &input) != 0) return 1;
+    input = arg_value_from(argc, argv, 2, "--input", input);
+    if (!input) {
+        print_hiep_usage(argv[0]);
+        return 1;
+    }
+    cfg.input_path = input;
+
+    const char *value;
+    value = arg_value_from(argc, argv, 2, "--input-type", NULL);
+    if (value && hiep_parse_input_type(value, &cfg.params.input_type) != 0) {
+        fprintf(stderr, "Unknown HIEP input type: %s\n", value);
+        return 1;
+    }
+    value = arg_value_from(argc, argv, 2, "--mode", NULL);
+    if (value && hiep_parse_mode(value, &cfg.params.mode) != 0) {
+        fprintf(stderr, "Unknown HIEP mode: %s\n", value);
+        return 1;
+    }
+    value = arg_value_from(argc, argv, 2, "--window", NULL);
+    if (value) cfg.params.window_length = (size_t)strtoull(value, NULL, 10);
+    value = arg_value_from(argc, argv, 2, "--stride", NULL);
+    if (value) cfg.params.stride = (size_t)strtoull(value, NULL, 10);
+    value = arg_value_from(argc, argv, 2, "--theta", NULL);
+    if (value) cfg.params.theta = atof(value);
+    value = arg_value_from(argc, argv, 2, "--theta-ratio", NULL);
+    if (value) cfg.params.theta_ratio = atof(value);
+    value = arg_value_from(argc, argv, 2, "--minsup", NULL);
+    if (value) parse_hiep_minsup(&cfg.params, value);
+    value = arg_value_from(argc, argv, 2, "--alpha", NULL);
+    if (value) cfg.params.alpha = atof(value);
+    value = arg_value_from(argc, argv, 2, "--gamma", NULL);
+    if (value) cfg.params.gamma = atof(value);
+    value = arg_value_from(argc, argv, 2, "--max-depth", NULL);
+    if (value) cfg.params.max_depth = (size_t)strtoull(value, NULL, 10);
+    value = arg_value_from(argc, argv, 2, "--max-patterns", NULL);
+    if (value) cfg.params.max_patterns = (size_t)strtoull(value, NULL, 10);
+    value = arg_value_from(argc, argv, 2, "--max-transactions", NULL);
+    if (value) cfg.params.max_transactions = (size_t)strtoull(value, NULL, 10);
+    value = arg_value_from(argc, argv, 2, "--max-tokens", NULL);
+    if (value) cfg.params.max_tokens = (size_t)strtoull(value, NULL, 10);
+    value = arg_value_from(argc, argv, 2, "--max-bytes", NULL);
+    if (value) cfg.params.max_bytes = (size_t)strtoull(value, NULL, 10);
+    value = arg_value_from(argc, argv, 2, "--max-seconds", NULL);
+    if (value) cfg.params.max_seconds = atof(value);
+    value = arg_value_from(argc, argv, 2, "--tokenizer", NULL);
+    if (value) cfg.params.tokenizer_name = value;
+    cfg.params.output_path = arg_value_from(argc, argv, 2, "--output", NULL);
+    cfg.params.disable_tiub = has_flag_from(argc, argv, 2, "--no-tiub");
+    cfg.params.disable_iwru = has_flag_from(argc, argv, 2, "--no-iwru");
+    cfg.params.uniform_weights = has_flag_from(argc, argv, 2, "--uniform-weights");
+    cfg.params.disable_compactness = has_flag_from(argc, argv, 2, "--no-compactness");
+
+    dm_bench_reset();
+    dm_bench_start(DM_PHASE_TOTAL);
+    dm_bench_start(DM_PHASE_ALGO);
+    DM_Status status = algo->run(NULL, &cfg);
+    dm_bench_stop(DM_PHASE_ALGO);
+    dm_bench_stop(DM_PHASE_TOTAL);
+    dm_bench_record_results(stats.emitted_patterns, stats.total_output_items);
+    DM_BenchmarkReport report = dm_bench_get_report();
+
+    if (status != DM_SUCCESS) {
+        fprintf(stderr, "HIEP-Miner failed for %s\n", input);
+        return 1;
+    }
+
+    double runtime_sec = report.phase_times_ms[DM_PHASE_ALGO] / 1000.0;
+    double mb = (double)stats.input_bytes / 1048576.0;
+    double throughput_mb = runtime_sec > 0.0 ? mb / runtime_sec : 0.0;
+    double throughput_tok = runtime_sec > 0.0 ? (double)stats.token_stream_length / runtime_sec : 0.0;
+
+    printf("HIEP-Miner\n");
+    printf("input=%s\n", input);
+    printf("input_type=%s\n", hiep_input_type_name(cfg.params.input_type));
+    printf("mode=%s\n", hiep_mode_name(cfg.params.mode));
+    printf("tokenizer=%s\n", cfg.params.tokenizer_name ? cfg.params.tokenizer_name : "faro");
+    printf("window_length=%zu\n", cfg.params.window_length);
+    printf("stride=%zu\n", cfg.params.stride);
+    printf("transactions=%zu\n", stats.transactions);
+    printf("token_stream_length=%zu\n", stats.token_stream_length);
+    printf("input_bytes=%zu\n", stats.input_bytes);
+    printf("nnz=%zu\n", stats.nnz);
+    printf("vocabulary_size=%zu\n", stats.vocabulary_size);
+    printf("minsup_ratio=%.10g\n", stats.transactions ? (double)stats.min_support / (double)stats.transactions : 0.0);
+    printf("minsup_count=%u\n", stats.min_support);
+    printf("theta=%.10g\n", stats.theta);
+    printf("theta_ratio=%.10g\n", stats.theta_ratio);
+    printf("alpha=%.10g\n", stats.alpha);
+    printf("gamma=%.10g\n", stats.gamma);
+    printf("disable_tiub=%d\n", cfg.params.disable_tiub);
+    printf("disable_iwru=%d\n", cfg.params.disable_iwru);
+    printf("uniform_weights=%d\n", cfg.params.uniform_weights);
+    printf("disable_compactness=%d\n", cfg.params.disable_compactness);
+    printf("status=%s\n", stats.limited ? "LIMITED" : "OK");
+    printf("runtime_sec=%.6f\n", runtime_sec);
+    printf("total_sec=%.6f\n", report.phase_times_ms[DM_PHASE_TOTAL] / 1000.0);
+    printf("peak_ram_mb=%.6f\n", report.peak_memory_kb / 1024.0);
+    printf("throughput_mb_s=%.6f\n", throughput_mb);
+    printf("throughput_tok_s=%.6f\n", throughput_tok);
+    printf("surviving_items=%zu\n", stats.surviving_items);
+    printf("singleton_occurrences=%zu\n", stats.singleton_occurrences);
+    printf("visited_nodes=%zu\n", stats.visited_nodes);
+    printf("generated_children=%zu\n", stats.generated_children);
+    printf("joins=%zu\n", stats.joins);
+    printf("joined_entries=%zu\n", stats.joined_entries);
+    printf("pruned_support=%zu\n", stats.pruned_support);
+    printf("pruned_tiub=%zu\n", stats.pruned_tiub);
+    printf("pruned_iwru=%zu\n", stats.pruned_iwru);
+    printf("output_count=%zu\n", stats.emitted_patterns);
+    printf("total_output_items=%zu\n", stats.total_output_items);
+    printf("avg_output_length=%.6f\n", stats.emitted_patterns ? (double)stats.total_output_items / (double)stats.emitted_patterns : 0.0);
+    printf("avg_support=%.6f\n", stats.avg_support);
+    printf("avg_utility=%.6f\n", stats.avg_utility);
+    printf("avg_pattern_weight=%.6f\n", stats.avg_pattern_weight);
+    printf("best_utility=%.6f\n", stats.best_utility);
+    printf("information_density_optimization=%.6f\n", stats.information_density_optimization);
+    printf("noise_filtering_efficiency=%.6f\n", stats.noise_filtering_efficiency);
+    printf("signal_recall=%.6f\n", stats.signal_recall);
+    printf("avg_utility_list_length=%.6f\n", stats.avg_utility_list_length);
+    printf("max_utility_list_length=%.6f\n", stats.max_utility_list_length);
+    printf("max_depth=%zu\n", stats.max_depth_seen);
+    printf("result_ram_bytes=%zu\n", stats.result_ram_bytes);
+    printf("result_disk_est_bytes=%zu\n", stats.result_disk_est_bytes);
+    return stats.limited ? 2 : 0;
+}
+
 int main(int argc, char **argv) {
     dm_register_algorithm(&bio_huif_ga_algo);
     dm_register_algorithm(&bio_huif_pso_algo);
@@ -173,6 +379,7 @@ int main(int argc, char **argv) {
     dm_register_algorithm(&mhoui_algo);
     dm_register_algorithm(&vifp_algo);
     dm_register_algorithm(&tmku_algo);
+    dm_register_algorithm(&hiep_algo);
 
     if (argc < 3) {
         printf("Usage: %s <algo_id> <dataset_path> [type_id] [min_support]\n", argv[0]);
@@ -185,6 +392,7 @@ int main(int argc, char **argv) {
         printf("RegularMine: %s regular_mine <transactional_dataset> 0 <min_support>\n", argv[0]);
         printf("VIFP: %s vifp <transactional_dataset> 0 <min_support> [mode:plaintext|smpc|fhe]\n", argv[0]);
         printf("TMKU: %s tmku <utility_dataset> 1 [k] [min_utility] [target_pattern]\n", argv[0]);
+        print_hiep_usage(argv[0]);
         printf("Types: 0=Transactional, 1=Utility, 2=Matrix, 3=SequenceUtility, 4=Quantity\n");
         dm_list_algorithms();
         return 1;
@@ -200,6 +408,10 @@ int main(int argc, char **argv) {
         printf("Error: Algorithm '%s' not found.\n", algo_id);
         dm_list_algorithms();
         return 1;
+    }
+
+    if (strcmp(algo_id, "hiep") == 0) {
+        return run_hiep_cli(algo, argc, argv);
     }
 
     dm_bench_reset();

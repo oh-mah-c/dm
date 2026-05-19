@@ -7,6 +7,8 @@ BIN_DIR = bin
 # Source files
 SOURCES = $(SRC_DIR)/main.c \
           $(wildcard $(SRC_DIR)/core/*.c) \
+          $(SRC_DIR)/tokenizer/faro_tokenizer.c \
+          $(SRC_DIR)/tokenizer/tokenizer_variants.c \
           $(wildcard $(SRC_DIR)/algorithms/*.c)
 MFHOI_COMMON_SOURCES = $(SRC_DIR)/algorithms/mfhoi_common.c \
                        $(SRC_DIR)/core/experiment.c \

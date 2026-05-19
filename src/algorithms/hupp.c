@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "algorithms/hupp.h"
+#include "core/dm_portability.h"
 
 #include <ctype.h>
 #include <math.h>
@@ -443,7 +444,7 @@ static int load_prompt_db(const char *path, const HUPPParams *params, HUPPDB *db
     int first = 1;
     size_t concept_cap = params->max_concepts_per_prompt ? params->max_concepts_per_prompt : 64;
     if (concept_cap > 512) concept_cap = 512;
-    while ((len = getline(&line, &cap_line, fp)) != -1) {
+    while ((len = dm_getline(&line, &cap_line, fp)) != -1) {
         if (len <= 1) continue;
         if (first && type == HUPP_DATASET_AUTO) type = auto_type(path, line);
         first = 0;

@@ -1,6 +1,7 @@
 #include "algorithms/dphim.h"
 #include "core/dm_benchmark.h"
 #include "core/dm_dataset_types.h"
+#include "core/dm_portability.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -269,7 +270,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
 
     DM_DPHIM_Params *p = (DM_DPHIM_Params *)params;
     double min_util = p ? p->min_utility : 1000.0;
-    int threads = p && p->threads > 0 ? p->threads : (int)sysconf(_SC_NPROCESSORS_ONLN);
+    int threads = p && p->threads > 0 ? p->threads : (int)dm_cpu_count();
     if (threads < 1) threads = 1;
     if (threads > 128) threads = 128;
 

@@ -1,4 +1,5 @@
 #include "algorithms/tipn_houi.h"
+#include "core/dm_portability.h"
 
 #include <ctype.h>
 #include <math.h>
@@ -187,7 +188,7 @@ static int load_db(const char *path, const TIPNHouiParams *params, DB *db) {
     if (!fp) return -1;
     char *line = NULL;
     size_t n = 0, tid = 0;
-    while (getline(&line, &n, fp) != -1) {
+    while (dm_getline(&line, &n, fp) != -1) {
         if (params->max_transactions && tid >= params->max_transactions) break;
         if (line[0] == '@' || line[0] == '#' || line[0] == '%' || line[0] == '\n') continue;
         if (parse_line(line, tid, params, db) != 0) {

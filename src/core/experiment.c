@@ -1,4 +1,5 @@
 #include "core/experiment.h"
+#include "core/dm_portability.h"
 #include <libgen.h>
 #include <stdio.h>
 #include <string.h>
@@ -11,11 +12,11 @@ int dm_ensure_dir(const char *path) {
     for (char *p = tmp + 1; *p; p++) {
         if (*p == '/') {
             *p = '\0';
-            mkdir(tmp, 0775);
+            dm_mkdir(tmp, 0775);
             *p = '/';
         }
     }
-    return mkdir(tmp, 0775);
+    return dm_mkdir(tmp, 0775);
 }
 
 const char *dm_path_basename(const char *path) {

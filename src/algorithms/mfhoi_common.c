@@ -1,4 +1,5 @@
 #include "algorithms/mfhoi.h"
+#include "core/dm_portability.h"
 #include <ctype.h>
 #include <errno.h>
 #include <math.h>
@@ -663,13 +664,13 @@ double mfhoi_avg_jaccard_to_nearest(const PatternList *source, const PatternList
 }
 
 static void ensure_dir(const char *path) {
-    mkdir(path, 0775);
+    dm_mkdir(path, 0775);
 }
 
 static void write_random_transactions(FILE *fp, int transactions, int items, int len, unsigned int *seed) {
     int *buf = malloc((size_t)len * sizeof(int));
     for (int t = 0; t < transactions; t++) {
-        for (int i = 0; i < len; i++) buf[i] = (int)(rand_r(seed) % (unsigned int)items) + 1;
+        for (int i = 0; i < len; i++) buf[i] = (int)(dm_rand_r(seed) % (unsigned int)items) + 1;
         qsort(buf, (size_t)len, sizeof(int), cmp_int);
         int last = -1;
         int printed = 0;
@@ -712,12 +713,12 @@ int mfhoi_write_synthetic_datasets(const char *dataset_root) {
     if (!fp) return -1;
     for (int t = 0; t < 10000; t++) {
         int printed = 0;
-        if (rand_r(&seed) % 100 < 20) for (int i = 1; i <= 10; i++) { fprintf(fp, "%s%d", printed ? " " : "", i); printed = 1; }
-        if (rand_r(&seed) % 100 < 10) for (int i = 101; i <= 115; i++) { fprintf(fp, "%s%d", printed ? " " : "", i); printed = 1; }
-        if (rand_r(&seed) % 100 < 35) for (int i = 201; i <= 205; i++) { fprintf(fp, "%s%d", printed ? " " : "", i); printed = 1; }
-        int extra = 5 + (int)(rand_r(&seed) % 12);
+        if (dm_rand_r(&seed) % 100 < 20) for (int i = 1; i <= 10; i++) { fprintf(fp, "%s%d", printed ? " " : "", i); printed = 1; }
+        if (dm_rand_r(&seed) % 100 < 10) for (int i = 101; i <= 115; i++) { fprintf(fp, "%s%d", printed ? " " : "", i); printed = 1; }
+        if (dm_rand_r(&seed) % 100 < 35) for (int i = 201; i <= 205; i++) { fprintf(fp, "%s%d", printed ? " " : "", i); printed = 1; }
+        int extra = 5 + (int)(dm_rand_r(&seed) % 12);
         for (int i = 0; i < extra; i++) {
-            int item = (int)(rand_r(&seed) % 500) + 1;
+            int item = (int)(dm_rand_r(&seed) % 500) + 1;
             fprintf(fp, "%s%d", printed ? " " : "", item);
             printed = 1;
         }

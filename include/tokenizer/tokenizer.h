@@ -7,7 +7,8 @@
 typedef enum {
     MODE_DOCUMENT,   /* Line-by-line transactions */
     MODE_SENTENCE,   /* Split transactions at sentence boundaries (. ? !) */
-    MODE_SLIDING     /* Sliding window transactions */
+    MODE_SLIDING,    /* Sliding itemset windows; tokens are sorted and uniqued */
+    MODE_SLIDING_SEQUENCE /* Sliding sequence windows; token order and repeats are preserved */
 } TransactionMode;
 
 /* Generic Polymorphic Tokenizer Interface matching Section 3 */
@@ -32,6 +33,10 @@ struct Tokenizer {
     
     /* Print detailed stats for standard benchmark comparisons */
     void (*print_stats)(Tokenizer *self, const char *input_path, size_t file_size, double elapsed_sec, size_t tx_count, long peak_rss);
+
+    /* Optional vocabulary lookup used by downstream miners for readable output. */
+    const char *(*token_text)(Tokenizer *self, uint32_t token_id, uint32_t *len);
+    uint32_t (*vocab_size)(Tokenizer *self);
 };
 
 /* --- FARO-Tokenizer Specific Definitions matching Section 4 --- */
@@ -61,6 +66,12 @@ Tokenizer *lp_fp_tokenizer_create(uint32_t initial_capacity);
 Tokenizer *rh_fp_tokenizer_create(uint32_t initial_capacity);
 Tokenizer *rh_arena_tokenizer_create(uint32_t initial_capacity);  /* Default FARO */
 Tokenizer *rh_borrow_tokenizer_create(uint32_t initial_capacity);
+
+/* Named factory for the unified dm.exe path. Add future tokenizers here. */
+Tokenizer *dm_tokenizer_create(const char *name, uint32_t initial_capacity);
+const char *dm_tokenizer_supported_names(void);
+const char *dm_tokenizer_token_text(Tokenizer *self, uint32_t token_id, uint32_t *len);
+uint32_t dm_tokenizer_vocab_size(Tokenizer *self);
 
 /* Common utilities */
 uint64_t faro_hash(const char *bytes, uint32_t len);

@@ -1,4 +1,5 @@
 #include "algorithms/kclotree_miner.h"
+#include "core/dm_portability.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -194,7 +195,7 @@ static int parse_file(const char *path, SeqDB *db) {
     if (!fp) return -1;
     char *line = NULL;
     size_t n = 0;
-    while (getline(&line, &n, fp) != -1) {
+    while (dm_getline(&line, &n, fp) != -1) {
         if (line[0] == '@' || line[0] == '#' || line[0] == '%' || line[0] == '\n') continue;
         uint32_t *items = NULL;
         size_t len = 0, cap = 0;

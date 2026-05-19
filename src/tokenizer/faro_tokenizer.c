@@ -273,7 +273,7 @@ void faro_tokenize_buffer_polymorphic(Tokenizer *self,
         if (token_len > 0) { \
             uint64_t hash_val = faro_hash(token_buf, token_len); \
             uint32_t tid = self->get_or_create(self, token_buf, token_len, hash_val); \
-            if (mode == MODE_SLIDING) { \
+            if (mode == MODE_SLIDING || mode == MODE_SLIDING_SEQUENCE) { \
                 if (global_count >= global_capacity) { \
                     global_capacity = global_capacity * 2 + 128; \
                     global_tokens = realloc(global_tokens, global_capacity * sizeof(uint32_t)); \
@@ -366,7 +366,7 @@ void faro_tokenize_buffer_polymorphic(Tokenizer *self,
         FINALIZE_TRANSACTION();
     }
     
-    if (mode == MODE_SLIDING && global_count > 0) {
+    if ((mode == MODE_SLIDING || mode == MODE_SLIDING_SEQUENCE) && global_count > 0) {
         if (window_size == 0) window_size = 10;
         if (stride == 0) stride = 1;
         
@@ -379,7 +379,7 @@ void faro_tokenize_buffer_polymorphic(Tokenizer *self,
             size_t count = end - start;
             memcpy(win_buf, global_tokens + start, count * sizeof(uint32_t));
             
-            size_t final_count = faro_sort_uniq(win_buf, count);
+            size_t final_count = (mode == MODE_SLIDING_SEQUENCE) ? count : faro_sort_uniq(win_buf, count);
             emit_callback(win_buf, final_count, user_data);
         }
         
@@ -456,6 +456,24 @@ static void faro_print_stats_wrapper(Tokenizer *self, const char *input_path, si
     }
 }
 
+static const char *faro_token_text_wrapper(Tokenizer *self, uint32_t token_id, uint32_t *len) {
+    FaroTokenizerImpl *tok = (FaroTokenizerImpl *)self->impl;
+    if (!tok || token_id == 0) return NULL;
+    for (uint32_t i = 0; i < tok->capacity; i++) {
+        FaroSlot *slot = &tok->slots[i];
+        if (slot->token_id == token_id) {
+            if (len) *len = slot->token_len;
+            return tok->arena + slot->arena_offset;
+        }
+    }
+    return NULL;
+}
+
+static uint32_t faro_vocab_size_wrapper(Tokenizer *self) {
+    FaroTokenizerImpl *tok = (FaroTokenizerImpl *)self->impl;
+    return tok ? tok->unique_tokens : 0;
+}
+
 
 Tokenizer *rh_arena_tokenizer_create(uint32_t initial_capacity) {
     uint32_t cap = 16;
@@ -493,6 +511,8 @@ Tokenizer *rh_arena_tokenizer_create(uint32_t initial_capacity) {
     self->tokenize_buffer = faro_tokenize_buffer_wrapper;
     self->free = faro_free_wrapper;
     self->print_stats = faro_print_stats_wrapper;
+    self->token_text = faro_token_text_wrapper;
+    self->vocab_size = faro_vocab_size_wrapper;
     
     return self;
 }

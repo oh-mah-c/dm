@@ -57,3 +57,4 @@ dkms.conf
 # Custom project ignores
 bin/
 __pycache__/
+results

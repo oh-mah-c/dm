@@ -153,11 +153,14 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 ### Prompt Pattern Mining
 59. **HUPP-Miner** - Mines High-Utility Prompt Patterns from prompt JSONL logs using semantic concept transactions, candidate optimizer banks, preserve masks, PTWO pruning, and AAUB alignment pruning.
 
+### High-Information Entropy Pattern Mining
+60. **HIEP-Miner** - Mines rare but recurring high-information token itemsets or sequences from integerized text streams using Shannon self-information, window-bounded transactions, TIUB pruning, and IWRU utility-list branch-and-bound.
+
 ### Closed High-Utility Occupancy Mining
-60. **CHUO-Miner** - Mines Closed High-Utility Occupancy Itemsets from positive utility datasets using COU-lists, RUU utility pruning, OUB occupancy-envelope pruning, backward closure pruning, forward closure jumping, and CHUO-signatures.
+61. **CHUO-Miner** - Mines Closed High-Utility Occupancy Itemsets from positive utility datasets using COU-lists, RUU utility pruning, OUB occupancy-envelope pruning, backward closure pruning, forward closure jumping, and CHUO-signatures.
 
 ### Classification Rule Mining
-61. **PSO Classifier** - Particle Swarm based classification-rule discovery using continuous CPSO, TP/TN rule quality, rule pruning, covering, default rules, rule-set cleaning, and tenfold cross-validation.
+62. **PSO Classifier** - Particle Swarm based classification-rule discovery using continuous CPSO, TP/TN rule quality, rule pruning, covering, default rules, rule-set cleaning, and tenfold cross-validation.
 
 ---
 
@@ -170,15 +173,15 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 ### Compilation
 Build the executable from the source:
 ```bash
-gcc -Iinclude -Iinclude/core -Wall -Wextra -O2 src/main.c src/core/*.c src/algorithms/*.c -o bin/dm.exe -lpsapi
+gcc -Iinclude -Iinclude/core -Wall -Wextra -O2 -pthread src/main.c src/core/*.c src/tokenizer/faro_tokenizer.c src/tokenizer/tokenizer_variants.c src/algorithms/*.c -o bin/dm.exe -lm -lpsapi
 ```
-*(On Linux, remove `-lpsapi` and use `-lm` if needed)*
+*(On Linux, remove `-lpsapi`; keep `-lm` for math functions.)*
 
 ### Usage
 ```bash
 ./bin/dm.exe <algorithm> <dataset_path> <format> <min_support> [min_io] [ins_threshold] [prn_threshold] [decay_base] [decay_life]
 ```
-* **`<algorithm>`**: `ais`, `apriori`, `eclat`, `fpgrowth`, `tree_projection`, `aclose`, `close`, `closet`, `closetplus`, `fpclose`, `charm`, `dci_closed`, `lcm`, `lcmver2`, `nafcp`, `fcfia`, `max_miner`, `genmax`, `fpmax`, `mafia`, `hep`, `fhoi`, `dfhoi`, `tkhoim`, `hoimto`, `mfhoi`, `fhoi_miner`, `weak_mfhoi_miner`, `strong_mfhoi_miner`, `mhoui`, `houi_miner`, `weak_mhoui_miner`, `strong_mhoui_miner`, `direct_mhoui_miner`, `regular_mine`, `negfin`, `prepost`, `prepostplus`, `dic`, `ltm`, `sam`, `carpenter`, `dbv_miner`, `defme`, `talky_g`, `pascal`, `zart`, `apriori_rare`, `apriori_inverse`, `cori`, `rp_tree`, `estdec`, `clostream`, `cfi_stream`, `uapriori`, `msapriori`, `ffiminer`, `ubmffp`, `dfigrowth`, `sum`, `mlhui_miner`, `fchm`, `vhuqi`, `fhuqi_miner`, `tkq`, `mheinu`, `dphim`, `closed_fhuim_kinana`, `uspan`, `hupspm`, `hup_miner`.
+* **`<algorithm>`**: `ais`, `apriori`, `eclat`, `fpgrowth`, `tree_projection`, `aclose`, `close`, `closet`, `closetplus`, `fpclose`, `charm`, `dci_closed`, `lcm`, `lcmver2`, `nafcp`, `fcfia`, `max_miner`, `genmax`, `fpmax`, `mafia`, `hep`, `fhoi`, `dfhoi`, `tkhoim`, `hoimto`, `mfhoi`, `fhoi_miner`, `weak_mfhoi_miner`, `strong_mfhoi_miner`, `mhoui`, `houi_miner`, `weak_mhoui_miner`, `strong_mhoui_miner`, `direct_mhoui_miner`, `regular_mine`, `negfin`, `prepost`, `prepostplus`, `dic`, `ltm`, `sam`, `carpenter`, `dbv_miner`, `defme`, `talky_g`, `pascal`, `zart`, `apriori_rare`, `apriori_inverse`, `cori`, `rp_tree`, `estdec`, `clostream`, `cfi_stream`, `uapriori`, `msapriori`, `ffiminer`, `ubmffp`, `dfigrowth`, `sum`, `mlhui_miner`, `fchm`, `vhuqi`, `fhuqi_miner`, `tkq`, `mheinu`, `dphim`, `closed_fhuim_kinana`, `uspan`, `hupspm`, `hup_miner`, `hiep`.
 * **`vhuqi`** uses `<min_support>` as the absolute minimum utility threshold and accepts optional `[qrc]`, defaulting to `3`.
 * **`fhuqi_miner`** requires quantity format `4`: `./bin/dm.exe fhuqi_miner <quantity_dataset> 4 <theta> <qrc> <all|min|max> <profit_file>`.
 * **`tkq`** requires quantity format `4`: `./bin/dm.exe tkq <quantity_dataset> 4 <k> <qrc> <all|min|max> <profit_file>`.
@@ -190,6 +193,7 @@ gcc -Iinclude -Iinclude/core -Wall -Wextra -O2 src/main.c src/core/*.c src/algor
 * **`mfhoi`**, **`fhoi_miner`**, **`weak_mfhoi_miner`**, and **`strong_mfhoi_miner`** require transactional format `0`: `./bin/dm.exe strong_mfhoi_miner <transactional_dataset> 0 <min_support> <min_occupancy>`.
 * **`mhoui`**, **`houi_miner`**, **`weak_mhoui_miner`**, **`strong_mhoui_miner`**, and **`direct_mhoui_miner`** require utility format `1`: `./bin/dm.exe mhoui <utility_dataset> 1 <min_support> <min_occupancy> <min_utility> [strong] [direct]`.
 * **`hupp_miner`** is a standalone prompt-log miner: `./bin/hupp_miner --input <prompt_jsonl> --dataset-type auto|dolly|code_feedback --minsup <ratio|count> --minutil-ratio <value> --minalign <value>`. The companion script `scripts/run_hupp_experiments.sh` runs the full prompt benchmark and generates charts.
+* **`hiep`** runs HIEP-Miner through the unified `dm.exe` algorithm registry: `./bin/dm.exe hiep --input <text_or_transaction_file> --input-type text|transactions --mode itemset|sequence --minsup <ratio|count> --theta-ratio <value> --window <N> --stride <N> --tokenizer faro`. HIEP text input uses `include/tokenizer/tokenizer.h`, so new tokenizer algorithms can be exposed through `dm_tokenizer_create()` and selected with `--tokenizer`. The companion scripts `scripts/run_hiep_experiments.sh` and `scripts/run_hiep_experiments.ps1` run Retail, Accidents, Chess, Dolly text, Zipfian planted-signal, ablation, and Apriori/Eclat/FP-Growth external baseline experiments through `dm.exe`, then write Q1-style charts to `results/hiep_q1/`.
 * **`chuo_miner`** is a standalone utility-dataset miner: `./bin/chuo_miner --input <utility_dataset> --minutil <value> --minsup <ratio|count> --minocc <value>`. The companion script `scripts/run_chuo_experiments.sh` runs Foodmart, Liquor, and Chainstore CHUO benchmarks and generates charts.
 * **`pso_classifier`** is a standalone supervised classification-rule miner: `./bin/pso_classifier --input <spmf_class_folder> --particles <N> --threshold <T> --radius <R>`. The companion script `scripts/run_pso_classifier_experiments.sh` runs the malware-family classification benchmark and prints statistics only.
 * **`tku_miner`** is a standalone top-k utility miner: `./bin/tku_miner --input <utility_dataset> --k <N> [--max-depth N] [--max-seconds S]`. The companion script `scripts/run_tku_experiments.sh` runs Foodmart and Liquor TKU benchmarks and prints statistics only.
@@ -425,6 +429,8 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 **[107]** X. Zhang, B. Liu, J. Chen, S. Yang, Z. Gu, Z. Liu, and S. Xu, "TOPKPHM: Periodic Patterns Mining of Top-K High Utility Itemsets," in *Proc. 2025 International Conference on Trustworthy Big Data and Artificial Intelligence (ICTBAI)*, 2025. https://doi.org/10.1109/ICTBAI68361.2025.00009 *(TOPKPHM)*
 
 **[108]** S. Carstensen and J. C.-W. Lin, "TKU-PSO: An Efficient Particle Swarm Optimization Model for Top-k High-Utility Itemset Mining," *International Journal of Interactive Multimedia and Artificial Intelligence*, vol. 9, no. 4, pp. 70-81, 2025. https://doi.org/10.9781/ijimai.2024.01.002 *(TKU-PSO)*
+
+**[109]** Q. Van, "HIEP-Miner: High-Information Entropy Pattern Mining for Embedded Text Streams," local project paper, `docs/core/hiep.tex`, 2026. *(HIEP-Miner)*
 
 ---
 

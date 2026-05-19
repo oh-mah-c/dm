@@ -27,6 +27,27 @@ typedef struct {
     uint32_t unique_tokens;
 } LpRawImpl;
 
+static const char *arena_like_token_text(FaroSlot *slots, uint32_t capacity, const char *arena, uint32_t token_id, uint32_t *len) {
+    if (!slots || !arena || token_id == 0) return NULL;
+    for (uint32_t i = 0; i < capacity; i++) {
+        if (slots[i].token_id == token_id) {
+            if (len) *len = slots[i].token_len;
+            return arena + slots[i].arena_offset;
+        }
+    }
+    return NULL;
+}
+
+static const char *lp_raw_token_text(Tokenizer *self, uint32_t token_id, uint32_t *len) {
+    LpRawImpl *tok = (LpRawImpl *)self->impl;
+    return tok ? arena_like_token_text(tok->slots, tok->capacity, tok->arena, token_id, len) : NULL;
+}
+
+static uint32_t lp_raw_vocab_size(Tokenizer *self) {
+    LpRawImpl *tok = (LpRawImpl *)self->impl;
+    return tok ? tok->unique_tokens : 0;
+}
+
 static void lp_raw_rehash(LpRawImpl *tok) {
     uint32_t old_capacity = tok->capacity;
     FaroSlot *old_slots = tok->slots;
@@ -170,6 +191,8 @@ Tokenizer *lp_raw_tokenizer_create(uint32_t initial_capacity) {
     self->tokenize_buffer = faro_tokenize_buffer_polymorphic;
     self->free = lp_raw_free;
     self->print_stats = lp_raw_print_stats;
+    self->token_text = lp_raw_token_text;
+    self->vocab_size = lp_raw_vocab_size;
     return self;
 }
 
@@ -185,6 +208,16 @@ typedef struct {
     uint32_t arena_capacity;
     uint32_t unique_tokens;
 } LpFpImpl;
+
+static const char *lp_fp_token_text(Tokenizer *self, uint32_t token_id, uint32_t *len) {
+    LpFpImpl *tok = (LpFpImpl *)self->impl;
+    return tok ? arena_like_token_text(tok->slots, tok->capacity, tok->arena, token_id, len) : NULL;
+}
+
+static uint32_t lp_fp_vocab_size(Tokenizer *self) {
+    LpFpImpl *tok = (LpFpImpl *)self->impl;
+    return tok ? tok->unique_tokens : 0;
+}
 
 static void lp_fp_rehash(LpFpImpl *tok) {
     uint32_t old_capacity = tok->capacity;
@@ -335,6 +368,8 @@ Tokenizer *lp_fp_tokenizer_create(uint32_t initial_capacity) {
     self->tokenize_buffer = faro_tokenize_buffer_polymorphic;
     self->free = lp_fp_free;
     self->print_stats = lp_fp_print_stats;
+    self->token_text = lp_fp_token_text;
+    self->vocab_size = lp_fp_vocab_size;
     return self;
 }
 
@@ -578,6 +613,24 @@ static void rh_fp_print_stats(Tokenizer *self, const char *input_path, size_t fi
     }
 }
 
+static const char *rh_fp_token_text(Tokenizer *self, uint32_t token_id, uint32_t *len) {
+    RhFpImpl *tok = (RhFpImpl *)self->impl;
+    if (!tok || token_id == 0) return NULL;
+    for (uint32_t i = 0; i < tok->capacity; i++) {
+        FaroSlot *slot = &tok->slots[i];
+        if (slot->token_id == token_id) {
+            if (len) *len = slot->token_len;
+            return tok->unique_ptrs[slot->arena_offset];
+        }
+    }
+    return NULL;
+}
+
+static uint32_t rh_fp_vocab_size(Tokenizer *self) {
+    RhFpImpl *tok = (RhFpImpl *)self->impl;
+    return tok ? tok->unique_tokens : 0;
+}
+
 
 Tokenizer *rh_fp_tokenizer_create(uint32_t initial_capacity) {
     uint32_t cap = 16;
@@ -599,6 +652,8 @@ Tokenizer *rh_fp_tokenizer_create(uint32_t initial_capacity) {
     self->tokenize_buffer = faro_tokenize_buffer_polymorphic;
     self->free = rh_fp_free;
     self->print_stats = rh_fp_print_stats;
+    self->token_text = rh_fp_token_text;
+    self->vocab_size = rh_fp_vocab_size;
     return self;
 }
 
@@ -709,8 +764,10 @@ static uint32_t rh_borrow_get_or_create(Tokenizer *self, const char *token_bytes
         }
         
         if (slot_fp == 0) {
-            tok->unique_tokens++;
-            cand_id = tok->unique_tokens;
+            if (cand_id == 0) {
+                tok->unique_tokens++;
+                cand_id = tok->unique_tokens;
+            }
             
             slot->metadata = cand_fp | (cand_dib << 8);
             slot->arena_offset = cand_offset;
@@ -732,6 +789,11 @@ static uint32_t rh_borrow_get_or_create(Tokenizer *self, const char *token_bytes
         goto next_probe;
         
     do_insert_swap:
+        if (cand_id == 0) {
+            tok->unique_tokens++;
+            cand_id = tok->unique_tokens;
+        }
+
         /* Swap candidate state with occupant */
         uint8_t temp_fp = slot_fp;
         uint32_t temp_dib = slot_dib;
@@ -823,7 +885,7 @@ static void rh_borrow_tokenize_buffer_impl(Tokenizer *self,
     size_t global_capacity = 0;
     
     #define EMIT_TID(tid) do { \
-        if (mode == MODE_SLIDING) { \
+        if (mode == MODE_SLIDING || mode == MODE_SLIDING_SEQUENCE) { \
             if (global_count >= global_capacity) { \
                 global_capacity = global_capacity * 2 + 128; \
                 global_tokens = realloc(global_tokens, global_capacity * sizeof(uint32_t)); \
@@ -908,7 +970,7 @@ static void rh_borrow_tokenize_buffer_impl(Tokenizer *self,
         FINALIZE_TRANSACTION();
     }
     
-    if (mode == MODE_SLIDING && global_count > 0) {
+    if ((mode == MODE_SLIDING || mode == MODE_SLIDING_SEQUENCE) && global_count > 0) {
         if (window_size == 0) window_size = 10;
         if (stride == 0) stride = 1;
         uint32_t *win_buf = malloc(window_size * sizeof(uint32_t));
@@ -918,7 +980,7 @@ static void rh_borrow_tokenize_buffer_impl(Tokenizer *self,
             if (end > global_count) end = global_count;
             size_t count = end - start;
             memcpy(win_buf, global_tokens + start, count * sizeof(uint32_t));
-            size_t final_count = faro_sort_uniq(win_buf, count);
+            size_t final_count = (mode == MODE_SLIDING_SEQUENCE) ? count : faro_sort_uniq(win_buf, count);
             emit_callback(win_buf, final_count, user_data);
         }
         free(win_buf);
@@ -929,6 +991,24 @@ static void rh_borrow_tokenize_buffer_impl(Tokenizer *self,
     
     #undef EMIT_TID
     #undef FINALIZE_TRANSACTION
+}
+
+static const char *rh_borrow_token_text(Tokenizer *self, uint32_t token_id, uint32_t *len) {
+    RhBorrowImpl *tok = (RhBorrowImpl *)self->impl;
+    if (!tok || !self->base_address || token_id == 0) return NULL;
+    for (uint32_t i = 0; i < tok->capacity; i++) {
+        FaroSlot *slot = &tok->slots[i];
+        if (slot->token_id == token_id) {
+            if (len) *len = slot->token_len;
+            return (const char *)self->base_address + slot->arena_offset;
+        }
+    }
+    return NULL;
+}
+
+static uint32_t rh_borrow_vocab_size(Tokenizer *self) {
+    RhBorrowImpl *tok = (RhBorrowImpl *)self->impl;
+    return tok ? tok->unique_tokens : 0;
 }
 
 Tokenizer *rh_borrow_tokenizer_create(uint32_t initial_capacity) {
@@ -948,5 +1028,32 @@ Tokenizer *rh_borrow_tokenizer_create(uint32_t initial_capacity) {
     self->tokenize_buffer = rh_borrow_tokenize_buffer_impl;
     self->free = rh_borrow_free;
     self->print_stats = rh_borrow_print_stats;
+    self->token_text = rh_borrow_token_text;
+    self->vocab_size = rh_borrow_vocab_size;
     return self;
+}
+
+Tokenizer *dm_tokenizer_create(const char *name, uint32_t initial_capacity) {
+    if (!name || strcmp(name, "faro") == 0 || strcmp(name, "rh-arena") == 0) {
+        return rh_arena_tokenizer_create(initial_capacity);
+    }
+    if (strcmp(name, "lp-raw") == 0) return lp_raw_tokenizer_create(initial_capacity);
+    if (strcmp(name, "lp-fp") == 0) return lp_fp_tokenizer_create(initial_capacity);
+    if (strcmp(name, "rh-fp") == 0) return rh_fp_tokenizer_create(initial_capacity);
+    if (strcmp(name, "rh-borrow") == 0) return rh_borrow_tokenizer_create(initial_capacity);
+    return NULL;
+}
+
+const char *dm_tokenizer_supported_names(void) {
+    return "faro|rh-arena|lp-raw|lp-fp|rh-fp|rh-borrow";
+}
+
+const char *dm_tokenizer_token_text(Tokenizer *self, uint32_t token_id, uint32_t *len) {
+    if (!self || !self->token_text) return NULL;
+    return self->token_text(self, token_id, len);
+}
+
+uint32_t dm_tokenizer_vocab_size(Tokenizer *self) {
+    if (!self || !self->vocab_size) return 0;
+    return self->vocab_size(self);
 }
