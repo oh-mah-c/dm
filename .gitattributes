@@ -1,0 +1,2 @@
+datasets/Malware_types_in_SPMF_Format/*.txt filter=lfs diff=lfs merge=lfs -text
+datasets/prompt/*.jsonl filter=lfs diff=lfs merge=lfs -text
