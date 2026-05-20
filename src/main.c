@@ -648,7 +648,7 @@ int main(int argc, char **argv) {
         params = &ufh_params;
     } else if (strcmp(algo_id, "huciminer") == 0) {
         huciminer_params.min_utility = min_support;
-        huciminer_params.min_confidence = 0.8;
+        huciminer_params.min_confidence = (argc >= 6) ? atof(argv[5]) : 0.8;
         params = &huciminer_params;
     } else if (strcmp(algo_id, "uphist") == 0) {
         uphist_params.min_utility = min_support;

@@ -36,9 +36,10 @@ HTK_MINER_TARGET = $(BIN_DIR)/htk_miner
 TOPKPHM_MINER_TARGET = $(BIN_DIR)/topkphm_miner
 TKU_PSO_MINER_TARGET = $(BIN_DIR)/tku_pso_miner
 TMKU_MINER_TARGET = $(BIN_DIR)/tmku_miner
-EXPERIMENT_TARGET = $(BIN_DIR)/run_mfhoi_experiments
 ITEMSET_BENCH_TARGET = $(BIN_DIR)/itemset_mining_bench
 HUST_TARGET = $(BIN_DIR)/hust_tokenize
+CONNECT_TARGET = $(BIN_DIR)/dm_connect
+RUN_TARGET = $(BIN_DIR)/dm_run
 MFHOI_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/mfhoi_miner.c $(MFHOI_COMMON_SOURCES))
 TMKU_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/tmku_miner.c $(SRC_DIR)/algorithms/tmku.c $(SRC_DIR)/core/dm_dataset.c $(SRC_DIR)/core/dm_registry.c $(SRC_DIR)/core/dm_benchmark.c)
 MHOUI_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/mhoui_miner.c $(SRC_DIR)/algorithms/mhoui.c $(SRC_DIR)/core/dm_dataset.c $(SRC_DIR)/core/dm_registry.c $(SRC_DIR)/core/dm_benchmark.c)
@@ -54,13 +55,20 @@ TOPKPHM_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/to
 TKU_PSO_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/tku_pso_miner.c $(SRC_DIR)/algorithms/tku_pso.c $(SRC_DIR)/core/dm_dataset.c $(SRC_DIR)/core/dm_benchmark.c)
 EXPERIMENT_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/experiments/run_mfhoi_experiments.c $(MFHOI_COMMON_SOURCES))
 ITEMSET_BENCH_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/itemset_mining_bench.c)
+CONNECT_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/dm_connect.c $(SRC_DIR)/core/dm_flat.c $(SRC_DIR)/core/dm_arena.c $(SRC_DIR)/core/dm_mmap.c $(SRC_DIR)/core/dm_benchmark.c $(SRC_DIR)/tokenizer/faro_tokenizer.c $(SRC_DIR)/tokenizer/tokenizer_variants.c)
+RUN_SOURCES = $(SRC_DIR)/tools/dm_run.c \
+              $(wildcard $(SRC_DIR)/core/*.c) \
+              $(SRC_DIR)/tokenizer/faro_tokenizer.c \
+              $(SRC_DIR)/tokenizer/tokenizer_variants.c \
+              $(wildcard $(SRC_DIR)/algorithms/*.c)
+RUN_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(RUN_SOURCES))
 
 LDFLAGS = -lm -pthread
 ifeq ($(OS),Windows_NT)
     LDFLAGS += -lpsapi
 endif
 
-all: $(TARGET) $(MFHOI_MINER_TARGET) $(MHOUI_MINER_TARGET) $(VIFP_MINER_TARGET) $(HUPP_MINER_TARGET) $(CHUO_MINER_TARGET) $(PSO_CLASSIFIER_TARGET) $(TKU_MINER_TARGET) $(KCLOTREE_MINER_TARGET) $(TIPN_HOUI_MINER_TARGET) $(HTK_MINER_TARGET) $(TOPKPHM_MINER_TARGET) $(TKU_PSO_MINER_TARGET) $(TMKU_MINER_TARGET) $(EXPERIMENT_TARGET) $(ITEMSET_BENCH_TARGET) $(HUST_TARGET)
+all: $(TARGET) $(MFHOI_MINER_TARGET) $(MHOUI_MINER_TARGET) $(VIFP_MINER_TARGET) $(HUPP_MINER_TARGET) $(CHUO_MINER_TARGET) $(PSO_CLASSIFIER_TARGET) $(TKU_MINER_TARGET) $(KCLOTREE_MINER_TARGET) $(TIPN_HOUI_MINER_TARGET) $(HTK_MINER_TARGET) $(TOPKPHM_MINER_TARGET) $(TKU_PSO_MINER_TARGET) $(TMKU_MINER_TARGET) $(ITEMSET_BENCH_TARGET) $(HUST_TARGET) $(CONNECT_TARGET) $(RUN_TARGET)
 
 
 $(TARGET): $(OBJECTS)
@@ -119,13 +127,17 @@ $(TMKU_MINER_TARGET): $(TMKU_MINER_OBJECTS)
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(TMKU_MINER_OBJECTS) -o $@ $(LDFLAGS)
 
-$(EXPERIMENT_TARGET): $(EXPERIMENT_OBJECTS)
-	@mkdir -p $(BIN_DIR)
-	$(CC) $(EXPERIMENT_OBJECTS) -o $@ $(LDFLAGS)
-
 $(ITEMSET_BENCH_TARGET): $(ITEMSET_BENCH_OBJECTS) $(TARGET)
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(ITEMSET_BENCH_OBJECTS) -o $@ $(LDFLAGS)
+
+$(CONNECT_TARGET): $(CONNECT_OBJECTS)
+	@mkdir -p $(BIN_DIR)
+	$(CC) $(CONNECT_OBJECTS) -o $@ $(LDFLAGS)
+
+$(RUN_TARGET): $(RUN_OBJECTS)
+	@mkdir -p $(BIN_DIR)
+	$(CC) $(RUN_OBJECTS) -o $@ $(LDFLAGS)
 
 $(HUST_TARGET): $(SRC_DIR)/tokenizer/hust_tokenize.c
 	@mkdir -p $(BIN_DIR)
@@ -138,9 +150,6 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR)
-
-experiments: $(EXPERIMENT_TARGET)
-	./$(EXPERIMENT_TARGET) --datasets datasets --out results --runs 3
 
 plots:
 	MPLCONFIGDIR=/tmp/mpl python3 scripts/plot_results.py results

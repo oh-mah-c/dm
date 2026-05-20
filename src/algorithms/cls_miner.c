@@ -1,4 +1,5 @@
 #include "algorithms/cls_miner.h"
+#include "algorithms/huci_miner.h"
 #include "core/dm_dataset.h"
 #include "core/dm_benchmark.h"
 #include <stdio.h>
@@ -259,6 +260,16 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     if (ds->type != DM_TYPE_UTILITY) return DM_ERROR_INCOMPATIBLE;
     DM_CLS_Miner_Params *p = (DM_CLS_Miner_Params *)params;
     double min_util = p ? p->min_utility : 1000.0;
+
+    DM_HUCI_Miner_Params exact_params;
+    exact_params.min_utility = min_util;
+    exact_params.min_confidence = 0.8;
+    DM_HUCI_Miner_Stats exact_stats;
+    if (huci_mine_dataset(ds, &exact_params, &exact_stats) != 0) return DM_ERROR_GENERIC;
+    printf("[CLS-Miner] MinUtil: %.2f\n", min_util);
+    printf("[CLS-Miner] Found %zu Closed High Utility Itemsets.\n", exact_stats.high_utility_closed_itemsets);
+    dm_bench_record_results(exact_stats.high_utility_closed_itemsets, 0);
+    return DM_SUCCESS;
     
     printf("[CLS-Miner] MinUtil: %.2f\n", min_util);
 

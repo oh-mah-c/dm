@@ -108,12 +108,11 @@ static int cmp_item_twu_static(const void *a, const void *b) {
 /* --- CORE --- */
 
 static size_t total_chui_count = 0;
-static uint32_t *item_counts = NULL; // For closure checks (FUC)
+static size_t total_chui_items = 0;
 
 static void efc_search(uint32_t *alpha, size_t alpha_len, EFC_Database *db, double *u_alpha_per_trans, 
                        uint32_t *primary, size_t prim_count, uint32_t *secondary, size_t sec_count, 
-                       uint32_t *back_items, size_t back_count, double min_util) {
-    
+                       double min_util) {
     for (size_t i = 0; i < prim_count; i++) {
         uint32_t item = primary[i];
         uint32_t item_rank = rank[item];
@@ -122,162 +121,264 @@ static void efc_search(uint32_t *alpha, size_t alpha_len, EFC_Database *db, doub
         if (alpha_len > 0) memcpy(beta, alpha, sizeof(uint32_t) * alpha_len);
         beta[alpha_len] = item;
 
-        double *u_beta_per_trans = malloc(sizeof(double) * db->count);
+        // Calculate support, utility of beta, and back_counts for BCC
         double total_u_beta = 0;
         size_t sup_beta = 0;
+        uint32_t *back_counts = calloc(db->max_item_id + 1, sizeof(uint32_t));
         
-        EFC_Database beta_db;
-        beta_db.max_item_id = db->max_item_id;
-        beta_db.transactions = malloc(sizeof(EFC_Transaction) * db->count);
-        beta_db.count = 0;
-
-        // For BCC: check backward items in Transactions containing beta
-        uint32_t *local_back_counts = calloc(db->max_item_id + 1, sizeof(uint32_t));
-
         for (size_t j = 0; j < db->count; j++) {
             EFC_Transaction *t = &db->transactions[j];
-            double u_item = 0;
             bool found = false;
             size_t item_idx = 0;
             for (size_t k = 0; k < t->count; k++) {
                 if (t->items[k].id == item) {
-                    u_item = t->items[k].utility;
                     found = true;
                     item_idx = k;
                     break;
                 }
             }
-
             if (found) {
-                u_beta_per_trans[beta_db.count] = u_alpha_per_trans[j] + u_item;
-                total_u_beta += u_beta_per_trans[beta_db.count];
                 sup_beta += t->weight;
-
-                // Track backward items for BCC
-                // We need to check items that were in the original transaction but are in 'back_items'
-                // Wait, easiest way is to pass them or check the original transaction data.
-                // But for EFIM-Closed, we can just track counts of all items in transactions where beta exists.
-                // However, items before beta in the rank are relevant for BCC.
-                // We'll use a hack: check items that are in 'back_items' by looking at 'db' transactions
-                // But 'db' transactions only contain items AFTER 'alpha'.
-                // So backward items must be those from previous levels.
-                // Actually, the paper says "backward extension if there exists z < i such that z NOT in beta".
-                // This includes items that were removed because they were low TWU or because they were not secondary.
+                total_u_beta += (u_alpha_per_trans[j] + t->items[item_idx].utility);
+                for (size_t k = 0; k < item_idx; k++) {
+                    back_counts[t->items[k].id] += t->weight;
+                }
+            }
+        }
+        
+        // BCC check: does there exist an item z < i (rank[z] < item_rank) in Secondary(alpha)
+        // such that back_counts[z] == sup_beta?
+        bool has_backward = false;
+        for (uint32_t z = 0; z <= db->max_item_id; z++) {
+            if (back_counts[z] == sup_beta) {
+                has_backward = true;
+                break;
+            }
+        }
+        free(back_counts);
+        
+        if (has_backward) {
+            free(beta);
+            continue; // Pruned by BCC!
+        }
+        
+        // If no backward extension, construct projected database beta_db
+        EFC_Database beta_db;
+        beta_db.max_item_id = db->max_item_id;
+        beta_db.transactions = malloc(sizeof(EFC_Transaction) * db->count);
+        beta_db.count = 0;
+        
+        double *u_beta_per_trans = malloc(sizeof(double) * db->count);
+        
+        for (size_t j = 0; j < db->count; j++) {
+            EFC_Transaction *t = &db->transactions[j];
+            bool found = false;
+            size_t item_idx = 0;
+            for (size_t k = 0; k < t->count; k++) {
+                if (t->items[k].id == item) {
+                    found = true;
+                    item_idx = k;
+                    break;
+                }
+            }
+            if (found) {
+                u_beta_per_trans[beta_db.count] = u_alpha_per_trans[j] + t->items[item_idx].utility;
                 
-                // Let's assume BCC is done by tracking counts of items in Transactions where beta exists.
-                // We'll implement a simpler BCC using a global/context structure if needed.
-                // For now, let's focus on the search and forward closure.
-
-                size_t p_count = t->count - 1 - item_idx;
+                // Copy both backward items and forward items
+                size_t p_count = t->count - 1; // excluding the item itself
                 if (p_count > 0) {
                     beta_db.transactions[beta_db.count].items = malloc(sizeof(EFC_Item) * p_count);
                     beta_db.transactions[beta_db.count].count = 0;
                     beta_db.transactions[beta_db.count].weight = t->weight;
                     double t_u = 0;
-                    for (size_t k = item_idx + 1; k < t->count; k++) {
+                    for (size_t k = 0; k < t->count; k++) {
+                        if (k == item_idx) continue;
                         beta_db.transactions[beta_db.count].items[beta_db.transactions[beta_db.count].count++] = t->items[k];
-                        t_u += t->items[k].utility;
+                        if (k > item_idx) {
+                            t_u += t->items[k].utility;
+                        }
                     }
                     beta_db.transactions[beta_db.count].total_utility = t_u;
-                    beta_db.count++;
-                } else {
-                    // Still need to track this transaction for support and utility even if empty projected
-                    // Actually, beta_db.count++ is handled above. Wait.
-                    // If p_count is 0, we still have a transaction in beta_db that is empty?
-                    // EFIM usually removes empty transactions.
-                    // But for support calculation, we must account for them.
-                    // I'll keep them as count=0.
-                    beta_db.transactions[beta_db.count].items = NULL;
-                    beta_db.transactions[beta_db.count].count = 0;
-                    beta_db.transactions[beta_db.count].weight = t->weight;
-                    beta_db.transactions[beta_db.count].total_utility = 0;
                     beta_db.count++;
                 }
             }
         }
-
-        bool has_backward = false;
-        // Check BCC (Simplified: not implemented in this draft yet, will add if needed)
-
-        if (!has_backward) {
-            merge_database(&beta_db, u_beta_per_trans);
-
-            double *su_bins = calloc(db->max_item_id + 1, sizeof(double));
-            double *lu_bins = calloc(db->max_item_id + 1, sizeof(double));
-            uint32_t *sup_bins = calloc(db->max_item_id + 1, sizeof(uint32_t));
-
-            for (size_t j = 0; j < beta_db.count; j++) {
-                EFC_Transaction *t = &beta_db.transactions[j];
-                double remaining = 0;
-                for (size_t k = t->count; k-- > 0; ) {
-                    uint32_t id = t->items[k].id;
+        
+        merge_database(&beta_db, u_beta_per_trans);
+        
+        // Calculate sup_bins, su_bins, lu_bins for forward items
+        double *su_bins = calloc(db->max_item_id + 1, sizeof(double));
+        double *lu_bins = calloc(db->max_item_id + 1, sizeof(double));
+        uint32_t *sup_bins = calloc(db->max_item_id + 1, sizeof(uint32_t));
+        
+        for (size_t j = 0; j < beta_db.count; j++) {
+            EFC_Transaction *t = &beta_db.transactions[j];
+            double remaining = 0;
+            for (size_t k = t->count; k-- > 0; ) {
+                uint32_t id = t->items[k].id;
+                if (rank[id] < item_rank) {
+                    sup_bins[id] += (uint32_t)t->weight;
+                } else {
                     lu_bins[id] += u_beta_per_trans[j] + t->total_utility;
                     su_bins[id] += u_beta_per_trans[j] + t->items[k].utility + remaining;
                     sup_bins[id] += (uint32_t)t->weight;
                     remaining += t->items[k].utility;
                 }
             }
-
-            uint32_t *new_primary = malloc(sizeof(uint32_t) * sec_count);
-            size_t new_prim_count = 0;
-            uint32_t *new_secondary = malloc(sizeof(uint32_t) * sec_count);
-            size_t new_sec_count = 0;
-            bool all_items_same_sup = true;
-            bool has_forward = false;
-
-            for (size_t j = 0; j < sec_count; j++) {
-                uint32_t z = secondary[j];
-                if (rank[z] <= item_rank) continue;
-                
-                if (sup_bins[z] == sup_beta) {
-                    has_forward = true;
-                } else {
-                    all_items_same_sup = false;
-                }
-
-                if (lu_bins[z] >= min_util) {
-                    new_secondary[new_sec_count++] = z;
-                    if (su_bins[z] >= min_util) {
-                        new_primary[new_prim_count++] = z;
-                    }
-                }
-            }
-
-            // CJU: Closure Jumping
-            if (has_forward && all_items_same_sup) {
-                // Construct the jump itemset
-                uint32_t *jump_set = malloc(sizeof(uint32_t) * (alpha_len + 1 + new_sec_count));
-                memcpy(jump_set, beta, sizeof(uint32_t) * (alpha_len + 1));
-                size_t jump_len = alpha_len + 1;
-                for (size_t j = 0; j < new_sec_count; j++) jump_set[jump_len++] = new_secondary[j];
-                
-                // Calculate utility of jump_set (it is just total_u_beta + sum of utilities of added items)
-                // Actually, the paper says "Output β ∪ E(β) if it is a HUI".
-                // Utility calculation for jump_set:
-                double jump_util = 0;
-                // Simplified: if we are here, we can compute it from transactions.
-                // But for now, let's just use the logic to jump.
-                // (Logic omitted for brevity, adding CHUI count for now)
-                total_chui_count++;
-                free(jump_set);
-            } else {
-                if (new_prim_count > 0) {
-                    efc_search(beta, alpha_len + 1, &beta_db, u_beta_per_trans, new_primary, new_prim_count, new_secondary, new_sec_count, NULL, 0, min_util);
-                }
-                if (!has_forward && total_u_beta >= min_util) {
-                    total_chui_count++;
-                }
-            }
-
-            free(su_bins); free(lu_bins); free(sup_bins);
-            free(new_primary); free(new_secondary);
         }
+        
+        // Determine new primary and secondary items
+        uint32_t *new_primary = malloc(sizeof(uint32_t) * sec_count);
+        size_t new_prim_count = 0;
+        uint32_t *new_secondary = malloc(sizeof(uint32_t) * sec_count);
+        size_t new_sec_count = 0;
+        
+        bool has_forward = false;
+        bool all_items_same_sup = true;
+        size_t forward_items_checked = 0;
+        
+        // Find index of 'item' in 'secondary'
+        size_t item_idx_in_sec = 0;
+        for (size_t j = 0; j < sec_count; j++) {
+            if (secondary[j] == item) {
+                item_idx_in_sec = j;
+                break;
+            }
+        }
+        
+        for (size_t j = item_idx_in_sec + 1; j < sec_count; j++) {
+            uint32_t z = secondary[j];
+            forward_items_checked++;
+            if (sup_bins[z] == sup_beta) {
+                has_forward = true;
+            } else {
+                all_items_same_sup = false;
+            }
+            
+            if (lu_bins[z] >= min_util) {
+                new_secondary[new_sec_count++] = z;
+                if (su_bins[z] >= min_util) {
+                    new_primary[new_prim_count++] = z;
+                }
+            }
+        }
+        
+        if (forward_items_checked == 0) {
+            all_items_same_sup = true; // vacuously true
+        }
+        
+        // CJU: Closure Jumping
+        if (has_forward && all_items_same_sup) {
+            // Calculate closure utility
+            double jump_util = total_u_beta;
+            for (size_t j = 0; j < beta_db.count; j++) {
+                jump_util += beta_db.transactions[j].total_utility;
+            }
+            if (jump_util >= min_util) {
+                total_chui_count++;
+                total_chui_items += (alpha_len + 1 + (sec_count - 1 - item_idx_in_sec));
 
-        for (size_t j = 0; j < beta_db.count; j++) free(beta_db.transactions[j].items);
+                FILE *f = fopen("efim_results.txt", "a");
+                if (f) {
+                    size_t len = alpha_len + 1 + (sec_count - 1 - item_idx_in_sec);
+                    uint32_t *sorted_items = malloc(sizeof(uint32_t) * len);
+                    if (sorted_items) {
+                        memcpy(sorted_items, beta, sizeof(uint32_t) * (alpha_len + 1));
+                        size_t idx = alpha_len + 1;
+                        for (size_t j = item_idx_in_sec + 1; j < sec_count; j++) {
+                            sorted_items[idx++] = secondary[j];
+                        }
+                        for (size_t x = 0; x < len; x++) {
+                            for (size_t y = x + 1; y < len; y++) {
+                                if (sorted_items[x] > sorted_items[y]) {
+                                    uint32_t tmp = sorted_items[x];
+                                    sorted_items[x] = sorted_items[y];
+                                    sorted_items[y] = tmp;
+                                }
+                            }
+                        }
+                        for (size_t x = 0; x < len; x++) {
+                            fprintf(f, "%u ", sorted_items[x]);
+                        }
+                        fprintf(f, "#UTIL: %.2f\n", jump_util);
+                    }
+                    free(sorted_items);
+                    fclose(f);
+                }
+            }
+        } else {
+            if (new_prim_count > 0) {
+                // Filter beta_db to keep only valid forward and backward items
+                bool *is_sec = calloc(beta_db.max_item_id + 1, sizeof(bool));
+                if (is_sec) {
+                    for (size_t j = 0; j < new_sec_count; j++) {
+                        is_sec[new_secondary[j]] = true;
+                    }
+                    for (size_t j = 0; j < beta_db.count; j++) {
+                        EFC_Transaction *t = &beta_db.transactions[j];
+                        size_t write_idx = 0;
+                        double t_u = 0;
+                        for (size_t k = 0; k < t->count; k++) {
+                            uint32_t id = t->items[k].id;
+                            if (rank[id] < item_rank) {
+                                // Backward item: keep it
+                                t->items[write_idx++] = t->items[k];
+                            } else if (is_sec[id]) {
+                                // Forward item in Secondary(beta): keep it and add utility to t_u
+                                t->items[write_idx++] = t->items[k];
+                                t_u += t->items[k].utility;
+                            }
+                        }
+                        t->count = write_idx;
+                        t->total_utility = t_u;
+                    }
+                    free(is_sec);
+                }
+                
+                efc_search(beta, alpha_len + 1, &beta_db, u_beta_per_trans, new_primary, new_prim_count, new_secondary, new_sec_count, min_util);
+            }
+            if (!has_forward && total_u_beta >= min_util) {
+                total_chui_count++;
+                total_chui_items += (alpha_len + 1);
+
+                FILE *f = fopen("efim_results.txt", "a");
+                if (f) {
+                    size_t len = alpha_len + 1;
+                    uint32_t *sorted_items = malloc(sizeof(uint32_t) * len);
+                    if (sorted_items) {
+                        memcpy(sorted_items, beta, sizeof(uint32_t) * len);
+                        for (size_t x = 0; x < len; x++) {
+                            for (size_t y = x + 1; y < len; y++) {
+                                if (sorted_items[x] > sorted_items[y]) {
+                                    uint32_t tmp = sorted_items[x];
+                                    sorted_items[x] = sorted_items[y];
+                                    sorted_items[y] = tmp;
+                                }
+                            }
+                        }
+                        for (size_t x = 0; x < len; x++) {
+                            fprintf(f, "%u ", sorted_items[x]);
+                        }
+                        fprintf(f, "#UTIL: %.2f\n", total_u_beta);
+                    }
+                    free(sorted_items);
+                    fclose(f);
+                }
+            }
+        }
+        
+        // Free resources
+        free(su_bins); free(lu_bins); free(sup_bins);
+        free(new_primary); free(new_secondary);
+        
+        for (size_t j = 0; j < beta_db.count; j++) {
+            if (beta_db.transactions[j].items) {
+                free(beta_db.transactions[j].items);
+            }
+        }
         free(beta_db.transactions);
         free(u_beta_per_trans);
         free(beta);
-        free(local_back_counts);
     }
 }
 
@@ -285,13 +386,19 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     if (ds->type != DM_TYPE_UTILITY) return DM_ERROR_INCOMPATIBLE;
     DM_EFIM_Closed_Params *p = (DM_EFIM_Closed_Params *)params;
     double min_util = p ? p->min_utility : 1000.0;
-    
+
+    FILE *f_init = fopen("efim_results.txt", "w");
+    if (f_init) fclose(f_init);
+
     DM_Trans_Utility *src_data = (DM_Trans_Utility *)ds->payload;
     total_chui_count = 0;
+    total_chui_items = 0;
 
     double *twu_counts = calloc(ds->max_id + 1, sizeof(double));
     for (size_t i = 0; i < ds->count; i++) {
-        for (size_t j = 0; j < src_data[i].count; j++) twu_counts[src_data[i].items[j].id] += src_data[i].total_utility;
+        for (size_t j = 0; j < src_data[i].count; j++) {
+            twu_counts[src_data[i].items[j].id] += src_data[i].total_utility;
+        }
     }
 
     ItemTWU *items = malloc(sizeof(ItemTWU) * (ds->max_id + 1));
@@ -361,17 +468,19 @@ static DM_Status run(DM_Dataset *ds, void *params) {
         if (su_bins[secondary[i]] >= min_util) primary[prim_count++] = secondary[i];
     }
 
-    efc_search(NULL, 0, &db, u_alpha_per_trans, primary, prim_count, secondary, item_count, NULL, 0, min_util);
+    efc_search(NULL, 0, &db, u_alpha_per_trans, primary, prim_count, secondary, item_count, min_util);
 
     printf("[EFIM-Closed] Found %zu Closed High Utility Itemsets.\n", total_chui_count);
 
-    for (size_t i = 0; i < db.count; i++) free(db.transactions[i].items);
+    for (size_t i = 0; i < db.count; i++) {
+        if (db.transactions[i].items) free(db.transactions[i].items);
+    }
     free(db.transactions);
     free(u_alpha_per_trans);
     free(primary); free(secondary);
     free(rank); free(twu_counts); free(items); free(su_bins);
 
-    dm_bench_record_results(total_chui_count, 0);
+    dm_bench_record_results(total_chui_count, total_chui_items);
     return DM_SUCCESS;
 }
 

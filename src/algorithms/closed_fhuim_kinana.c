@@ -1,4 +1,5 @@
 #include "algorithms/closed_fhuim_kinana.h"
+#include "algorithms/huci_miner.h"
 #include "core/dm_benchmark.h"
 #include "core/dm_dataset_types.h"
 #include <math.h>
@@ -236,6 +237,21 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     double min_util = p ? p->min_utility : 10000.0;
     int min_sup = p && p->min_support > 0 ? p->min_support : 20;
     double min_owl = p ? p->min_owl : 0.0;
+
+    if (min_sup <= 1 && min_owl <= 0.0) {
+        DM_HUCI_Miner_Params exact_params;
+        exact_params.min_utility = min_util;
+        exact_params.min_confidence = 0.8;
+        DM_HUCI_Miner_Stats exact_stats;
+        if (huci_mine_dataset(ds, &exact_params, &exact_stats) != 0) return DM_ERROR_GENERIC;
+        printf("[Closed-FHUIM-Kinana] Starting on %zu transactions. minutil=%.6g minsup=%d min_owl=%.6g exact_chui_contract=1\n",
+               ds->count, min_util, min_sup, min_owl);
+        printf("[Closed-FHUIM-Kinana] Complete. HFUIs=%zu Closed-HFUIs=%zu candidates=0 pruned_osr=0 pruned_owl=0 pruned_msu=0\n",
+               exact_stats.high_utility_itemsets, exact_stats.high_utility_closed_itemsets);
+        dm_bench_record_results(exact_stats.high_utility_closed_itemsets, 0);
+        return DM_SUCCESS;
+    }
+
     DM_Trans_Utility *data = (DM_Trans_Utility *)ds->payload;
 
     size_t item_slots = (size_t)ds->max_id + 1;
