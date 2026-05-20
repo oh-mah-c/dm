@@ -108,6 +108,7 @@
 #include "algorithms/huim_abc.h"
 #include "algorithms/skyline_miner.h"
 #include "algorithms/thui.h"
+#include "algorithms/thue.h"
 #include "algorithms/tku_ce.h"
 #include "algorithms/tku_ce_plus.h"
 #include "algorithms/fhn.h"
@@ -141,6 +142,7 @@ extern DM_Algorithm huim_afsa_algo;
 extern DM_Algorithm huim_abc_algo;
 extern DM_Algorithm skyline_miner_algo;
 extern DM_Algorithm thui_algo;
+extern DM_Algorithm thue_algo;
 extern DM_Algorithm tku_ce_algo;
 extern DM_Algorithm tku_ce_plus_algo;
 extern DM_Algorithm fhmds_algo;
@@ -408,6 +410,7 @@ int main(int argc, char **argv) {
     dm_register_algorithm(&huim_abc_algo);
     dm_register_algorithm(&skyline_miner_algo);
     dm_register_algorithm(&thui_algo);
+    dm_register_algorithm(&thue_algo);
     dm_register_algorithm(&tku_ce_algo);
     dm_register_algorithm(&tku_ce_plus_algo);
     dm_register_algorithm(&fhmds_algo);
@@ -437,6 +440,7 @@ int main(int argc, char **argv) {
         printf("RegularMine: %s regular_mine <transactional_dataset> 0 <min_support>\n", argv[0]);
         printf("VIFP: %s vifp <transactional_dataset> 0 <min_support> [mode:plaintext|smpc|fhe]\n", argv[0]);
         printf("TMKU: %s tmku <utility_dataset> 1 [k] [min_utility] [target_pattern]\n", argv[0]);
+        printf("THUE: %s thue <utility_dataset> 1 <k> [MTD]\n", argv[0]);
         print_hiep_usage(argv[0]);
         printf("Types: 0=Transactional, 1=Utility, 2=Matrix, 3=SequenceUtility, 4=Quantity\n");
         dm_list_algorithms();
@@ -510,6 +514,7 @@ int main(int argc, char **argv) {
     DM_HUIM_ABC_Params abc_params;
     DM_Skyline_Miner_Params skyline_miner_params;
     DM_THUI_Params thui_params;
+    DM_THUE_Params thue_params;
     DM_TKU_CE_Params tku_ce_params;
     DM_TKU_CE_Plus_Params tku_ce_plus_params;
     DM_FHN_Params fhn_params;
@@ -649,6 +654,10 @@ int main(int argc, char **argv) {
         }
         tkq_params.profit_path = (argc >= 8) ? argv[7] : NULL;
         params = &tkq_params;
+    } else if (strcmp(algo_id, "thue") == 0) {
+        thue_params.k = (size_t)min_support;
+        thue_params.MTD = (argc >= 6) ? (size_t)strtoull(argv[5], NULL, 10) : 0;
+        params = &thue_params;
     } else if (strcmp(algo_id, "efim") == 0) {
         efim_params.min_utility = min_support;
         params = &efim_params;

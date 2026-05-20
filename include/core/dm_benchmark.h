@@ -23,7 +23,20 @@ typedef struct {
     size_t result_disk_est_bytes; // Estimated Disk size (CSV/TXT)
     size_t num_itemsets;        // Total FIs found
     size_t total_items;         // Sum of lengths of all FIs
+    
+    double throughput_mb_s;     // Cache-Locality Metric (Data Size / Time)
 } DM_BenchmarkReport;
+
+typedef struct {
+    int** transactions;
+    size_t txn_count;
+    size_t* txn_lengths;
+    int max_item_id;
+    size_t total_bytes;         // Total payload size in bytes
+} BenchmarkDataset;
+
+typedef void (*MiningAlgorithmHook)(const BenchmarkDataset* dataset, float min_support, float min_utility);
+
 
 /**
  * @brief Initialize the benchmarking module
@@ -56,5 +69,12 @@ DM_BenchmarkReport dm_bench_get_report(void);
  * @brief Print a beautifully formatted benchmark table
  */
 void dm_bench_print_report(const char *algo_name, const char *dataset_name);
+
+/**
+ * @brief Run a full benchmark matrix against an algorithm hook
+ * @param algo_name Name of the algorithm
+ * @param hook Function pointer to the algorithm hook
+ */
+void dm_run_benchmark(const char *algo_name, MiningAlgorithmHook hook);
 
 #endif // DM_BENCHMARK_H

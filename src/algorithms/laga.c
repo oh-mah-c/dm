@@ -780,3 +780,42 @@ int dm_laga_cli(int argc, char **argv) {
     free_layout(&real);
     return best.accepted == p.target_size ? 0 : 2;
 }
+
+// Generate data directly to Arena
+BenchmarkDataset* dm_laga_generate_ram(DM_Arena* arena, size_t target_bytes, double alpha, double noise) {
+    BenchmarkDataset* ds = (BenchmarkDataset*)dm_arena_alloc(arena, sizeof(BenchmarkDataset), 8);
+    if (!ds) return NULL;
+    
+    // We will simulate a Zipfian distribution for items and length
+    size_t avg_len = 10;
+    size_t num_txns = target_bytes / (avg_len * sizeof(int));
+    if (num_txns < 10) num_txns = 10;
+    
+    ds->txn_count = num_txns;
+    ds->max_item_id = 1000;
+    ds->total_bytes = target_bytes;
+    
+    ds->transactions = (int**)dm_arena_alloc(arena, num_txns * sizeof(int*), 8);
+    ds->txn_lengths = (size_t*)dm_arena_alloc(arena, num_txns * sizeof(size_t), 8);
+    
+    uint32_t seed = 42;
+    for (size_t i = 0; i < num_txns; i++) {
+        // Simple length distribution
+        size_t len = 5 + (size_t)(rng_double(&seed) * 10.0);
+        ds->txn_lengths[i] = len;
+        
+        int* items = (int*)dm_arena_alloc(arena, len * sizeof(int), 4);
+        ds->transactions[i] = items;
+        
+        for (size_t j = 0; j < len; j++) {
+            // Zipfian-like distribution (simplified for benchmark speed)
+            double r = rng_double(&seed);
+            int item = (int)(pow(r, alpha) * ds->max_item_id);
+            if (item >= ds->max_item_id) item = ds->max_item_id - 1;
+            if (item < 0) item = 0;
+            items[j] = item;
+        }
+    }
+    
+    return ds;
+}

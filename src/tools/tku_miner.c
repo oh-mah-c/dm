@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+int output_json = 0;
+
 static const char *arg_value(int argc, char **argv, const char *key, const char *fallback) {
     for (int i = 1; i + 1 < argc; i++) {
         if (strcmp(argv[i], key) == 0) return argv[i + 1];

@@ -1,5 +1,8 @@
 #include "core/dm_benchmark.h"
+#include "core/dm_arena.h"
+#include "algorithms/laga.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #ifdef _WIN32
@@ -150,6 +153,13 @@ static void read_peak_memory(void) {
 
 DM_BenchmarkReport dm_bench_get_report(void) {
     read_peak_memory();
+    double runtime_sec = report.phase_times_ms[DM_PHASE_ALGO] / 1000.0;
+    if (runtime_sec > 0 && report.result_ram_bytes > 0) {
+        // Approximate Cache Locality with throughput (Data size / Time)
+        // If result_ram_bytes isn't populated yet, we can't do this easily.
+        // Wait, the hook runs, we don't know the dataset size in dm_bench_get_report unless we pass it.
+        // Let's just set throughput_mb_s to 0 here, and calculate it in dm_run_benchmark.
+    }
     return report;
 }
 
@@ -187,4 +197,94 @@ void dm_bench_print_report(const char *algo_name, const char *dataset_name) {
     printf("     - Frequent Itemsets: %zu\n", report.num_itemsets);
     printf("     - Total Items      : %zu\n", report.total_items);
     printf("============================================================\n\n");
+}
+
+void dm_run_benchmark(const char *algo_name, MiningAlgorithmHook hook) {
+    printf("Starting Autonomous Benchmark Matrix for '%s'...\n", algo_name);
+    
+    // Configurations: 1MB, 10MB, 50MB, 100MB
+    size_t data_sizes[] = { 1 * 1024 * 1024, 10 * 1024 * 1024, 50 * 1024 * 1024, 100 * 1024 * 1024 };
+    int num_configs = 4;
+    
+    FILE* md_file = fopen("benchmark_matrix.md", "w");
+    if (md_file) {
+        fprintf(md_file, "# Benchmark Report: %s\n\n", algo_name);
+        fprintf(md_file, "| Data Size (MB) | Txns | Exec Time (ms) | Peak RAM (MB) | Throughput (MB/s) |\n");
+        fprintf(md_file, "|----------------|------|----------------|---------------|-------------------|\n");
+    }
+    
+    FILE* gp_file = fopen("benchmark_plot.gp", "w");
+    if (gp_file) {
+        fprintf(gp_file, "set terminal png size 800,600\n");
+        fprintf(gp_file, "set output 'benchmark_plot.png'\n");
+        fprintf(gp_file, "set title 'Execution Time vs Data Size (%s)'\n", algo_name);
+        fprintf(gp_file, "set xlabel 'Data Size (MB)'\n");
+        fprintf(gp_file, "set ylabel 'Execution Time (ms)'\n");
+        fprintf(gp_file, "plot '-' with linespoints title 'Exec Time'\n");
+    }
+    
+    // We will use a dynamically resizing arena or recreate it per config
+    for (int i = 0; i < num_configs; i++) {
+        size_t target_bytes = data_sizes[i];
+        double size_mb = target_bytes / (1024.0 * 1024.0);
+        
+        printf("\n--- Configuration %d: %.2f MB ---\n", i + 1, size_mb);
+        
+        DM_Arena arena;
+        dm_arena_init(&arena, target_bytes + 1024 * 1024 * 50); // Add 50MB overhead buffer
+        
+        dm_bench_reset();
+        dm_bench_start(DM_PHASE_TOTAL);
+        
+        dm_bench_start(DM_PHASE_LOAD);
+        BenchmarkDataset* ds = dm_laga_generate_ram(&arena, target_bytes, 0.5, 0.1);
+        dm_bench_stop(DM_PHASE_LOAD);
+        
+        if (!ds) {
+            printf("Error generating data for %.2f MB\n", size_mb);
+            dm_arena_free(&arena);
+            continue;
+        }
+        
+        dm_bench_start(DM_PHASE_ALGO);
+        hook(ds, 0.05, 0.0); // Default support 5%
+        dm_bench_stop(DM_PHASE_ALGO);
+        
+        dm_bench_stop(DM_PHASE_TOTAL);
+        
+        DM_BenchmarkReport rep = dm_bench_get_report();
+        double exec_time = rep.phase_times_ms[DM_PHASE_ALGO];
+        double peak_ram = rep.peak_memory_kb / 1024.0;
+        double throughput = 0.0;
+        if (exec_time > 0) {
+            throughput = size_mb / (exec_time / 1000.0);
+        }
+        rep.throughput_mb_s = throughput;
+        
+        printf("Transactions: %zu\n", ds->txn_count);
+        printf("Exec Time: %.2f ms\n", exec_time);
+        printf("Peak RAM: %.2f MB\n", peak_ram);
+        printf("Throughput: %.2f MB/s\n", throughput);
+        
+        if (md_file) {
+            fprintf(md_file, "| %.2f | %zu | %.2f | %.2f | %.2f |\n", 
+                    size_mb, ds->txn_count, exec_time, peak_ram, throughput);
+        }
+        
+        if (gp_file) {
+            fprintf(gp_file, "%.2f %.2f\n", size_mb, exec_time);
+        }
+        
+        dm_arena_free(&arena);
+    }
+    
+    if (md_file) fclose(md_file);
+    if (gp_file) {
+        fprintf(gp_file, "e\n");
+        fclose(gp_file);
+    }
+    
+    printf("\nBenchmark Matrix generation complete.\n");
+    printf("- Markdown matrix saved to benchmark_matrix.md\n");
+    printf("- Gnuplot script saved to benchmark_plot.gp\n");
 }
