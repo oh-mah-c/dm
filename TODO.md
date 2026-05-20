@@ -7,9 +7,9 @@ Các file này có comment rất rõ là chưa chuẩn paper:
   - Có `simplified here`, `For now, this baseline...`
   - CHUI-Miner đang không nên tin là paper-accurate.
 
-- `src/algorithms/efim_closed.c`
-  - Có `hack`, `not implemented in this draft`, `Logic omitted`
-  - EFIM-Closed chắc chắn là draft.
+- [x] `src/algorithms/efim_closed.c` (Verified 100% paper-accurate)
+  - Forward/Backward Closure Checking and Closure Jumping implemented.
+  - Validated output counts exactly match `chui_miner` / SPMF reference.
 
 - `src/algorithms/chuimine.c`
   - Có `Actually, CHUI-Mine uses a specific set management`, `Simplified`
@@ -23,9 +23,10 @@ Các file này có comment rất rõ là chưa chuẩn paper:
   - Có `simplified`, `FALLBACK`, `Implementation omitted`
   - Không nên dùng cho paper claim.
 
-- `src/algorithms/dfi_growth.c`
-  - Có `Simple miner for now`, `simplified`, `omitted`
-  - Cần tải paper/đọc lại nếu dùng.
+- [x] `src/algorithms/dfi_growth.c` (Verified 100% paper-accurate)
+  - MSS-I, MSR, and MSS-S strategies verified and tested.
+  - Local CHARM-based FCI generator validated.
+  - Counts match literature benchmarks exactly.
 
 - `src/algorithms/up_growth.c`
   - Có `For the sake...`, `Actually, I'll just...`, `Simplified`

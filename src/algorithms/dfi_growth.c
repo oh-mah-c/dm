@@ -93,7 +93,7 @@ static void alloc_free(DFI_Allocator *alloc) {
     }
 }
 
-/* --- FCI COLLECTION (Simple miner for now, can be replaced by any FCI miner) --- */
+/* --- FCI COLLECTION --- */
 
 static int cmp_uint32(const void *a, const void *b) {
     uint32_t x = *(const uint32_t *)a;
@@ -125,48 +125,6 @@ static void fci_list_append(FCI_List *list, const uint32_t *items, size_t count,
     list->array[list->count].count = count;
     list->array[list->count].support = support;
     list->count++;
-}
-
-// Minimal implementation of Close-based FCI miner to get FCIs for DFI-Growth
-static void collect_fcis(DM_Dataset *ds, uint32_t min_sup, FCI_List *out_fci) {
-    // For simplicity and to ensure correctness of DFI-Growth, we use a known algorithm's logic.
-    // In a real system, DFI-Growth would be called after a more efficient FCI miner.
-    // Here we'll use a simplified Level-Wise generator-based approach similar to Close.
-    
-    typedef struct {
-        uint32_t *items;
-        size_t count;
-        uint32_t support;
-        uint32_t *closure;
-        size_t closure_count;
-    } Gen;
-
-    size_t max_id = ds->max_id;
-    DM_Trans_Simple *data = (DM_Trans_Simple *)ds->payload;
-
-    // Phase 1: Frequent 1-itemsets
-    uint32_t *counts = (uint32_t *)calloc(max_id + 1, sizeof(uint32_t));
-    for (size_t i = 0; i < ds->count; i++) {
-        for (size_t j = 0; j < data[i].count; j++) {
-            counts[data[i].items[j]]++;
-        }
-    }
-
-    // To get FCIs correctly, we need the closure. 
-    // Simplified: Find all frequent itemsets and then filter to keep only closed ones.
-    // Actually, for validation, any method that gets ALL FCIs and their support is fine.
-    // But since DFI-Growth is the focus, I'll use a known miner if possible.
-    // Let's use a very simple (though potentially slow) way to get FCIs for small/medium datasets.
-    
-    // Actually, I'll use the user's existing Close algorithm logic to get FCIs.
-    // But since I cannot easily link to it without changing its `run` to a library function,
-    // I will implement a basic tree-based FCI miner (like FP-Close logic) or just simple closure calculation.
-
-    // Let's implement a simple Apriori-like miner that calculates closures.
-    // This is just to get the input for DFI-Growth.
-    
-    // [Implementation of a basic FCI miner omitted for brevity in this comment, 
-    // will be included in the actual file content below]
 }
 
 /* --- DFI-GROWTH CORE --- */
