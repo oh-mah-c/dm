@@ -123,11 +123,13 @@
 #include "algorithms/tmku.h"
 #include "algorithms/hiep.h"
 #include "algorithms/medm_gen.h"
+#include "algorithms/laga.h"
 #include "tokenizer/tokenizer.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 
 int output_json = 0;
 
@@ -395,6 +397,9 @@ static int run_medm_gen_cli(int argc, char **argv) {
 int main(int argc, char **argv) {
     if (argc >= 2 && strcmp(argv[1], "medm_gen") == 0) {
         return run_medm_gen_cli(argc, argv);
+    }
+    if (argc >= 2 && strcmp(argv[1], "laga") == 0) {
+        return dm_laga_cli(argc, argv);
     }
     dm_register_algorithm(&bio_huif_ga_algo);
     dm_register_algorithm(&bio_huif_pso_algo);

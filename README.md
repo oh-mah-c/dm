@@ -166,6 +166,9 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 63. **FARO Tokenizer** - Frequency-Aware Robust Out-of-vocabulary Subword Tokenizer that dynamically merges high-frequency subword structures while managing vocabulary size.
 64. **HUST-Tokenize** - High-Utility Subword Tokenization engine that integrates downstream pattern utility metrics into the subword tokenization and merging process.
 
+### Self-Contained Data Generators
+65. **LAGA** - Self-contained Layout-Aware Generative Architecture for knowledge-preserving synthetic transaction, utility, sequence, text, and tabular data generation using embedded encoding, support/co-occurrence/transition layouts, miner-style evaluation, privacy rejection, and closed-loop repair.
+
 ---
 
 ## 🚀 Getting Started
@@ -207,6 +210,7 @@ gcc -Iinclude -Iinclude/core -Wall -Wextra -O2 -pthread src/main.c src/core/*.c 
 * **`tipn_houi_miner`** is a standalone top-k high-on-shelf utility miner for positive/negative utility datasets: `./bin/tipn_houi_miner --input <negative_utility_dataset> --k <N> --intervals <N>`. The companion script `scripts/run_tipn_houi_experiments.sh` runs bounded Retail/Mushroom negative-utility benchmarks and prints statistics only.
 * **`htk_miner`** is a standalone top-k frequent itemset miner using the paper's vertical BSN representation, top-k singleton initialization with ties, equivalence-class joins, and Q-Heap threshold raising: `./bin/htk_miner --input <transaction_dataset> --k <N> [--mode bsn]`. The companion script `scripts/run_htk_experiments.sh` runs transactional FIMI-style benchmarks and prints statistics only.
 * **`topkphm_miner`** is a standalone top-k periodic high-utility itemset miner using periodic utility-lists, dynamic top-k utility thresholding, and EUSCS pruning: `./bin/topkphm_miner --input <utility_dataset> --k <N> --maxper <N> --maxavg <N>`. The companion script `scripts/run_topkphm_experiments.sh` runs statistics-only utility benchmarks.
+* **`laga`** is a self-contained synthetic data generator: `./bin/dm.exe laga --input <dataset> --output <synthetic_file> --schema auto|transaction|sequence|text|tabular|utility [--target-size N] [--minsup ratio|count] [--tau-copy V] [--iterations N]`. It writes the synthetic dataset plus `<synthetic_file>.stats`.
 * **`dm_connect`** is the universal connector smoke-test tool for the next-generation core: `./bin/dm_connect --input <path> --connector spmf|text|graph`. It uses mmap input and an arena-backed flat `uint32_t[] + row_offsets[]` representation without writing intermediate files.
 * **`dm_run`** is the unified connector runner: `./bin/dm_run --algorithm <id> --input <path> --connector spmf|text|graph`. It first builds the arena-backed `DM_FlatDataset` when the algorithm can use flat item ids, then runs either a native flat plugin or a legacy `DM_Algorithm` through a flat-to-family adapter (`transactional`, `utility`, `sequence utility`, `quantity`, or `matrix`). Algorithms whose paper format carries extra semantics, such as HUCI utility values or PSO class folders, are exposed as raw plugins through the same command. Built-in adapters include `flat_stats`, `topk_items`, `chuo`, `huciminer`, `tku_miner`, `tku_pso`, `htk_miner`, `hupp`, `kclotree_miner`, `tipn_houi`, `topkphm`, and `pso_classifier`.
 * **`<dataset_path>`**: Path to your transactional dataset (e.g., `datasets/chess.txt`).
@@ -441,7 +445,13 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 
 **[110]** Q. Van, "FARO: Frequency-Aware Robust Out-of-vocabulary Subword Tokenizer," local project paper, `docs/core/faro_tokenizer_fixed.pdf`, 2026. *(FARO Tokenizer)*
 
-**[111]** Jane Doe, "HUST: Mining-Driven Subword Tokenization for High-Utility Pattern Mining," local project paper, `docs/core/hust.tex` and `docs/core/hust.pdf`, 2026. *(HUST-Tokenize)*
+**[111]** Jane Doe, "HUST: Mining-Driven Subword Tokenization for High-Utility Pattern Mining," local project paper, `docs/core/hust.pdf`, 2026. *(HUST-Tokenize)*
+
+**[112]** Quan Van, "Global Breakthroughs in Data Mining During 2025–2026: A Survey of Pattern Mining, Graph Mining, Stream Mining, and LLM-Centric Knowledge Discovery," local project survey, `docs/core/data_mining_2025_2026_survey_q1.pdf`, 2026.
+
+**[113]** Văn Hà Minh Quân, "MEDM-GEN: A Pattern-Guided, Constraint-Aware Dataset Generator Framework for Reproducible Data Mining Research," local project paper, `docs/core/medm_gen_q1_paper.pdf`, 2026. *(MEDM-GEN)*
+
+**[114]** Author Name, "LAGA: A Self-Contained Layout-Aware Generative Architecture for Knowledge-Preserving Data Generation," local project paper, `docs/core/LAGA_self_contained_data_generator_q1.tex`, 2026. *(LAGA)*
 
 ---
 
