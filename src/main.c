@@ -122,6 +122,7 @@
 #include "algorithms/regular_mine.h"
 #include "algorithms/tmku.h"
 #include "algorithms/hiep.h"
+#include "algorithms/medm_gen.h"
 #include "tokenizer/tokenizer.h"
 #include <stdio.h>
 #include <string.h>
@@ -355,7 +356,46 @@ static int run_hiep_cli(DM_Algorithm *algo, int argc, char **argv) {
     return stats.limited ? 2 : 0;
 }
 
+static int run_medm_gen_cli(int argc, char **argv) {
+    if (argc < 4) {
+        printf("Usage: %s medm_gen <spec_file> <output_base_path> [real_dataset_path] [seed]\n", argv[0]);
+        return 1;
+    }
+    const char *spec_file = argv[2];
+    const char *output_base_path = argv[3];
+    const char *real_dataset_path = (argc >= 5) ? argv[4] : "";
+    unsigned int seed = (argc >= 6) ? (unsigned int)atoi(argv[5]) : (unsigned int)time(NULL);
+
+    DM_Spec *spec = dm_spec_new();
+    DM_Ledger *ledger = dm_ledger_new();
+
+    int parse_status = dm_spec_parse(spec_file, spec, ledger);
+    if (parse_status != DM_SUCCESS) {
+        printf("Error: Could not parse specification file '%s'\n", spec_file);
+        dm_spec_free(spec);
+        dm_ledger_free(ledger);
+        return 1;
+    }
+
+    printf("Starting MeDM-Gen framework...\n");
+    int status = dm_medm_repair_and_feedback(spec, ledger, output_base_path, real_dataset_path, seed);
+    
+    dm_spec_free(spec);
+    dm_ledger_free(ledger);
+
+    if (status == DM_SUCCESS) {
+        printf("MeDM-Gen complete. Output files written successfully.\n");
+        return 0;
+    } else {
+        printf("Error in MeDM-Gen execution (code %d)\n", status);
+        return 1;
+    }
+}
+
 int main(int argc, char **argv) {
+    if (argc >= 2 && strcmp(argv[1], "medm_gen") == 0) {
+        return run_medm_gen_cli(argc, argv);
+    }
     dm_register_algorithm(&bio_huif_ga_algo);
     dm_register_algorithm(&bio_huif_pso_algo);
     dm_register_algorithm(&bio_huif_ba_algo);
