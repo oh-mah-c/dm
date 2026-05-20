@@ -28,9 +28,10 @@ Các file này có comment rất rõ là chưa chuẩn paper:
   - Local CHARM-based FCI generator validated.
   - Counts match literature benchmarks exactly.
 
-- `src/algorithms/up_growth.c`
-  - Có `For the sake...`, `Actually, I'll just...`, `Simplified`
-  - UP-Growth chưa đáng tin.
+- [x] `src/algorithms/up_growth.c` (Verified 100% paper-accurate)
+  - Global UP-Tree constructed using DGU and DGN.
+  - Recursive UP-Growth mining implements DLU and DLN with minimum utility table (MIUT).
+  - Validation counts match reference exactly.
 
 **Cần Rà Lại**
 Có dấu hiệu không hoàn toàn paper-exact hoặc dùng approximation/basic logic:
