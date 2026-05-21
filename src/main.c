@@ -21,6 +21,9 @@
 #include "algorithms/mafia.h"
 #include "algorithms/hep.h"
 #include "algorithms/dfhoi.h"
+#include "algorithms/cloe_hoi.h"
+#include "algorithms/aura_hoi.h"
+#include "algorithms/sparc_hoi.h"
 #include "algorithms/fhoi.h"
 #include "algorithms/mfhoi.h"
 #include "algorithms/mhoui.h"
@@ -158,6 +161,9 @@ extern DM_Algorithm hup_miner_algo;
 extern DM_Algorithm regular_mine_algo;
 extern DM_Algorithm mhoui_algo;
 extern DM_Algorithm vifp_algo;
+extern DM_Algorithm cloe_hoi_algo;
+extern DM_Algorithm aura_hoi_algo;
+extern DM_Algorithm sparc_hoi_algo;
 
 static const char *arg_value_from(int argc, char **argv, int start, const char *key, const char *fallback) {
     for (int i = start; i + 1 < argc; i++) {
@@ -426,12 +432,18 @@ int main(int argc, char **argv) {
     dm_register_algorithm(&regular_mine_algo);
     dm_register_algorithm(&mhoui_algo);
     dm_register_algorithm(&vifp_algo);
+    dm_register_algorithm(&cloe_hoi_algo);
+    dm_register_algorithm(&aura_hoi_algo);
+    dm_register_algorithm(&sparc_hoi_algo);
     dm_register_algorithm(&tmku_algo);
     dm_register_algorithm(&hiep_algo);
 
     if (argc < 3) {
         printf("Usage: %s <algo_id> <dataset_path> [type_id] [min_support]\n", argv[0]);
         printf("MFHOI: %s mfhoi <dataset_path> 0 <min_support> <min_occupancy> [strong:0|1]\n", argv[0]);
+        printf("CLOE-HOI: %s cloe_hoi <transactional_dataset> 0 <min_occupancy> [min_support] [max_seconds]\n", argv[0]);
+        printf("AURA-HOI: %s aura_hoi <transactional_dataset> 0 <min_occupancy> [min_support] [max_seconds] [avg|sum] [closed|raw]\n", argv[0]);
+        printf("SPARC-HOI: %s sparc_hoi <transactional_dataset> 0 <min_occupancy> [min_support] [max_seconds] [avg|sum]\n", argv[0]);
         printf("MHOUI: %s mhoui <utility_dataset> 1 <min_support> <min_occupancy> <min_utility> [strong:0|1] [direct:0|1]\n", argv[0]);
         printf("MHEINU: %s mheinu <utility_dataset> 1 <min_efficiency> [investment_file]\n", argv[0]);
         printf("DPHIM: %s dphim <utility_dataset> 1 <min_utility> [threads]\n", argv[0]);
@@ -499,6 +511,9 @@ int main(int argc, char **argv) {
     DM_MAFIA_Params mafia_params;
     DM_HEP_Params hep_params;
     DM_DFHOI_Params dfhoi_params;
+    DM_CLOE_HOI_Params cloe_hoi_params;
+    DM_AURA_HOI_Params aura_hoi_params;
+    DM_SPARC_HOI_Params sparc_hoi_params;
     DM_FHOI_Params fhoi_params;
     DM_MFHOI_Params mfhoi_params;
     DM_MHOUI_Params mhoui_params;
@@ -771,6 +786,28 @@ int main(int argc, char **argv) {
     } else if (strcmp(algo_id, "dfhoi") == 0) {
         dfhoi_params.min_occupancy = min_support;
         params = &dfhoi_params;
+    } else if (strcmp(algo_id, "cloe_hoi") == 0) {
+        cloe_hoi_params.min_occupancy = min_support;
+        cloe_hoi_params.min_support = (argc >= 6) ? (size_t)strtoull(argv[5], NULL, 10) : 0;
+        cloe_hoi_params.max_patterns = 0;
+        cloe_hoi_params.max_seconds = (argc >= 7) ? atof(argv[6]) : 0.0;
+        params = &cloe_hoi_params;
+    } else if (strcmp(algo_id, "aura_hoi") == 0) {
+        aura_hoi_params.min_occupancy = min_support;
+        aura_hoi_params.min_support = (argc >= 6) ? (size_t)strtoull(argv[5], NULL, 10) : 0;
+        aura_hoi_params.max_patterns = 0;
+        aura_hoi_params.max_seconds = (argc >= 7) ? atof(argv[6]) : 0.0;
+        aura_hoi_params.emit_raw_view = (argc >= 9 && strcmp(argv[8], "raw") == 0) ? 1 : 0;
+        aura_hoi_params.top_k = 0;
+        aura_hoi_params.summed_occupancy_mode = (argc >= 8 && strcmp(argv[7], "sum") == 0) ? 1 : 0;
+        params = &aura_hoi_params;
+    } else if (strcmp(algo_id, "sparc_hoi") == 0) {
+        sparc_hoi_params.min_occupancy = min_support;
+        sparc_hoi_params.min_support = (argc >= 6) ? (size_t)strtoull(argv[5], NULL, 10) : 0;
+        sparc_hoi_params.max_patterns = 0;
+        sparc_hoi_params.max_seconds = (argc >= 7) ? atof(argv[6]) : 0.0;
+        sparc_hoi_params.summed_occupancy_mode = (argc >= 8 && strcmp(argv[7], "sum") == 0) ? 1 : 0;
+        params = &sparc_hoi_params;
     } else if (strcmp(algo_id, "fhoi") == 0) {
         fhoi_params.min_occupancy = min_support;
         params = &fhoi_params;
