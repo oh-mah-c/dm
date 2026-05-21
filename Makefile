@@ -10,6 +10,14 @@ SOURCES = $(SRC_DIR)/main.c \
           $(SRC_DIR)/tokenizer/faro_tokenizer.c \
           $(SRC_DIR)/tokenizer/tokenizer_variants.c \
           $(SRC_DIR)/tokenizer/maximal_munch.c \
+          $(SRC_DIR)/tokenizer/bpe_subword.c \
+          $(SRC_DIR)/tokenizer/bpe_dropout.c \
+          $(SRC_DIR)/tokenizer/fast_wordpiece.c \
+          $(SRC_DIR)/tokenizer/grapheme_pair_encoding.c \
+          $(SRC_DIR)/tokenizer/parity_bpe.c \
+          $(SRC_DIR)/tokenizer/sentencepiece_lite.c \
+          $(SRC_DIR)/tokenizer/tokenizer_lab.c \
+          $(SRC_DIR)/tokenizer/unigram_subword.c \
           $(wildcard $(SRC_DIR)/algorithms/*.c)
 MFHOI_COMMON_SOURCES = $(SRC_DIR)/algorithms/mfhoi_common.c \
                        $(SRC_DIR)/core/experiment.c \
@@ -70,10 +78,19 @@ RUN_SOURCES = $(SRC_DIR)/tools/dm_run.c \
               $(SRC_DIR)/tokenizer/faro_tokenizer.c \
               $(SRC_DIR)/tokenizer/tokenizer_variants.c \
               $(SRC_DIR)/tokenizer/maximal_munch.c \
+              $(SRC_DIR)/tokenizer/bpe_subword.c \
+              $(SRC_DIR)/tokenizer/bpe_dropout.c \
+              $(SRC_DIR)/tokenizer/fast_wordpiece.c \
+              $(SRC_DIR)/tokenizer/grapheme_pair_encoding.c \
+              $(SRC_DIR)/tokenizer/parity_bpe.c \
+              $(SRC_DIR)/tokenizer/sentencepiece_lite.c \
+              $(SRC_DIR)/tokenizer/tokenizer_lab.c \
+              $(SRC_DIR)/tokenizer/unigram_subword.c \
               $(wildcard $(SRC_DIR)/algorithms/*.c)
 RUN_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(RUN_SOURCES))
 
 LDFLAGS = -lm -pthread
+ICU_LDFLAGS = -licuuc
 ifeq ($(OS),Windows_NT)
     LDFLAGS += -lpsapi
 endif
@@ -83,7 +100,7 @@ all: $(TARGET) $(MFHOI_MINER_TARGET) $(MHOUI_MINER_TARGET) $(VIFP_MINER_TARGET) 
 
 $(TARGET): $(OBJECTS)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(OBJECTS) -o $@ $(LDFLAGS)
+	$(CC) $(OBJECTS) -o $@ $(LDFLAGS) $(ICU_LDFLAGS)
 
 $(MFHOI_MINER_TARGET): $(MFHOI_MINER_OBJECTS)
 	@mkdir -p $(BIN_DIR)
@@ -147,51 +164,43 @@ $(CONNECT_TARGET): $(CONNECT_OBJECTS)
 
 $(RUN_TARGET): $(RUN_OBJECTS)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(RUN_OBJECTS) -o $@ $(LDFLAGS)
+	$(CC) $(RUN_OBJECTS) -o $@ $(LDFLAGS) $(ICU_LDFLAGS)
 
 $(HUST_TARGET): $(SRC_DIR)/tokenizer/hust_tokenize.c
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
 
-$(BPE_TARGET): scripts/tokenizer/dm_bpe.py src/tokenizer/nlp/bpe_subword.py
+$(BPE_TARGET): $(SRC_DIR)/tools/dm_bpe.c $(SRC_DIR)/tokenizer/bpe_subword.c include/tokenizer/bpe_subword.h
 	@mkdir -p $(BIN_DIR)
-	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_bpe.py" "$$@"' > $@
-	@chmod +x $@
+	$(CC) $(CFLAGS) $(SRC_DIR)/tools/dm_bpe.c $(SRC_DIR)/tokenizer/bpe_subword.c -o $@ $(LDFLAGS)
 
-$(BPE_DROPOUT_TARGET): scripts/tokenizer/dm_bpe_dropout.py src/tokenizer/nlp/bpe_dropout.py src/tokenizer/nlp/bpe_subword.py
+$(BPE_DROPOUT_TARGET): $(SRC_DIR)/tools/dm_bpe_dropout.c $(SRC_DIR)/tokenizer/bpe_dropout.c include/tokenizer/bpe_dropout.h
 	@mkdir -p $(BIN_DIR)
-	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_bpe_dropout.py" "$$@"' > $@
-	@chmod +x $@
+	$(CC) $(CFLAGS) $(SRC_DIR)/tools/dm_bpe_dropout.c $(SRC_DIR)/tokenizer/bpe_dropout.c -o $@ $(LDFLAGS)
 
-$(UNIGRAM_TARGET): scripts/tokenizer/dm_unigram.py src/tokenizer/nlp/unigram_subword.py
+$(UNIGRAM_TARGET): $(SRC_DIR)/tools/dm_unigram.c $(SRC_DIR)/tokenizer/unigram_subword.c include/tokenizer/unigram_subword.h
 	@mkdir -p $(BIN_DIR)
-	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_unigram.py" "$$@"' > $@
-	@chmod +x $@
+	$(CC) $(CFLAGS) $(SRC_DIR)/tools/dm_unigram.c $(SRC_DIR)/tokenizer/unigram_subword.c -o $@ $(LDFLAGS)
 
-$(SENTENCEPIECE_TARGET): scripts/tokenizer/dm_sentencepiece.py src/tokenizer/nlp/sentencepiece_lite.py src/tokenizer/nlp/unigram_subword.py
+$(SENTENCEPIECE_TARGET): $(SRC_DIR)/tools/dm_sentencepiece.c $(SRC_DIR)/tokenizer/sentencepiece_lite.c include/tokenizer/sentencepiece_lite.h
 	@mkdir -p $(BIN_DIR)
-	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_sentencepiece.py" "$$@"' > $@
-	@chmod +x $@
+	$(CC) $(CFLAGS) $(SRC_DIR)/tools/dm_sentencepiece.c $(SRC_DIR)/tokenizer/sentencepiece_lite.c -o $@ $(LDFLAGS) $(ICU_LDFLAGS)
 
-$(TOKENIZER_LAB_TARGET): scripts/tokenizer/dm_tokenizer_lab.py src/tokenizer/nlp/tokenizer_lab.py
+$(TOKENIZER_LAB_TARGET): $(SRC_DIR)/tools/dm_tokenizer_lab.c $(SRC_DIR)/tokenizer/tokenizer_lab.c include/tokenizer/tokenizer_lab.h
 	@mkdir -p $(BIN_DIR)
-	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_tokenizer_lab.py" "$$@"' > $@
-	@chmod +x $@
+	$(CC) $(CFLAGS) $(SRC_DIR)/tools/dm_tokenizer_lab.c $(SRC_DIR)/tokenizer/tokenizer_lab.c -o $@ $(LDFLAGS)
 
-$(GPE_TARGET): scripts/tokenizer/dm_gpe.py src/tokenizer/nlp/grapheme_pair_encoding.py
+$(GPE_TARGET): $(SRC_DIR)/tools/dm_gpe.c $(SRC_DIR)/tokenizer/grapheme_pair_encoding.c include/tokenizer/grapheme_pair_encoding.h
 	@mkdir -p $(BIN_DIR)
-	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_gpe.py" "$$@"' > $@
-	@chmod +x $@
+	$(CC) $(CFLAGS) $(SRC_DIR)/tools/dm_gpe.c $(SRC_DIR)/tokenizer/grapheme_pair_encoding.c -o $@ $(LDFLAGS)
 
-$(PARITY_BPE_TARGET): scripts/tokenizer/dm_parity_bpe.py src/tokenizer/nlp/parity_bpe.py
+$(PARITY_BPE_TARGET): $(SRC_DIR)/tools/dm_parity_bpe.c $(SRC_DIR)/tokenizer/parity_bpe.c include/tokenizer/parity_bpe.h
 	@mkdir -p $(BIN_DIR)
-	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_parity_bpe.py" "$$@"' > $@
-	@chmod +x $@
+	$(CC) $(CFLAGS) $(SRC_DIR)/tools/dm_parity_bpe.c $(SRC_DIR)/tokenizer/parity_bpe.c -o $@ $(LDFLAGS)
 
-$(FAST_WORDPIECE_TARGET): scripts/tokenizer/dm_fast_wordpiece.py src/tokenizer/nlp/fast_wordpiece.py
+$(FAST_WORDPIECE_TARGET): $(SRC_DIR)/tools/dm_fast_wordpiece.c $(SRC_DIR)/tokenizer/fast_wordpiece.c include/tokenizer/fast_wordpiece.h
 	@mkdir -p $(BIN_DIR)
-	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_fast_wordpiece.py" "$$@"' > $@
-	@chmod +x $@
+	$(CC) $(CFLAGS) $(SRC_DIR)/tools/dm_fast_wordpiece.c $(SRC_DIR)/tokenizer/fast_wordpiece.c -o $@ $(LDFLAGS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
