@@ -1,0 +1,162 @@
+Machine learning ( ML ) is a field of study in artificial intelligence concerned with the development and study of statistical algorithms that can learn from data and generalize to unseen data, and thus perform tasks without being explicitly programmed.
+Advances in the field of deep learning have allowed neural networks, a class of statistical algorithms, to surpass many previous machine learning approaches in performance.
+Statistics and mathematical optimisation methods compose the foundations of machine learning.
+Data mining is a related field of study, focusing on exploratory data analysis (EDA) through unsupervised learning.
+From a theoretical viewpoint, probably approximately correct learning provides a mathematical and statistical framework for describing machine learning.
+Most traditional machine learning and deep learning algorithms can be described as empirical risk minimisation under this framework.
+Natural language processing ( NLP ) is the processing of natural language information by a computer.
+NLP is a subfield of computer science and is closely associated with artificial intelligence.
+NLP is also related to information retrieval, knowledge representation, computational linguistics, and linguistics more broadly.
+Major processing tasks in an NLP system include: speech recognition, text classification, natural language understanding, and natural language generation.
+In deep learning, the transformer is a family of artificial neural network architectures based on the multi-head attention mechanism, in which text is converted to numerical representations called tokens, and each token is converted into a vector via lookup from a word embedding table.
+At each layer, each token is then contextualized within the scope of the context window with other (unmasked) tokens via a parallel multi-head attention mechanism, allowing the signal for key tokens to be amplified and less important tokens to be diminished.
+Because self-attention alone is permutation-invariant, transformers inject positional information, typically through positional encodings or learned positional embeddings, so token order can affect the output.
+Transformers have the advantage of having no recurrent units, therefore requiring less training time than earlier recurrent neural architectures (RNNs) such as long short-term memory (LSTM).
+Later variations have been widely adopted for training large language models (LLMs) on large (language) datasets.
+Modern transformer designs are commonly grouped into encoder-only, decoder-only, and encoder-decoder variants, depending on whether they are optimized for representation learning, autoregressive generation, or conditional sequence-to-sequence tasks.
+The original version of the transformer architecture was proposed in the 2017 paper "Attention Is All You Need" by researchers at Google.
+The predecessors of transformers were developed as an improvement over previous architectures for machine translation, but have found many applications since.
+They are used in large-scale natural language processing, computer vision (vision transformers), reinforcement learning, audio, multimodal learning, robotics,, playing chess and at disaster responses.
+It has also led to the development of pre-trained systems, such as generative pre-trained transformers (GPTs) and BERT (bidirectional encoder representations from transformers).
+Bidirectional encoder representations from transformers ( BERT ) is a language model introduced in October 2018 by researchers at Google.
+It learns to represent text as a sequence of vectors using self-supervised learning.
+It uses the encoder-only transformer architecture.
+BERT dramatically improved the state of the art for large language models.
+As of 2020, BERT is a ubiquitous baseline in natural language processing (NLP) experiments.
+BERT is trained by masked token prediction and next sentence prediction.
+With this training, BERT learns contextual, latent representations of tokens in their context, similar to ELMo and GPT-2.
+It found applications for many natural language processing tasks, such as coreference resolution and polysemy resolution.
+It improved on ELMo and spawned the study of "BERTology", which attempts to interpret what is learned by BERT.
+BERT was originally implemented in the English language at two model sizes, BERT BASE (110 million parameters) and BERT LARGE (340 million parameters).
+Both were trained on the Toronto BookCorpus (800M words) and English Wikipedia (2,500M words).
+The weights were released on GitHub.
+On March 11, 2020, 24 smaller models were released, the smallest being BERT TINY with just 4 million parameters.
+Generative Pre-trained Transformer 4 ( GPT-4 ) is a large language model developed by OpenAI and the fourth in its series of GPT foundation models.
+GPT-4 is preceded by GPT-3.5 and followed by its successor GPT-5.
+GPT-4V is a version of GPT-4 that can process images in addition to text.
+OpenAI has not revealed technical details and statistics about GPT-4, such as the precise size of the model.
+An early version of GPT-4 was integrated by Microsoft into Bing Chat, launched in February 2023.
+GPT-4 was released in ChatGPT in March 2023, and removed in 2025.
+GPT-4 is still available in OpenAI's API.
+Lexical tokenization is conversion of a text into (semantically or syntactically) meaningful lexical tokens belonging to categories defined by a "lexer" program.
+In case of a natural language, those categories include nouns, verbs, adjectives, punctuations etc.
+In case of a programming language, the categories include identifiers, operators, grouping symbols, data types and language keywords.
+Lexical tokenization is related to the type of tokenization used in large language models (LLMs) but with two differences.
+First, lexical tokenization is usually based on a lexical grammar, whereas LLM tokenizers are usually probability-based.
+Second, LLM tokenizers perform a second step that converts the tokens into numerical values.
+In computing, byte-pair encoding ( BPE ), or digram coding , is an algorithm, first described in 1994 by Philip Gage, for encoding strings of text into smaller strings by creating and using a translation table.
+A slightly modified version of the algorithm is used in large language model tokenizers.
+The original version of the algorithm focused on compression.
+It replaces the highest-frequency pair of bytes with a new byte that was not contained in the initial dataset.
+A lookup table of the replacements is required to rebuild the initial dataset.
+The modified version builds "tokens" (units of recognition) that match varying amounts of source text, from single characters (including single digits or single punctuation marks) to whole words (even long compound words).
+Neural machine translation ( NMT ) is an approach to machine translation that uses an artificial neural network to predict the likelihood of a sequence of words, typically modeling entire sentences in a single integrated model.
+It is the dominant approach today and can produce translations that rival human translations when translating between high-resource languages under specific conditions.
+However, there still remain challenges, especially with languages that have less high-quality data available, and with domain shift between the data a system was trained on and the texts it is supposed to translate.
+NMT systems also tend to produce fairly literal translations.
+A large language model ( LLM ) is a neural network trained on a vast amount of text for natural language processing tasks, especially language generation.
+LLMs can generate, summarize, translate and parse text in many contexts, and are a foundational technology behind modern chatbots.
+Biased or inaccurate training data can make an LLM's output less reliable.
+As of 2024, the largest and most capable LLMs are all based on transformer architectures, which, according to the 2017 paper "Attention Is All You Need", can be more efficient and parallelizable than earlier statistical and recurrent neural network models.
+Research into other architectures, such as state space models, is ongoing.
+Benchmark evaluations for LLMs attempt to measure model reasoning, factual accuracy, alignment, and safety.
+Information theory is the mathematical study of the quantification, storage, and communication of a particular type of mathematically defined information.
+The field was established and formalized by Claude Shannon in the 1940s, though early contributions were made in the 1920s through the works of Harry Nyquist and Ralph Hartley.
+Information theory was initially formed in the context of telecommunication but soon found a wide range of other applications.
+It is now at the intersection of mathematics, statistics and computer science, and has applications in diverse fields ranging from electrical engineering and physics to neurobiology.
+As a simple example of the concept, if one flips a fair coin and does not yet know the outcome (heads or tails), then they lack a certain amount of information.
+After looking at the coin, they gain information about the outcome.
+For a fair coin, the probability of either heads or tails is 1/2 and the amount of information is expressed as − log 2 ⁡ ( 1 / 2 ) {\displaystyle -\log _{2}(1/2)} = 1 bit of information.
+A key concept in information theory is entropy.
+In Shannon's formulation entropy is equal to the lack of information about an event.
+In the above coin flip example, the entropy in the case where you don't know the outcome is 1 bit.
+When you know the outcome after the coin has landed, the entropy is zero because you have gained one bit Information theory has been used in a wide range of applications, such as source coding/data compression (e.g.
+for ZIP files), and channel coding/error detection and correction (e.g.
+Its impact has been crucial to the success of the Voyager missions to deep space, the invention of the compact disc, the feasibility of mobile phones and the development of the Internet and artificial intelligence.
+The theory has also found applications in other areas, including statistical inference, cryptography, neurobiology, perception, signal processing, linguistics, the evolution and function of molecular codes (bioinformatics), thermal physics, molecular dynamics, black holes, quantum computing, information retrieval, intelligence gathering, plagiarism detection, pattern recognition, anomaly detection, the analysis of music, art creation, imaging system design, study of outer space, the dimensionality of space, and epistemology.
+In information theory, the entropy of a random variable quantifies the average level of uncertainty or information associated with the variable's potential states or possible outcomes.
+This measures the expected amount of information needed to describe the state of the variable, considering the distribution of probabilities across all potential states.
+Given a discrete random variable X {\displaystyle X} , which may be any member x {\displaystyle x} within the set X {\displaystyle {\mathcal {X}}} and is distributed according to p : X → [ 0 , 1 ] {\displaystyle p\colon {\mathcal {X}}\to [0,1]} , the entropy is H ( X ) := − ∑ x ∈ X p ( x ) log ⁡ p ( x ) , {\displaystyle \mathrm {H} (X):=-\sum _{x\in {\mathcal {X}}}p(x)\log p(x),} where Σ {\displaystyle \Sigma } denotes the sum over the variable's possible values.
+The choice of base for log {\displaystyle \log } , the logarithm, varies for different applications.
+Base 2 gives the unit of bits (or "shannons"), while base e gives "natural units" nat, and base 10 gives units of "dits", "bans", or "hartleys".
+An equivalent definition of entropy is the expected value of the self-information of a variable.
+The concept of information entropy was introduced by Claude Shannon in his 1948 paper "A Mathematical Theory of Communication", and is also referred to as Shannon entropy .
+Shannon's theory defines a data communication system composed of three elements: a source of data, a communication channel, and a receiver.
+The "fundamental problem of communication" – as expressed by Shannon – is for the receiver to be able to identify what data was generated by the source, based on the signal it receives through the channel.
+Shannon considered various ways to encode, compress, and transmit messages from a data source, and proved in his source coding theorem that the entropy represents an absolute mathematical limit on how well data from the source can be losslessly compressed onto a perfectly noiseless channel.
+Shannon strengthened this result considerably for noisy channels in his noisy-channel coding theorem.
+Entropy in information theory is directly analogous to the entropy in statistical thermodynamics.
+The analogy results when the values of the random variable designate energies of microstates, so Gibbs's formula for the entropy is formally identical to Shannon's formula.
+Entropy has relevance to other areas of mathematics such as combinatorics and machine learning.
+The definition can be derived from a set of axioms establishing that entropy should be a measure of how informative the average outcome of a variable is.
+For a continuous random variable, differential entropy is analogous to entropy.
+The definition E [ − log ⁡ p ( X ) ] {\displaystyle \mathbb {E} [-\log p(X)]} generalizes the above.
+In machine learning, attention is a method that determines the importance of each component in a sequence relative to the other components in that sequence.
+In natural language processing, importance is represented by "soft" weights assigned to each word in a sentence.
+More generally, attention encodes vectors called token embeddings across a fixed-width sequence that can range from tens to millions of tokens in size.
+Unlike "hard" weights, which are computed during the backwards training pass, "soft" weights exist only in the forward pass and therefore change with every step of the input.
+Earlier designs implemented the attention mechanism in a serial recurrent neural network (RNN) language translation system, but a more recent design, namely the transformer, removed the slower sequential RNN and relied more heavily on the faster parallel attention scheme.
+Inspired by ideas about attention in humans, the attention mechanism was developed to address the weaknesses of using information from the hidden layers of recurrent neural networks.
+Recurrent neural networks favor information contained in words at the end of a sentence and thus deemed more recent, thereby tending to attenuate the significance and associated predictive weight assigned to information earlier in the sentence.
+Attention allows a token equal access to any part of a sentence directly, rather than only through the previous state.
+Word2vec is a technique in natural language processing for obtaining vector representations of words.
+These vectors capture information about the meaning of the word based on the surrounding words.
+The word2vec algorithm estimates these representations by modeling text in a large corpus.
+Once trained, such a model can detect synonymous words or suggest additional words for a partial sentence.
+Word2vec was developed by Tomáš Mikolov, Kai Chen, Greg Corrado, Ilya Sutskever and Jeff Dean at Google, and published in 2013.
+Word2vec represents a word as a high-dimension vector of numbers which capture relationships between words.
+In particular, words which appear in similar contexts are mapped to vectors which are nearby as measured by cosine similarity.
+This indicates the level of semantic similarity between the words, so for example the vectors for walk and ran are nearby, as are those for "but" and "however", and "Berlin" and "Germany".
+Text segmentation is the process of dividing written text into meaningful units, such as words, sentences, or topics.
+The term applies both to mental processes used by humans when reading text, and to artificial processes implemented in computers, which are the subject of natural language processing.
+The problem is non-trivial, because while some written languages have explicit word boundary markers, such as the word spaces of written English and the distinctive initial, medial and final letter shapes of Arabic, such signals are sometimes ambiguous and not present in all written languages.
+Compare speech segmentation, the process of dividing speech into linguistically meaningful portions.
+Statistical machine translation ( SMT ) is a machine translation approach where translations are generated on the basis of statistical models whose parameters are derived from the analysis of bilingual text corpora.
+The statistical approach contrasts with the rule-based approaches to machine translation as well as with example-based machine translation, that superseded the previous rule-based approach that required explicit description of each and every linguistic rule, which was costly, and which often did not generalize to other languages.
+The first ideas of statistical machine translation were introduced by Warren Weaver in 1949, including the ideas of applying Claude Shannon's information theory.
+Statistical machine translation was re-introduced in the late 1980s and early 1990s by researchers at IBM's Thomas J.
+Watson Research Center.
+Before the introduction of neural machine translation, it was by far the most widely studied machine translation method.
+A language model is a computational model that predicts sequences in natural language.
+Language models are useful for a variety of tasks, including speech recognition, machine translation, natural language generation (generating more human-like text), optical character recognition, route optimization, handwriting recognition, grammar induction, information retrieval and disaster response.
+Large language models (LLMs), currently their most advanced form as of 2026, are predominantly based on transformers trained on larger datasets (frequently using texts scraped from the public internet).
+They have superseded recurrent neural network-based models, which had previously superseded the purely statistical models, such as the word n -gram language model.
+A vocabulary (also known as a lexicon ) is a set of words, typically the set in a language or the set known to an individual.
+The word vocabulary originated from the Latin vocabulum , meaning "a word, name".
+It forms an essential component of language and communication, helping convey thoughts, ideas, emotions, and information.
+Vocabulary can be oral, written, or signed and can be categorized into two main types: active vocabulary (words one uses regularly) and passive vocabulary (words one recognizes but does not use often).
+An individual's vocabulary continually evolves through various methods, including direct instruction, independent reading, and natural language exposure, but it can also shrink due to forgetting, trauma, or disease.
+Furthermore, vocabulary is a significant focus of study across various disciplines, like linguistics, education, psychology, and artificial intelligence.
+Vocabulary is not limited to single words; it also encompasses multi-word units known as collocations, idioms, and other types of phraseology.
+Acquiring an adequate vocabulary is one of the largest challenges in learning a second language.
+Linguistics is the scientific study of language.
+The areas of linguistic analysis are syntax (rules governing the structure of sentences), semantics (meaning), morphology (structure of words), phonetics (speech sounds and equivalent gestures in sign languages), phonology (the abstract sound system of a particular language, and analogous systems of sign languages), and pragmatics (how the context of use contributes to meaning).
+Subdisciplines such as biolinguistics (the study of the biological variables and evolution of language) and psycholinguistics (the study of psychological factors in human language) bridge many of these divisions.
+Linguistics encompasses many branches and subfields that span both theoretical and practical applications.
+Theoretical linguistics is concerned with understanding the universal and fundamental nature of language and developing a general theoretical framework for describing it.
+Applied linguistics seeks to utilize the scientific findings of the study of language for practical purposes, such as developing methods of improving language education and literacy.
+Mathematical linguistics is the application of mathematics to model phenomena and solve problems in general linguistics and theoretical linguistics.
+Computational linguistics is an interdisciplinary field concerned with the computational modelling of natural language, as well as the study of appropriate computational approaches to linguistic questions.
+Linguistic features may be studied through a variety of perspectives: synchronically (by describing the structure of a language at a specific point in time) or diachronically (through the historical development of a language over a period of time), in monolinguals or in multilinguals, among children or among adults, in terms of how it is being learnt or how it was acquired, as abstract objects or as cognitive structures, through written texts or through oral elicitation, and finally through mechanical data collection or practical fieldwork.
+Linguistics emerged from the field of philology, of which some branches are more qualitative and holistic in approach.
+Today, philology and linguistics are variably described as related fields, subdisciplines, or separate fields of language study, but, by and large, linguistics can be seen as an umbrella term.
+Linguistics is also related to the philosophy of language, stylistics, rhetoric, semiotics, lexicography, and translation.
+Computational linguistics is an interdisciplinary field concerned with the computational modelling of natural language, as well as the study of appropriate computational approaches to linguistic questions.
+In general, computational linguistics draws upon linguistics, computer science, artificial intelligence, mathematics, logic, philosophy, cognitive science, cognitive psychology, psycholinguistics, anthropology and neuroscience, among others.
+Computational linguistics is closely related to mathematical linguistics.
+Phonology (formerly also phonemics or phonematics ) is the branch of linguistics that concerns how languages organize the foundational elements that make their words.
+In spoken languages, these are phonemes like vowel and consonant sounds that affect meaning.
+Examples of this effect can be found in comparisons of English words like bat and gnat .
+In sign languages, these are components of signs such as hand shape and location.
+Examples can be found in comparisons of American Sign Language signs glossed as CAR and WHICH (hand shape contrasts) and APPLE and ONION (location contrasts).
+At one time, the study of phonology related only to the study of the systems of phonemes in spoken languages, but now it may relate to any linguistic analysis either:
+In linguistics, morphology is the study of how words are formed, and how they relate to one another within a language.
+Most approaches to morphology investigate the structure of words in terms of morphemes, which are the smallest units in a language with some independent meaning or grammatical function.
+Morphemes include roots that can exist as words by themselves, but also categories such as affixes that can only appear as part of a larger word.
+For example, in English the root catch and the suffix ‑ing are both morphemes; catch may appear on its own as a word, or it may be combined with ‑ing to form the new word catching .
+Morphology also analyzes how words behave as parts of speech, and how they may be inflected to express grammatical categories such as number, tense, and aspect.
+Morphology also concerns productivity, or how speakers create words in specific contexts.
+These processes evolve over the history of a language.
+The basic fields of linguistics broadly focus on language structure at different "scales".
+Morphology is considered to operate at a larger scale than phonology, which investigates the categories of speech sounds that are distinguished within a spoken language, and thus may constitute the difference between a morpheme and another; and at a smaller scale than syntax, which investigates how words form phrases and sentences.
+Morphological typology is a distinct field that categorises languages based on the morphological features they exhibit.

@@ -5,8 +5,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef DM_NO_ICU
 #include <unicode/unorm2.h>
 #include <unicode/ustring.h>
+#endif
 
 #define SP_SPACE "\xE2\x96\x81"
 #define SP_UNK "<unk>"
@@ -73,6 +75,7 @@ static char *join_range(StrVec *v, size_t i, size_t j) { size_t n = 0; for (size
 
 static char *lower_ascii(const char *s) { char *o = xstrdup(s); if (!o) return NULL; for (char *p = o; *p; p++) *p = (char)tolower((unsigned char)*p); return o; }
 static char *icu_normalize_utf8(const char *s, const char *name) {
+#ifndef DM_NO_ICU
     UErrorCode status = U_ZERO_ERROR;
     const UNormalizer2 *norm = strcmp(name, "nfc") == 0 ? unorm2_getNFCInstance(&status) : unorm2_getNFKCInstance(&status);
     if (U_FAILURE(status)) return xstrdup(s);
@@ -102,6 +105,10 @@ static char *icu_normalize_utf8(const char *s, const char *name) {
     free(nbuf);
     if (U_FAILURE(status)) { free(out); return xstrdup(s); }
     return out;
+#else
+    (void)name;
+    return xstrdup(s);
+#endif
 }
 static char *apply_rules(const char *s, const Rules *rules) {
     StrVec out = {0}; size_t i = 0, n = strlen(s);

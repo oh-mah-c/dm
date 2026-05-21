@@ -412,6 +412,65 @@ static int run_medm_gen_cli(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
+    /* Unified training interface: dm --train --algo <name> [options] */
+    if (has_flag_from(argc, argv, 1, "--train")) {
+        const char *algo = arg_value_from(argc, argv, 1, "--algo", NULL);
+        if (!algo) {
+            fprintf(stderr, "Usage: %s --train --algo <name> [options]\n\n", argv[0]);
+            fprintf(stderr, "  --algo bpe           -i <corpus...> -m <merges> [-o codes.txt] [--min-frequency N] [--vocab-out path] [--stats]\n");
+            fprintf(stderr, "  --algo unigram        -i <corpus...> --vocab-size <N> [-o model.txt]\n");
+            fprintf(stderr, "  --algo sentencepiece  --input <corpus> --model-type bpe|unigram --vocab-size <N> [-o prefix]\n");
+            fprintf(stderr, "  --algo tokenizer_lab  -i <corpus...> --pretokenizer gpt4|punct|identity --vocab-size <N> [-o tok.json]\n");
+            fprintf(stderr, "  --algo gpe            -i <corpus...> --vocab-size <N> [-o gpe.json]\n");
+            fprintf(stderr, "  --algo parity_bpe     --lang-corpus <lang=file> --merges <K> [-o pbpe.json]\n");
+            return 2;
+        }
+
+        const char *algo_name;
+        const char *subcmd;
+        int (*cli_fn)(int, char **);
+
+        if (strcmp(algo, "bpe") == 0 || strcmp(algo, "dm_bpe") == 0) {
+            algo_name = "bpe";           subcmd = "learn-bpe"; cli_fn = dm_bpe_cli;
+        } else if (strcmp(algo, "unigram") == 0 || strcmp(algo, "dm_unigram") == 0) {
+            algo_name = "unigram";       subcmd = "train";     cli_fn = dm_unigram_cli;
+        } else if (strcmp(algo, "sentencepiece") == 0 || strcmp(algo, "spm") == 0) {
+            algo_name = "sentencepiece"; subcmd = "train";     cli_fn = dm_sentencepiece_cli;
+        } else if (strcmp(algo, "tokenizer_lab") == 0 || strcmp(algo, "toklab") == 0) {
+            algo_name = "tokenizer_lab"; subcmd = "train-bpe"; cli_fn = dm_tokenizer_lab_cli;
+        } else if (strcmp(algo, "gpe") == 0 || strcmp(algo, "dm_gpe") == 0) {
+            algo_name = "gpe";           subcmd = "train";     cli_fn = dm_gpe_cli;
+        } else if (strcmp(algo, "parity_bpe") == 0 || strcmp(algo, "pbpe") == 0) {
+            algo_name = "parity_bpe";    subcmd = "train";     cli_fn = dm_parity_bpe_cli;
+        } else {
+            fprintf(stderr, "Unknown --algo '%s'. Choose: bpe, unigram, sentencepiece, tokenizer_lab, gpe, parity_bpe\n", algo);
+            return 2;
+        }
+
+        /* Build filtered argv: drop --train and --algo <name>, inject algo_name + subcmd */
+        int new_argc = 3;
+        for (int i = 1; i < argc; i++) {
+            if (strcmp(argv[i], "--train") == 0) continue;
+            if (strcmp(argv[i], "--algo") == 0 && i + 1 < argc) { i++; continue; }
+            new_argc++;
+        }
+        char **new_argv = (char **)malloc(sizeof(char *) * ((size_t)new_argc + 1));
+        if (!new_argv) { fprintf(stderr, "out of memory\n"); return 1; }
+        new_argv[0] = argv[0];
+        new_argv[1] = (char *)algo_name;
+        new_argv[2] = (char *)subcmd;
+        int pos = 3;
+        for (int i = 1; i < argc; i++) {
+            if (strcmp(argv[i], "--train") == 0) continue;
+            if (strcmp(argv[i], "--algo") == 0 && i + 1 < argc) { i++; continue; }
+            new_argv[pos++] = argv[i];
+        }
+        new_argv[pos] = NULL;
+        int rc = cli_fn(new_argc, new_argv);
+        free(new_argv);
+        return rc;
+    }
+
     if (argc >= 2 && strcmp(argv[1], "medm_gen") == 0) {
         return run_medm_gen_cli(argc, argv);
     }
@@ -489,14 +548,16 @@ int main(int argc, char **argv) {
         printf("VIFP: %s vifp <transactional_dataset> 0 <min_support> [mode:plaintext|smpc|fhe]\n", argv[0]);
         printf("TMKU: %s tmku <utility_dataset> 1 [k] [min_utility] [target_pattern]\n", argv[0]);
         printf("THUE: %s thue <utility_dataset> 1 <k> [MTD]\n", argv[0]);
-        printf("BPE: %s bpe learn-bpe -i <corpus...> -m <merges> -o codes.bpe\n", argv[0]);
+        printf("Tokenizer training (unified):\n");
+        printf("  %s --train --algo bpe          -i <corpus...> -m <merges> [-o codes.txt] [--min-frequency N] [--vocab-out path]\n", argv[0]);
+        printf("  %s --train --algo unigram       -i <corpus...> --vocab-size <N> [-o model.txt]\n", argv[0]);
+        printf("  %s --train --algo sentencepiece --input <corpus> --model-type bpe|unigram --vocab-size <N> [-o prefix]\n", argv[0]);
+        printf("  %s --train --algo tokenizer_lab -i <corpus...> --pretokenizer gpt4|punct|identity --vocab-size <N> [-o tok.json]\n", argv[0]);
+        printf("  %s --train --algo gpe           -i <corpus...> --vocab-size <N> [-o gpe.json]\n", argv[0]);
+        printf("  %s --train --algo parity_bpe    --lang-corpus en=en.txt --merges <K> [-o pbpe.json]\n", argv[0]);
+        printf("Tokenizer (low-level): %s bpe learn-bpe -i <corpus...> -m <merges> -o codes.bpe\n", argv[0]);
         printf("Maximal-Munch: %s maximal_munch --dfa spec.dfa --input text [--stats]\n", argv[0]);
         printf("BPE-Dropout: %s bpe_dropout -c codes.bpe -p 0.1 --seed 7 segment -i corpus.txt\n", argv[0]);
-        printf("Unigram: %s unigram train -i <corpus...> -o unigram.model --vocab-size <N>\n", argv[0]);
-        printf("SentencePiece: %s sentencepiece train --input raw.txt --model-type bpe|unigram --vocab-size <N> -o spm.model\n", argv[0]);
-        printf("Tokenizer Lab: %s tokenizer_lab train-bpe -i <corpus...> --pretokenizer gpt4|punct|identity --vocab-size <N> -o tok.json\n", argv[0]);
-        printf("GPE: %s gpe train -i <corpus...> --unit grapheme --pretokenizer whitespace --vocab-size <N> -o gpe.json\n", argv[0]);
-        printf("Parity-BPE: %s parity_bpe train --lang-corpus en=en.txt --lang-corpus ta=ta.txt --merges <K> -o pbpe.json\n", argv[0]);
         printf("Fast WordPiece: %s fast_wordpiece encode -v vocab.txt -i text.txt [--ids]\n", argv[0]);
         print_hiep_usage(argv[0]);
         printf("Types: 0=Transactional, 1=Utility, 2=Matrix, 3=SequenceUtility, 4=Quantity\n");
