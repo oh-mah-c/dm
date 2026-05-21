@@ -9,6 +9,7 @@ SOURCES = $(SRC_DIR)/main.c \
           $(wildcard $(SRC_DIR)/core/*.c) \
           $(SRC_DIR)/tokenizer/faro_tokenizer.c \
           $(SRC_DIR)/tokenizer/tokenizer_variants.c \
+          $(SRC_DIR)/tokenizer/maximal_munch.c \
           $(wildcard $(SRC_DIR)/algorithms/*.c)
 MFHOI_COMMON_SOURCES = $(SRC_DIR)/algorithms/mfhoi_common.c \
                        $(SRC_DIR)/core/experiment.c \
@@ -38,6 +39,14 @@ TKU_PSO_MINER_TARGET = $(BIN_DIR)/tku_pso_miner
 TMKU_MINER_TARGET = $(BIN_DIR)/tmku_miner
 ITEMSET_BENCH_TARGET = $(BIN_DIR)/itemset_mining_bench
 HUST_TARGET = $(BIN_DIR)/hust_tokenize
+BPE_TARGET = $(BIN_DIR)/dm_bpe
+BPE_DROPOUT_TARGET = $(BIN_DIR)/dm_bpe_dropout
+UNIGRAM_TARGET = $(BIN_DIR)/dm_unigram
+SENTENCEPIECE_TARGET = $(BIN_DIR)/dm_sentencepiece
+TOKENIZER_LAB_TARGET = $(BIN_DIR)/dm_tokenizer_lab
+GPE_TARGET = $(BIN_DIR)/dm_gpe
+PARITY_BPE_TARGET = $(BIN_DIR)/dm_parity_bpe
+FAST_WORDPIECE_TARGET = $(BIN_DIR)/dm_fast_wordpiece
 CONNECT_TARGET = $(BIN_DIR)/dm_connect
 RUN_TARGET = $(BIN_DIR)/dm_run
 MFHOI_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/mfhoi_miner.c $(MFHOI_COMMON_SOURCES))
@@ -60,6 +69,7 @@ RUN_SOURCES = $(SRC_DIR)/tools/dm_run.c \
               $(wildcard $(SRC_DIR)/core/*.c) \
               $(SRC_DIR)/tokenizer/faro_tokenizer.c \
               $(SRC_DIR)/tokenizer/tokenizer_variants.c \
+              $(SRC_DIR)/tokenizer/maximal_munch.c \
               $(wildcard $(SRC_DIR)/algorithms/*.c)
 RUN_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(RUN_SOURCES))
 
@@ -68,7 +78,7 @@ ifeq ($(OS),Windows_NT)
     LDFLAGS += -lpsapi
 endif
 
-all: $(TARGET) $(MFHOI_MINER_TARGET) $(MHOUI_MINER_TARGET) $(VIFP_MINER_TARGET) $(HUPP_MINER_TARGET) $(CHUO_MINER_TARGET) $(PSO_CLASSIFIER_TARGET) $(TKU_MINER_TARGET) $(KCLOTREE_MINER_TARGET) $(TIPN_HOUI_MINER_TARGET) $(HTK_MINER_TARGET) $(TOPKPHM_MINER_TARGET) $(TKU_PSO_MINER_TARGET) $(TMKU_MINER_TARGET) $(ITEMSET_BENCH_TARGET) $(HUST_TARGET) $(CONNECT_TARGET) $(RUN_TARGET)
+all: $(TARGET) $(MFHOI_MINER_TARGET) $(MHOUI_MINER_TARGET) $(VIFP_MINER_TARGET) $(HUPP_MINER_TARGET) $(CHUO_MINER_TARGET) $(PSO_CLASSIFIER_TARGET) $(TKU_MINER_TARGET) $(KCLOTREE_MINER_TARGET) $(TIPN_HOUI_MINER_TARGET) $(HTK_MINER_TARGET) $(TOPKPHM_MINER_TARGET) $(TKU_PSO_MINER_TARGET) $(TMKU_MINER_TARGET) $(ITEMSET_BENCH_TARGET) $(HUST_TARGET) $(BPE_TARGET) $(BPE_DROPOUT_TARGET) $(UNIGRAM_TARGET) $(SENTENCEPIECE_TARGET) $(TOKENIZER_LAB_TARGET) $(GPE_TARGET) $(PARITY_BPE_TARGET) $(FAST_WORDPIECE_TARGET) $(CONNECT_TARGET) $(RUN_TARGET)
 
 
 $(TARGET): $(OBJECTS)
@@ -142,6 +152,46 @@ $(RUN_TARGET): $(RUN_OBJECTS)
 $(HUST_TARGET): $(SRC_DIR)/tokenizer/hust_tokenize.c
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
+
+$(BPE_TARGET): scripts/tokenizer/dm_bpe.py src/tokenizer/nlp/bpe_subword.py
+	@mkdir -p $(BIN_DIR)
+	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_bpe.py" "$$@"' > $@
+	@chmod +x $@
+
+$(BPE_DROPOUT_TARGET): scripts/tokenizer/dm_bpe_dropout.py src/tokenizer/nlp/bpe_dropout.py src/tokenizer/nlp/bpe_subword.py
+	@mkdir -p $(BIN_DIR)
+	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_bpe_dropout.py" "$$@"' > $@
+	@chmod +x $@
+
+$(UNIGRAM_TARGET): scripts/tokenizer/dm_unigram.py src/tokenizer/nlp/unigram_subword.py
+	@mkdir -p $(BIN_DIR)
+	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_unigram.py" "$$@"' > $@
+	@chmod +x $@
+
+$(SENTENCEPIECE_TARGET): scripts/tokenizer/dm_sentencepiece.py src/tokenizer/nlp/sentencepiece_lite.py src/tokenizer/nlp/unigram_subword.py
+	@mkdir -p $(BIN_DIR)
+	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_sentencepiece.py" "$$@"' > $@
+	@chmod +x $@
+
+$(TOKENIZER_LAB_TARGET): scripts/tokenizer/dm_tokenizer_lab.py src/tokenizer/nlp/tokenizer_lab.py
+	@mkdir -p $(BIN_DIR)
+	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_tokenizer_lab.py" "$$@"' > $@
+	@chmod +x $@
+
+$(GPE_TARGET): scripts/tokenizer/dm_gpe.py src/tokenizer/nlp/grapheme_pair_encoding.py
+	@mkdir -p $(BIN_DIR)
+	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_gpe.py" "$$@"' > $@
+	@chmod +x $@
+
+$(PARITY_BPE_TARGET): scripts/tokenizer/dm_parity_bpe.py src/tokenizer/nlp/parity_bpe.py
+	@mkdir -p $(BIN_DIR)
+	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_parity_bpe.py" "$$@"' > $@
+	@chmod +x $@
+
+$(FAST_WORDPIECE_TARGET): scripts/tokenizer/dm_fast_wordpiece.py src/tokenizer/nlp/fast_wordpiece.py
+	@mkdir -p $(BIN_DIR)
+	@printf '%s\n' '#!/usr/bin/env sh' 'ROOT=$$(CDPATH= cd -- "$$(dirname -- "$$0")/.." && pwd)' 'exec python3 "$$ROOT/scripts/tokenizer/dm_fast_wordpiece.py" "$$@"' > $@
+	@chmod +x $@
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)

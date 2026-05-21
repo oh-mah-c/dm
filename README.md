@@ -168,9 +168,18 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 ### Subword Tokenization Algorithms
 63. **FARO Tokenizer** - Frequency-Aware Robust Out-of-vocabulary Subword Tokenizer that dynamically merges high-frequency subword structures while managing vocabulary size.
 64. **HUST-Tokenize** - High-Utility Subword Tokenization engine that integrates downstream pattern utility metrics into the subword tokenization and merging process.
+65. **Sennrich BPE Subword** - Implements ACL 2016 byte-pair encoding subword learning and application for open-vocabulary neural translation preprocessing, including joint BPE over multiple corpora.
+66. **BPE-Dropout** - Implements ACL 2020 stochastic BPE subword regularization, reusing conventional BPE merge tables while randomly dropping merge occurrences during training-time segmentation.
+67. **Kudo Unigram Subword Regularization** - Implements ACL 2018 unigram language-model subword segmentation with EM training, vocabulary pruning, Viterbi encoding, n-best segmentation, and FFBS stochastic sampling.
+68. **SentencePiece Lite** - Implements EMNLP 2018 SentencePiece-style raw-sentence training, lossless whitespace escaping with U+2581, NFKC/custom normalization, BPE/unigram models, ids, and self-contained model files.
+69. **Tokenizer Lab** - Implements tokenizer-domain-adaptation experiments for BPE code tokenizers: regex pre-tokenization variants, vocabulary-size sweeps, NSL, bytes-per-token, Renyi entropy, and inference/memory vocabulary trade-off estimates.
+70. **Grapheme Pair Encoding** - Implements COLING 2025 GPE for egalitarian complex-script tokenization using grapheme clusters as BPE atomic units, plus CR/TP pre-tokenization analysis.
+71. **Parity-aware BPE** - Implements arXiv 2025 Parity-aware Byte-Pair Encoding, selecting each merge from the currently worst-compressed language while applying the merge globally, with classical, hybrid, and moving-window variants plus CR/Gini/vocabulary-use metrics.
+72. **Fast WordPiece / LinMaxMatch** - Implements EMNLP 2021 linear-time WordPiece tokenization using a vocabulary trie with failure links and failure pops, plus BERT-style end-to-end punctuation/whitespace tokenization.
+73. **Reps Maximal-Munch Scanner** - Implements Reps' linear-time maximal-munch tokenization using DFA configurations, stack backtracking, and `failed_previously` tabulation restricted to the states required by the paper's optimized `Tab` set.
 
 ### Self-Contained Data Generators
-65. **LAGA** - Self-contained Layout-Aware Generative Architecture for knowledge-preserving synthetic transaction, utility, sequence, text, and tabular data generation using embedded encoding, support/co-occurrence/transition layouts, miner-style evaluation, privacy rejection, and closed-loop repair.
+74. **LAGA** - Self-contained Layout-Aware Generative Architecture for knowledge-preserving synthetic transaction, utility, sequence, text, and tabular data generation using embedded encoding, support/co-occurrence/transition layouts, miner-style evaluation, privacy rejection, and closed-loop repair.
 
 ---
 
@@ -183,7 +192,7 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 ### Compilation
 Build the executable from the source:
 ```bash
-gcc -Iinclude -Iinclude/core -Wall -Wextra -O2 -pthread src/main.c src/core/*.c src/tokenizer/faro_tokenizer.c src/tokenizer/tokenizer_variants.c src/algorithms/*.c -o bin/dm.exe -lm -lpsapi
+gcc -Iinclude -Iinclude/core -Wall -Wextra -O2 -pthread src/main.c src/core/*.c src/tokenizer/faro_tokenizer.c src/tokenizer/tokenizer_variants.c src/tokenizer/maximal_munch.c src/algorithms/*.c -o bin/dm.exe -lm -lpsapi
 ```
 *(On Linux, remove `-lpsapi`; keep `-lm` for math functions.)*
 
@@ -191,7 +200,7 @@ gcc -Iinclude -Iinclude/core -Wall -Wextra -O2 -pthread src/main.c src/core/*.c 
 ```bash
 ./bin/dm.exe <algorithm> <dataset_path> <format> <min_support> [min_io] [ins_threshold] [prn_threshold] [decay_base] [decay_life]
 ```
-* **`<algorithm>`**: `ais`, `apriori`, `eclat`, `fpgrowth`, `tree_projection`, `aclose`, `close`, `closet`, `closetplus`, `fpclose`, `charm`, `dci_closed`, `lcm`, `lcmver2`, `nafcp`, `fcfia`, `max_miner`, `genmax`, `fpmax`, `mafia`, `hep`, `fhoi`, `dfhoi`, `tkhoim`, `hoimto`, `mfhoi`, `fhoi_miner`, `weak_mfhoi_miner`, `strong_mfhoi_miner`, `mhoui`, `houi_miner`, `weak_mhoui_miner`, `strong_mhoui_miner`, `direct_mhoui_miner`, `regular_mine`, `negfin`, `prepost`, `prepostplus`, `dic`, `ltm`, `sam`, `carpenter`, `dbv_miner`, `defme`, `talky_g`, `pascal`, `zart`, `apriori_rare`, `apriori_inverse`, `cori`, `rp_tree`, `estdec`, `clostream`, `cfi_stream`, `uapriori`, `msapriori`, `ffiminer`, `ubmffp`, `dfigrowth`, `sum`, `mlhui_miner`, `fchm`, `vhuqi`, `fhuqi_miner`, `tkq`, `thue`, `mheinu`, `dphim`, `closed_fhuim_kinana`, `uspan`, `hupspm`, `hup_miner`, `hiep`.
+* **`<algorithm>` / direct subcommand**: `ais`, `apriori`, `eclat`, `fpgrowth`, `tree_projection`, `aclose`, `close`, `closet`, `closetplus`, `fpclose`, `charm`, `dci_closed`, `lcm`, `lcmver2`, `nafcp`, `fcfia`, `max_miner`, `genmax`, `fpmax`, `mafia`, `hep`, `fhoi`, `dfhoi`, `tkhoim`, `hoimto`, `mfhoi`, `fhoi_miner`, `weak_mfhoi_miner`, `strong_mfhoi_miner`, `mhoui`, `houi_miner`, `weak_mhoui_miner`, `strong_mhoui_miner`, `direct_mhoui_miner`, `regular_mine`, `negfin`, `prepost`, `prepostplus`, `dic`, `ltm`, `sam`, `carpenter`, `dbv_miner`, `defme`, `talky_g`, `pascal`, `zart`, `apriori_rare`, `apriori_inverse`, `cori`, `rp_tree`, `estdec`, `clostream`, `cfi_stream`, `uapriori`, `msapriori`, `ffiminer`, `ubmffp`, `dfigrowth`, `sum`, `mlhui_miner`, `fchm`, `vhuqi`, `fhuqi_miner`, `tkq`, `thue`, `mheinu`, `dphim`, `closed_fhuim_kinana`, `uspan`, `hupspm`, `hup_miner`, `hiep`, `maximal_munch`, `bpe`, `bpe_dropout`, `unigram`, `sentencepiece`, `tokenizer_lab`, `gpe`, `parity_bpe`, `fast_wordpiece`.
 * **`vhuqi`** uses `<min_support>` as the absolute minimum utility threshold and accepts optional `[qrc]`, defaulting to `3`.
 * **`fhuqi_miner`** requires quantity format `4`: `./bin/dm.exe fhuqi_miner <quantity_dataset> 4 <theta> <qrc> <all|min|max> <profit_file>`.
 * **`tkq`** requires quantity format `4`: `./bin/dm.exe tkq <quantity_dataset> 4 <k> <qrc> <all|min|max> <profit_file>`.
@@ -207,6 +216,15 @@ gcc -Iinclude -Iinclude/core -Wall -Wextra -O2 -pthread src/main.c src/core/*.c 
 * **`mhoui`**, **`houi_miner`**, **`weak_mhoui_miner`**, **`strong_mhoui_miner`**, and **`direct_mhoui_miner`** require utility format `1`: `./bin/dm.exe mhoui <utility_dataset> 1 <min_support> <min_occupancy> <min_utility> [strong] [direct]`.
 * **`hupp_miner`** is a standalone prompt-log miner: `./bin/hupp_miner --input <prompt_jsonl> --dataset-type auto|dolly|code_feedback --minsup <ratio|count> --minutil-ratio <value> --minalign <value>`. The companion script `scripts/run_hupp_experiments.sh` runs the full prompt benchmark and generates charts.
 * **`hiep`** runs HIEP-Miner through the unified `dm.exe` algorithm registry: `./bin/dm.exe hiep --input <text_or_transaction_file> --input-type text|transactions --mode itemset|sequence --minsup <ratio|count> --theta-ratio <value> --window <N> --stride <N> --tokenizer faro`. HIEP text input uses `include/tokenizer/tokenizer.h`, so new tokenizer algorithms can be exposed through `dm_tokenizer_create()` and selected with `--tokenizer`. The companion scripts `scripts/run_hiep_experiments.sh` and `scripts/run_hiep_experiments.ps1` run Retail, Accidents, Chess, Dolly text, Zipfian planted-signal, ablation, and Apriori/Eclat/FP-Growth external baseline experiments through `dm.exe`, then write Q1-style charts to `results/hiep_q1/`.
+* **`bpe`** runs the Sennrich-Haddow-Birch ACL 2016 BPE subword tokenizer through `dm.exe`: `./bin/dm.exe bpe learn-bpe -i <corpus...> -m <merges> -o codes.bpe`, then `./bin/dm.exe bpe apply-bpe -c codes.bpe -i <corpus> -o corpus.bpe`. Pass multiple input corpora to `learn-bpe` for joint BPE, matching the paper's source-target vocabulary-union setup.
+* **`bpe_dropout`** runs Provilkov et al.'s ACL 2020 BPE-Dropout through `dm.exe`: first learn ordinary BPE codes with `./bin/dm.exe bpe learn-bpe ...`, then sample training-time segmentations with `./bin/dm.exe bpe_dropout -c codes.bpe -p 0.1 --seed 7 segment -i corpus.txt`. Use `sample-word` to inspect stochastic alternatives and `stats` to measure segmentation diversity. Setting `-p 0` recovers deterministic BPE; setting `-p 1` leaves character-level pieces.
+* **`unigram`** runs the Kudo ACL 2018 unigram LM subword regularization tokenizer through `dm.exe`: `./bin/dm.exe unigram train -i <corpus...> -o unigram.model --vocab-size <N>`, then `./bin/dm.exe unigram encode -m unigram.model -i <corpus> --mode viterbi|sample --alpha <value> --seed <N>`. `--mode sample` uses Forward-Filtering Backward-Sampling over all segmentations for on-the-fly subword regularization.
+* **`sentencepiece`** runs a SentencePiece-style raw-text tokenizer/detokenizer through `dm.exe`: `./bin/dm.exe sentencepiece train --input raw.txt --model-type bpe|unigram --vocab-size <N> -o spm.model`, then `./bin/dm.exe sentencepiece encode --model spm.model --input raw.txt --output-format piece|id` and `./bin/dm.exe sentencepiece decode --model spm.model --input pieces.txt --input-format piece|id`. It also supports literal `--text`, `--add-bos`, `--add-eos`, `vocab`, custom TSV normalization, and unigram sampling with `--mode sample --alpha <value>`. The model is self-contained with normalization rules, vocabulary/id mapping, BPE merges or unigram probabilities, and the U+2581 whitespace escape needed for lossless detokenization.
+* **`tokenizer_lab`** runs the Dagan/Synnaeve/Roziere tokenizer-domain-adaptation toolkit through `dm.exe`: `./bin/dm.exe tokenizer_lab train-bpe -i <corpus...> --pretokenizer gpt4|punct|identity --vocab-size <N> -o tok.json`, then `./bin/dm.exe tokenizer_lab evaluate -m tok.json -i <eval...> --baseline base.json`. It reports NSL, bytes-per-token, observed vocabulary, and Renyi entropy, plus `vocab-tradeoff` for memory/inference vocabulary-size estimates.
+* **`gpe`** runs Grapheme Pair Encoding through `dm.exe`: `./bin/dm.exe gpe train -i <corpus...> --unit grapheme --pretokenizer whitespace --vocab-size <N> -o gpe.json`, then `./bin/dm.exe gpe encode -m gpe.json -i <text>`. It also supports `pretoken-eval` for CRmax/Tokenization Parity and `units` to compare UTF-8 bytes, Unicode codepoints, and grapheme clusters.
+* **`parity_bpe`** runs Parity-aware BPE through `dm.exe`: `./bin/dm.exe parity_bpe train --lang-corpus en=en.txt --lang-corpus ta=ta.txt --dev-corpus en=en_dev.txt --dev-corpus ta=ta_dev.txt --merges <K> --strategy parity -o pbpe.json`, then `./bin/dm.exe parity_bpe encode -m pbpe.json -i text.txt`. It also supports `classic`, `hybrid`, and `window` strategies and `evaluate` reports per-language compression rates, tokenizer-fairness Gini, vocabulary utilization, TTR, and Renyi entropy.
+* **`fast_wordpiece`** runs Song et al.'s EMNLP 2021 LinMaxMatch WordPiece tokenizer through `dm.exe`: `./bin/dm.exe fast_wordpiece word -v vocab.txt johanson`, or `./bin/dm.exe fast_wordpiece encode -v vocab.txt -i text.txt --ids`. It builds the trie, failure links, and failure pops from the WordPiece vocabulary and supports BERT-style `##` suffix tokens, `[UNK]`, punctuation splitting, and numeric token-id output.
+* **`maximal_munch`** runs Reps' TOPLAS 1998 linear-time maximal-munch scanner through `dm.exe`: `./bin/dm.exe maximal_munch --dfa spec.dfa --input text.txt`, or add `--stats` to report tokens, errors, transitions, backtracks, failed-table hits, failed-table marks, and optimized `Tab` states. The DFA spec uses `states N`, `start Q`, `final Q TOKEN_ID NAME`, and `trans FROM SYMBOL TO`; symbols may be `a`, `'a'`, `0x61`, `0x30-0x39`, or `ANY`.
 * **`huciminer`** implements Sahoo, Das, and Goswami's HUCI-Miner flow: utility-list HUI mining, level-wise high utility closed itemset/generator derivation, and HGB rule-basis statistics. Use `./bin/dm.exe huciminer <utility_dataset> 1 <min_utility> [min_uconf]` or `./bin/dm_run --algorithm huciminer --input <utility_dataset> --minutil <value> --minconf <value>`.
 * **`chuo_miner`** is a standalone utility-dataset miner: `./bin/chuo_miner --input <utility_dataset> --minutil <value> --minsup <ratio|count> --minocc <value>`. The companion script `scripts/run_chuo_experiments.sh` runs Foodmart, Liquor, and Chainstore CHUO benchmarks and generates charts.
 * **`pso_classifier`** is a standalone supervised classification-rule miner: `./bin/pso_classifier --input <spmf_class_folder> --particles <N> --threshold <T> --radius <R>`. The companion script `scripts/run_pso_classifier_experiments.sh` runs the malware-family classification benchmark and prints statistics only.
@@ -460,6 +478,24 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 **[114]** Author Name, "LAGA: A Self-Contained Layout-Aware Generative Architecture for Knowledge-Preserving Data Generation," local project paper, `docs/core/LAGA_self_contained_data_generator_q1.tex`, 2026. *(LAGA)*
 
 **[115]** S. Wan, J. Chen, W. Gan, G. Chen, and V. Goyal, "THUE: Discovering Top-K High Utility Episodes," arXiv:2106.14830, 2021. *(THUE)*
+
+**[116]** R. Sennrich, B. Haddow, and A. Birch, "Neural Machine Translation of Rare Words with Subword Units," in *Proc. ACL 2016*, pp. 1715-1725, 2016. https://aclanthology.org/P16-1162/ *(Sennrich BPE Subword)*
+
+**[117]** T. Kudo, "Subword Regularization: Improving Neural Network Translation Models with Multiple Subword Candidates," in *Proc. ACL 2018*, pp. 66-75, 2018. https://aclanthology.org/P18-1007/ *(Unigram Subword Regularization)*
+
+**[118]** G. Dagan, G. Synnaeve, and B. Roziere, "Getting the most out of your tokenizer for pre-training and domain adaptation," arXiv:2402.01035v2, 2024. *(Tokenizer Lab)*
+
+**[119]** M. Velayuthan and K. Sarveswaran, "Egalitarian Language Representation in Language Models: It All Begins with Tokenizers," in *Proc. COLING 2025*, pp. 5987-5996, 2025. *(Grapheme Pair Encoding)*
+
+**[120]** D. Paul, C. Meister, N. Foroutan, J. Niklaus, S. Ahmadi, A. Bosselut, and R. Sennrich, "Parity-Aware Byte-Pair Encoding: Improving Cross-lingual Fairness in Tokenization," arXiv:2508.04796v2, 2025. *(Parity-aware BPE)*
+
+**[121]** X. Song, A. Salcianu, Y. Song, D. Dopson, and D. Zhou, "Fast WordPiece Tokenization," in *Proc. EMNLP 2021*, pp. 2089-2103, 2021. https://aclanthology.org/2021.emnlp-main.160/ *(Fast WordPiece / LinMaxMatch)*
+
+**[122]** I. Provilkov, D. Emelianenko, and E. Voita, "BPE-Dropout: Simple and Effective Subword Regularization," in *Proc. ACL 2020*, pp. 1882-1892, 2020. https://aclanthology.org/2020.acl-main.170/ *(BPE-Dropout)*
+
+**[123]** T. Kudo and J. Richardson, "SentencePiece: A simple and language independent subword tokenizer and detokenizer for Neural Text Processing," in *Proc. EMNLP 2018: System Demonstrations*, pp. 66-71, 2018. https://aclanthology.org/D18-2012/ *(SentencePiece Lite)*
+
+**[124]** T. Reps, "Maximal-munch tokenization in linear time," *ACM Transactions on Programming Languages and Systems*, vol. 20, no. 2, pp. 259-273, 1998. https://doi.org/10.1145/276393.276394 *(Reps Maximal-Munch Scanner)*
 
 ---
 

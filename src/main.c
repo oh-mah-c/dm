@@ -129,13 +129,78 @@
 #include "algorithms/medm_gen.h"
 #include "algorithms/laga.h"
 #include "tokenizer/tokenizer.h"
+#include "tokenizer/maximal_munch.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 int output_json = 0;
+
+static int run_python_repo_tool(int argc, char **argv, const char *script_name) {
+    char script_path[8192];
+    const char *slash = strrchr(argv[0], '/');
+    if (slash) {
+        size_t dir_len = (size_t)(slash - argv[0]);
+        char root[4096];
+        if (dir_len >= sizeof(root)) {
+            fprintf(stderr, "dm: executable path is too long\n");
+            return 1;
+        }
+        memcpy(root, argv[0], dir_len);
+        root[dir_len] = '\0';
+        char *root_slash = strrchr(root, '/');
+        if (root_slash) {
+            *root_slash = '\0';
+            int n = snprintf(script_path, sizeof(script_path), "%s/scripts/%s", root, script_name);
+            if (n < 0 || (size_t)n >= sizeof(script_path)) {
+                fprintf(stderr, "dm: script path is too long\n");
+                return 1;
+            }
+        } else {
+            snprintf(script_path, sizeof(script_path), "scripts/%s", script_name);
+        }
+    } else {
+        snprintf(script_path, sizeof(script_path), "scripts/%s", script_name);
+    }
+
+    char **tool_argv = (char **)calloc((size_t)argc + 1, sizeof(char *));
+    if (!tool_argv) {
+        fprintf(stderr, "dm: out of memory while launching %s\n", script_name);
+        return 1;
+    }
+    tool_argv[0] = "python3";
+    tool_argv[1] = script_path;
+    int out = 2;
+    for (int i = 2; i < argc; i++) tool_argv[out++] = argv[i];
+    tool_argv[out] = NULL;
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        execvp("python3", tool_argv);
+        perror("dm: exec python3");
+        _exit(127);
+    }
+    free(tool_argv);
+    if (pid < 0) {
+        perror("dm: fork");
+        return 1;
+    }
+    int status = 0;
+    if (waitpid(pid, &status, 0) < 0) {
+        perror("dm: waitpid");
+        return 1;
+    }
+    if (WIFEXITED(status)) return WEXITSTATUS(status);
+    if (WIFSIGNALED(status)) {
+        fprintf(stderr, "dm: %s terminated by signal %d\n", script_name, WTERMSIG(status));
+        return 128 + WTERMSIG(status);
+    }
+    return 1;
+}
 
 extern DM_Algorithm bio_huif_ga_algo;
 extern DM_Algorithm tmku_algo;
@@ -409,6 +474,33 @@ int main(int argc, char **argv) {
     if (argc >= 2 && strcmp(argv[1], "laga") == 0) {
         return dm_laga_cli(argc, argv);
     }
+    if (argc >= 2 && (strcmp(argv[1], "maximal_munch") == 0 || strcmp(argv[1], "reps_munch") == 0)) {
+        return dm_maximal_munch_cli(argc, argv);
+    }
+    if (argc >= 2 && (strcmp(argv[1], "bpe") == 0 || strcmp(argv[1], "dm_bpe") == 0)) {
+        return run_python_repo_tool(argc, argv, "tokenizer/dm_bpe.py");
+    }
+    if (argc >= 2 && (strcmp(argv[1], "bpe_dropout") == 0 || strcmp(argv[1], "bpede") == 0 || strcmp(argv[1], "dm_bpe_dropout") == 0)) {
+        return run_python_repo_tool(argc, argv, "tokenizer/dm_bpe_dropout.py");
+    }
+    if (argc >= 2 && (strcmp(argv[1], "unigram") == 0 || strcmp(argv[1], "dm_unigram") == 0)) {
+        return run_python_repo_tool(argc, argv, "tokenizer/dm_unigram.py");
+    }
+    if (argc >= 2 && (strcmp(argv[1], "sentencepiece") == 0 || strcmp(argv[1], "spm") == 0 || strcmp(argv[1], "dm_sentencepiece") == 0)) {
+        return run_python_repo_tool(argc, argv, "tokenizer/dm_sentencepiece.py");
+    }
+    if (argc >= 2 && (strcmp(argv[1], "tokenizer_lab") == 0 || strcmp(argv[1], "toklab") == 0)) {
+        return run_python_repo_tool(argc, argv, "tokenizer/dm_tokenizer_lab.py");
+    }
+    if (argc >= 2 && (strcmp(argv[1], "gpe") == 0 || strcmp(argv[1], "dm_gpe") == 0)) {
+        return run_python_repo_tool(argc, argv, "tokenizer/dm_gpe.py");
+    }
+    if (argc >= 2 && (strcmp(argv[1], "parity_bpe") == 0 || strcmp(argv[1], "pbpe") == 0 || strcmp(argv[1], "dm_parity_bpe") == 0)) {
+        return run_python_repo_tool(argc, argv, "tokenizer/dm_parity_bpe.py");
+    }
+    if (argc >= 2 && (strcmp(argv[1], "fast_wordpiece") == 0 || strcmp(argv[1], "linmaxmatch") == 0 || strcmp(argv[1], "dm_fast_wordpiece") == 0)) {
+        return run_python_repo_tool(argc, argv, "tokenizer/dm_fast_wordpiece.py");
+    }
     dm_register_algorithm(&bio_huif_ga_algo);
     dm_register_algorithm(&bio_huif_pso_algo);
     dm_register_algorithm(&bio_huif_ba_algo);
@@ -453,6 +545,15 @@ int main(int argc, char **argv) {
         printf("VIFP: %s vifp <transactional_dataset> 0 <min_support> [mode:plaintext|smpc|fhe]\n", argv[0]);
         printf("TMKU: %s tmku <utility_dataset> 1 [k] [min_utility] [target_pattern]\n", argv[0]);
         printf("THUE: %s thue <utility_dataset> 1 <k> [MTD]\n", argv[0]);
+        printf("BPE: %s bpe learn-bpe -i <corpus...> -m <merges> -o codes.bpe\n", argv[0]);
+        printf("Maximal-Munch: %s maximal_munch --dfa spec.dfa --input text [--stats]\n", argv[0]);
+        printf("BPE-Dropout: %s bpe_dropout -c codes.bpe -p 0.1 --seed 7 segment -i corpus.txt\n", argv[0]);
+        printf("Unigram: %s unigram train -i <corpus...> -o unigram.model --vocab-size <N>\n", argv[0]);
+        printf("SentencePiece: %s sentencepiece train --input raw.txt --model-type bpe|unigram --vocab-size <N> -o spm.model\n", argv[0]);
+        printf("Tokenizer Lab: %s tokenizer_lab train-bpe -i <corpus...> --pretokenizer gpt4|punct|identity --vocab-size <N> -o tok.json\n", argv[0]);
+        printf("GPE: %s gpe train -i <corpus...> --unit grapheme --pretokenizer whitespace --vocab-size <N> -o gpe.json\n", argv[0]);
+        printf("Parity-BPE: %s parity_bpe train --lang-corpus en=en.txt --lang-corpus ta=ta.txt --merges <K> -o pbpe.json\n", argv[0]);
+        printf("Fast WordPiece: %s fast_wordpiece encode -v vocab.txt -i text.txt [--ids]\n", argv[0]);
         print_hiep_usage(argv[0]);
         printf("Types: 0=Transactional, 1=Utility, 2=Matrix, 3=SequenceUtility, 4=Quantity\n");
         dm_list_algorithms();
