@@ -16,7 +16,7 @@
  *   § 3   Algorithm  (132 registered data-mining algorithms)
  *   § 4   Tokenizer
  *   § 5   Vision Model  (MobileNetV4 Tiny + TinyViT-5M/11M/21M)
- *   § 6   Language Model  (Transformer enc-dec + TinyTransformer + TinyStories)
+ *   § 6   Language Model  (Transformer enc-dec + BERT + TinyTransformer + TinyStories)
  *   § 7   Image utilities
  *   § 8   Tensor  (primitive ops, C-only)
  *   § 9   Benchmark
@@ -353,13 +353,17 @@ DM_API DM_Status  dm_tinyvit_distill_loss(const float    *student_logits,
  *       • "transformer"       — Transformer encoder-decoder (Vaswani et al.
  *                               NeurIPS 2017 / arXiv:1706.03762)
  *                               Variants: base (65M) and big (213M)
+ *       • "bert"              — BERT encoder (Devlin et al., NAACL-HLT 2019,
+ *                               ACL Anthology N19-1423), variants base/large.
+ *                               Binding generate() accepts space-separated
+ *                               token IDs and returns pooled [CLS] values.
  *       • "tiny_transformer"  — Compact byte-level causal LM
  *       • "tinystories"       — TinyStories byte-level causal LM
  * ───────────────────────────────────────────────────────────────────────── */
 
 typedef void *DM_LM;
 
-/** model_type: "transformer" | "tiny_transformer" | "tinystories" */
+/** model_type: "transformer" | "bert" | "tiny_transformer" | "tinystories" */
 DM_API DM_LM     dm_lm_create   (const char *model_type);
 DM_API DM_Status  dm_lm_train   (DM_LM lm,
                                   const char *corpus_path,

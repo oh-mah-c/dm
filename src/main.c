@@ -141,6 +141,7 @@
 #include "tokenizer/volt.h"
 #include "models/tinystories.h"
 #include "models/language/tiny_transformer.h"
+#include "models/lm/bert.h"
 #include "models/vision/mobilenet_tiny.h"
 #include "generator/textbook_generator.h"
 #include <stdio.h>
@@ -517,6 +518,9 @@ int main(int argc, char **argv) {
     }
     if (argc >= 2 && (strcmp(argv[1], "tiny_lm") == 0 || strcmp(argv[1], "tiny_transformer") == 0 || strcmp(argv[1], "dm_tiny_transformer") == 0)) {
         return dm_tiny_transformer_cli(argc, argv);
+    }
+    if (argc >= 2 && (strcmp(argv[1], "bert") == 0 || strcmp(argv[1], "dm_bert") == 0)) {
+        return dm_bert_cli(argc, argv);
     }
     if (argc >= 2 && (strcmp(argv[1], "textbook") == 0 || strcmp(argv[1], "dm_textbook_generator") == 0)) {
         return dm_textbook_generator_cli(argc, argv);

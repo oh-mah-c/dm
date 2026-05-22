@@ -283,7 +283,7 @@ private:
 
 class LM {
 public:
-    /** model_type: "tiny_transformer" | "tinystories" */
+    /** model_type: "bert" | "tiny_transformer" | "tinystories" */
     explicit LM(std::string_view model_type) {
         handle_ = dm_lm_create(std::string(model_type).c_str());
         if (!handle_) throw std::runtime_error("dm::LM: create failed");

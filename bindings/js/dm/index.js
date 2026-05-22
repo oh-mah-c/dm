@@ -370,7 +370,7 @@ class Vision {
 // ── § 6  LM ───────────────────────────────────────────────────────────────────
 
 class LM {
-  /** @param {string} modelType "tiny_transformer" | "tinystories" */
+  /** @param {string} modelType "bert" | "tiny_transformer" | "tinystories" */
   constructor(modelType) {
     this._h = lib.dm_lm_create(modelType);
     if (ref.isNull(this._h))
@@ -387,6 +387,7 @@ class LM {
   }
   /** @returns {string} */
   generate(prompt, maxTokens = 256) {
+    // For BERT, prompt is space-separated token IDs and output is pooled [CLS] values.
     const buf = Buffer.alloc(maxTokens * 4 + 256);
     check(lib.dm_lm_generate(this._h, prompt, maxTokens, buf, buf.length),
           'dm.LM.generate');

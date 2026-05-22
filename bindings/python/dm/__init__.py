@@ -447,10 +447,10 @@ class Vision:
 # ── § 6  Language Model ───────────────────────────────────────────────────────
 
 class LM:
-    """Tiny byte-level language model."""
+    """Language model wrapper, including BERT encoder inference."""
 
     def __init__(self, model_type: str):
-        """model_type: "tiny_transformer" | "tinystories" """
+        """model_type: "bert" | "tiny_transformer" | "tinystories" """
         h = _dm_lm_create(_enc(model_type))
         if not h:
             raise RuntimeError(f"dm.LM: create failed for type '{model_type}'")
@@ -474,6 +474,7 @@ class LM:
         _check(_dm_lm_load(self._h, _enc(checkpoint_dir)), "dm.LM.load")
 
     def generate(self, prompt: str, max_tokens: int = 256) -> str:
+        """Generate text for causal LMs; for BERT, pass token IDs and receive [CLS] values."""
         buf = ctypes.create_string_buffer(max_tokens * 4 + 256)
         _check(_dm_lm_generate(self._h, _enc(prompt), max_tokens, buf, len(buf)),
                "dm.LM.generate")

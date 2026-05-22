@@ -312,7 +312,7 @@ func (v *Vision) Save() error {
 // LM wraps a DM_LM handle.
 type LM struct{ h C.DM_LM }
 
-// NewLM creates a language model.  modelType: "tiny_transformer" | "tinystories"
+// NewLM creates a language model.  modelType: "bert" | "tiny_transformer" | "tinystories"
 func NewLM(modelType string) (*LM, error) {
 	cm := C.CString(modelType)
 	defer C.free(unsafe.Pointer(cm))
@@ -341,7 +341,8 @@ func (l *LM) Load(checkpointDir string) error {
 	return statusErr(C.dm_lm_load(l.h, cd), "dm.LM.Load")
 }
 
-// Generate produces text from prompt.
+// Generate produces text from prompt. For BERT, prompt is space-separated token IDs
+// and the returned string contains pooled [CLS] values.
 func (l *LM) Generate(prompt string, maxTokens int) (string, error) {
 	cp := C.CString(prompt)
 	defer C.free(unsafe.Pointer(cp))

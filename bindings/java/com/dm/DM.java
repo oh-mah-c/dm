@@ -369,7 +369,7 @@ public final class DM {
     public static final class LM implements AutoCloseable {
         private Pointer h;
 
-        /** @param modelType "tiny_transformer" | "tinystories" */
+        /** @param modelType "bert" | "tiny_transformer" | "tinystories" */
         public LM(String modelType) {
             h = N.dm_lm_create(modelType);
             if (h == null)
@@ -384,6 +384,7 @@ public final class DM {
             check(N.dm_lm_load(h, checkpointDir), "DM.LM.load");
         }
         public String generate(String prompt, int maxTokens) {
+            // For BERT, prompt is space-separated token IDs and output is pooled [CLS] values.
             byte[] buf = new byte[maxTokens * 4 + 256];
             check(N.dm_lm_generate(h, prompt, maxTokens, buf, buf.length),
                   "DM.LM.generate");

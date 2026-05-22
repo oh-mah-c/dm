@@ -238,7 +238,7 @@ try (DM.Tokenizer tok = new DM.Tokenizer("bpe")) {
 | § 3 | `Algorithm` — 132 algorithms, run, list |
 | § 4 | `Tokenizer` — train, load, encode, decode, VOLT |
 | § 5 | `Vision` — MobileNetV4-Tiny train/eval/predict + **TinyViT-5M/11M/21M** |
-| § 6 | `LM` — **Transformer** (Vaswani et al. 2017) enc-dec + TinyTransformer + TinyStories |
+| § 6 | `LM` — **Transformer** (Vaswani et al. 2017) enc-dec, TinyTransformer, TinyStories, and **BERT encoder inference** (`model_type="bert"`; space-separated token IDs in, pooled `[CLS]` values out). BERT follows Devlin, Chang, Lee, and Toutanova, "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding," NAACL-HLT 2019, ACL Anthology N19-1423. |
 | § 7 | Image load/resize/patchify (via C API directly) |
 | § 8 | `Tensor` + neural ops (C++ wrapper; raw C elsewhere) |
 | § 9 | `Benchmark` — phase timing, report, print |

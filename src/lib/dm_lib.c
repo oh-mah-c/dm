@@ -23,6 +23,7 @@
 
 #define DM_BUILDING_LIB
 #include "dm.h"
+#include "models/lm/bert.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,6 +98,7 @@ extern int dm_tinyvit_cli             (int argc, char **argv);
 extern int dm_transformer_cli         (int argc, char **argv);
 extern int dm_tiny_transformer_cli    (int argc, char **argv);
 extern int dm_tinystories_cli         (int argc, char **argv);
+extern int dm_bert_cli                (int argc, char **argv);
 extern int dm_textbook_generator_cli  (int argc, char **argv);
 
 /* §7 Image utilities (internal names) */
@@ -884,7 +886,8 @@ typedef struct {
 DM_API DM_LM dm_lm_create(const char *model_type) {
     if (!model_type) return NULL;
     if (strcmp(model_type, "tiny_transformer") != 0 &&
-        strcmp(model_type, "tinystories")      != 0)
+        strcmp(model_type, "tinystories")      != 0 &&
+        strcmp(model_type, "bert")             != 0)
         return NULL;
     _LMHandle *h = (_LMHandle *)calloc(1, sizeof(*h));
     if (!h) return NULL;
@@ -909,9 +912,14 @@ DM_API DM_Status dm_lm_train(DM_LM lm, const char *corpus_path,
         "--epochs", ep, "--batch-size", bs, "--lr", lrs,
         NULL
     };
-    int rc = strcmp(h->type, "tiny_transformer") == 0
-           ? dm_tiny_transformer_cli(12, argv)
-           : dm_tinystories_cli(12, argv);
+    int rc;
+    if (strcmp(h->type, "bert") == 0) {
+        return DM_ERR_NOT_SUPPORTED;
+    } else if (strcmp(h->type, "tiny_transformer") == 0) {
+        rc = dm_tiny_transformer_cli(12, argv);
+    } else {
+        rc = dm_tinystories_cli(12, argv);
+    }
     if (rc == 0) {
         strncpy(h->checkpoint_dir, checkpoint_dir,
                 sizeof(h->checkpoint_dir) - 1);
@@ -933,6 +941,60 @@ DM_API DM_Status dm_lm_generate(DM_LM lm, const char *prompt,
 {
     if (!lm || !prompt || !out_buf) return DM_ERR_INVALID_PARAM;
     _LMHandle *h = (_LMHandle *)lm;
+    if (strcmp(h->type, "bert") == 0) {
+        BertConfig cfg;
+        float *weights = NULL;
+        int *ids = NULL, seq = 0;
+        if (!h->loaded || dm_bert_load(h->checkpoint_dir, &cfg, &weights) != 0)
+            return DM_ERR_IO;
+        {
+            int cap = 16;
+            const char *p = prompt;
+            ids = (int *)malloc((size_t)cap * sizeof(int));
+            if (!ids) { free(weights); return DM_ERR_MEMORY; }
+            while (*p) {
+                char *end = NULL;
+                long v = strtol(p, &end, 10);
+                if (p == end) { p++; continue; }
+                if (v < 0 || v >= cfg.vocab_size) {
+                    free(weights); free(ids); return DM_ERR_INVALID_PARAM;
+                }
+                if (seq == cap) {
+                    cap *= 2;
+                    int *tmp = (int *)realloc(ids, (size_t)cap * sizeof(int));
+                    if (!tmp) { free(weights); free(ids); return DM_ERR_MEMORY; }
+                    ids = tmp;
+                }
+                ids[seq++] = (int)v;
+                p = end;
+            }
+        }
+        if (seq <= 0 || seq > cfg.max_seq_len) {
+            free(weights); free(ids); return DM_ERR_INVALID_PARAM;
+        }
+        float *hidden = (float *)malloc((size_t)seq * cfg.hidden_size * sizeof(float));
+        float *cls = (float *)malloc((size_t)cfg.hidden_size * sizeof(float));
+        int *seg = (int *)calloc((size_t)seq, sizeof(int));
+        if (!hidden || !cls || !seg) {
+            free(weights); free(ids); free(hidden); free(cls); free(seg);
+            return DM_ERR_MEMORY;
+        }
+        if (dm_bert_forward(&cfg, weights, ids, seg, seq, hidden, cls) != 0) {
+            free(weights); free(ids); free(hidden); free(cls); free(seg);
+            return DM_ERR_GENERIC;
+        }
+        int written = 0;
+        int limit = max_tokens > 0 && max_tokens < cfg.hidden_size ? max_tokens : cfg.hidden_size;
+        for (int i = 0; i < limit && written < buf_size - 1; i++) {
+            int n = snprintf(out_buf + written, (size_t)(buf_size - written),
+                             "%s%.7g", i ? " " : "", (double)cls[i]);
+            if (n < 0 || n >= buf_size - written) break;
+            written += n;
+        }
+        out_buf[written < buf_size ? written : buf_size - 1] = '\0';
+        free(weights); free(ids); free(hidden); free(cls); free(seg);
+        return DM_OK;
+    }
     char tmp_out[256], mt[16];
     snprintf(tmp_out, sizeof(tmp_out), "/tmp/dm_lm_out_%d.txt", (int)getpid());
     snprintf(mt, sizeof(mt), "%d", max_tokens);
@@ -1212,6 +1274,7 @@ DM_API int dm_cli_run(const char *command, int argc, char **argv) {
     if (strcmp(command, "transformer")        == 0) return dm_transformer_cli(argc, argv);
     if (strcmp(command, "tiny_transformer")   == 0) return dm_tiny_transformer_cli(argc, argv);
     if (strcmp(command, "tinystories")        == 0) return dm_tinystories_cli(argc, argv);
+    if (strcmp(command, "bert")               == 0) return dm_bert_cli(argc, argv);
     if (strcmp(command, "textbook_generator") == 0) return dm_textbook_generator_cli(argc, argv);
     if (strcmp(command, "version")            == 0) { printf("%s\n", dm_version()); return 0; }
     fprintf(stderr, "dm: unknown command '%s'\n", command);
