@@ -93,6 +93,7 @@ extern int dm_volt_cli          (int argc, char **argv);
 
 /* §5-6 Model CLI entry points */
 extern int dm_mobilenet_tiny_cli      (int argc, char **argv);
+extern int dm_tinyvit_cli             (int argc, char **argv);
 extern int dm_tiny_transformer_cli    (int argc, char **argv);
 extern int dm_tinystories_cli         (int argc, char **argv);
 extern int dm_textbook_generator_cli  (int argc, char **argv);
@@ -761,6 +762,115 @@ DM_API DM_Status dm_vision_forward_raw(const float *rgb_nhwc,
 }
 
 /* =========================================================================
+ * § 5b  TinyViT direct API (pure-C, no TF for inference)
+ * ========================================================================= */
+
+/*
+ * We forward-declare the internal functions from tinyvit.c using their
+ * internal TinyViTConfig struct instead of importing the full header (which
+ * would conflict with typedef DM_TinyViTVariant defined here in dm.h).
+ * We call them via the stable wrappers below.
+ */
+
+/* Internal TinyViTConfig struct mirror — must stay in sync with tinyvit.h */
+typedef struct {
+    int variant;
+    int embed_dims[4];
+    int depths[4];
+    int window_sizes[3];
+    int mbconv_expand;
+    int mlp_ratio;
+    int head_dim;
+    int num_classes;
+    int img_size;
+} _TVCfg;
+
+extern void   dm_tinyvit_config_init       (void *cfg, int variant, int classes, int img_size);
+extern size_t dm_tinyvit_cfg_count(const void *cfg);
+extern int    dm_tinyvit_cfg_forward  (const void *cfg, const float *weights,
+                                             const float *input, int batch, float *logits);
+extern int    dm_tinyvit_cfg_save     (const char *path, const void *cfg, const float *w);
+extern int    dm_tinyvit_cfg_load     (const char *path, void *cfg, float **w_out);
+extern int    dm_tinyvit_save_sparse_labels(const char *path, int n, int classes, int K,
+                                             const void *labels);
+extern float  dm_tinyvit_cfg_loss(const float *logits, const void *label, float T);
+
+/* public dm.h wrappers */
+
+DM_API size_t dm_tinyvit_weight_count(DM_TinyViTVariant variant, int classes, int img_size)
+{
+    _TVCfg cfg;
+    dm_tinyvit_config_init(&cfg, (int)variant, classes, img_size);
+    return dm_tinyvit_cfg_count(&cfg);
+}
+
+DM_API DM_Status dm_tinyvit_forward(DM_TinyViTVariant variant,
+                                     const float *weights,
+                                     const float *input_nhwc,
+                                     int batch, int classes, int img_size,
+                                     float *logits_out)
+{
+    if (!weights || !input_nhwc || !logits_out) return DM_ERR_INVALID_PARAM;
+    _TVCfg cfg;
+    dm_tinyvit_config_init(&cfg, (int)variant, classes, img_size);
+    int rc = dm_tinyvit_cfg_forward(&cfg, weights, input_nhwc, batch, logits_out);
+    return rc == 0 ? DM_OK : DM_ERR_GENERIC;
+}
+
+DM_API DM_Status dm_tinyvit_load(const char *weight_path,
+                                  DM_TinyViTVariant *variant_out,
+                                  int *classes_out, int *img_size_out,
+                                  float **weights_out)
+{
+    if (!weight_path || !weights_out) return DM_ERR_INVALID_PARAM;
+    _TVCfg cfg;
+    int rc = dm_tinyvit_cfg_load(weight_path, &cfg, weights_out);
+    if (rc != 0) return DM_ERR_GENERIC;
+    if (variant_out)   *variant_out  = (DM_TinyViTVariant)cfg.variant;
+    if (classes_out)   *classes_out  = cfg.num_classes;
+    if (img_size_out)  *img_size_out = cfg.img_size;
+    return DM_OK;
+}
+
+DM_API DM_Status dm_tinyvit_save_labels(const char *out_path,
+                                         int num_images, int num_classes, int topK,
+                                         const uint32_t *indices, const float *values,
+                                         const uint32_t *aug_seeds)
+{
+    if (!out_path || !indices || !values || !aug_seeds) return DM_ERR_INVALID_PARAM;
+    /* Build TinyViTSparseLabel array for internal function */
+    typedef struct { uint32_t *indices; float *values; int K; int C; uint32_t aug_seed; } _SL;
+    _SL *labels = (_SL*)calloc(num_images, sizeof(_SL));
+    if (!labels) return DM_ERR_MEMORY;
+    for (int i = 0; i < num_images; i++) {
+        labels[i].K        = topK;
+        labels[i].C        = num_classes;
+        labels[i].aug_seed = aug_seeds[i];
+        labels[i].indices  = (uint32_t*)(indices + (size_t)i * topK);
+        labels[i].values   = (float*)(values   + (size_t)i * topK);
+    }
+    int rc = dm_tinyvit_save_sparse_labels(out_path, num_images, num_classes, topK, labels);
+    free(labels);
+    return rc == 0 ? DM_OK : DM_ERR_GENERIC;
+}
+
+DM_API DM_Status dm_tinyvit_distill_loss(const float *student_logits,
+                                          const uint32_t *indices,
+                                          const float *teacher_values,
+                                          int K, int C, float temperature,
+                                          float *loss_out)
+{
+    if (!student_logits || !indices || !teacher_values || !loss_out) return DM_ERR_INVALID_PARAM;
+    typedef struct { uint32_t *indices; float *values; int K; int C; uint32_t aug_seed; } _SL;
+    _SL lbl;
+    lbl.indices  = (uint32_t*)indices;
+    lbl.values   = (float*)teacher_values;
+    lbl.K        = K; lbl.C = C; lbl.aug_seed = 0;
+    *loss_out = dm_tinyvit_cfg_loss(student_logits, &lbl, temperature);
+    return DM_OK;
+}
+
+/* =========================================================================
  * § 6  Language Model
  * ========================================================================= */
 
@@ -1097,6 +1207,7 @@ DM_API int dm_cli_run(const char *command, int argc, char **argv) {
     if (strcmp(command, "tokenizer_lab")      == 0) return dm_tokenizer_lab_cli(argc, argv);
     if (strcmp(command, "volt")               == 0) return dm_volt_cli(argc, argv);
     if (strcmp(command, "mobilenet_tiny")     == 0) return dm_mobilenet_tiny_cli(argc, argv);
+    if (strcmp(command, "tinyvit")            == 0) return dm_tinyvit_cli(argc, argv);
     if (strcmp(command, "tiny_transformer")   == 0) return dm_tiny_transformer_cli(argc, argv);
     if (strcmp(command, "tinystories")        == 0) return dm_tinystories_cli(argc, argv);
     if (strcmp(command, "textbook_generator") == 0) return dm_textbook_generator_cli(argc, argv);

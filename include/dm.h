@@ -15,7 +15,7 @@
  *   § 2   Dataset
  *   § 3   Algorithm  (132 registered data-mining algorithms)
  *   § 4   Tokenizer
- *   § 5   Vision Model  (MobileNetV4 Tiny)
+ *   § 5   Vision Model  (MobileNetV4 Tiny + TinyViT-5M/11M/21M)
  *   § 6   Language Model  (Tiny Transformer / TinyStories byte-LM)
  *   § 7   Image utilities
  *   § 8   Tensor  (primitive ops, C-only)
@@ -210,12 +210,26 @@ DM_API DM_Status dm_tokenizer_volt_run(const char *corpus_path,
                                        const char *output_path);
 
 /* ─────────────────────────────────────────────────────────────────────────
- * § 5  Vision Model (MobileNetV4 Tiny — TF C API backend)
+ * § 5  Vision Model
+ *       • "mobilenet_tiny"   — MobileNetV4-Tiny (TF C API backend)
+ *       • "tinyvit_5m"       — TinyViT-5M  (Wu et al. arXiv:2207.10666v1)
+ *       • "tinyvit_11m"      — TinyViT-11M
+ *       • "tinyvit_21m"      — TinyViT-21M  [DEFAULT]
+ *
+ * TinyViT architecture (Section 3.2):
+ *   Patch Embed → Stage1:MBConv×2 → DS → Stage2:Transformer×2(W=7) →
+ *   DS → Stage3:Transformer×6(W=14) → DS → Stage4:Transformer×2(W=7) →
+ *   AvgPool+LN+Linear
+ *   Shared: depths={2,2,6,2}, windows={7,14,7}, R=4, M=4, E=32
+ *
+ * Fast Pretraining Distillation (Section 3.1):
+ *   Teacher logits are sparsified (top-K) and stored on disk.
+ *   Student trains via dm_vision_distill_train() reusing stored labels.
  * ───────────────────────────────────────────────────────────────────────── */
 
 typedef void *DM_Vision;
 
-/** model_type: currently "mobilenet_tiny" */
+/** model_type: "mobilenet_tiny" | "tinyvit_5m" | "tinyvit_11m" | "tinyvit_21m" */
 DM_API DM_Vision  dm_vision_create (const char *model_type);
 DM_API DM_Status  dm_vision_init   (DM_Vision   v,
                                     const char *saved_model_dir,
@@ -253,6 +267,86 @@ DM_API DM_Status  dm_vision_forward_raw(const float *rgb_nhwc,
                                         int          w,
                                         float       *out_logits,
                                         int          classes);
+
+/* ── TinyViT direct API (pure-C, no TF dependency for inference) ────────── */
+
+/** TinyViT variant selector */
+typedef enum {
+    DM_TINYVIT_5M  = 0,
+    DM_TINYVIT_11M = 1,
+    DM_TINYVIT_21M = 2
+} DM_TinyViTVariant;
+
+/**
+ * Count total float parameters for a TinyViT variant.
+ * @param variant   DM_TINYVIT_5M / 11M / 21M
+ * @param classes   Number of output classes (e.g. 1000)
+ * @param img_size  Input resolution (e.g. 224)
+ */
+DM_API size_t dm_tinyvit_weight_count(DM_TinyViTVariant variant,
+                                       int               classes,
+                                       int               img_size);
+
+/**
+ * Pure-C forward inference pass.
+ * @param variant      Model size
+ * @param weights      float[dm_tinyvit_weight_count(variant,classes,img_size)]
+ * @param input_nhwc   float[batch × img_size × img_size × 3], values in [0,1]
+ * @param batch        Batch size
+ * @param classes      Number of output classes
+ * @param img_size     Input resolution
+ * @param logits_out   float[batch × classes]  (pre-softmax, caller-allocated)
+ */
+DM_API DM_Status  dm_tinyvit_forward(DM_TinyViTVariant variant,
+                                      const float      *weights,
+                                      const float      *input_nhwc,
+                                      int               batch,
+                                      int               classes,
+                                      int               img_size,
+                                      float            *logits_out);
+
+/** Load weights from a .bin file written by 'dm tinyvit train'. */
+DM_API DM_Status  dm_tinyvit_load(const char *weight_path,
+                                   DM_TinyViTVariant *variant_out,
+                                   int               *classes_out,
+                                   int               *img_size_out,
+                                   float            **weights_out);
+
+/**
+ * Fast Pretraining Distillation — save sparse teacher logits (Section 3.1).
+ * @param out_path      Output .tspl file path
+ * @param num_images    Number of images in the dataset
+ * @param num_classes   Total number of classes C
+ * @param topK          Top-K logits to store per image (K≪C)
+ * @param indices       uint32[num_images × topK]  top-K class indices
+ * @param values        float[num_images × topK]   top-K softmax values
+ * @param aug_seeds     uint32[num_images]          PCG seeds (d_0)
+ */
+DM_API DM_Status  dm_tinyvit_save_labels(const char     *out_path,
+                                          int             num_images,
+                                          int             num_classes,
+                                          int             topK,
+                                          const uint32_t *indices,
+                                          const float    *values,
+                                          const uint32_t *aug_seeds);
+
+/**
+ * Compute sparse cross-entropy distillation loss (Eq. 1–2).
+ * @param student_logits  float[C]  pre-softmax
+ * @param indices         uint32[K] top-K teacher indices
+ * @param teacher_values  float[K]  top-K teacher softmax values
+ * @param K               sparsity
+ * @param C               total classes
+ * @param temperature     distillation temperature (1.0 per paper)
+ * @param loss_out        output scalar loss
+ */
+DM_API DM_Status  dm_tinyvit_distill_loss(const float    *student_logits,
+                                           const uint32_t *indices,
+                                           const float    *teacher_values,
+                                           int             K,
+                                           int             C,
+                                           float           temperature,
+                                           float          *loss_out);
 
 /* ─────────────────────────────────────────────────────────────────────────
  * § 6  Language Model (Tiny Transformer / TinyStories byte-LM)

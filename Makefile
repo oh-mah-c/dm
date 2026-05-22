@@ -313,9 +313,17 @@ $(SHADER_OUT_DIR)/%.spv: $(SHADER_DIR)/%.glsl
 		exit 127; \
 	fi
 
+TF_IFLAGS = -Ithird_party/tensorflow \
+            -Ithird_party/tensorflow/third_party/xla \
+            -Ithird_party/tensorflow/third_party/xla/third_party/tsl
+
 $(OBJ_DIR)/models/vision/mobilenet_tiny.o: $(SRC_DIR)/models/vision/mobilenet_tiny.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -Ithird_party/tensorflow -Ithird_party/tensorflow/third_party/xla -Ithird_party/tensorflow/third_party/xla/third_party/tsl -c $< -o $@
+	$(CC) $(CFLAGS) $(TF_IFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/models/vision/tinyvit.o: $(SRC_DIR)/models/vision/tinyvit.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(TF_IFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
