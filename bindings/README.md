@@ -238,7 +238,7 @@ try (DM.Tokenizer tok = new DM.Tokenizer("bpe")) {
 | § 3 | `Algorithm` — 132 algorithms, run, list |
 | § 4 | `Tokenizer` — train, load, encode, decode, VOLT |
 | § 5 | `Vision` — MobileNetV4-Tiny train/eval/predict + **TinyViT-5M/11M/21M** |
-| § 6 | `LM` — Tiny Transformer / TinyStories generate |
+| § 6 | `LM` — **Transformer** (Vaswani et al. 2017) enc-dec + TinyTransformer + TinyStories |
 | § 7 | Image load/resize/patchify (via C API directly) |
 | § 8 | `Tensor` + neural ops (C++ wrapper; raw C elsewhere) |
 | § 9 | `Benchmark` — phase timing, report, print |
@@ -395,6 +395,151 @@ dm tinyvit distill \
     -o tinyvit21m.bin \
     --variant 21m --epochs 90
 ```
+
+---
+
+## Transformer — "Attention Is All You Need"
+
+**Paper:** Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser, Polosukhin,
+*Attention Is All You Need*, NeurIPS 2017 (arXiv:1706.03762)
+
+The Transformer is the foundational encoder-decoder sequence transduction model
+based entirely on attention mechanisms.  Every building block is exposed as a
+standalone reusable function.
+
+### Architecture
+
+```
+Input tokens  →  Embedding (×√d_model) + Sinusoidal PE
+  └─ Encoder: N=6 layers, each:
+        Self-MHA  →  Add & LayerNorm
+        FFN       →  Add & LayerNorm
+  └─ Final encoder LayerNorm
+
+Output tokens (shifted right)  →  Embedding + PE
+  └─ Decoder: N=6 layers, each:
+        Masked Self-MHA  →  Add & LayerNorm
+        Cross-MHA        →  Add & LayerNorm   (Q=decoder, K=V=encoder output)
+        FFN              →  Add & LayerNorm
+  └─ Linear projection (shared with embedding) →  Softmax → Probabilities
+```
+
+**Shared weight matrix** (§3.4): source embedding, target embedding, and
+pre-softmax linear projection all use the same weight matrix (transposed for
+projection), scaled by √d_model when applied.
+
+### Hyperparameters (Table 3)
+
+| Variant | N | d_model | d_ff | h | d_k=d_v | P_drop | Params |
+|---------|---|---------|------|---|---------|--------|--------|
+| `base`  | 6 | 512  | 2048 | 8  | 64 | 0.1 | ~65 M  |
+| `big`   | 6 | 1024 | 4096 | 16 | 64 | 0.3 | ~213 M |
+
+### Reusable Primitives (§3)
+
+Each module is independently callable for use in other architectures:
+
+| Function | Paper reference |
+|----------|----------------|
+| `dm_transformer_positional_encoding` | §3.5 — sin/cos encoding |
+| `dm_transformer_layer_norm` | §3.1 — Ba et al. 2016 |
+| `dm_transformer_sdp_attention` | §3.2.1 Eq. 1 — Attention(Q,K,V)=softmax(QKᵀ/√dₖ)V |
+| `dm_transformer_causal_mask` | §3.2.3 — upper-triangle −∞ mask |
+| `dm_transformer_mha` | §3.2.2 Eq. 2 — MultiHead(Q,K,V)=Concat(heads)Wᴼ |
+| `dm_transformer_ffn` | §3.3 Eq. 2 — FFN(x)=max(0,xW₁+b₁)W₂+b₂ |
+| `dm_transformer_encoder_layer` | §3.1 — single encoder layer |
+| `dm_transformer_decoder_layer` | §3.1 — single decoder layer |
+| `dm_transformer_encode` | §3.1 — full encoder stack |
+| `dm_transformer_decode` | §3.1 — full decoder stack + output projection |
+| `dm_transformer_forward` | §3 — full encoder-decoder forward pass |
+| `dm_transformer_lr_schedule` | §5.3 Eq. 3 — Adam warmup schedule |
+
+### CLI usage
+
+```bash
+# Train (requires TensorFlow/Keras — exact paper setup)
+dm transformer train \
+    --src train.src.tok  --tgt train.tgt.tok \
+    -o transformer_base.bin \
+    --variant base --vocab-size 37000 --max-len 512 \
+    --epochs 100 --batch 32 --warmup 4000
+
+# Greedy decode (pure-C inference, no TF needed)
+dm transformer infer -m transformer_base.bin \
+    --src "10 20 30 40 50" --max-tokens 64
+
+# Encoder only (export contextual representations)
+dm transformer encode --src tokens.txt -m transformer_base.bin -o enc.bin
+
+# Throughput benchmark (pure-C, zero-initialized weights)
+dm transformer bench --variant base --src-len 64 --tgt-len 64
+dm transformer bench --variant big  --src-len 32 --tgt-len 32
+
+# Show model metadata
+dm transformer info -m transformer_base.bin
+```
+
+### C API usage
+
+```c
+#include "dm.h"              /* or directly: #include "models/lm/transformer.h" */
+
+/* 1. Configure */
+TransformerConfig cfg;
+dm_transformer_config_init(&cfg, TRANSFORMER_BASE, 37000, 512);
+
+/* 2. Count + allocate weights */
+size_t wc = dm_transformer_weight_count(&cfg);
+float *weights = malloc(wc * sizeof(float));
+dm_transformer_load("transformer_base.bin", &cfg, &weights);
+
+/* 3. Full forward pass */
+int src[] = {10, 20, 30};
+int tgt[] = {1, 50};               /* 1 = BOS */
+float logits[2 * 37000];
+dm_transformer_forward(&cfg, weights, src, 3, tgt, 2, logits);
+
+/* 4. Use individual modules in your own architecture */
+float pe[512 * 512];
+dm_transformer_positional_encoding(512, 512, pe);
+
+float out[seq * 512];
+dm_transformer_encoder_layer(x_in, &cfg, layer_weights, seq, out);
+
+/* 5. Learning rate at step t (§5.3 Eq. 3) */
+float lr = dm_transformer_lr_schedule(512, /*step=*/1000, /*warmup=*/4000);
+
+free(weights);
+```
+
+### Python usage
+
+```python
+import dm
+
+dm.init()
+
+# Train via CLI passthrough
+dm.cliRun("transformer", ["train",
+    "--src", "train.src.tok", "--tgt", "train.tgt.tok",
+    "-o", "model.bin", "--variant", "base",
+    "--vocab-size", "37000", "--epochs", "100"])
+
+# Infer
+dm.cliRun("transformer", ["infer", "-m", "model.bin",
+    "--src", "10 20 30", "--max-tokens", "64"])
+```
+
+### Training details (§5)
+
+- **Optimizer:** Adam, β₁=0.9, β₂=0.98, ε=10⁻⁹
+- **LR schedule (Eq. 3):** `lrate = d_model⁻⁰·⁵ · min(step⁻⁰·⁵, step · warmup⁻¹·⁵)`
+  - Linear warmup for first `warmup_steps=4000` steps, then ∝ step⁻⁰·⁵ decay
+- **Residual dropout** (P_drop=0.1 base / 0.3 big): applied after each sub-layer
+  before Add & Norm, and on embedding + PE sums
+- **Label smoothing** ε_ls=0.1 (§5.4): improves accuracy / BLEU despite hurting
+  perplexity
+- **Shared embedding weight** (§3.4): reduces parameters and improves quality
 
 ---
 

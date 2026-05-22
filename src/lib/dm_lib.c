@@ -94,6 +94,7 @@ extern int dm_volt_cli          (int argc, char **argv);
 /* §5-6 Model CLI entry points */
 extern int dm_mobilenet_tiny_cli      (int argc, char **argv);
 extern int dm_tinyvit_cli             (int argc, char **argv);
+extern int dm_transformer_cli         (int argc, char **argv);
 extern int dm_tiny_transformer_cli    (int argc, char **argv);
 extern int dm_tinystories_cli         (int argc, char **argv);
 extern int dm_textbook_generator_cli  (int argc, char **argv);
@@ -1208,6 +1209,7 @@ DM_API int dm_cli_run(const char *command, int argc, char **argv) {
     if (strcmp(command, "volt")               == 0) return dm_volt_cli(argc, argv);
     if (strcmp(command, "mobilenet_tiny")     == 0) return dm_mobilenet_tiny_cli(argc, argv);
     if (strcmp(command, "tinyvit")            == 0) return dm_tinyvit_cli(argc, argv);
+    if (strcmp(command, "transformer")        == 0) return dm_transformer_cli(argc, argv);
     if (strcmp(command, "tiny_transformer")   == 0) return dm_tiny_transformer_cli(argc, argv);
     if (strcmp(command, "tinystories")        == 0) return dm_tinystories_cli(argc, argv);
     if (strcmp(command, "textbook_generator") == 0) return dm_textbook_generator_cli(argc, argv);
