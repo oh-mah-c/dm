@@ -1,0 +1,14 @@
+{
+  "name": "@pomaieco/dm",
+  "version": "1.0.0",
+  "description": "Node.js bindings for the DM data-mining framework",
+  "main": "index.js",
+  "license": "MIT",
+  "peerDependencies": {
+    "ffi-napi": ">=4.0.0",
+    "ref-napi": ">=3.0.0",
+    "ref-array-di": ">=1.2.0",
+    "ref-struct-di": ">=1.1.0"
+  },
+  "engines": { "node": ">=14" }
+}

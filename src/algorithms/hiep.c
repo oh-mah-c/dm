@@ -206,7 +206,7 @@ static int text_map_get(HIEPTextBuildCtx *ctx, uint32_t external, uint32_t *inte
 
     if (ctx->external_to_internal[external] == HIEP_NO_RANK) {
         uint32_t len = 0;
-        const char *name = dm_tokenizer_token_text(ctx->tokenizer, external, &len);
+        const char *name = dm_faro_tok_token_text(ctx->tokenizer, external, &len);
         uint32_t id;
         if (name && len > 0) {
             if (add_token_bytes(ctx->db, name, len, &id) != 0) return -1;
@@ -302,10 +302,10 @@ static int load_text_file(const char *path, const HIEPParams *params, HIEPDB *db
     db->input_bytes = len;
 
     const char *tokenizer_name = params->tokenizer_name ? params->tokenizer_name : "faro";
-    Tokenizer *tokenizer = dm_tokenizer_create(tokenizer_name, 65536);
+    Tokenizer *tokenizer = dm_faro_tok_create(tokenizer_name, 65536);
     if (!tokenizer) {
         fprintf(stderr, "Unknown tokenizer '%s'. Supported tokenizers: %s\n",
-                tokenizer_name, dm_tokenizer_supported_names());
+                tokenizer_name, dm_faro_tok_supported_names());
         free(data);
         return -1;
     }

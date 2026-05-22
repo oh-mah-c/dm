@@ -1,7 +1,7 @@
 CC = gcc
 VULKAN_HEADERS_DIR = third_party/Vulkan-Hpp/Vulkan-Headers
 VULKAN_CFLAGS = -I$(VULKAN_HEADERS_DIR)/include
-CFLAGS = -D_POSIX_C_SOURCE=200809L -Iinclude -Iinclude/core $(VULKAN_CFLAGS) -Wall -Wextra -O2 -pthread
+CFLAGS = -D_POSIX_C_SOURCE=200809L -Iinclude -Iinclude/core $(VULKAN_CFLAGS) -Wall -Wextra -O2 -pthread -fPIC
 SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin
@@ -130,6 +130,14 @@ SHADER_SOURCES = $(SHADER_DIR)/bpe_pair_count.glsl \
                  $(SHADER_DIR)/unigram_word.glsl
 SPV_SHADERS = $(patsubst $(SHADER_DIR)/%.glsl,$(SHADER_OUT_DIR)/%.spv,$(SHADER_SOURCES))
 
+# ── Shared library (libdm.so / libdm.dylib) ────────────────────────────────
+# All sources from the main build minus main.c, plus the public API facade.
+LIB_SOURCES = $(filter-out $(SRC_DIR)/main.c, $(SOURCES)) \
+              $(SRC_DIR)/lib/dm_lib.c
+LIB_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(LIB_SOURCES))
+LIBDM_SO    = libdm.so
+LIBDM_DYLIB = libdm.dylib
+
 LDFLAGS = -lm -pthread
 ICU_LDFLAGS = -licuuc
 VULKAN_LDFLAGS =
@@ -140,11 +148,28 @@ ifeq ($(OS),Windows_NT)
     LDFLAGS += -lpsapi
 endif
 
-all: $(TARGET) $(MFHOI_MINER_TARGET) $(MHOUI_MINER_TARGET) $(VIFP_MINER_TARGET) $(HUPP_MINER_TARGET) $(CHUO_MINER_TARGET) $(PSO_CLASSIFIER_TARGET) $(TKU_MINER_TARGET) $(KCLOTREE_MINER_TARGET) $(TIPN_HOUI_MINER_TARGET) $(HTK_MINER_TARGET) $(TOPKPHM_MINER_TARGET) $(TKU_PSO_MINER_TARGET) $(TMKU_MINER_TARGET) $(ITEMSET_BENCH_TARGET) $(HUST_TARGET) $(BPE_TARGET) $(BPE_DROPOUT_TARGET) $(UNIGRAM_TARGET) $(SENTENCEPIECE_TARGET) $(TOKENIZER_LAB_TARGET) $(GPE_TARGET) $(PARITY_BPE_TARGET) $(FAST_WORDPIECE_TARGET) $(VOLT_TARGET) $(TINYSTORIES_TARGET) $(TINY_TRANSFORMER_TARGET) $(TEXTBOOK_GENERATOR_TARGET) $(MOBILENET_TINY_TARGET) $(CONNECT_TARGET) $(RUN_TARGET)
+all: $(TARGET) $(LIBDM_SO) $(MFHOI_MINER_TARGET) $(MHOUI_MINER_TARGET) $(VIFP_MINER_TARGET) $(HUPP_MINER_TARGET) $(CHUO_MINER_TARGET) $(PSO_CLASSIFIER_TARGET) $(TKU_MINER_TARGET) $(KCLOTREE_MINER_TARGET) $(TIPN_HOUI_MINER_TARGET) $(HTK_MINER_TARGET) $(TOPKPHM_MINER_TARGET) $(TKU_PSO_MINER_TARGET) $(TMKU_MINER_TARGET) $(ITEMSET_BENCH_TARGET) $(HUST_TARGET) $(BPE_TARGET) $(BPE_DROPOUT_TARGET) $(UNIGRAM_TARGET) $(SENTENCEPIECE_TARGET) $(TOKENIZER_LAB_TARGET) $(GPE_TARGET) $(PARITY_BPE_TARGET) $(FAST_WORDPIECE_TARGET) $(VOLT_TARGET) $(TINYSTORIES_TARGET) $(TINY_TRANSFORMER_TARGET) $(TEXTBOOK_GENERATOR_TARGET) $(MOBILENET_TINY_TARGET) $(CONNECT_TARGET) $(RUN_TARGET)
 
 vulkan: $(TARGET) $(BPE_TARGET) $(UNIGRAM_TARGET) $(SENTENCEPIECE_TARGET) $(TOKENIZER_LAB_TARGET) $(GPE_TARGET) $(VOLT_TARGET) $(TINYSTORIES_TARGET) $(TINY_TRANSFORMER_TARGET) $(TEXTBOOK_GENERATOR_TARGET) $(MOBILENET_TINY_TARGET) shaders
 
 
+# ─── Shared library targets ────────────────────────────────────────────────
+$(LIBDM_SO): $(LIB_OBJECTS)
+	$(CC) -shared -fPIC -DDM_BUILDING_LIB $(LIB_OBJECTS) \
+	    -o $@ $(LDFLAGS) $(ICU_LDFLAGS) $(VULKAN_LDFLAGS) \
+	    -L.venv/lib/python3.12/site-packages/tensorflow \
+	    -ltensorflow_cc -ltensorflow_framework \
+	    -Wl,-rpath,.venv/lib/python3.12/site-packages/tensorflow
+
+$(LIBDM_DYLIB): $(LIB_OBJECTS)
+	$(CC) -shared -DDM_BUILDING_LIB $(LIB_OBJECTS) \
+	    -o $@ $(LDFLAGS) $(ICU_LDFLAGS) $(VULKAN_LDFLAGS)
+
+# Pattern rule to compile the lib facade with -DDM_BUILDING_LIB
+$(OBJ_DIR)/lib/dm_lib.o: $(SRC_DIR)/lib/dm_lib.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -DDM_BUILDING_LIB -c $< -o $@
+# ─── Main executable ────────────────────────────────────────────────────────
 $(TARGET): $(OBJECTS)
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(OBJECTS) -o $@ $(LDFLAGS) $(ICU_LDFLAGS) $(VULKAN_LDFLAGS) -L.venv/lib/python3.12/site-packages/tensorflow -ltensorflow_cc -ltensorflow_framework -Wl,-rpath,.venv/lib/python3.12/site-packages/tensorflow
@@ -297,8 +322,10 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 
+libdm: $(LIBDM_SO)
+
 clean:
-	rm -rf $(OBJ_DIR) $(BIN_DIR)
+	rm -rf $(OBJ_DIR) $(BIN_DIR) $(LIBDM_SO) $(LIBDM_DYLIB)
 
 plots:
 	MPLCONFIGDIR=/tmp/mpl python3 scripts/plot_results.py results
@@ -306,4 +333,4 @@ plots:
 report: experiments
 	@echo "Report generated at results/reports/experiment_report.txt"
 
-.PHONY: all clean experiments plots report vulkan shaders
+.PHONY: all clean experiments plots report vulkan shaders libdm

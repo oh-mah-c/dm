@@ -10,6 +10,26 @@
  *  - Every _create() has a matching _free()
  *  - All functions return DM_Status (0 = OK, negative = error)
  *
+ * Sections:
+ *   § 1   Core / Version
+ *   § 2   Dataset
+ *   § 3   Algorithm  (132 registered data-mining algorithms)
+ *   § 4   Tokenizer
+ *   § 5   Vision Model  (MobileNetV4 Tiny)
+ *   § 6   Language Model  (Tiny Transformer / TinyStories byte-LM)
+ *   § 7   Image utilities
+ *   § 8   Tensor  (primitive ops, C-only)
+ *   § 9   Benchmark
+ *   § 10  BitSet
+ *   § 11  Synthetic Data Generator  (MEDM / Textbook)
+ *   § 12  Plugin system
+ *   § 13  CLI passthrough
+ *   § 14  GPU Compute Acceleration  (Vulkan backend)
+ *   § 15  Arena Allocator
+ *   § 16  Memory-mapped I/O
+ *   § 17  Flat Dataset / Connector
+ *   § 18  Experiment helpers
+ *
  * SPDX-License-Identifier: MIT
  */
 
@@ -53,7 +73,7 @@ typedef enum {
  * § 1  Core / Version
  * ───────────────────────────────────────────────────────────────────────── */
 DM_API const char *dm_version(void);
-DM_API uint32_t    dm_version_number(void);  /* major<<16|minor<<8|patch */
+DM_API uint32_t    dm_version_number(void);   /* major<<16 | minor<<8 | patch */
 DM_API DM_Status   dm_init(void);
 DM_API const char *dm_strerror(DM_Status code);
 
@@ -241,20 +261,20 @@ DM_API DM_Status  dm_vision_forward_raw(const float *rgb_nhwc,
 typedef void *DM_LM;
 
 /** model_type: "tiny_transformer" | "tinystories" */
-DM_API DM_LM    dm_lm_create   (const char *model_type);
-DM_API DM_Status dm_lm_train   (DM_LM lm,
-                                 const char *corpus_path,
-                                 const char *checkpoint_dir,
-                                 int         epochs,
-                                 int         batch_size,
-                                 float       lr);
-DM_API DM_Status dm_lm_generate(DM_LM        lm,
-                                 const char  *prompt,
-                                 int          max_tokens,
-                                 char        *out_buf,
-                                 int          buf_size);
-DM_API DM_Status dm_lm_load    (DM_LM lm, const char *checkpoint_dir);
-DM_API void      dm_lm_free    (DM_LM lm);
+DM_API DM_LM     dm_lm_create   (const char *model_type);
+DM_API DM_Status  dm_lm_train   (DM_LM lm,
+                                  const char *corpus_path,
+                                  const char *checkpoint_dir,
+                                  int         epochs,
+                                  int         batch_size,
+                                  float       lr);
+DM_API DM_Status  dm_lm_generate(DM_LM        lm,
+                                  const char  *prompt,
+                                  int          max_tokens,
+                                  char        *out_buf,
+                                  int          buf_size);
+DM_API DM_Status  dm_lm_load    (DM_LM lm, const char *checkpoint_dir);
+DM_API void       dm_lm_free    (DM_LM lm);
 
 /* ─────────────────────────────────────────────────────────────────────────
  * § 7  Image utilities
@@ -278,15 +298,15 @@ DM_API DM_Status dm_image_load_resize(const char *path,
  * @param patch_w   Patch width in pixels.
  * @param out_patches Set by callee: number of patches per image.
  */
-DM_API DM_Status dm_image_patchify(const float *in_nhwc,
-                                   int          n,
-                                   int          h,
-                                   int          w,
-                                   int          c,
-                                   int          patch_h,
-                                   int          patch_w,
-                                   float       *out_buf,
-                                   int         *out_patches);
+DM_API DM_Status dm_image_patchify_raw(const float *in_nhwc,
+                                       int          n,
+                                       int          h,
+                                       int          w,
+                                       int          c,
+                                       int          patch_h,
+                                       int          patch_w,
+                                       float       *out_buf,
+                                       int         *out_patches);
 
 /* ─────────────────────────────────────────────────────────────────────────
  * § 8  Tensor (primitive operations — C-only, no TF dependency)
@@ -295,29 +315,29 @@ DM_API DM_Status dm_image_patchify(const float *in_nhwc,
 typedef struct {
     int    n, c, h, w;
     float *data;
-} DM_Tensor_t;
+} DM_Tensor;
 
-DM_API DM_Status dm_tensor_alloc (DM_Tensor_t *t, int n, int c, int h, int w);
-DM_API void      dm_tensor_free  (DM_Tensor_t *t);
-DM_API void      dm_tensor_fill  (DM_Tensor_t *t, float value);
-DM_API float     dm_tensor_get   (const DM_Tensor_t *t, int n, int c, int y, int x);
-DM_API void      dm_tensor_set   (DM_Tensor_t *t, int n, int c, int y, int x, float v);
-DM_API size_t    dm_tensor_count (const DM_Tensor_t *t);
+DM_API DM_Status dm_tensor_alloc (DM_Tensor *t, int n, int c, int h, int w);
+DM_API void      dm_tensor_free  (DM_Tensor *t);
+DM_API void      dm_tensor_fill  (DM_Tensor *t, float value);
+DM_API float     dm_tensor_get   (const DM_Tensor *t, int n, int c, int y, int x);
+DM_API void      dm_tensor_set   (DM_Tensor *t, int n, int c, int y, int x, float v);
+DM_API size_t    dm_tensor_count (const DM_Tensor *t);
 
 /* Primitive neural ops */
-DM_API DM_Status dm_op_conv2d_same   (const DM_Tensor_t *in, DM_Tensor_t *out,
+DM_API DM_Status dm_op_conv2d_same   (const DM_Tensor *in, DM_Tensor *out,
                                       const float *w, const float *b,
                                       int out_c, int kernel, int stride);
-DM_API DM_Status dm_op_depthwise_conv(const DM_Tensor_t *in, DM_Tensor_t *out,
+DM_API DM_Status dm_op_depthwise_conv(const DM_Tensor *in, DM_Tensor *out,
                                       const float *w, const float *b,
                                       int kernel, int stride);
-DM_API DM_Status dm_op_pointwise_conv(const DM_Tensor_t *in, DM_Tensor_t *out,
+DM_API DM_Status dm_op_pointwise_conv(const DM_Tensor *in, DM_Tensor *out,
                                       const float *w, const float *b, int out_c);
-DM_API DM_Status dm_op_linear        (const DM_Tensor_t *in, DM_Tensor_t *out,
+DM_API DM_Status dm_op_linear        (const DM_Tensor *in, DM_Tensor *out,
                                       const float *w, const float *b, int out_c);
-DM_API DM_Status dm_op_global_avg_pool(const DM_Tensor_t *in, DM_Tensor_t *out);
-DM_API void      dm_op_relu6         (DM_Tensor_t *t);
-DM_API void      dm_op_softmax       (DM_Tensor_t *t);
+DM_API DM_Status dm_op_global_avg_pool(const DM_Tensor *in, DM_Tensor *out);
+DM_API void      dm_op_relu6         (DM_Tensor *t);
+DM_API void      dm_op_softmax       (DM_Tensor *t);
 
 /* ─────────────────────────────────────────────────────────────────────────
  * § 9  Benchmark
@@ -331,23 +351,23 @@ typedef enum {
 } DM_BenchPhase;
 
 typedef struct {
-    double  phase_times_ms[4];   /* Load, Algo, Write, Total */
-    size_t  peak_memory_kb;
-    double  user_cpu_ms;
-    double  sys_cpu_ms;
-    size_t  result_ram_bytes;
-    size_t  result_disk_est_bytes;
-    size_t  num_patterns;
-    size_t  total_items;
-    double  throughput_mb_s;
+    double  phase_times_ms[4];       /* Load, Algo, Write, Total */
+    size_t  peak_memory_kb;          /* High-water mark in KB */
+    double  user_cpu_ms;             /* User CPU time */
+    double  sys_cpu_ms;              /* System CPU time */
+    size_t  result_ram_bytes;        /* Exact RAM footprint of results */
+    size_t  result_disk_est_bytes;   /* Estimated disk size (CSV/TXT) */
+    size_t  num_patterns;            /* Total patterns / itemsets found */
+    size_t  total_items;             /* Sum of lengths of all patterns */
+    double  throughput_mb_s;         /* Data size / total time */
 } DM_BenchReport;
 
-DM_API void          dm_bench_reset         (void);
-DM_API void          dm_bench_start         (DM_BenchPhase phase);
-DM_API void          dm_bench_stop          (DM_BenchPhase phase);
-DM_API void          dm_bench_record        (size_t num_patterns, size_t total_items);
+DM_API void           dm_bench_reset        (void);
+DM_API void           dm_bench_start        (DM_BenchPhase phase);
+DM_API void           dm_bench_stop         (DM_BenchPhase phase);
+DM_API void           dm_bench_record       (size_t num_patterns, size_t total_items);
 DM_API DM_BenchReport dm_bench_get_report   (void);
-DM_API void          dm_bench_print         (const char *algo_name, const char *dataset_name);
+DM_API void           dm_bench_print        (const char *algo_name, const char *dataset_name);
 
 /* ─────────────────────────────────────────────────────────────────────────
  * § 10  BitSet
@@ -394,7 +414,7 @@ typedef struct {
     const char *description;
 } DM_PluginInfo;
 
-/** Load an external .so plugin at runtime. */
+/** Load an external .so / .dll plugin at runtime. */
 DM_API DM_Status dm_plugin_load  (const char *so_path);
 DM_API DM_Status dm_plugin_list  (DM_PluginInfo *out_buf, int *in_out_count);
 DM_API DM_Status dm_plugin_run   (const char *id,
@@ -411,6 +431,341 @@ DM_API DM_Status dm_plugin_run   (const char *id,
  * Example: dm_cli_run("mobilenet_tiny", 5, argv_array)
  * ───────────────────────────────────────────────────────────────────────── */
 DM_API int dm_cli_run(const char *command, int argc, char **argv);
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * § 14  GPU Compute Acceleration  (Vulkan 1.1 backend)
+ *
+ * Runtime-loaded — no link-time dependency on vulkan-1.lib.
+ * Falls back to CPU automatically when a GPU is unavailable.
+ *
+ * Supported operations:
+ *   dm_gpu_bpe_pair_count  — parallel pair-frequency histogram (BPE training)
+ *   dm_gpu_sinkhorn        — Sinkhorn balanced OT iterations (VOLT)
+ *   dm_gpu_unigram_em_step — forward-backward EM E-step (Unigram training)
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/** Opaque GPU context — one per training run. NOT thread-safe. */
+typedef void *DM_GpuCtx;
+
+/** GPU error codes (returned by dm_gpu_* functions, not DM_Status). */
+#define DM_GPU_OK                    0
+#define DM_GPU_ERR_NO_DEVICE        -1   /* no Vulkan-capable GPU found       */
+#define DM_GPU_ERR_INIT             -2   /* Vulkan init failed                */
+#define DM_GPU_ERR_SHADER           -3   /* .spv file not found / invalid     */
+#define DM_GPU_ERR_OOM              -4   /* GPU out of memory                 */
+#define DM_GPU_ERR_VOCAB_TOO_LARGE  -5   /* vocab > DM_GPU_BPE_MAX_VOCAB      */
+#define DM_GPU_ERR_NO_ATOMIC_FLOAT  -6   /* VK_EXT_shader_atomic_float absent */
+
+/** Maximum vocabulary size for the dense BPE pair-count matrix (64 MB). */
+#define DM_GPU_BPE_MAX_VOCAB 4096
+
+/**
+ * Create a Vulkan compute context.
+ *   device_index  0 = first discrete GPU, -1 = driver pick.
+ *   shader_dir    directory containing compiled .spv files, or NULL for
+ *                 automatic search: shaders/ → shaders/vulkan/tokenizer/
+ *                 → bin/shaders/ → exe-dir/shaders/
+ * Returns NULL on failure; call dm_gpu_free() when done.
+ */
+DM_API DM_GpuCtx dm_gpu_create     (int device_index, const char *shader_dir);
+DM_API void      dm_gpu_free       (DM_GpuCtx ctx);
+DM_API int       dm_gpu_ready      (DM_GpuCtx ctx);   /* 1 = usable, 0 = not */
+DM_API int       dm_gpu_device_name(DM_GpuCtx ctx, char *buf, size_t buf_len);
+
+/**
+ * Flat corpus for BPE pair counting.
+ * All words concatenated into sym_ids[]; word w spans
+ * [word_starts[w], word_starts[w] + word_lens[w]).
+ */
+typedef struct {
+    const uint32_t *sym_ids;      /* flat symbol-ID array, length = total_syms */
+    size_t          total_syms;
+    const uint32_t *word_starts;  /* word_starts[w] = first index in sym_ids   */
+    const uint32_t *word_lens;    /* word_lens[w]   = symbol count of word w   */
+    const uint32_t *word_freqs;   /* word_freqs[w]  = corpus frequency         */
+    size_t          n_words;
+    uint32_t        vocab_size;   /* distinct symbol IDs, must be ≤ MAX_VOCAB  */
+} DM_GpuBpeInput;
+
+/**
+ * Count adjacent-pair frequencies on the GPU (or CPU fallback).
+ *   pair_counts[left * vocab_size + right] += word_freqs[w]
+ * Caller allocates and zeroes pair_counts[vocab_size * vocab_size].
+ */
+DM_API int dm_gpu_bpe_pair_count(DM_GpuCtx ctx,
+                                  const DM_GpuBpeInput *in,
+                                  uint32_t             *pair_counts);
+
+/** Sparse CSR matrix, used for the Sinkhorn kernel (§14 / VOLT). */
+typedef struct {
+    const uint32_t *row_ptr;   /* length = n_rows + 1   */
+    const uint32_t *col_idx;   /* length = nnz          */
+    const float    *vals;      /* length = nnz          */
+    uint32_t        n_rows;
+    uint32_t        n_cols;
+    uint32_t        nnz;
+} DM_GpuCSR;
+
+/**
+ * Run Sinkhorn iterations on GPU (or CPU fallback).
+ * K and Kt must be the same matrix and its transpose in CSR form.
+ * row_sums_out[n_tok] receives sum_j u[i]*K[i,j]*v[j] for each row.
+ */
+DM_API int dm_gpu_sinkhorn(DM_GpuCtx       ctx,
+                            const DM_GpuCSR *K,
+                            const DM_GpuCSR *Kt,
+                            const float     *p_tok,
+                            const float     *p_char,
+                            int              max_iter,
+                            float            tol,
+                            float           *row_sums_out);
+
+/** Unigram language model descriptor for the GPU EM step. */
+typedef struct {
+    const float   *log_probs;     /* log(prob) per piece, length = n_pieces    */
+    uint32_t       n_pieces;
+    uint32_t       max_piece_len; /* max codepoint-length of any piece         */
+} DM_GpuUnigramModel;
+
+/** Codepoint-ID corpus with pre-computed piece coverage in CSR form. */
+typedef struct {
+    const uint16_t *cp_ids;         /* flat codepoint-ID array, length = total_cps */
+    size_t          total_cps;
+    const uint32_t *word_starts;    /* start index in cp_ids for word w            */
+    const uint32_t *word_lens;      /* codepoint length of word w                  */
+    const uint32_t *word_freqs;     /* corpus frequency of word w                  */
+    size_t          n_words;
+    const uint32_t *piece_row_ptr;  /* length = total_cps + 1                      */
+    const uint32_t *piece_col;      /* piece IDs valid at each position             */
+    uint32_t        total_covered_arcs;
+} DM_GpuUnigramCorpus;
+
+/**
+ * Run one EM E-step on GPU (or CPU fallback).
+ * new_counts[n_pieces] and *expected_total are accumulated (not reset).
+ */
+DM_API int dm_gpu_unigram_em_step(DM_GpuCtx                  ctx,
+                                   const DM_GpuUnigramModel  *model,
+                                   const DM_GpuUnigramCorpus *corpus,
+                                   float                     *new_counts,
+                                   float                     *expected_total);
+
+/**
+ * Build a CSR matrix from COO (row, col, val) triples.
+ * Free *row_ptr_out, *col_idx_out, *vals_out with free().
+ */
+DM_API void dm_gpu_build_csr(const uint32_t *coo_row,
+                              const uint32_t *coo_col,
+                              const float    *coo_val,
+                              uint32_t        nnz,
+                              uint32_t        n_rows,
+                              uint32_t        n_cols,
+                              uint32_t      **row_ptr_out,
+                              uint32_t      **col_idx_out,
+                              float         **vals_out);
+
+/** Build the transpose of a CSR matrix. Free outputs with free(). */
+DM_API void dm_gpu_csr_transpose(const DM_GpuCSR *K,
+                                  uint32_t       **kt_row_ptr_out,
+                                  uint32_t       **kt_col_idx_out,
+                                  float          **kt_vals_out);
+
+/* CPU fallbacks (called automatically; also available for direct use): */
+DM_API void dm_gpu_bpe_pair_count_cpu(const DM_GpuBpeInput *in,
+                                       uint32_t             *pair_counts);
+DM_API void dm_gpu_sinkhorn_cpu      (const DM_GpuCSR *K,
+                                       const DM_GpuCSR *Kt,
+                                       const float     *p_tok,
+                                       const float     *p_char,
+                                       int              max_iter,
+                                       float            tol,
+                                       float           *row_sums_out);
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * § 15  Arena Allocator
+ *
+ * Fast bump-pointer allocator.  Use when you need many small, short-lived
+ * allocations that are freed together (algorithm work buffers, parsed
+ * datasets, etc.).  The arena owns its memory unless created via
+ * dm_arena_wrap() with an external buffer.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+typedef struct {
+    unsigned char *base;       /* Backing store start     */
+    size_t         capacity;   /* Total bytes available   */
+    size_t         offset;     /* Next free byte          */
+    int            owns_memory;/* 1 if we called malloc   */
+} DM_Arena;
+
+/**
+ * Initialise a new arena backed by a malloc'd block of `capacity` bytes.
+ * Returns 0 on success, -1 on allocation failure.
+ */
+DM_API int   dm_arena_init   (DM_Arena *arena, size_t capacity);
+
+/** Wrap an externally-owned buffer.  dm_arena_free() becomes a no-op. */
+DM_API void  dm_arena_wrap   (DM_Arena *arena, void *memory, size_t capacity);
+
+/** Reset the bump pointer to zero (does NOT free backing memory). */
+DM_API void  dm_arena_reset  (DM_Arena *arena);
+
+/** Free backing memory if owns_memory, then zero-out the struct. */
+DM_API void  dm_arena_free   (DM_Arena *arena);
+
+/**
+ * Allocate `size` bytes with `alignment` (must be power-of-two).
+ * Returns NULL if the arena is exhausted.
+ */
+DM_API void *dm_arena_alloc  (DM_Arena *arena, size_t size, size_t alignment);
+
+/** Duplicate at most `len` bytes of `src` into the arena (NUL-terminated). */
+DM_API char *dm_arena_strndup(DM_Arena *arena, const char *src, size_t len);
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * § 16  Memory-mapped I/O
+ *
+ * Thin cross-platform (mmap / MapViewOfFile) wrapper.  The mapped region
+ * is read-only and alive until dm_mmap_close().
+ * ───────────────────────────────────────────────────────────────────────── */
+
+typedef struct {
+    const unsigned char *data;   /* Pointer to mapped bytes    */
+    size_t               size;   /* File size in bytes         */
+    int                  fd;     /* File descriptor (POSIX)    */
+    int                  mapped; /* 1 if mmap is active        */
+} DM_MMap;
+
+/** Open and mmap `path`.  Returns 0 on success. */
+DM_API int  dm_mmap_open (const char *path, DM_MMap *map);
+
+/** Unmap and close.  Safe to call on a zero-initialised struct. */
+DM_API void dm_mmap_close(DM_MMap *map);
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * § 17  Flat Dataset / Connector
+ *
+ * Low-level zero-copy dataset representation shared by all mining
+ * algorithms.  The DM_FlatDataset owns no memory — it borrows from a
+ * DM_MMap + DM_Arena pair.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+typedef enum {
+    DM_CONNECTOR_SPMF  = 0,   /* Space-separated integer items per line       */
+    DM_CONNECTOR_TEXT  = 1,   /* Sliding-window tokeniser over UTF-8 text     */
+    DM_CONNECTOR_GRAPH = 2    /* Adjacency list → per-node neighbourhood txns */
+} DM_ConnectorKind;
+
+typedef struct {
+    uint32_t *items;           /* Flat array of all item IDs, row-major        */
+    size_t    item_count;      /* Total number of items across all rows        */
+    size_t   *row_offsets;     /* row_offsets[r] = start index of row r        */
+    size_t    row_count;       /* Number of rows (transactions)                */
+    uint32_t  max_item;        /* Maximum item ID present                      */
+    DM_ConnectorKind source_kind;
+    DM_Arena        *arena;          /* Arena that owns items[] and row_offsets[] */
+    const unsigned char *borrowed_base;  /* Mmap base (borrowed, not owned)   */
+    size_t               borrowed_bytes;
+} DM_FlatDataset;
+
+typedef struct {
+    DM_ConnectorKind kind;
+    size_t  text_window;       /* Token window size (TEXT connector)           */
+    size_t  text_stride;       /* Window stride     (TEXT connector)           */
+    int     text_sequence;     /* 1 = preserve order; 0 = sorted unique        */
+    int     graph_undirected;  /* 1 = add reverse edges (GRAPH connector)      */
+} DM_ConnectorOptions;
+
+typedef struct {
+    size_t   input_bytes;
+    size_t   rows;
+    size_t   items;
+    size_t   distinct_estimate;
+    uint32_t max_item;
+    double   avg_row_len;
+} DM_ConnectorStats;
+
+DM_API const char          *dm_connector_name        (DM_ConnectorKind kind);
+DM_API int                  dm_connector_parse_kind  (const char *name,
+                                                       DM_ConnectorKind *out_kind);
+DM_API DM_ConnectorOptions  dm_connector_default_opts(DM_ConnectorKind kind);
+
+/**
+ * Parse `path` into `out` using a memory-mapped zero-copy pass.
+ * `arena` must outlive `out`.  `stats` may be NULL.
+ */
+DM_API int dm_flat_load(const char          *path,
+                         const DM_ConnectorOptions *opts,
+                         DM_Arena            *arena,
+                         DM_FlatDataset      *out,
+                         DM_ConnectorStats   *stats);
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * § 18  Experiment helpers
+ *
+ * Lightweight CSV logger for multi-algorithm benchmark runs.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * One row in the experiment results CSV.
+ * All string fields are NUL-terminated; numeric fields use 0 for "not set".
+ */
+typedef struct {
+    char   dataset[256];
+    char   algorithm[64];
+    double minsup_ratio;
+    int    minsup_count;
+    double minocc;
+    int    run_id;
+    char   status[32];         /* "ok" | "timeout" | "oom" | "error" */
+    double runtime_seconds;
+    double peak_ram_mb;
+    double temp_disk_mb;
+    double output_disk_mb;
+    int    num_generated_candidates;
+    int    num_output_itemsets;
+    /* HOI-specific counters (zero for non-HOI algorithms): */
+    int    num_fhoi;
+    int    num_weak_mfhoi;
+    int    num_strong_mfhoi;
+    int    dominance_removed_count;
+    double compression_vs_fi;
+    double compression_vs_fhoi;
+    double reduction_vs_fhoi_percent;
+    double strong_extra_reduction_percent;
+} DM_ExperimentRow;
+
+/** Return the current wall-clock time in seconds (monotonic clock). */
+DM_API double dm_timer_now(void);
+
+/** Return peak resident set size in MB (reads /proc/self/status on Linux). */
+DM_API double dm_peak_ram_mb(void);
+
+/** Return the size of a single file in MB (0 if not found). */
+DM_API double dm_file_size_mb(const char *path);
+
+/** Return the total size of all files under a directory in MB. */
+DM_API double dm_dir_size_mb(const char *path);
+
+/** Recursively create directories along `path` (like mkdir -p). */
+DM_API int  dm_ensure_dir(const char *path);
+
+/** Return the last path component (no allocation; points inside `path`). */
+DM_API const char *dm_path_basename(const char *path);
+
+/** Write dataset statistics for an array of file paths to a CSV. */
+DM_API void dm_dataset_stats_write(const char  *csv_path,
+                                    const char **paths,
+                                    int          count);
+
+/** Write the CSV header row (call once before dm_experiment_append_row). */
+DM_API void dm_experiment_write_header(const char *csv_path);
+
+/** Append one DM_ExperimentRow to an existing CSV. */
+DM_API void dm_experiment_append_row(const char            *csv_path,
+                                      const DM_ExperimentRow *row);
+
+/** Scan results_root for CSV files and emit a Markdown summary report. */
+DM_API void dm_experiment_generate_report(const char *results_root);
 
 #ifdef __cplusplus
 }

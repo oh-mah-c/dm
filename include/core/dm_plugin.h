@@ -42,7 +42,7 @@ typedef struct DM_Plugin {
 
 int dm_plugin_register(DM_Plugin *plugin);
 DM_Plugin *dm_plugin_get(const char *id);
-void dm_plugin_list(void);
+void dm_plugin_print_all(void);
 const char *dm_plugin_arg(const DM_PluginInput *input, const char *key, const char *fallback);
 long dm_plugin_arg_long(const DM_PluginInput *input, const char *key, long fallback);
 double dm_plugin_arg_double(const DM_PluginInput *input, const char *key, double fallback);

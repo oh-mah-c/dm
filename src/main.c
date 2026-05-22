@@ -199,7 +199,7 @@ static void print_hiep_usage(const char *prog) {
     printf("      [--minsup ratio|count] [--alpha value] [--gamma value]\n");
     printf("      [--max-depth N] [--max-patterns N] [--max-transactions N]\n");
     printf("      [--max-tokens N] [--max-bytes N] [--max-seconds S]\n");
-    printf("      [--tokenizer %s] [--output patterns.tsv]\n", dm_tokenizer_supported_names());
+    printf("      [--tokenizer %s] [--output patterns.tsv]\n", dm_faro_tok_supported_names());
     printf("      [--no-tiub] [--no-iwru] [--uniform-weights] [--no-compactness]\n");
     printf("HIEP positional: %s hiep <input> [text|transactions] [minsup] [itemset|sequence] [theta_ratio] [window] [stride] [max_depth] [tokenizer]\n", prog);
 }

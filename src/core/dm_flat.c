@@ -195,7 +195,7 @@ static void text_emit(const uint32_t *tokens, size_t count, void *user_data) {
 }
 
 static int load_text(const DM_MMap *map, const DM_ConnectorOptions *opt, FlatBuilder *b) {
-    Tokenizer *tok = dm_tokenizer_create("rh-arena", 1u << 16);
+    Tokenizer *tok = dm_faro_tok_create("rh-arena", 1u << 16);
     if (!tok) return -1;
     tok->base_address = map->data;
     TextCtx ctx;

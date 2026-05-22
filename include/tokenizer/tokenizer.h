@@ -68,10 +68,10 @@ Tokenizer *rh_arena_tokenizer_create(uint32_t initial_capacity);  /* Default FAR
 Tokenizer *rh_borrow_tokenizer_create(uint32_t initial_capacity);
 
 /* Named factory for the unified dm.exe path. Add future tokenizers here. */
-Tokenizer *dm_tokenizer_create(const char *name, uint32_t initial_capacity);
-const char *dm_tokenizer_supported_names(void);
-const char *dm_tokenizer_token_text(Tokenizer *self, uint32_t token_id, uint32_t *len);
-uint32_t dm_tokenizer_vocab_size(Tokenizer *self);
+Tokenizer *dm_faro_tok_create(const char *name, uint32_t initial_capacity);
+const char *dm_faro_tok_supported_names(void);
+const char *dm_faro_tok_token_text(Tokenizer *self, uint32_t token_id, uint32_t *len);
+uint32_t    dm_faro_tok_vocab_size(Tokenizer *self);
 
 /* Common utilities */
 uint64_t faro_hash(const char *bytes, uint32_t len);

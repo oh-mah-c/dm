@@ -1033,7 +1033,7 @@ Tokenizer *rh_borrow_tokenizer_create(uint32_t initial_capacity) {
     return self;
 }
 
-Tokenizer *dm_tokenizer_create(const char *name, uint32_t initial_capacity) {
+Tokenizer *dm_faro_tok_create(const char *name, uint32_t initial_capacity) {
     if (!name || strcmp(name, "faro") == 0 || strcmp(name, "rh-arena") == 0) {
         return rh_arena_tokenizer_create(initial_capacity);
     }
@@ -1044,16 +1044,16 @@ Tokenizer *dm_tokenizer_create(const char *name, uint32_t initial_capacity) {
     return NULL;
 }
 
-const char *dm_tokenizer_supported_names(void) {
+const char *dm_faro_tok_supported_names(void) {
     return "faro|rh-arena|lp-raw|lp-fp|rh-fp|rh-borrow";
 }
 
-const char *dm_tokenizer_token_text(Tokenizer *self, uint32_t token_id, uint32_t *len) {
+const char *dm_faro_tok_token_text(Tokenizer *self, uint32_t token_id, uint32_t *len) {
     if (!self || !self->token_text) return NULL;
     return self->token_text(self, token_id, len);
 }
 
-uint32_t dm_tokenizer_vocab_size(Tokenizer *self) {
+uint32_t dm_faro_tok_vocab_size(Tokenizer *self) {
     if (!self || !self->vocab_size) return 0;
     return self->vocab_size(self);
 }

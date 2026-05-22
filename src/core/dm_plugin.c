@@ -27,7 +27,7 @@ DM_Plugin *dm_plugin_get(const char *id) {
     return NULL;
 }
 
-void dm_plugin_list(void) {
+void dm_plugin_print_all(void) {
     printf("Available dm plugins/adapters:\n");
     for (size_t i = 0; i < plugin_count; i++) {
         printf("  %s - %s\n", plugins[i]->id, plugins[i]->description ? plugins[i]->description : plugins[i]->name);

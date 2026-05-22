@@ -95,7 +95,7 @@ int main(int argc, char **argv) {
 
     if (has_flag(argc, argv, "--list")) {
         printf("Plugins/adapters:\n");
-        dm_plugin_list();
+        dm_plugin_print_all();
         printf("\nLegacy algorithms reachable through DM_FlatDataset adapters:\n");
         dm_list_algorithms();
         return 0;
@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
     if (!plugin && !legacy) {
         fprintf(stderr, "Unknown algorithm: %s\n", algorithm);
         printf("Plugins/adapters:\n");
-        dm_plugin_list();
+        dm_plugin_print_all();
         printf("\nLegacy algorithms reachable through DM_FlatDataset adapters:\n");
         dm_list_algorithms();
         return 1;
