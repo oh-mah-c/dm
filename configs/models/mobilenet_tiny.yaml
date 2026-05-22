@@ -1,0 +1,18 @@
+model: mobilenet_tiny_mnv4_style
+paper_lineage: MobileNetV4 arXiv:2404.10518v2
+scope: C99 MobileNetV4-style operator baseline for dm computer-vision pipeline
+input:
+  format: PPM P6 RGB
+  size: 64
+blocks:
+  - FusedIB stem
+  - Universal Inverted Bottleneck ExtraDW
+  - Universal Inverted Bottleneck IB
+  - Universal Inverted Bottleneck ConvNext-like
+  - Mobile MQA with shared K/V and stride-2 depthwise spatial reduction
+  - pointwise projection
+  - global average pool
+  - linear classifier
+notes:
+  - Deterministic random weights are for smoke-test inference only.
+  - Training and pretrained ImageNet weights are intentionally not bundled.

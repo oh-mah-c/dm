@@ -138,6 +138,11 @@
 #include "tokenizer/sentencepiece_lite.h"
 #include "tokenizer/tokenizer_lab.h"
 #include "tokenizer/unigram_subword.h"
+#include "tokenizer/volt.h"
+#include "models/tinystories.h"
+#include "models/language/tiny_transformer.h"
+#include "models/vision/mobilenet_tiny.h"
+#include "generator/textbook_generator.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -503,6 +508,21 @@ int main(int argc, char **argv) {
     }
     if (argc >= 2 && (strcmp(argv[1], "fast_wordpiece") == 0 || strcmp(argv[1], "linmaxmatch") == 0 || strcmp(argv[1], "dm_fast_wordpiece") == 0)) {
         return dm_fast_wordpiece_cli(argc, argv);
+    }
+    if (argc >= 2 && (strcmp(argv[1], "volt") == 0 || strcmp(argv[1], "dm_volt") == 0)) {
+        return dm_volt_cli(argc, argv);
+    }
+    if (argc >= 2 && (strcmp(argv[1], "tinystories") == 0 || strcmp(argv[1], "dm_tinystories") == 0)) {
+        return dm_tinystories_cli(argc, argv);
+    }
+    if (argc >= 2 && (strcmp(argv[1], "tiny_lm") == 0 || strcmp(argv[1], "tiny_transformer") == 0 || strcmp(argv[1], "dm_tiny_transformer") == 0)) {
+        return dm_tiny_transformer_cli(argc, argv);
+    }
+    if (argc >= 2 && (strcmp(argv[1], "textbook") == 0 || strcmp(argv[1], "dm_textbook_generator") == 0)) {
+        return dm_textbook_generator_cli(argc, argv);
+    }
+    if (argc >= 2 && (strcmp(argv[1], "mobilenet_tiny") == 0 || strcmp(argv[1], "mobilenetv4_tiny") == 0 || strcmp(argv[1], "dm_mobilenet_tiny") == 0)) {
+        return dm_mobilenet_tiny_cli(argc, argv);
     }
     dm_register_algorithm(&bio_huif_ga_algo);
     dm_register_algorithm(&bio_huif_pso_algo);

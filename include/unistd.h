@@ -13,6 +13,12 @@ typedef SSIZE_T ssize_t;
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
 static inline int usleep(unsigned int us) { Sleep((us + 999) / 1000); return 0; }
+#else
+#if defined(__GNUC__) || defined(__clang__)
+#include_next <unistd.h>
+#else
+#include </usr/include/unistd.h>
+#endif
 #endif /* _WIN32 */
 
 #endif /* DM_UNISTD_STUB_H */

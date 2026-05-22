@@ -114,8 +114,8 @@ static char *resolve_shader_dir(const char *hint) {
 
     /* Paths relative to CWD */
     candidates[nc++] = "shaders";
+    candidates[nc++] = "shaders/vulkan/tokenizer";
     candidates[nc++] = "bin/shaders";
-    candidates[nc++] = "src/gpu/shaders";
 
 #ifdef _WIN32
     /* Try exe directory */

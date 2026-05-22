@@ -1,0 +1,22 @@
+pipeline: phi_textbook_generator
+paper: arXiv:2309.05463v1
+principle: data_quality_over_raw_size
+synthetic_textbook_data:
+  topics: topics.txt
+  prompt_styles:
+    - concise textbook lesson
+    - worked example with step-by-step reasoning
+    - Socratic teacher/student dialogue
+    - lesson with exercises and answers
+    - common mistakes and corrections
+  web_samples_for_diversity: optional_snippets.txt
+quality_filter:
+  min_score: 0.55
+mixing:
+  phi_1_5_training:
+    synthetic: 0.80
+    phi_1_data: 0.20
+  phi_1_5_web_variant:
+    synthetic: 0.40
+    filtered_web: 0.40
+    code: 0.20

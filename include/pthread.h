@@ -37,7 +37,11 @@ static inline int pthread_create(pthread_t *t, const pthread_attr_t *a, void *(*
 static inline int pthread_join(pthread_t t, void **ret) { (void)ret; WaitForSingleObject(t, INFINITE); CloseHandle(t); return 0; }
 
 #else
-#error "This stub is for Windows only"
+#if defined(__GNUC__) || defined(__clang__)
+#include_next <pthread.h>
+#else
+#include </usr/include/pthread.h>
+#endif
 #endif /* _WIN32 */
 
 #endif /* DM_PTHREAD_STUB_H */

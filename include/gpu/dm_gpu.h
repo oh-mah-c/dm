@@ -43,7 +43,8 @@ typedef struct DmGpuCtx DmGpuCtx;
  * Create a Vulkan compute context.
  *   device_index  0 = first discrete GPU, -1 = let the driver pick.
  *   shader_dir    path to the directory containing compiled .spv files,
- *                 or NULL to search: shaders/ → bin/shaders/ → exe-dir/shaders/
+ *                 or NULL to search: shaders/ → shaders/vulkan/tokenizer/
+ *                 → bin/shaders/ → exe-dir/shaders/
  * Returns NULL on failure; caller owns and must call dm_gpu_destroy().
  */
 DmGpuCtx *dm_gpu_create(int device_index, const char *shader_dir);

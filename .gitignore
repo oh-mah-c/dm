@@ -56,8 +56,11 @@ dkms.conf
 
 # Custom project ignores
 bin/
+obj/
+build/
+.venv/
 __pycache__/
-results
+results/
 
 # Tokenizer training outputs & test corpora
 merges.txt

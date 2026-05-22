@@ -1,0 +1,12 @@
+model: tiny_transformer_lm
+paper_lineage: TinyStories arXiv:2305.07759
+scope: small C99 byte-level language-model baseline for dm pipeline validation
+vocab_size: 256
+context: 64
+embedding_dim: 64
+learning_rate: 0.05
+epochs: 3
+seed: 1
+notes:
+  - This config is intentionally tiny; it validates data generator -> model -> generated text.
+  - Full GPT-Neo-style TinyStories reproduction needs external dataset/model tooling.
