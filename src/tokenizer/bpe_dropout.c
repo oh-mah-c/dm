@@ -451,6 +451,10 @@ int dm_bpe_dropout_cli(int argc, char **argv) {
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             usage(argv[0]);
             return 0;
+        } else if (strcmp(argv[i], "--gpu") == 0) {
+            /* accepted but ignored: BPE dropout is an encoding operation that doesn't benefit from GPU */
+        } else if (strcmp(argv[i], "--gpu-device") == 0 && i + 1 < argc) {
+            i++; /* skip device arg */
         } else {
             command_idx = i;
             break;

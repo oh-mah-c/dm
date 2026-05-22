@@ -6,6 +6,40 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef DM_GPU
+#include "gpu/dm_gpu.h"
+
+/* Simple intern table mapping symbol strings to uint32 IDs for the GPU path. */
+typedef struct { char **names; uint32_t count, cap; } GpeIntern;
+
+static void gpe_intern_free(GpeIntern *t) {
+    for (uint32_t i = 0; i < t->count; i++) free(t->names[i]);
+    free(t->names); t->names = NULL; t->count = t->cap = 0;
+}
+
+/* Returns ID (existing or new). Returns UINT32_MAX on allocation failure. */
+static uint32_t gpe_intern_add(GpeIntern *t, const char *sym) {
+    for (uint32_t i = 0; i < t->count; i++)
+        if (strcmp(t->names[i], sym) == 0) return i;
+    if (t->count == t->cap) {
+        uint32_t nc = t->cap ? t->cap * 2 : 64;
+        char **tmp = (char **)realloc(t->names, nc * sizeof(char *));
+        if (!tmp) return UINT32_MAX;
+        t->names = tmp; t->cap = nc;
+    }
+    t->names[t->count] = strdup(sym);
+    if (!t->names[t->count]) return UINT32_MAX;
+    return t->count++;
+}
+
+static uint32_t gpe_intern_lookup(const GpeIntern *t, const char *sym) {
+    for (uint32_t i = 0; i < t->count; i++)
+        if (strcmp(t->names[i], sym) == 0) return i;
+    return UINT32_MAX;
+}
+
+#endif /* DM_GPU */
+
 #define GPE_EOW "</w>"
 
 typedef struct { char **items; size_t count, cap; } StrVec;
@@ -83,7 +117,145 @@ static int symword_merge(SymWord*w,const char*l,const char*r){ char **next=(char
 static int symvocab_merge(SymVocab*v,const char*l,const char*r){ for(size_t i=0;i<v->count;i++) if(symword_merge(&v->items[i],l,r)!=0)return -1; return 0; }
 
 static int read_training_tokens(char **paths,size_t n,const char *pretok,TextVocab *tv){ char line[32768]; for(size_t p=0;p<(n?n:1);p++){ FILE *fp=n?fopen(paths[p],"rb"):stdin; if(!fp){perror(paths[p]);return -1;} while(fgets(line,sizeof(line),fp)){ size_t ln=strlen(line); while(ln&&(line[ln-1]=='\n'||line[ln-1]=='\r'))line[--ln]='\0'; StrVec toks={0}; if(pretokenize(line,pretok,&toks)!=0){strvec_free(&toks); if(n)fclose(fp); return -1;} for(size_t i=0;i<toks.count;i++) if(text_vocab_add(tv,toks.items[i],1)!=0){strvec_free(&toks); if(n)fclose(fp); return -1;} strvec_free(&toks);} if(n)fclose(fp);} return 0; }
-static int learn_gpe(char **paths,size_t n,const char*unit,const char*pretok,size_t vocab_size,size_t minf,GPEModel *model){ TextVocab tv={0}; if(read_training_tokens(paths,n,pretok,&tv)!=0)return -1; SymVocab sv={0}; if(symvocab_from_text(&tv,unit,&sv)!=0){text_vocab_free(&tv);return -1;} TextVocab init={0}; for(size_t w=0;w<sv.count;w++) for(size_t i=0;i<sv.items[w].len;i++) if(text_vocab_add(&init,sv.items[w].syms[i],1)!=0){symvocab_free(&sv);text_vocab_free(&tv);text_vocab_free(&init);return -1;} size_t target=vocab_size>init.count?vocab_size-init.count:0; text_vocab_free(&init); model->unit=xstrdup(unit); model->pretokenizer=xstrdup(pretok); if(!model->unit||!model->pretokenizer){symvocab_free(&sv);text_vocab_free(&tv);return -1;} for(size_t i=0;i<target;i++){ PairStats ps={0}; if(collect_pairs(&sv,&ps)!=0){pairstats_free(&ps);symvocab_free(&sv);text_vocab_free(&tv);return -1;} const PairStat*b=best_pair(&ps,minf); if(!b){pairstats_free(&ps);break;} char *l=xstrdup(b->left),*r=xstrdup(b->right); if(!l||!r||merges_push(&model->merges,l,r)!=0||symvocab_merge(&sv,l,r)!=0){free(l);free(r);pairstats_free(&ps);symvocab_free(&sv);text_vocab_free(&tv);return -1;} free(l);free(r);pairstats_free(&ps);} symvocab_free(&sv); text_vocab_free(&tv); return 0; }
+#ifdef DM_GPU
+static int gpe_build_gpu_input(const SymVocab *sv, const GpeIntern *intern,
+                                DmGpuBpeInput *out,
+                                uint32_t **sid, uint32_t **wst,
+                                uint32_t **wln, uint32_t **wfr) {
+    size_t total = 0;
+    for (size_t w = 0; w < sv->count; w++) total += sv->items[w].len;
+    *sid = (uint32_t *)malloc(total * sizeof(uint32_t));
+    *wst = (uint32_t *)malloc(sv->count * sizeof(uint32_t));
+    *wln = (uint32_t *)malloc(sv->count * sizeof(uint32_t));
+    *wfr = (uint32_t *)malloc(sv->count * sizeof(uint32_t));
+    if (!*sid || !*wst || !*wln || !*wfr) { free(*sid); free(*wst); free(*wln); free(*wfr); return -1; }
+    uint32_t off = 0;
+    for (size_t w = 0; w < sv->count; w++) {
+        (*wst)[w] = off; (*wln)[w] = (uint32_t)sv->items[w].len; (*wfr)[w] = (uint32_t)sv->items[w].freq;
+        for (size_t s = 0; s < sv->items[w].len; s++) {
+            uint32_t id = gpe_intern_lookup(intern, sv->items[w].syms[s]);
+            if (id == UINT32_MAX) { free(*sid); free(*wst); free(*wln); free(*wfr); return -1; }
+            (*sid)[off++] = id;
+        }
+    }
+    out->sym_ids = *sid; out->total_syms = total;
+    out->word_starts = *wst; out->word_lens = *wln;
+    out->word_freqs = *wfr; out->n_words = sv->count;
+    out->vocab_size = intern->count;
+    return 0;
+}
+static int gpe_best_pair_gpu(const uint32_t *pair_counts, uint32_t vsz,
+                              const GpeIntern *intern, size_t min_freq,
+                              const char **lout, const char **rout) {
+    uint32_t best = (uint32_t)min_freq, ba = UINT32_MAX, bb = UINT32_MAX;
+    for (uint32_t a = 0; a < vsz; a++)
+        for (uint32_t b = 0; b < vsz; b++) {
+            uint32_t f = pair_counts[(size_t)a * vsz + b];
+            if (f > best || (f == best && ba == UINT32_MAX)) { best = f; ba = a; bb = b; }
+        }
+    if (ba == UINT32_MAX) return 0;
+    *lout = intern->names[ba]; *rout = intern->names[bb]; return 1;
+}
+#endif /* DM_GPU */
+
+static int learn_gpe(char **paths, size_t n, const char *unit, const char *pretok,
+                     size_t vocab_size, size_t minf, GPEModel *model, void *gpu_ctx) {
+    TextVocab tv = {0};
+    if (read_training_tokens(paths, n, pretok, &tv) != 0) return -1;
+    SymVocab sv = {0};
+    if (symvocab_from_text(&tv, unit, &sv) != 0) { text_vocab_free(&tv); return -1; }
+
+    /* Count initial atomic symbols to determine how many merges to learn. */
+    TextVocab init = {0};
+    for (size_t w = 0; w < sv.count; w++)
+        for (size_t s = 0; s < sv.items[w].len; s++)
+            if (text_vocab_add(&init, sv.items[w].syms[s], 1) != 0) {
+                symvocab_free(&sv); text_vocab_free(&tv); text_vocab_free(&init); return -1;
+            }
+    size_t target = vocab_size > init.count ? vocab_size - init.count : 0;
+
+#ifdef DM_GPU
+    DmGpuCtx *gpu = (DmGpuCtx *)gpu_ctx;
+    GpeIntern intern = {0};
+    if (gpu && dm_gpu_ready(gpu)) {
+        /* Populate intern table from initial symbols. */
+        for (size_t i = 0; i < init.count; i++)
+            if (gpe_intern_add(&intern, init.items[i].text) == UINT32_MAX) {
+                gpe_intern_free(&intern); gpu = NULL; /* fall back to CPU */
+            }
+    }
+#else
+    (void)gpu_ctx;
+#endif
+    text_vocab_free(&init);
+
+    model->unit = xstrdup(unit); model->pretokenizer = xstrdup(pretok);
+    if (!model->unit || !model->pretokenizer) {
+#ifdef DM_GPU
+        gpe_intern_free(&intern);
+#endif
+        symvocab_free(&sv); text_vocab_free(&tv); return -1;
+    }
+
+    for (size_t i = 0; i < target; i++) {
+        char *l = NULL, *r = NULL; int found = 0;
+
+#ifdef DM_GPU
+        if (gpu && dm_gpu_ready(gpu) && intern.count <= DM_GPU_BPE_MAX_VOCAB) {
+            uint32_t *sid = NULL, *wst = NULL, *wln = NULL, *wfr = NULL;
+            DmGpuBpeInput inp = {0};
+            if (gpe_build_gpu_input(&sv, &intern, &inp, &sid, &wst, &wln, &wfr) == 0) {
+                size_t vsz = intern.count;
+                uint32_t *pc = (uint32_t *)calloc(vsz * vsz, sizeof(uint32_t));
+                if (pc && dm_gpu_bpe_pair_count(gpu, &inp, pc) == 0) {
+                    const char *lp = NULL, *rp = NULL;
+                    if (gpe_best_pair_gpu(pc, (uint32_t)vsz, &intern, minf, &lp, &rp)) {
+                        l = xstrdup(lp); r = xstrdup(rp);
+                        found = (l && r) ? 1 : 0;
+                    } else { found = -1; }
+                }
+                free(pc); free(sid); free(wst); free(wln); free(wfr);
+            }
+        }
+#endif
+
+        if (!found) {
+            PairStats ps = {0};
+            if (collect_pairs(&sv, &ps) != 0) {
+                pairstats_free(&ps); symvocab_free(&sv); text_vocab_free(&tv);
+#ifdef DM_GPU
+                gpe_intern_free(&intern);
+#endif
+                return -1;
+            }
+            const PairStat *b = best_pair(&ps, minf);
+            if (!b) { pairstats_free(&ps); break; }
+            l = xstrdup(b->left); r = xstrdup(b->right);
+            pairstats_free(&ps);
+            found = (l && r) ? 1 : 0;
+        } else if (found < 0) { break; }
+
+        if (!found || !l || !r ||
+            merges_push(&model->merges, l, r) != 0 ||
+            symvocab_merge(&sv, l, r) != 0) {
+            free(l); free(r); symvocab_free(&sv); text_vocab_free(&tv);
+#ifdef DM_GPU
+            gpe_intern_free(&intern);
+#endif
+            return -1;
+        }
+#ifdef DM_GPU
+        char *joined = concat2(l, r);
+        if (joined) { gpe_intern_add(&intern, joined); free(joined); }
+#endif
+        free(l); free(r);
+    }
+
+#ifdef DM_GPU
+    gpe_intern_free(&intern);
+#endif
+    symvocab_free(&sv); text_vocab_free(&tv); return 0;
+}
 
 static void strip_eow(StrVec *v){ if(!v->count)return; char *last=v->items[v->count-1]; size_t n=strlen(last),e=strlen(GPE_EOW); if(strcmp(last,GPE_EOW)==0){free(last);v->count--;} else if(n>=e&&strcmp(last+n-e,GPE_EOW)==0){last[n-e]='\0'; if(!*last){free(last);v->count--;}} }
 static int encode_token(const GPEModel*m,const char*tok,StrVec*out){ if(atomic_units(tok,m->unit,out)!=0)return -1; if(strvec_push_copy(out,GPE_EOW)!=0)return -1; for(size_t mi=0;mi<m->merges.count;mi++){ StrVec next={0}; for(size_t i=0;i<out->count;){ Merge *mg=&m->merges.items[mi]; if(i+1<out->count&&strcmp(out->items[i],mg->left)==0&&strcmp(out->items[i+1],mg->right)==0){ char*j=concat2(out->items[i],out->items[i+1]); if(!j||strvec_push_owned(&next,j)!=0){free(j);strvec_free(&next);return -1;} i+=2; } else { if(strvec_push_copy(&next,out->items[i])!=0){strvec_free(&next);return -1;} i++; }} strvec_free(out); *out=next; if(out->count==1)break;} strip_eow(out); return 0; }
@@ -101,7 +273,17 @@ static int pretoken_eval_paths(char**paths,size_t n,const char*pretok,const char
 static void usage(const char*prog){ fprintf(stderr,"Usage: %s gpe train -i <corpus...> -o model --unit grapheme|codepoint|byte --pretokenizer whitespace|gpt2|gpt4|none --vocab-size N\n",prog); fprintf(stderr,"       %s gpe encode -m model [-i input] [-o output] [--json-tokens]\n",prog); fprintf(stderr,"       %s gpe evaluate -m model -i <corpus...> [--length-unit unit]\n",prog); fprintf(stderr,"       %s gpe pretoken-eval -i <corpus...> [--reference <corpus...>] [--pretokenizer mode] [--length-unit unit]\n",prog); fprintf(stderr,"       %s gpe units text...\n",prog); }
 
 int dm_gpe_cli(int argc,char**argv){ int start=1; if(argc>=2&&(strcmp(argv[1],"gpe")==0||strcmp(argv[1],"dm_gpe")==0))start=2; if(argc<=start){usage(argv[0]);return 2;} const char*cmd=argv[start];
-    if(strcmp(cmd,"train")==0){ StrVec inputs={0}; const char*out=NULL,*unit="grapheme,*bad",*pretok="whitespace"; unit="grapheme"; size_t vs=0,minf=2; int stats=0; for(int i=start+1;i<argc;i++){ if((strcmp(argv[i],"-i")==0||strcmp(argv[i],"--input")==0)&&i+1<argc){ while(i+1<argc&&argv[i+1][0]!='-') if(strvec_push_copy(&inputs,argv[++i])!=0)return 1; } else if((strcmp(argv[i],"-o")==0||strcmp(argv[i],"--output")==0)&&i+1<argc)out=argv[++i]; else if(strcmp(argv[i],"--unit")==0&&i+1<argc)unit=argv[++i]; else if(strcmp(argv[i],"--pretokenizer")==0&&i+1<argc)pretok=argv[++i]; else if(strcmp(argv[i],"--vocab-size")==0&&i+1<argc)vs=(size_t)strtoull(argv[++i],NULL,10); else if(strcmp(argv[i],"--min-frequency")==0&&i+1<argc)minf=(size_t)strtoull(argv[++i],NULL,10); else if(strcmp(argv[i],"--stats")==0)stats=1; else {usage(argv[0]);strvec_free(&inputs);return 2;} } if(!out||!vs){usage(argv[0]);strvec_free(&inputs);return 2;} GPEModel m={0}; int rc=learn_gpe(inputs.items,inputs.count,unit,pretok,vs,minf,&m); if(rc==0)rc=write_model(&m,out); if(rc==0&&stats)fprintf(stderr,"{\"merges\": %zu, \"pretokenizer\": \"%s\", \"requested_vocab_size\": %zu, \"unit\": \"%s\"}\n",m.merges.count,m.pretokenizer,vs,m.unit); model_free(&m); strvec_free(&inputs); return rc==0?0:1; }
+    if(strcmp(cmd,"train")==0){ StrVec inputs={0}; const char*out=NULL,*unit="grapheme,*bad",*pretok="whitespace"; unit="grapheme"; size_t vs=0,minf=2; int stats=0,use_gpu=0,gpu_device=0; for(int i=start+1;i<argc;i++){ if((strcmp(argv[i],"-i")==0||strcmp(argv[i],"--input")==0)&&i+1<argc){ while(i+1<argc&&argv[i+1][0]!='-') if(strvec_push_copy(&inputs,argv[++i])!=0)return 1; } else if((strcmp(argv[i],"-o")==0||strcmp(argv[i],"--output")==0)&&i+1<argc)out=argv[++i]; else if(strcmp(argv[i],"--unit")==0&&i+1<argc)unit=argv[++i]; else if(strcmp(argv[i],"--pretokenizer")==0&&i+1<argc)pretok=argv[++i]; else if(strcmp(argv[i],"--vocab-size")==0&&i+1<argc)vs=(size_t)strtoull(argv[++i],NULL,10); else if(strcmp(argv[i],"--min-frequency")==0&&i+1<argc)minf=(size_t)strtoull(argv[++i],NULL,10); else if(strcmp(argv[i],"--stats")==0)stats=1; else if(strcmp(argv[i],"--gpu")==0)use_gpu=1; else if(strcmp(argv[i],"--gpu-device")==0&&i+1<argc){gpu_device=(int)strtol(argv[++i],NULL,10);use_gpu=1;} else {usage(argv[0]);strvec_free(&inputs);return 2;} } if(!out||!vs){usage(argv[0]);strvec_free(&inputs);return 2;} void*gpu_ctx=NULL;
+#ifdef DM_GPU
+        if(use_gpu){gpu_ctx=dm_gpu_create(gpu_device,NULL); if(!gpu_ctx||!dm_gpu_ready((DmGpuCtx*)gpu_ctx)){fprintf(stderr,"[gpe] GPU init failed, falling back to CPU\n");dm_gpu_destroy((DmGpuCtx*)gpu_ctx);gpu_ctx=NULL;} else { char _dname[256]={0}; dm_gpu_device_name((DmGpuCtx*)gpu_ctx,_dname,sizeof(_dname)); fprintf(stderr,"[gpe] GPU: %s\n",_dname); }}
+#else
+        if(use_gpu)fprintf(stderr,"[gpe] built without GPU support, using CPU\n");
+#endif
+        GPEModel m={0}; int rc=learn_gpe(inputs.items,inputs.count,unit,pretok,vs,minf,&m,gpu_ctx); if(rc==0)rc=write_model(&m,out); if(rc==0&&stats)fprintf(stderr,"{\"merges\": %zu, \"pretokenizer\": \"%s\", \"requested_vocab_size\": %zu, \"unit\": \"%s\"}\n",m.merges.count,m.pretokenizer,vs,m.unit); model_free(&m); strvec_free(&inputs);
+#ifdef DM_GPU
+        dm_gpu_destroy((DmGpuCtx*)gpu_ctx);
+#endif
+        return rc==0?0:1; }
     if(strcmp(cmd,"encode")==0){ const char*modelp=NULL,*input=NULL,*output=NULL; int json=0; for(int i=start+1;i<argc;i++){ if((strcmp(argv[i],"-m")==0||strcmp(argv[i],"--model")==0)&&i+1<argc)modelp=argv[++i]; else if((strcmp(argv[i],"-i")==0||strcmp(argv[i],"--input")==0)&&i+1<argc)input=argv[++i]; else if((strcmp(argv[i],"-o")==0||strcmp(argv[i],"--output")==0)&&i+1<argc)output=argv[++i]; else if(strcmp(argv[i],"--json-tokens")==0)json=1; else {usage(argv[0]);return 2;} } if(!modelp){usage(argv[0]);return 2;} GPEModel m={0}; if(read_model(modelp,&m)!=0)return 1; FILE*in=input?fopen(input,"rb"):stdin; FILE*out=output?fopen(output,"wb"):stdout; if(!in||!out){model_free(&m);return 1;} char line[32768]; while(fgets(line,sizeof(line),in)){ size_t ln=strlen(line); while(ln&&(line[ln-1]=='\n'||line[ln-1]=='\r'))line[--ln]='\0'; StrVec pcs={0}; if(encode_line_model(&m,line,&pcs)!=0){strvec_free(&pcs);model_free(&m);return 1;} if(json){ fputc('[',out); for(size_t i=0;i<pcs.count;i++){ if(i)fputs(", ",out); json_string(out,pcs.items[i]); } fputs("]\n",out);} else { for(size_t i=0;i<pcs.count;i++){ if(i)fputc(' ',out); fputs(pcs.items[i],out);} fputc('\n',out);} strvec_free(&pcs);} if(input)fclose(in); if(output)fclose(out); model_free(&m); return 0; }
     if(strcmp(cmd,"evaluate")==0){ const char*modelp=NULL,*lu="grapheme"; StrVec inputs={0}; for(int i=start+1;i<argc;i++){ if((strcmp(argv[i],"-m")==0||strcmp(argv[i],"--model")==0)&&i+1<argc)modelp=argv[++i]; else if((strcmp(argv[i],"-i")==0||strcmp(argv[i],"--input")==0)&&i+1<argc){ while(i+1<argc&&argv[i+1][0]!='-') if(strvec_push_copy(&inputs,argv[++i])!=0)return 1; } else if(strcmp(argv[i],"--length-unit")==0&&i+1<argc)lu=argv[++i]; else {usage(argv[0]);strvec_free(&inputs);return 2;} } GPEModel m={0}; if(!modelp||read_model(modelp,&m)!=0){strvec_free(&inputs);return 1;} double o,t; int rc=eval_model(&m,inputs.items,inputs.count,lu,&o,&t); if(rc==0)printf("{\n  \"compression_ratio\": %.12g,\n  \"original_length\": %.12g,\n  \"tokenized_length\": %.12g\n}\n",t?o/t:0.0,o,t); model_free(&m); strvec_free(&inputs); return rc==0?0:1; }
     if(strcmp(cmd,"pretoken-eval")==0){ StrVec in={0},ref={0}; const char*pretok="gpt2",*lu="grapheme"; int mode=0; for(int i=start+1;i<argc;i++){ if((strcmp(argv[i],"-i")==0||strcmp(argv[i],"--input")==0)&&i+1<argc){mode=1; while(i+1<argc&&argv[i+1][0]!='-') if(strvec_push_copy(&in,argv[++i])!=0)return 1;} else if(strcmp(argv[i],"--reference")==0&&i+1<argc){mode=2; while(i+1<argc&&argv[i+1][0]!='-') if(strvec_push_copy(&ref,argv[++i])!=0)return 1;} else if(strcmp(argv[i],"--pretokenizer")==0&&i+1<argc)pretok=argv[++i]; else if(strcmp(argv[i],"--length-unit")==0&&i+1<argc)lu=argv[++i]; else { (void)mode; usage(argv[0]);strvec_free(&in);strvec_free(&ref);return 2;} } double o,t,ro,rt; int rc=pretoken_eval_paths(in.items,in.count,pretok,lu,&o,&t); if(rc==0){ printf("{\n  \"cr_max\": %.12g,\n  \"original_length\": %.12g,\n  \"pretoken_count\": %.12g",t?o/t:0.0,o,t); if(ref.count&&pretoken_eval_paths(ref.items,ref.count,pretok,lu,&ro,&rt)==0) printf(",\n  \"tokenization_parity_to_reference\": %.12g",rt?t/rt:0.0); printf("\n}\n"); } strvec_free(&in);strvec_free(&ref); return rc==0?0:1; }

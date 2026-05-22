@@ -7,6 +7,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef DM_GPU
+#include "gpu/dm_gpu.h"
+#endif
+
 #define UNI_SEP "@@"
 #define LOG_ZERO (-1.0e100)
 
@@ -183,13 +187,155 @@ static int em_step(const UniModel *m, const WordVocab *wv, UniModel *newm, doubl
     return 0;
 }
 
+#ifdef DM_GPU
+/* Sorted piece table for O(log V) piece-string → ID lookup. */
+typedef struct { const char *piece; uint32_t id; } PieceEntry;
+static int piece_entry_cmp(const void *a, const void *b) { return strcmp(((const PieceEntry *)a)->piece, ((const PieceEntry *)b)->piece); }
+
+/* Run one GPU EM E-step. Returns 0 on success, -1 to fall back to CPU. */
+static int em_step_gpu(DmGpuCtx *gpu, const UniModel *m, const WordVocab *wv,
+                        UniModel *newm, double *expected_total) {
+    uint32_t n_pieces = (uint32_t)m->count;
+    size_t maxl = max_piece_len_cp(m);
+
+    /* Sorted lookup table for piece string → piece_id. */
+    PieceEntry *ptab = (PieceEntry *)malloc(n_pieces * sizeof(PieceEntry));
+    if (!ptab) return -1;
+    for (uint32_t i = 0; i < n_pieces; i++) { ptab[i].piece = m->items[i].piece; ptab[i].id = i; }
+    qsort(ptab, n_pieces, sizeof(PieceEntry), piece_entry_cmp);
+
+    float *log_probs = (float *)malloc(n_pieces * sizeof(float));
+    if (!log_probs) { free(ptab); return -1; }
+    for (uint32_t i = 0; i < n_pieces; i++)
+        log_probs[i] = (float)log(m->items[i].prob > 1e-300 ? m->items[i].prob : 1e-300);
+
+    /* Split all words into codepoints; count total codepoints. */
+    size_t n_words = wv->count;
+    StrVec *word_cps = (StrVec *)calloc(n_words, sizeof(StrVec));
+    if (!word_cps) { free(log_probs); free(ptab); return -1; }
+    uint32_t total_cps = 0;
+    for (size_t w = 0; w < n_words; w++) {
+        split_codepoints(wv->items[w].text, &word_cps[w]);
+        total_cps += (uint32_t)word_cps[w].count;
+    }
+
+    uint32_t *word_starts = (uint32_t *)malloc(n_words * sizeof(uint32_t));
+    uint32_t *word_lens   = (uint32_t *)malloc(n_words * sizeof(uint32_t));
+    uint32_t *word_freqs  = (uint32_t *)malloc(n_words * sizeof(uint32_t));
+    uint32_t *rptr        = (uint32_t *)calloc(total_cps + 1, sizeof(uint32_t));
+    uint16_t *cp_ids_dummy = (uint16_t *)calloc(total_cps + 1, sizeof(uint16_t));
+    if (!word_starts || !word_lens || !word_freqs || !rptr || !cp_ids_dummy) goto fail_early;
+
+    { uint32_t off = 0;
+      for (size_t w = 0; w < n_words; w++) {
+          word_starts[w] = off; word_lens[w] = (uint32_t)word_cps[w].count;
+          word_freqs[w]  = (uint32_t)wv->items[w].freq; off += word_lens[w];
+      }
+    }
+
+    /* Pass 1: count arcs per global position to size piece_col. */
+    { uint32_t gpos = 0;
+      for (size_t w = 0; w < n_words; w++) {
+          size_t n = word_cps[w].count;
+          for (size_t p = 0; p < n; p++, gpos++) {
+              for (size_t e = p + 1; e <= n && e <= p + maxl; e++) {
+                  char *sub = join_range(&word_cps[w], p, e);
+                  if (!sub) continue;
+                  PieceEntry key = { sub, 0 };
+                  if (bsearch(&key, ptab, n_pieces, sizeof(PieceEntry), piece_entry_cmp))
+                      rptr[gpos]++;
+                  free(sub);
+              }
+          }
+      }
+    }
+
+    /* Build prefix sum → piece_row_ptr (each arc = 2 uint32 entries). */
+    { uint32_t acc = 0;
+      for (uint32_t i = 0; i <= total_cps; i++) { uint32_t c = rptr[i]; rptr[i] = acc; acc += c * 2u; }
+    }
+    uint32_t piece_col_len = rptr[total_cps];
+    uint32_t *piece_col = (uint32_t *)malloc(piece_col_len ? piece_col_len * sizeof(uint32_t) : sizeof(uint32_t));
+    uint32_t *fill      = (uint32_t *)calloc(total_cps + 1, sizeof(uint32_t));
+    if (!piece_col || !fill) { free(piece_col); free(fill); goto fail_early; }
+
+    /* Pass 2: fill piece_col with (piece_id, end_pos_local) pairs. */
+    { uint32_t gpos = 0;
+      for (size_t w = 0; w < n_words; w++) {
+          size_t n = word_cps[w].count;
+          for (size_t p = 0; p < n; p++, gpos++) {
+              for (size_t e = p + 1; e <= n && e <= p + maxl; e++) {
+                  char *sub = join_range(&word_cps[w], p, e);
+                  if (!sub) continue;
+                  PieceEntry key = { sub, 0 };
+                  PieceEntry *found = (PieceEntry *)bsearch(&key, ptab, n_pieces, sizeof(PieceEntry), piece_entry_cmp);
+                  if (found) {
+                      uint32_t base = rptr[gpos] + fill[gpos];
+                      piece_col[base]     = found->id;
+                      piece_col[base + 1] = (uint32_t)e;
+                      fill[gpos] += 2;
+                  }
+                  free(sub);
+              }
+          }
+      }
+    }
+    free(fill);
+
+    { DmGpuUnigramModel gm = { log_probs, n_pieces, (uint32_t)maxl };
+      DmGpuUnigramCorpus gc = {
+          cp_ids_dummy, total_cps,
+          word_starts, word_lens, word_freqs, n_words,
+          rptr, piece_col, piece_col_len / 2
+      };
+      float *new_counts = (float *)calloc(n_pieces, sizeof(float));
+      float exp_f = 0.0f;
+      int rc = new_counts ? dm_gpu_unigram_em_step(gpu, &gm, &gc, new_counts, &exp_f) : DM_GPU_ERR_OOM;
+      if (rc == DM_GPU_OK) {
+          newm->separator = xstrdup(m->separator ? m->separator : UNI_SEP);
+          for (uint32_t i = 0; i < n_pieces; i++) model_add(newm, m->items[i].piece, (double)new_counts[i]);
+          *expected_total = (double)exp_f;
+          normalize_probs(newm);
+      }
+      free(new_counts); free(piece_col); free(rptr); free(cp_ids_dummy);
+      free(word_starts); free(word_lens); free(word_freqs); free(log_probs); free(ptab);
+      for (size_t w = 0; w < n_words; w++) strvec_free(&word_cps[w]); free(word_cps);
+      return (rc == DM_GPU_OK) ? 0 : -1;
+    }
+
+fail_early:
+    free(rptr); free(cp_ids_dummy); free(word_starts); free(word_lens);
+    free(word_freqs); free(log_probs); free(ptab);
+    for (size_t w = 0; w < n_words; w++) strvec_free(&word_cps[w]); free(word_cps);
+    return -1;
+}
+#endif /* DM_GPU */
+
 static int score_cmp_desc(const void *a, const void *b) { const PieceProb *x = (const PieceProb *)a, *y = (const PieceProb *)b; if (x->prob < y->prob) return 1; if (x->prob > y->prob) return -1; return strcmp(y->piece, x->piece); }
-static int train_unigram(const WordVocab *wv, size_t vocab_size, size_t seed_size, size_t max_piece_len, size_t minf, double shrinking, int em_iters, UniModel *out, double *expected_total) {
+static int train_unigram(const WordVocab *wv, size_t vocab_size, size_t seed_size, size_t max_piece_len, size_t minf, double shrinking, int em_iters, UniModel *out, double *expected_total, void *gpu_ctx) {
+#define DO_EM_STEP(model_ptr, wv_ptr, next_ptr, exp_total_ptr) do { \
+    int _rc = -1; \
+    (void)gpu_ctx; \
+    _rc = em_step((model_ptr), (wv_ptr), (next_ptr), (exp_total_ptr)); \
+    if (_rc != 0) return -1; \
+} while(0)
+
+#ifdef DM_GPU
+#undef DO_EM_STEP
+#define DO_EM_STEP(model_ptr, wv_ptr, next_ptr, exp_total_ptr) do { \
+    int _rc = -1; \
+    if (gpu_ctx && dm_gpu_ready((DmGpuCtx *)gpu_ctx)) \
+        _rc = em_step_gpu((DmGpuCtx *)gpu_ctx, (model_ptr), (wv_ptr), (next_ptr), (exp_total_ptr)); \
+    if (_rc != 0) _rc = em_step((model_ptr), (wv_ptr), (next_ptr), (exp_total_ptr)); \
+    if (_rc != 0) return -1; \
+} while(0)
+#endif
+
     StrVec chars = {0}; UniModel model = {0}; model.separator = xstrdup(UNI_SEP);
     if (enumerate_seed(wv, max_piece_len, seed_size > vocab_size ? seed_size : vocab_size, minf, &model, &chars) != 0) return -1;
     while (model.count > vocab_size) {
         UniModel next = {0};
-        for (int i = 0; i < em_iters; i++) { model_free(&next); if (em_step(&model, wv, &next, expected_total) != 0) return -1; model_free(&model); model = next; memset(&next, 0, sizeof(next)); }
+        for (int i = 0; i < em_iters; i++) { model_free(&next); DO_EM_STEP(&model, wv, &next, expected_total); model_free(&model); model = next; memset(&next, 0, sizeof(next)); }
         size_t target = (size_t)((double)model.count * shrinking); if (target < vocab_size) target = vocab_size;
         PieceProb *sc = (PieceProb *)calloc(model.count, sizeof(PieceProb)); if (!sc) return -1; size_t sn = 0;
         for (size_t i = 0; i < model.count; i++) if (!strvec_contains(&chars, model.items[i].piece)) { sc[sn].piece = model.items[i].piece; sc[sn].prob = -log(model.items[i].prob > 1e-300 ? model.items[i].prob : 1e-300); sn++; }
@@ -200,13 +346,14 @@ static int train_unigram(const WordVocab *wv, size_t vocab_size, size_t seed_siz
         if (keep.count >= model.count) { strvec_free(&keep); break; }
         UniModel kept = {0}; model_copy_filtered(&model, &kept, &keep); strvec_free(&keep); model_free(&model); model = kept;
     }
-    for (int i = 0; i < (em_iters > 1 ? em_iters : 1); i++) { UniModel next = {0}; if (em_step(&model, wv, &next, expected_total) != 0) return -1; model_free(&model); model = next; }
+    for (int i = 0; i < (em_iters > 1 ? em_iters : 1); i++) { UniModel next = {0}; DO_EM_STEP(&model, wv, &next, expected_total); model_free(&model); model = next; }
     if (model.count > vocab_size) {
         qsort(model.items, model.count, sizeof(PieceProb), score_cmp_desc);
         StrVec keep = {0}; for (size_t i = 0; i < chars.count; i++) strvec_push_unique(&keep, chars.items[i]);
         for (size_t i = 0; i < model.count && keep.count < vocab_size; i++) if (!strvec_contains(&chars, model.items[i].piece)) strvec_push_unique(&keep, model.items[i].piece);
         UniModel kept = {0}; model_copy_filtered(&model, &kept, &keep); strvec_free(&keep); model_free(&model); model = kept;
     }
+#undef DO_EM_STEP
     *out = model; strvec_free(&chars); return 0;
 }
 
@@ -275,7 +422,7 @@ int dm_unigram_cli(int argc, char **argv) {
     if (argc <= start) { usage(argv[0]); return 2; }
     const char *cmd = argv[start];
     if (strcmp(cmd, "train") == 0) {
-        StrVec inputs = {0}; const char *out = NULL; size_t vs = 0, seed = 8000, maxlen = 16, minf = 2; double shrink = 0.8; int emiters = 2, stats = 0;
+        StrVec inputs = {0}; const char *out = NULL; size_t vs = 0, seed = 8000, maxlen = 16, minf = 2; double shrink = 0.8; int emiters = 2, stats = 0, use_gpu = 0, gpu_device = 0;
         for (int i = start + 1; i < argc; i++) {
             if ((strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--input") == 0) && i + 1 < argc) while (i + 1 < argc && argv[i + 1][0] != '-') strvec_push_copy(&inputs, argv[++i]);
             else if ((strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) && i + 1 < argc) out = argv[++i];
@@ -286,14 +433,26 @@ int dm_unigram_cli(int argc, char **argv) {
             else if (strcmp(argv[i], "--shrinking-factor") == 0 && i + 1 < argc) shrink = strtod(argv[++i], NULL);
             else if (strcmp(argv[i], "--em-iterations") == 0 && i + 1 < argc) emiters = atoi(argv[++i]);
             else if (strcmp(argv[i], "--stats") == 0) stats = 1;
+            else if (strcmp(argv[i], "--gpu") == 0) use_gpu = 1;
+            else if (strcmp(argv[i], "--gpu-device") == 0 && i + 1 < argc) { gpu_device = (int)strtol(argv[++i], NULL, 10); use_gpu = 1; }
             else { usage(argv[0]); return 2; }
         }
         if (!inputs.count || !out || !vs) { usage(argv[0]); return 2; }
+        void *gpu_ctx = NULL;
+#ifdef DM_GPU
+        if (use_gpu) { gpu_ctx = dm_gpu_create(gpu_device, NULL); if (!gpu_ctx || !dm_gpu_ready((DmGpuCtx *)gpu_ctx)) { fprintf(stderr, "[unigram] GPU init failed, falling back to CPU\n"); dm_gpu_destroy((DmGpuCtx *)gpu_ctx); gpu_ctx = NULL; } else { char _dname[256]={0}; dm_gpu_device_name((DmGpuCtx*)gpu_ctx,_dname,sizeof(_dname)); fprintf(stderr,"[unigram] GPU: %s\n",_dname); } }
+#else
+        if (use_gpu) fprintf(stderr, "[unigram] built without GPU support, using CPU\n");
+#endif
         WordVocab wv = {0}; UniModel m = {0}; double expected = 0.0; int rc = read_word_vocab(inputs.items, inputs.count, &wv);
-        if (rc == 0) rc = train_unigram(&wv, vs, seed, maxlen, minf, shrink, emiters, &m, &expected);
+        if (rc == 0) rc = train_unigram(&wv, vs, seed, maxlen, minf, shrink, emiters, &m, &expected, gpu_ctx);
         if (rc == 0) rc = write_model(&m, out);
         if (rc == 0 && stats) fprintf(stderr, "{\"word_types\":%zu,\"word_tokens\":%zu,\"vocab_size\":%zu,\"expected_pieces\":%.12g}\n", wv.count, (size_t)0, m.count, expected);
-        model_free(&m); wordvocab_free(&wv); strvec_free(&inputs); return rc == 0 ? 0 : 1;
+        model_free(&m); wordvocab_free(&wv); strvec_free(&inputs);
+#ifdef DM_GPU
+        dm_gpu_destroy((DmGpuCtx *)gpu_ctx);
+#endif
+        return rc == 0 ? 0 : 1;
     }
     if (strcmp(cmd, "encode") == 0) {
         const char *modelp = NULL, *input = NULL, *output = NULL, *mode = "viterbi"; double alpha = 1.0; uint64_t seed = 1;

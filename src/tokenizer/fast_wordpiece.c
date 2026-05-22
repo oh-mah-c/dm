@@ -616,6 +616,10 @@ int dm_fast_wordpiece_cli(int argc, char **argv) {
         else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             usage(argv[0]);
             return 0;
+        } else if (strcmp(argv[i], "--gpu") == 0) {
+            /* accepted but ignored: WordPiece trie inference is CPU-only */
+        } else if (strcmp(argv[i], "--gpu-device") == 0 && i + 1 < argc) {
+            i++; /* skip device arg */
         } else {
             command_idx = i;
             break;

@@ -58,3 +58,22 @@ dkms.conf
 bin/
 __pycache__/
 results
+
+# Tokenizer training outputs & test corpora
+merges.txt
+vocab.txt
+volt_vocab.json
+combined_merges.txt
+combined_vocab.txt
+combined_unigram_model.txt
+combined_volt_vocab.json
+unigram_model.txt
+test_corpus.txt
+*.model
+*.spv
+
+# MSVC / Visual Studio directories
+.vs/
+x64/
+Debug/
+Release/

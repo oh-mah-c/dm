@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef DM_GPU
+#include "gpu/dm_gpu.h"
+#endif
+
 #define LAB_EOW "</w>"
 
 typedef struct { char **items; size_t count, cap; } StrVec;
@@ -121,6 +125,45 @@ static PairStat *best_pair(PairStats *ps, size_t minf) {
     return b && b->freq >= minf ? b : NULL;
 }
 
+#ifdef DM_GPU
+typedef struct { char **names; uint32_t count, cap; } LabIntern;
+static void lab_intern_free(LabIntern *t) { for (uint32_t i = 0; i < t->count; i++) free(t->names[i]); free(t->names); memset(t, 0, sizeof(*t)); }
+static uint32_t lab_intern_add(LabIntern *t, const char *s) {
+    for (uint32_t i = 0; i < t->count; i++) if (strcmp(t->names[i], s) == 0) return i;
+    if (t->count == t->cap) { uint32_t nc = t->cap ? t->cap * 2 : 64; char **tmp = (char **)realloc(t->names, nc * sizeof(char *)); if (!tmp) return UINT32_MAX; t->names = tmp; t->cap = nc; }
+    t->names[t->count] = xstrdup(s); if (!t->names[t->count]) return UINT32_MAX; return t->count++;
+}
+static uint32_t lab_intern_lookup(const LabIntern *t, const char *s) { for (uint32_t i = 0; i < t->count; i++) if (strcmp(t->names[i], s) == 0) return i; return UINT32_MAX; }
+static int lab_build_gpu_input(const SymVocab *sv, const LabIntern *intern, DmGpuBpeInput *out,
+                                uint32_t **sid, uint32_t **wst, uint32_t **wln, uint32_t **wfr) {
+    size_t total = 0; for (size_t w = 0; w < sv->count; w++) total += sv->items[w].len;
+    *sid = (uint32_t *)malloc(total * sizeof(uint32_t)); *wst = (uint32_t *)malloc(sv->count * sizeof(uint32_t));
+    *wln = (uint32_t *)malloc(sv->count * sizeof(uint32_t)); *wfr = (uint32_t *)malloc(sv->count * sizeof(uint32_t));
+    if (!*sid || !*wst || !*wln || !*wfr) { free(*sid); free(*wst); free(*wln); free(*wfr); return -1; }
+    uint32_t off = 0;
+    for (size_t w = 0; w < sv->count; w++) {
+        (*wst)[w] = off; (*wln)[w] = (uint32_t)sv->items[w].len; (*wfr)[w] = (uint32_t)sv->items[w].freq;
+        for (size_t s = 0; s < sv->items[w].len; s++) {
+            uint32_t id = lab_intern_lookup(intern, sv->items[w].syms[s]);
+            if (id == UINT32_MAX) { free(*sid); free(*wst); free(*wln); free(*wfr); return -1; }
+            (*sid)[off++] = id;
+        }
+    }
+    out->sym_ids = *sid; out->total_syms = total; out->word_starts = *wst;
+    out->word_lens = *wln; out->word_freqs = *wfr; out->n_words = sv->count; out->vocab_size = intern->count;
+    return 0;
+}
+static int lab_best_pair_gpu(const uint32_t *pc, uint32_t vsz, const LabIntern *intern, size_t minf,
+                              const char **lout, const char **rout) {
+    uint32_t best = (uint32_t)minf, ba = UINT32_MAX, bb = UINT32_MAX;
+    for (uint32_t a = 0; a < vsz; a++) for (uint32_t b = 0; b < vsz; b++) {
+        uint32_t f = pc[(size_t)a * vsz + b];
+        if (f > best || (f == best && ba == UINT32_MAX)) { best = f; ba = a; bb = b; }
+    }
+    if (ba == UINT32_MAX) return 0; *lout = intern->names[ba]; *rout = intern->names[bb]; return 1;
+}
+#endif /* DM_GPU */
+
 static int symword_merge(SymWord *w, const char *l, const char *r) {
     char **next = (char **)calloc(w->len ? w->len : 1, sizeof(char *)); if (!next) return -1; size_t o = 0;
     for (size_t i = 0; i < w->len;) {
@@ -170,22 +213,72 @@ static int build_chunk_vocab(char **paths, size_t n, const char *pretok, size_t 
     return 0;
 }
 
-static int learn_bpe(const TextVocab *chunks, size_t vocab_size, size_t minf, LabModel *m) {
+static int learn_bpe(const TextVocab *chunks, size_t vocab_size, size_t minf, LabModel *m, void *gpu_ctx) {
     SymVocab sv = {0}; StrVec chars = {0};
     for (size_t i = 0; i < chunks->count; i++) {
         if (symvocab_add_from_text(&sv, chunks->items[i].text, chunks->items[i].freq) != 0) goto bad;
         for (size_t j = 0; j < sv.items[sv.count - 1].len; j++) if (strvec_push_unique(&chars, sv.items[sv.count - 1].syms[j]) != 0) goto bad;
     }
     size_t target = vocab_size > chars.count ? vocab_size - chars.count : 0;
-    for (size_t step = 0; step < target; step++) {
-        PairStats ps = {0}; if (collect_pairs(&sv, &ps) != 0) { pairstats_free(&ps); goto bad; }
-        PairStat *b = best_pair(&ps, minf);
-        if (!b) { pairstats_free(&ps); break; }
-        if (merges_push(&m->merges, b->left, b->right) != 0 || symvocab_merge(&sv, b->left, b->right) != 0) { pairstats_free(&ps); goto bad; }
-        pairstats_free(&ps);
+
+#ifdef DM_GPU
+    DmGpuCtx *gpu = (DmGpuCtx *)gpu_ctx;
+    LabIntern intern = {0};
+    if (gpu && dm_gpu_ready(gpu)) {
+        for (size_t i = 0; i < chars.count; i++)
+            if (lab_intern_add(&intern, chars.items[i]) == UINT32_MAX) { lab_intern_free(&intern); gpu = NULL; }
     }
+#else
+    (void)gpu_ctx;
+#endif
+
+    for (size_t step = 0; step < target; step++) {
+        char *l = NULL, *r = NULL; int found = 0;
+
+#ifdef DM_GPU
+        if (gpu && dm_gpu_ready(gpu) && intern.count <= DM_GPU_BPE_MAX_VOCAB) {
+            uint32_t *sid = NULL, *wst = NULL, *wln = NULL, *wfr = NULL;
+            DmGpuBpeInput inp = {0};
+            if (lab_build_gpu_input(&sv, &intern, &inp, &sid, &wst, &wln, &wfr) == 0) {
+                size_t vsz = intern.count;
+                uint32_t *pc = (uint32_t *)calloc(vsz * vsz, sizeof(uint32_t));
+                if (pc && dm_gpu_bpe_pair_count(gpu, &inp, pc) == 0) {
+                    const char *lp = NULL, *rp = NULL;
+                    if (lab_best_pair_gpu(pc, (uint32_t)vsz, &intern, minf, &lp, &rp)) {
+                        l = xstrdup(lp); r = xstrdup(rp); found = (l && r) ? 1 : 0;
+                    } else { found = -1; }
+                }
+                free(pc); free(sid); free(wst); free(wln); free(wfr);
+            }
+        }
+#endif
+
+        if (!found) {
+            PairStats ps = {0}; if (collect_pairs(&sv, &ps) != 0) { pairstats_free(&ps); goto bad; }
+            PairStat *b = best_pair(&ps, minf);
+            if (!b) { pairstats_free(&ps); break; }
+            l = xstrdup(b->left); r = xstrdup(b->right); pairstats_free(&ps);
+            found = (l && r) ? 1 : 0;
+        } else if (found < 0) { break; }
+
+        if (!found || !l || !r || merges_push(&m->merges, l, r) != 0 || symvocab_merge(&sv, l, r) != 0) {
+            free(l); free(r); goto bad;
+        }
+#ifdef DM_GPU
+        char *joined = concat2(l, r);
+        if (joined) { lab_intern_add(&intern, joined); free(joined); }
+#endif
+        free(l); free(r);
+    }
+
+#ifdef DM_GPU
+    lab_intern_free(&intern);
+#endif
     strvec_free(&chars); symvocab_free(&sv); return 0;
 bad:
+#ifdef DM_GPU
+    lab_intern_free(&intern);
+#endif
     strvec_free(&chars); symvocab_free(&sv); return -1;
 }
 
@@ -298,7 +391,7 @@ int dm_tokenizer_lab_cli(int argc, char **argv) {
     if (argc <= start) { usage(argv[0]); return 2; }
     const char *cmd = argv[start];
     if (strcmp(cmd, "train-bpe") == 0) {
-        StrVec inputs = {0}; const char *out = NULL, *pretok = "gpt4"; size_t vs = 0, minf = 2, max_chars = 0; int stats = 0;
+        StrVec inputs = {0}; const char *out = NULL, *pretok = "gpt4"; size_t vs = 0, minf = 2, max_chars = 0; int stats = 0, use_gpu = 0, gpu_device = 0;
         for (int i = start + 1; i < argc; i++) {
             if ((strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--input") == 0) && i + 1 < argc) while (i + 1 < argc && argv[i + 1][0] != '-') strvec_push_copy(&inputs, argv[++i]);
             else if ((strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) && i + 1 < argc) out = argv[++i];
@@ -307,15 +400,27 @@ int dm_tokenizer_lab_cli(int argc, char **argv) {
             else if (strcmp(argv[i], "--min-frequency") == 0 && i + 1 < argc) minf = (size_t)strtoull(argv[++i], NULL, 10);
             else if (strcmp(argv[i], "--max-chars") == 0 && i + 1 < argc) max_chars = (size_t)strtoull(argv[++i], NULL, 10);
             else if (strcmp(argv[i], "--stats") == 0) stats = 1;
+            else if (strcmp(argv[i], "--gpu") == 0) use_gpu = 1;
+            else if (strcmp(argv[i], "--gpu-device") == 0 && i + 1 < argc) { gpu_device = (int)strtol(argv[++i], NULL, 10); use_gpu = 1; }
             else { usage(argv[0]); strvec_free(&inputs); return 2; }
         }
         if (!inputs.count || !out || !vs) { usage(argv[0]); strvec_free(&inputs); return 2; }
+        void *gpu_ctx = NULL;
+#ifdef DM_GPU
+        if (use_gpu) { gpu_ctx = dm_gpu_create(gpu_device, NULL); if (!gpu_ctx || !dm_gpu_ready((DmGpuCtx *)gpu_ctx)) { fprintf(stderr, "[tokenizer_lab] GPU init failed, falling back to CPU\n"); dm_gpu_destroy((DmGpuCtx *)gpu_ctx); gpu_ctx = NULL; } else { char _dname[256]={0}; dm_gpu_device_name((DmGpuCtx*)gpu_ctx,_dname,sizeof(_dname)); fprintf(stderr,"[tokenizer_lab] GPU: %s\n",_dname); } }
+#else
+        if (use_gpu) fprintf(stderr, "[tokenizer_lab] built without GPU support, using CPU\n");
+#endif
         TextVocab chunks = {0}; LabModel m = {0}; m.pretokenizer = xstrdup(pretok);
         int rc = m.pretokenizer ? build_chunk_vocab(inputs.items, inputs.count, pretok, max_chars, &chunks) : -1;
-        if (rc == 0) rc = learn_bpe(&chunks, vs, minf, &m);
+        if (rc == 0) rc = learn_bpe(&chunks, vs, minf, &m, gpu_ctx);
         if (rc == 0) rc = write_model(&m, out);
         if (rc == 0 && stats) fprintf(stderr, "{\"chunk_types\":%zu,\"chunk_tokens\":%zu,\"pretokenizer\":\"%s\",\"requested_vocab_size\":%zu,\"merges\":%zu}\n", chunks.count, (size_t)0, pretok, vs, m.merges.count);
-        model_free(&m); textvocab_free(&chunks); strvec_free(&inputs); return rc == 0 ? 0 : 1;
+        model_free(&m); textvocab_free(&chunks); strvec_free(&inputs);
+#ifdef DM_GPU
+        dm_gpu_destroy((DmGpuCtx *)gpu_ctx);
+#endif
+        return rc == 0 ? 0 : 1;
     }
     if (strcmp(cmd, "encode") == 0) {
         const char *modelp = NULL, *input = NULL, *output = NULL; int json = 0;

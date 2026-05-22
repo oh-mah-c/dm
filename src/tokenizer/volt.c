@@ -1,6 +1,7 @@
 /*
  * VOLT: Vocabulary Learning via Optimal Transport for NMT
  * ACL 2021  -  Xu, Zhou, Gan, Zheng, Li (ByteDance AI Lab)
+ * GPU acceleration via Vulkan compute (dm_gpu_sinkhorn).
  *
  * Implements Algorithm 1 exactly as in the paper:
  *   For t in S:
@@ -18,6 +19,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef DM_GPU
+#include "gpu/dm_gpu.h"
+#endif
 
 /* -------------------------------------------------------------------------
  * String utilities
@@ -464,11 +469,75 @@ static void write_result(const char *path, const VStep *best, double muv,
  * Main VOLT driver
  * ---------------------------------------------------------------------- */
 
+#ifdef DM_GPU
+/* Convert SRow *K (double/size_t) → float CSR and call dm_gpu_sinkhorn.
+ * row_sums_out is double; conversion is done internally.
+ * Returns 0 on success, -1 to fall back to the CPU sinkhorn. */
+static int sinkhorn_gpu(DmGpuCtx *gpu, const SRow *K,
+                        size_t n_tok, size_t n_char,
+                        const double *p_tok, const double *p_char,
+                        int max_iter, float tol, double *row_sums_out) {
+    /* Count NNZ */
+    uint32_t nnz = 0;
+    for (size_t i = 0; i < n_tok; i++) nnz += (uint32_t)K[i].n;
+
+    uint32_t *coo_row = (uint32_t *)malloc(nnz * sizeof(uint32_t));
+    uint32_t *coo_col = (uint32_t *)malloc(nnz * sizeof(uint32_t));
+    float    *coo_val = (float    *)malloc(nnz * sizeof(float));
+    float    *fp_tok  = (float    *)malloc(n_tok  * sizeof(float));
+    float    *fp_char = (float    *)malloc(n_char * sizeof(float));
+    float    *frow    = (float    *)malloc(n_tok  * sizeof(float));
+    if (!coo_row || !coo_col || !coo_val || !fp_tok || !fp_char || !frow) goto fail;
+
+    { uint32_t k = 0;
+      for (size_t i = 0; i < n_tok; i++)
+          for (size_t j = 0; j < K[i].n; j++) {
+              coo_row[k] = (uint32_t)i;
+              coo_col[k] = (uint32_t)K[i].col[j];
+              coo_val[k] = (float)K[i].val[j];
+              k++;
+          }
+    }
+    for (size_t i = 0; i < n_tok;  i++) fp_tok[i]  = (float)p_tok[i];
+    for (size_t j = 0; j < n_char; j++) fp_char[j] = (float)p_char[j];
+
+    uint32_t *K_rp = NULL, *K_ci = NULL; float *K_v = NULL;
+    dm_gpu_build_csr(coo_row, coo_col, coo_val, nnz,
+                     (uint32_t)n_tok, (uint32_t)n_char,
+                     &K_rp, &K_ci, &K_v);
+    if (!K_rp) goto fail;
+
+    DmGpuCSR Kcsr = { K_rp, K_ci, K_v, (uint32_t)n_tok, (uint32_t)n_char, nnz };
+
+    uint32_t *Kt_rp = NULL, *Kt_ci = NULL; float *Kt_v = NULL;
+    dm_gpu_csr_transpose(&Kcsr, &Kt_rp, &Kt_ci, &Kt_v);
+    if (!Kt_rp) { free(K_rp); free(K_ci); free(K_v); goto fail; }
+
+    DmGpuCSR Ktcsr = { Kt_rp, Kt_ci, Kt_v, (uint32_t)n_char, (uint32_t)n_tok, nnz };
+
+    int rc = dm_gpu_sinkhorn(gpu, &Kcsr, &Ktcsr, fp_tok, fp_char, max_iter, tol, frow);
+
+    if (rc == DM_GPU_OK)
+        for (size_t i = 0; i < n_tok; i++) row_sums_out[i] = (double)frow[i];
+
+    free(K_rp); free(K_ci); free(K_v);
+    free(Kt_rp); free(Kt_ci); free(Kt_v);
+    free(coo_row); free(coo_col); free(coo_val);
+    free(fp_tok); free(fp_char); free(frow);
+    return (rc == DM_GPU_OK) ? 0 : -1;
+
+fail:
+    free(coo_row); free(coo_col); free(coo_val);
+    free(fp_tok); free(fp_char); free(frow);
+    return -1;
+}
+#endif /* DM_GPU */
+
 static int volt_run(const char *corpus, const char *bpe_path,
                     const char *output,
                     int *S, int S_len,
                     double threshold, int sink_iters, double sink_tol,
-                    size_t max_lines, int stats) {
+                    size_t max_lines, int stats, void *gpu_ctx) {
 
     fprintf(stderr, "Loading corpus: %s\n", corpus);
     KVDMap *wf = read_word_freq(corpus, max_lines);
@@ -544,7 +613,15 @@ static int volt_run(const char *corpus, const char *bpe_path,
 
         SRow *K = build_kernel(T, n_tok, cidx);
         double *row_sums = (double *)calloc(n_tok, sizeof(double));
-        sinkhorn(K, n_tok, nc, p_tok, p_char, sink_iters, sink_tol, row_sums);
+        int gpu_used = 0;
+#ifdef DM_GPU
+        if (gpu_ctx && dm_gpu_ready((DmGpuCtx *)gpu_ctx))
+            gpu_used = sinkhorn_gpu((DmGpuCtx *)gpu_ctx, K, n_tok, nc,
+                                    p_tok, p_char, sink_iters, (float)sink_tol,
+                                    row_sums) == 0;
+#endif
+        if (!gpu_used)
+            sinkhorn(K, n_tok, nc, p_tok, p_char, sink_iters, sink_tol, row_sums);
 
         /* Extract vocabulary */
         size_t nv = 0;
@@ -621,6 +698,7 @@ int dm_volt_cli(int argc, char **argv) {
     double sink_tol = 1e-9;
     size_t max_lines = 0;
     int stats_flag = 0;
+    int use_gpu = 0, gpu_device = 0;
 
     for (int i = start; i < argc; i++) {
         if (!strcmp(argv[i], "-i") || !strcmp(argv[i], "--input"))
@@ -645,6 +723,10 @@ int dm_volt_cli(int argc, char **argv) {
             max_lines = (size_t)atoi(argv[++i]);
         else if (!strcmp(argv[i], "--stats"))
             stats_flag = 1;
+        else if (!strcmp(argv[i], "--gpu"))
+            use_gpu = 1;
+        else if (!strcmp(argv[i], "--gpu-device") && i + 1 < argc)
+            { gpu_device = atoi(argv[++i]); use_gpu = 1; }
         else { fprintf(stderr, "volt: unknown option: %s\n", argv[i]); goto usage; }
     }
 
@@ -657,9 +739,25 @@ int dm_volt_cli(int argc, char **argv) {
     int *S_seq = (int *)malloc((size_t)S_len * sizeof(int));
     for (int i = 0; i < S_len; i++) S_seq[i] = S_min + i * S_step;
 
+    void *gpu_ctx = NULL;
+#ifdef DM_GPU
+    if (use_gpu) {
+        gpu_ctx = dm_gpu_create(gpu_device, NULL);
+        if (!gpu_ctx || !dm_gpu_ready((DmGpuCtx *)gpu_ctx)) {
+            fprintf(stderr, "[volt] GPU init failed, falling back to CPU\n");
+            dm_gpu_destroy((DmGpuCtx *)gpu_ctx); gpu_ctx = NULL;
+        } else { char _dname[256]={0}; dm_gpu_device_name((DmGpuCtx*)gpu_ctx,_dname,sizeof(_dname)); fprintf(stderr,"[volt] GPU: %s\n",_dname); }
+    }
+#else
+    if (use_gpu) fprintf(stderr, "[volt] built without GPU support, using CPU\n");
+#endif
+
     int rc = volt_run(corpus, bpe_model, output, S_seq, S_len,
-                      threshold, sink_iters, sink_tol, max_lines, stats_flag);
+                      threshold, sink_iters, sink_tol, max_lines, stats_flag, gpu_ctx);
     free(S_seq);
+#ifdef DM_GPU
+    dm_gpu_destroy((DmGpuCtx *)gpu_ctx);
+#endif
     return rc;
 
 usage:
@@ -667,7 +765,7 @@ usage:
         "Usage: volt -i corpus.txt --bpe-model bpe.txt -o vocab.json\n"
         "       [--S-min N] [--S-max N] [--S-step N]\n"
         "       [--threshold F] [--sinkhorn-iters N] [--sinkhorn-tol F]\n"
-        "       [--max-lines N] [--stats]\n\n"
+        "       [--max-lines N] [--stats] [--gpu] [--gpu-device N]\n\n"
         "VOLT: Vocabulary Learning via Optimal Transport (ACL 2021)\n"
         "Requires a BPE model file (from: dm --train --algo bpe).\n"
         "Example:\n"

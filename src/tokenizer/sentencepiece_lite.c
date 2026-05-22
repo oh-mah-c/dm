@@ -5,6 +5,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef DM_GPU
+#include "gpu/dm_gpu.h"
+#endif
 #ifndef DM_NO_ICU
 #include <unicode/unorm2.h>
 #include <unicode/ustring.h>
@@ -213,17 +217,119 @@ static int build_vocab(StrVec *out, const StrVec *reserved, const StrVec *pieces
 }
 static int textcmp_ptr(const void *a, const void *b) { const char * const *x = (const char * const *)a, * const *y = (const char * const *)b; return strcmp(*x, *y); }
 
-static int train_bpe(TextVocab *lines, SPModel *m, const StrVec *reserved, size_t vocab_size, size_t minf) {
+#ifdef DM_GPU
+typedef struct { char **names; uint32_t count, cap; } SpIntern;
+static void sp_intern_free(SpIntern *t) { for (uint32_t i = 0; i < t->count; i++) free(t->names[i]); free(t->names); memset(t, 0, sizeof(*t)); }
+static uint32_t sp_intern_add(SpIntern *t, const char *s) {
+    for (uint32_t i = 0; i < t->count; i++) if (strcmp(t->names[i], s) == 0) return i;
+    if (t->count == t->cap) { uint32_t nc = t->cap ? t->cap * 2 : 64; char **tmp = (char **)realloc(t->names, nc * sizeof(char *)); if (!tmp) return UINT32_MAX; t->names = tmp; t->cap = nc; }
+    t->names[t->count] = xstrdup(s); if (!t->names[t->count]) return UINT32_MAX; return t->count++;
+}
+static uint32_t sp_intern_lookup(const SpIntern *t, const char *s) { for (uint32_t i = 0; i < t->count; i++) if (strcmp(t->names[i], s) == 0) return i; return UINT32_MAX; }
+static int sp_build_gpu_input(const SymCorpus *corp, const SpIntern *intern, DmGpuBpeInput *out,
+                               uint32_t **sid, uint32_t **wst, uint32_t **wln, uint32_t **wfr) {
+    size_t total = 0; for (size_t w = 0; w < corp->count; w++) total += corp->items[w].len;
+    *sid = (uint32_t *)malloc(total * sizeof(uint32_t)); *wst = (uint32_t *)malloc(corp->count * sizeof(uint32_t));
+    *wln = (uint32_t *)malloc(corp->count * sizeof(uint32_t)); *wfr = (uint32_t *)malloc(corp->count * sizeof(uint32_t));
+    if (!*sid || !*wst || !*wln || !*wfr) { free(*sid); free(*wst); free(*wln); free(*wfr); return -1; }
+    uint32_t off = 0;
+    for (size_t w = 0; w < corp->count; w++) {
+        (*wst)[w] = off; (*wln)[w] = (uint32_t)corp->items[w].len; (*wfr)[w] = (uint32_t)corp->items[w].freq;
+        for (size_t s = 0; s < corp->items[w].len; s++) {
+            uint32_t id = sp_intern_lookup(intern, corp->items[w].syms[s]);
+            if (id == UINT32_MAX) { free(*sid); free(*wst); free(*wln); free(*wfr); return -1; }
+            (*sid)[off++] = id;
+        }
+    }
+    out->sym_ids = *sid; out->total_syms = total; out->word_starts = *wst;
+    out->word_lens = *wln; out->word_freqs = *wfr; out->n_words = corp->count; out->vocab_size = intern->count;
+    return 0;
+}
+static int sp_best_pair_gpu(const uint32_t *pc, uint32_t vsz, const SpIntern *intern, size_t minf,
+                             const char **aout, const char **bout) {
+    uint32_t best = (uint32_t)minf, ba = UINT32_MAX, bb = UINT32_MAX;
+    for (uint32_t a = 0; a < vsz; a++) for (uint32_t b = 0; b < vsz; b++) {
+        uint32_t f = pc[(size_t)a * vsz + b];
+        if (f > best || (f == best && ba == UINT32_MAX)) { best = f; ba = a; bb = b; }
+    }
+    if (ba == UINT32_MAX) return 0; *aout = intern->names[ba]; *bout = intern->names[bb]; return 1;
+}
+#endif /* DM_GPU */
+
+static int train_bpe(TextVocab *lines, SPModel *m, const StrVec *reserved,
+                     size_t vocab_size, size_t minf, void *gpu_ctx) {
     SymCorpus corp = {0}; StrVec chars = {0}, pieces = {0};
-    for (size_t i = 0; i < lines->count; i++) { SymSeq s = {0}; if (symseq_from_text(lines->items[i].text, lines->items[i].freq, &s) != 0 || symcorpus_push_owned(&corp, s) != 0) { symseq_free(&s); symcorpus_free(&corp); return -1; } for (size_t j = 0; j < s.len; j++) strvec_push_unique(&chars, s.syms[j]); }
+    for (size_t i = 0; i < lines->count; i++) {
+        SymSeq s = {0};
+        if (symseq_from_text(lines->items[i].text, lines->items[i].freq, &s) != 0 || symcorpus_push_owned(&corp, s) != 0)
+            { symseq_free(&s); symcorpus_free(&corp); return -1; }
+        for (size_t j = 0; j < s.len; j++) strvec_push_unique(&chars, s.syms[j]);
+    }
     qsort(chars.items, chars.count, sizeof(char *), textcmp_ptr);
     size_t target = vocab_size > reserved->count + chars.count ? vocab_size - reserved->count - chars.count : 0;
-    for (size_t k = 0; k < target; k++) { PairStats ps = {0}; if (collect_pairs(&corp, &ps) != 0) { pairstats_free(&ps); goto bad; } PairStat *b = best_pair(&ps, minf); if (!b) { pairstats_free(&ps); break; } if (merges_push(&m->merges, b->a, b->b) != 0) { pairstats_free(&ps); goto bad; } if (symcorpus_merge(&corp, b->a, b->b) != 0) { pairstats_free(&ps); goto bad; } pairstats_free(&ps); }
+
+#ifdef DM_GPU
+    DmGpuCtx *gpu = (DmGpuCtx *)gpu_ctx;
+    SpIntern intern = {0};
+    if (gpu && dm_gpu_ready(gpu)) {
+        for (size_t i = 0; i < chars.count; i++)
+            if (sp_intern_add(&intern, chars.items[i]) == UINT32_MAX) { sp_intern_free(&intern); gpu = NULL; }
+    }
+#else
+    (void)gpu_ctx;
+#endif
+
+    for (size_t k = 0; k < target; k++) {
+        char *la = NULL, *lb = NULL; int found = 0;
+
+#ifdef DM_GPU
+        if (gpu && dm_gpu_ready(gpu) && intern.count <= DM_GPU_BPE_MAX_VOCAB) {
+            uint32_t *sid = NULL, *wst = NULL, *wln = NULL, *wfr = NULL;
+            DmGpuBpeInput inp = {0};
+            if (sp_build_gpu_input(&corp, &intern, &inp, &sid, &wst, &wln, &wfr) == 0) {
+                size_t vsz = intern.count;
+                uint32_t *pc = (uint32_t *)calloc(vsz * vsz, sizeof(uint32_t));
+                if (pc && dm_gpu_bpe_pair_count(gpu, &inp, pc) == 0) {
+                    const char *ap = NULL, *bp = NULL;
+                    if (sp_best_pair_gpu(pc, (uint32_t)vsz, &intern, minf, &ap, &bp)) {
+                        la = xstrdup(ap); lb = xstrdup(bp); found = (la && lb) ? 1 : 0;
+                    } else { found = -1; }
+                }
+                free(pc); free(sid); free(wst); free(wln); free(wfr);
+            }
+        }
+#endif
+
+        if (!found) {
+            PairStats ps = {0}; if (collect_pairs(&corp, &ps) != 0) { pairstats_free(&ps); goto bad; }
+            PairStat *b = best_pair(&ps, minf);
+            if (!b) { pairstats_free(&ps); break; }
+            la = xstrdup(b->a); lb = xstrdup(b->b); pairstats_free(&ps);
+            found = (la && lb) ? 1 : 0;
+        } else if (found < 0) { break; }
+
+        if (!found || !la || !lb || merges_push(&m->merges, la, lb) != 0 || symcorpus_merge(&corp, la, lb) != 0)
+            { free(la); free(lb); goto bad; }
+#ifdef DM_GPU
+        char *joined = concat2(la, lb);
+        if (joined) { sp_intern_add(&intern, joined); free(joined); }
+#endif
+        free(la); free(lb);
+    }
+
     for (size_t i = 0; i < chars.count; i++) if (strvec_push_unique(&pieces, chars.items[i]) != 0) goto bad;
     for (size_t i = 0; i < m->merges.count; i++) { char *j = concat2(m->merges.items[i].a, m->merges.items[i].b); if (!j || strvec_push_owned(&pieces, j) != 0) { free(j); goto bad; } }
-    int rc = build_vocab(&m->vocab, reserved, &pieces, vocab_size);
-    strvec_free(&chars); strvec_free(&pieces); symcorpus_free(&corp); return rc;
+    {
+        int rc = build_vocab(&m->vocab, reserved, &pieces, vocab_size);
+#ifdef DM_GPU
+        sp_intern_free(&intern);
+#endif
+        strvec_free(&chars); strvec_free(&pieces); symcorpus_free(&corp); return rc;
+    }
 bad:
+#ifdef DM_GPU
+    sp_intern_free(&intern);
+#endif
     strvec_free(&chars); strvec_free(&pieces); symcorpus_free(&corp); return -1;
 }
 
@@ -388,7 +494,7 @@ int dm_sentencepiece_cli(int argc, char **argv) {
     if (argc <= start) { usage(argv[0]); return 2; }
     const char *cmd = argv[start];
     if (strcmp(cmd, "train") == 0) {
-        StrVec inputs = {0}, users = {0}, reserved = {0}; const char *out = NULL, *prefix = "spm", *type = "unigram", *norm = "nfkc", *rule_path = NULL, *unk = SP_UNK, *bos = SP_BOS, *eos = SP_EOS, *pad = SP_PAD; size_t vs = 0, minf = 2, seed = 8000, maxlen = 16; int dummy = 1, stats = 0, write_vocab = 0;
+        StrVec inputs = {0}, users = {0}, reserved = {0}; const char *out = NULL, *prefix = "spm", *type = "unigram", *norm = "nfkc", *rule_path = NULL, *unk = SP_UNK, *bos = SP_BOS, *eos = SP_EOS, *pad = SP_PAD; size_t vs = 0, minf = 2, seed = 8000, maxlen = 16; int dummy = 1, stats = 0, write_vocab = 0, use_gpu = 0, gpu_device = 0;
         for (int i = start + 1; i < argc; i++) {
             if (strcmp(argv[i], "--input") == 0 && i + 1 < argc) while (i + 1 < argc && argv[i + 1][0] != '-') strvec_push_copy(&inputs, argv[++i]);
             else if (strcmp(argv[i], "--model-prefix") == 0 && i + 1 < argc) prefix = argv[++i];
@@ -409,16 +515,29 @@ int dm_sentencepiece_cli(int argc, char **argv) {
             else if (strcmp(argv[i], "--write-vocab") == 0) write_vocab = 1;
             else if (strcmp(argv[i], "--stats") == 0) stats = 1;
             else if (strcmp(argv[i], "--normalization-rule-tsv") == 0 && i + 1 < argc) rule_path = argv[++i];
+            else if (strcmp(argv[i], "--gpu") == 0) use_gpu = 1;
+            else if (strcmp(argv[i], "--gpu-device") == 0 && i + 1 < argc) { gpu_device = (int)strtol(argv[++i], NULL, 10); use_gpu = 1; }
             else { usage(argv[0]); return 2; }
         }
         if (!inputs.count || !vs) { usage(argv[0]); return 2; }
+        void *gpu_ctx = NULL;
+#ifdef DM_GPU
+        if (use_gpu && strcmp(type, "bpe") == 0) { gpu_ctx = dm_gpu_create(gpu_device, NULL); if (!gpu_ctx || !dm_gpu_ready((DmGpuCtx *)gpu_ctx)) { fprintf(stderr, "[spm] GPU init failed, falling back to CPU\n"); dm_gpu_destroy((DmGpuCtx *)gpu_ctx); gpu_ctx = NULL; } else { char _dname[256]={0}; dm_gpu_device_name((DmGpuCtx*)gpu_ctx,_dname,sizeof(_dname)); fprintf(stderr,"[spm] GPU: %s\n",_dname); } }
+        else if (use_gpu) fprintf(stderr, "[spm] --gpu only applies to BPE mode, using CPU for unigram\n");
+#else
+        if (use_gpu) fprintf(stderr, "[spm] built without GPU support, using CPU\n");
+#endif
         char outbuf[4096]; if (!out) { snprintf(outbuf, sizeof(outbuf), "%s.model", prefix); out = outbuf; }
         SPModel m = {0}; TextVocab lines = {0}; int rc = model_init(&m, type, norm, dummy, unk, bos, eos, pad); if (rc == 0) rc = load_rules_tsv(&m.rules, rule_path); if (rc == 0) rc = build_reserved(&m, &reserved, &users); if (rc == 0) rc = read_lines_normalized(inputs.items, inputs.count, &m, &lines);
-        if (rc == 0) rc = strcmp(type, "bpe") == 0 ? train_bpe(&lines, &m, &reserved, vs, minf) : train_unigram_lite(&lines, &m, &reserved, vs, seed, maxlen, minf);
+        if (rc == 0) rc = strcmp(type, "bpe") == 0 ? train_bpe(&lines, &m, &reserved, vs, minf, gpu_ctx) : train_unigram_lite(&lines, &m, &reserved, vs, seed, maxlen, minf);
         if (rc == 0) rc = write_model(&m, out);
         if (rc == 0 && write_vocab) { char vb[4096]; snprintf(vb, sizeof(vb), "%s.vocab", prefix); FILE *vf = fopen(vb, "wb"); if (vf) { for (size_t i = 0; i < m.vocab.count; i++) fprintf(vf, "%zu\t%s\n", i, m.vocab.items[i]); fclose(vf); } }
         if (rc == 0 && stats) fprintf(stderr, "{\"model_type\":\"%s\",\"vocab_size\":%zu,\"normalization\":\"%s\"}\n", m.model_type, m.vocab.count, m.normalization);
-        model_free(&m); textvocab_free(&lines); strvec_free(&inputs); strvec_free(&users); strvec_free(&reserved); return rc == 0 ? 0 : 1;
+        model_free(&m); textvocab_free(&lines); strvec_free(&inputs); strvec_free(&users); strvec_free(&reserved);
+#ifdef DM_GPU
+        dm_gpu_destroy((DmGpuCtx *)gpu_ctx);
+#endif
+        return rc == 0 ? 0 : 1;
     }
     if (strcmp(cmd, "encode") == 0) {
         const char *modelp = NULL, *input = NULL, *output = NULL, *fmt = "piece"; StrVec texts = {0}; int add_bos = 0, add_eos = 0;

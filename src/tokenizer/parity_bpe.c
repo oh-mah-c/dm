@@ -410,6 +410,8 @@ int dm_parity_bpe_cli(int argc, char **argv) {
             else if (strcmp(argv[i], "--max-dev-lines") == 0 && i + 1 < argc) max_dev_lines = (size_t)strtoull(argv[++i], NULL, 10);
             else if (strcmp(argv[i], "--keep-trace") == 0) keep_trace = 1;
             else if (strcmp(argv[i], "--stats") == 0) stats = 1;
+            else if (strcmp(argv[i], "--gpu") == 0) { /* GPU accepted but not used: training uses language steering between merges which serializes the algorithm */ }
+            else if (strcmp(argv[i], "--gpu-device") == 0 && i + 1 < argc) { i++; /* skip device arg */ }
             else { usage(argv[0]); strvec_free(&train_entries); strvec_free(&dev_entries); return 2; }
         }
         if (!out || !merges || (!input_labeled && !train_entries.count)) { usage(argv[0]); strvec_free(&train_entries); strvec_free(&dev_entries); return 2; }

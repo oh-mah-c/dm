@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef DM_GPU
+#include "gpu/dm_gpu.h"
+#endif
+
 #define DM_BPE_EOW "</w>"
 #define DM_BPE_SEPARATOR "@@"
 
@@ -400,7 +404,81 @@ static int merge_table_push(MergeTable *table, const char *left, const char *rig
     return 0;
 }
 
-static int learn_bpe(const WordVocab *words, size_t num_merges, size_t min_freq, MergeTable *merges, TokenVocab *symbol_counts);
+#ifdef DM_GPU
+/* Map a symbol string to its uint32 ID using symbol_counts as intern table.
+ * Returns UINT32_MAX if not found. */
+static uint32_t sym_intern_id(const TokenVocab *sym_counts, const char *sym) {
+    for (size_t i = 0; i < sym_counts->count; i++) {
+        if (strcmp(sym_counts->items[i].token, sym) == 0) return (uint32_t)i;
+    }
+    return UINT32_MAX;
+}
+
+/* Build DmGpuBpeInput flat arrays from SymbolVocab + intern table.
+ * Caller must free sym_ids, word_starts, word_lens, word_freqs. */
+static int build_gpu_bpe_input(const SymbolVocab *vocab, const TokenVocab *sym_counts,
+                                DmGpuBpeInput *out,
+                                uint32_t **sym_ids_buf, uint32_t **starts_buf,
+                                uint32_t **lens_buf,   uint32_t **freqs_buf) {
+    size_t total = 0;
+    for (size_t w = 0; w < vocab->count; w++) total += vocab->items[w].len;
+
+    *sym_ids_buf = (uint32_t *)malloc(total * sizeof(uint32_t));
+    *starts_buf  = (uint32_t *)malloc(vocab->count * sizeof(uint32_t));
+    *lens_buf    = (uint32_t *)malloc(vocab->count * sizeof(uint32_t));
+    *freqs_buf   = (uint32_t *)malloc(vocab->count * sizeof(uint32_t));
+    if (!*sym_ids_buf || !*starts_buf || !*lens_buf || !*freqs_buf) {
+        free(*sym_ids_buf); free(*starts_buf); free(*lens_buf); free(*freqs_buf);
+        return -1;
+    }
+
+    uint32_t offset = 0;
+    for (size_t w = 0; w < vocab->count; w++) {
+        const SymbolWord *word = &vocab->items[w];
+        (*starts_buf)[w] = offset;
+        (*lens_buf)[w]   = (uint32_t)word->len;
+        (*freqs_buf)[w]  = (uint32_t)word->freq;
+        for (size_t s = 0; s < word->len; s++) {
+            uint32_t id = sym_intern_id(sym_counts, word->symbols[s]);
+            if (id == UINT32_MAX) { free(*sym_ids_buf); free(*starts_buf); free(*lens_buf); free(*freqs_buf); return -1; }
+            (*sym_ids_buf)[offset++] = id;
+        }
+    }
+
+    out->sym_ids     = *sym_ids_buf;
+    out->total_syms  = total;
+    out->word_starts = *starts_buf;
+    out->word_lens   = *lens_buf;
+    out->word_freqs  = *freqs_buf;
+    out->n_words     = vocab->count;
+    out->vocab_size  = (uint32_t)sym_counts->count;
+    return 0;
+}
+
+/* Find best pair from dense pair_counts[V*V], returning left/right strings.
+ * Returns 1 if found, 0 if nothing exceeds min_freq. */
+static int best_pair_gpu(const uint32_t *pair_counts, uint32_t vocab_size,
+                          const TokenVocab *sym_counts, size_t min_freq,
+                          const char **left_out, const char **right_out) {
+    uint32_t best_freq = (uint32_t)min_freq;
+    uint32_t best_a = UINT32_MAX, best_b = UINT32_MAX;
+    for (uint32_t a = 0; a < vocab_size; a++) {
+        for (uint32_t b = 0; b < vocab_size; b++) {
+            uint32_t f = pair_counts[(size_t)a * vocab_size + b];
+            if (f > best_freq || (f == best_freq && best_a == UINT32_MAX)) {
+                best_freq = f;
+                best_a = a; best_b = b;
+            }
+        }
+    }
+    if (best_a == UINT32_MAX) return 0;
+    *left_out  = sym_counts->items[best_a].token;
+    *right_out = sym_counts->items[best_b].token;
+    return 1;
+}
+#endif /* DM_GPU */
+
+static int learn_bpe(const WordVocab *words, size_t num_merges, size_t min_freq, MergeTable *merges, TokenVocab *symbol_counts, void *gpu_ctx);
 
 static void token_vocab_free(TokenVocab *v) {
     for (size_t i = 0; i < v->count; i++) free(v->items[i].token);
@@ -450,49 +528,89 @@ static int collect_symbol_counts(const SymbolVocab *vocab, TokenVocab *counts) {
     return 0;
 }
 
-static int learn_bpe(const WordVocab *words, size_t num_merges, size_t min_freq, MergeTable *merges, TokenVocab *symbol_counts) {
+static int learn_bpe(const WordVocab *words, size_t num_merges, size_t min_freq,
+                      MergeTable *merges, TokenVocab *symbol_counts, void *gpu_ctx) {
     SymbolVocab vocab = {0};
     if (symbol_vocab_from_words(words, &vocab) != 0) return -1;
     if (collect_symbol_counts(&vocab, symbol_counts) != 0) {
         symbol_vocab_free(&vocab);
         return -1;
     }
+
+#ifdef DM_GPU
+    DmGpuCtx *gpu = (DmGpuCtx *)gpu_ctx;
+#else
+    (void)gpu_ctx;
+#endif
+
     for (size_t i = 0; i < num_merges; i++) {
-        PairStats stats = {0};
-        if (collect_pair_stats(&vocab, &stats) != 0) {
-            pair_stats_free(&stats);
-            symbol_vocab_free(&vocab);
-            return -1;
+        char *left = NULL, *right = NULL;
+        size_t freq = 0;
+        int found = 0;
+
+#ifdef DM_GPU
+        /* GPU path: dense pair-count matrix, viable when vocab fits. */
+        if (gpu && dm_gpu_ready(gpu) && symbol_counts->count <= DM_GPU_BPE_MAX_VOCAB) {
+            uint32_t *sid = NULL, *wst = NULL, *wln = NULL, *wfr = NULL;
+            DmGpuBpeInput inp = {0};
+            if (build_gpu_bpe_input(&vocab, symbol_counts, &inp, &sid, &wst, &wln, &wfr) == 0) {
+                size_t vsz = (size_t)inp.vocab_size;
+                uint32_t *pair_counts = (uint32_t *)calloc(vsz * vsz, sizeof(uint32_t));
+                if (pair_counts && dm_gpu_bpe_pair_count(gpu, &inp, pair_counts) == 0) {
+                    const char *lstr = NULL, *rstr = NULL;
+                    if (best_pair_gpu(pair_counts, (uint32_t)vsz, symbol_counts, min_freq, &lstr, &rstr)) {
+                        uint32_t best_id_a = sym_intern_id(symbol_counts, lstr);
+                        uint32_t best_id_b = sym_intern_id(symbol_counts, rstr);
+                        freq  = (best_id_a < vsz && best_id_b < vsz)
+                                ? pair_counts[(size_t)best_id_a * vsz + best_id_b] : 0;
+                        left  = xstrdup(lstr);
+                        right = xstrdup(rstr);
+                        found = (left && right) ? 1 : 0;
+                    } else {
+                        found = -1; /* no pair above min_freq */
+                    }
+                }
+                free(pair_counts);
+                free(sid); free(wst); free(wln); free(wfr);
+            }
+            /* found == 0 here means GPU allocation failed — fall through to CPU */
         }
-        const PairStat *best = NULL;
-        int has = best_pair(&stats, min_freq, &best);
-        if (has <= 0) {
+#endif /* DM_GPU */
+
+        /* CPU fallback (also used when GPU not available or vocab too large). */
+        if (!found) {
+            PairStats stats = {0};
+            if (collect_pair_stats(&vocab, &stats) != 0) {
+                pair_stats_free(&stats);
+                symbol_vocab_free(&vocab);
+                return -1;
+            }
+            const PairStat *best = NULL;
+            int has = best_pair(&stats, min_freq, &best);
+            if (has <= 0) { pair_stats_free(&stats); break; }
+            left  = xstrdup(best->left);
+            right = xstrdup(best->right);
+            freq  = best->freq;
             pair_stats_free(&stats);
+            found = (left && right) ? 1 : 0;
+        } else if (found < 0) {
+            /* GPU found no pair above min_freq */
             break;
         }
-        char *left = xstrdup(best->left);
-        char *right = xstrdup(best->right);
-        size_t freq = best->freq;
-        if (!left || !right || merge_table_push(merges, left, right) != 0) {
-            free(left);
-            free(right);
-            pair_stats_free(&stats);
+
+        if (!found || !left || !right || merge_table_push(merges, left, right) != 0) {
+            free(left); free(right);
             symbol_vocab_free(&vocab);
             return -1;
         }
         char *joined = concat2(left, right);
-        if (!joined || token_vocab_add(symbol_counts, joined, freq) != 0 || symbol_vocab_merge(&vocab, left, right) != 0) {
-            free(joined);
-            free(left);
-            free(right);
-            pair_stats_free(&stats);
+        if (!joined || token_vocab_add(symbol_counts, joined, freq) != 0 ||
+            symbol_vocab_merge(&vocab, left, right) != 0) {
+            free(joined); free(left); free(right);
             symbol_vocab_free(&vocab);
             return -1;
         }
-        free(joined);
-        free(left);
-        free(right);
-        pair_stats_free(&stats);
+        free(joined); free(left); free(right);
     }
     symbol_vocab_free(&vocab);
     return 0;
@@ -717,7 +835,7 @@ static void decode_text(const char *line, const char *sep, FILE *out) {
 }
 
 static void usage(const char *prog) {
-    fprintf(stderr, "Usage: %s bpe learn-bpe -i <corpus...> -m <merges> [-o codes] [--min-frequency N] [--vocab-out path] [--stats]\n", prog);
+    fprintf(stderr, "Usage: %s bpe learn-bpe -i <corpus...> -m <merges> [-o codes] [--min-frequency N] [--vocab-out path] [--stats] [--gpu] [--gpu-device N]\n", prog);
     fprintf(stderr, "       %s bpe apply-bpe -c codes [-i input] [-o output] [--vocabulary vocab] [--vocabulary-threshold N]\n", prog);
     fprintf(stderr, "       %s bpe decode [-i input] [-o output] [--separator @@]\n", prog);
     fprintf(stderr, "       %s bpe vocab -i <corpus...> [-o vocab]\n", prog);
@@ -737,6 +855,8 @@ int dm_bpe_cli(int argc, char **argv) {
         const char *vocab_out = NULL;
         size_t merges_n = 0, min_frequency = 2;
         int stats = 0;
+        int use_gpu = 0;
+        int gpu_device = 0;
         for (int i = start + 1; i < argc; i++) {
             if ((strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--input") == 0) && i + 1 < argc) {
                 while (i + 1 < argc && argv[i + 1][0] != '-') {
@@ -752,6 +872,11 @@ int dm_bpe_cli(int argc, char **argv) {
                 vocab_out = argv[++i];
             } else if (strcmp(argv[i], "--stats") == 0) {
                 stats = 1;
+            } else if (strcmp(argv[i], "--gpu") == 0) {
+                use_gpu = 1;
+            } else if (strcmp(argv[i], "--gpu-device") == 0 && i + 1 < argc) {
+                gpu_device = (int)strtol(argv[++i], NULL, 10);
+                use_gpu = 1;
             } else {
                 usage(argv[0]);
                 strvec_free(&inputs);
@@ -767,9 +892,28 @@ int dm_bpe_cli(int argc, char **argv) {
         int rc = 0;
         if (inputs.count == 0) rc = read_words_from_stdin(&words);
         for (size_t i = 0; rc == 0 && i < inputs.count; i++) rc = read_words_from_file(inputs.items[i], &words);
+
+        void *gpu_ctx = NULL;
+#ifdef DM_GPU
+        if (use_gpu) {
+            gpu_ctx = dm_gpu_create(gpu_device, NULL);
+            if (!gpu_ctx || !dm_gpu_ready((DmGpuCtx *)gpu_ctx)) {
+                fprintf(stderr, "[bpe] GPU init failed, falling back to CPU\n");
+                dm_gpu_destroy((DmGpuCtx *)gpu_ctx);
+                gpu_ctx = NULL;
+            } else {
+                char _dname[256] = {0};
+                dm_gpu_device_name((DmGpuCtx *)gpu_ctx, _dname, sizeof(_dname));
+                fprintf(stderr, "[bpe] GPU: %s\n", _dname);
+            }
+        }
+#else
+        if (use_gpu) fprintf(stderr, "[bpe] built without GPU support, using CPU\n");
+#endif
+
         MergeTable merges = {0};
         TokenVocab symbols = {0};
-        if (rc == 0 && learn_bpe(&words, merges_n, min_frequency, &merges, &symbols) != 0) rc = -1;
+        if (rc == 0 && learn_bpe(&words, merges_n, min_frequency, &merges, &symbols, gpu_ctx) != 0) rc = -1;
         if (rc == 0 && write_merges_file(&merges, output) != 0) rc = -1;
         if (rc == 0 && vocab_out && write_token_vocab(&symbols, vocab_out) != 0) rc = -1;
         if (rc == 0 && stats) {
@@ -781,6 +925,9 @@ int dm_bpe_cli(int argc, char **argv) {
         token_vocab_free(&symbols);
         word_vocab_free(&words);
         strvec_free(&inputs);
+#ifdef DM_GPU
+        dm_gpu_destroy((DmGpuCtx *)gpu_ctx);
+#endif
         return rc == 0 ? 0 : 1;
     }
     if (strcmp(cmd, "apply-bpe") == 0) {
