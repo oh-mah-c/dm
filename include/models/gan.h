@@ -1,7 +1,7 @@
 #ifndef DM_GAN_H
 #define DM_GAN_H
 
-#include "models/tensor.h"
+#include "core/dm_engine.h"
 
 typedef struct {
     int input_dim;

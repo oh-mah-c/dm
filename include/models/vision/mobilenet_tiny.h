@@ -1,7 +1,7 @@
 #ifndef DM_MOBILENET_TINY_H
 #define DM_MOBILENET_TINY_H
 
-#include "models/tensor.h"
+#include "core/dm_engine.h"
 
 typedef enum {
     DM_UIB_FFN = 0,

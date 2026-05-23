@@ -1,7 +1,10 @@
 CC = gcc
 VULKAN_HEADERS_DIR = third_party/Vulkan-Hpp/Vulkan-Headers
 VULKAN_CFLAGS = -I$(VULKAN_HEADERS_DIR)/include
-CFLAGS = -D_POSIX_C_SOURCE=200809L -Iinclude -Iinclude/core $(VULKAN_CFLAGS) -Wall -Wextra -O2 -pthread -fPIC
+TF_IFLAGS = -Isrc/core/dm_engine \
+            -Isrc/core/dm_engine/third_party/xla \
+            -Isrc/core/dm_engine/third_party/xla/third_party/tsl
+CFLAGS = -D_POSIX_C_SOURCE=200809L -Iinclude -Iinclude/core $(VULKAN_CFLAGS) $(TF_IFLAGS) -Wall -Wextra -O2 -pthread -fPIC
 SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin
@@ -295,9 +298,9 @@ $(TEXTBOOK_GENERATOR_TARGET): $(SRC_DIR)/tools/dm_textbook_generator.c $(SRC_DIR
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(SRC_DIR)/tools/dm_textbook_generator.c $(SRC_DIR)/generator/textbook_generator.c -o $@ $(LDFLAGS)
 
-$(MOBILENET_TINY_TARGET): $(SRC_DIR)/tools/dm_mobilenet_tiny.c $(SRC_DIR)/models/vision/mobilenet_tiny.c $(SRC_DIR)/models/tensor.c $(SRC_DIR)/encoding/image_patchify.c include/models/vision/mobilenet_tiny.h include/models/tensor.h include/encoding/image_patchify.h
+$(MOBILENET_TINY_TARGET): $(SRC_DIR)/tools/dm_mobilenet_tiny.c $(SRC_DIR)/models/vision/mobilenet_tiny.c $(SRC_DIR)/core/dm_engine.c $(SRC_DIR)/encoding/image_patchify.c include/models/vision/mobilenet_tiny.h include/core/dm_engine.h include/encoding/image_patchify.h
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) -Ithird_party/tensorflow -Ithird_party/tensorflow/third_party/xla -Ithird_party/tensorflow/third_party/xla/third_party/tsl $(SRC_DIR)/tools/dm_mobilenet_tiny.c $(SRC_DIR)/models/vision/mobilenet_tiny.c $(SRC_DIR)/models/tensor.c $(SRC_DIR)/encoding/image_patchify.c -o $@ $(LDFLAGS) -L.venv/lib/python3.12/site-packages/tensorflow -ltensorflow_cc -ltensorflow_framework -Wl,-rpath,.venv/lib/python3.12/site-packages/tensorflow
+	$(CC) $(CFLAGS) $(TF_IFLAGS) $(SRC_DIR)/tools/dm_mobilenet_tiny.c $(SRC_DIR)/models/vision/mobilenet_tiny.c $(SRC_DIR)/core/dm_engine.c $(SRC_DIR)/encoding/image_patchify.c -o $@ $(LDFLAGS) -L.venv/lib/python3.12/site-packages/tensorflow -ltensorflow_cc -ltensorflow_framework -Wl,-rpath,.venv/lib/python3.12/site-packages/tensorflow
 
 shaders: $(SPV_SHADERS)
 
@@ -318,9 +321,7 @@ $(SHADER_OUT_DIR)/%.spv: $(SHADER_DIR)/%.glsl
 		exit 127; \
 	fi
 
-TF_IFLAGS = -Ithird_party/tensorflow \
-            -Ithird_party/tensorflow/third_party/xla \
-            -Ithird_party/tensorflow/third_party/xla/third_party/tsl
+
 
 $(OBJ_DIR)/models/vision/mobilenet_tiny.o: $(SRC_DIR)/models/vision/mobilenet_tiny.c
 	@mkdir -p $(dir $@)

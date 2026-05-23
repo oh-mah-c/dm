@@ -500,7 +500,7 @@ DM_API DM_Status dm_image_patchify_raw(const float *in_nhwc,
                                        int         *out_patches);
 
 /* ─────────────────────────────────────────────────────────────────────────
- * § 8  Tensor (primitive operations — C-only, no TF dependency)
+ * § 8  Tensor (dm_engine — ops dispatch through TFE; DM_Tensor is NCHW float32)
  * ───────────────────────────────────────────────────────────────────────── */
 
 typedef struct {

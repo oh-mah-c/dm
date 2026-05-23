@@ -17,7 +17,7 @@
  * [seq_len × d_model].  The NCHW DM_Tensor is only used for input/output.
  */
 
-#include "models/tensor.h"
+#include "core/dm_engine.h"
 
 /* ── Variant selector ────────────────────────────────────────────────────── */
 typedef enum {
