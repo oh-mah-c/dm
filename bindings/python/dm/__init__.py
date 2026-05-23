@@ -1566,3 +1566,744 @@ class op:
         _dm_op_sgd_momentum_step(p, g, vel, len(param), lr, momentum,
                                   weight_decay, int(nesterov))
         return list(p), list(vel)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# § Transformer raw FFI signatures
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Config struct (used by forward-declare C wrappers, 10 ints + 2 floats)
+# We pass primitive args directly via the _raw wrappers — no struct needed.
+
+_dm_transformer_weight_count_raw = _fn("dm_transformer_weight_count_raw",
+                                        c_size_t, c_int, c_int, c_int)
+_dm_transformer_save_raw = _fn("dm_transformer_save_raw",
+                                DM_Status, c_char_p, c_int, c_int, c_int,
+                                ctypes.POINTER(c_float))
+_dm_transformer_load_raw = _fn("dm_transformer_load_raw",
+                                DM_Status, c_char_p,
+                                ctypes.POINTER(c_int), ctypes.POINTER(c_int),
+                                ctypes.POINTER(c_int),
+                                ctypes.POINTER(ctypes.POINTER(c_float)))
+_dm_transformer_free_weights = _fn("dm_transformer_free_weights", None,
+                                    ctypes.POINTER(c_float))
+_dm_transformer_forward_raw  = _fn("dm_transformer_forward_raw",  DM_Status,
+                                    c_int, c_int, c_int,
+                                    ctypes.POINTER(c_float),
+                                    ctypes.POINTER(c_int), c_int,
+                                    ctypes.POINTER(c_int), c_int,
+                                    ctypes.POINTER(c_float))
+_dm_transformer_encode_raw   = _fn("dm_transformer_encode_raw",   DM_Status,
+                                    c_int, c_int, c_int,
+                                    ctypes.POINTER(c_float),
+                                    ctypes.POINTER(c_int), c_int,
+                                    ctypes.POINTER(c_float))
+_dm_transformer_decode_raw   = _fn("dm_transformer_decode_raw",   DM_Status,
+                                    c_int, c_int, c_int,
+                                    ctypes.POINTER(c_float),
+                                    ctypes.POINTER(c_int), c_int,
+                                    ctypes.POINTER(c_float), c_int,
+                                    ctypes.POINTER(c_float))
+_dm_transformer_lr_schedule_raw = _fn("dm_transformer_lr_schedule_raw",
+                                       c_float, c_int, c_int, c_int)
+_dm_transformer_positional_encoding_raw = _fn(
+    "dm_transformer_positional_encoding_raw",
+    None, c_int, c_int, ctypes.POINTER(c_float))
+_dm_transformer_causal_mask_raw = _fn("dm_transformer_causal_mask_raw",
+                                       None, c_int, ctypes.POINTER(c_float))
+
+# MobileNet Tiny simple forward
+_dm_mobilenet_tiny_forward_raw2 = _fn("dm_mobilenet_tiny_forward_raw2",
+                                       DM_Status,
+                                       ctypes.POINTER(c_float), c_int, c_int,
+                                       ctypes.c_uint32,
+                                       ctypes.POINTER(c_float))
+
+# ─────────────────────────────────────────────────────────────────────────────
+# § losses — standard loss functions (pure Python over dm.op primitives)
+# ─────────────────────────────────────────────────────────────────────────────
+
+import math as _math
+
+
+class losses:
+    """Standard loss functions implemented over dm.op primitives."""
+
+    @staticmethod
+    def cross_entropy(logits: List[float], targets: List[int],
+                      num_classes: int) -> float:
+        """
+        Softmax cross-entropy loss.
+
+        logits  : flat float list [batch × num_classes]
+        targets : int list [batch]  — gold class indices
+        Returns scalar mean loss.
+        """
+        batch = len(targets)
+        # copy logits, apply softmax row-wise
+        arr = (c_float * len(logits))(*logits)
+        _dm_op_softmax_rows(arr, batch, num_classes)
+        total = 0.0
+        for i, t in enumerate(targets):
+            p = arr[i * num_classes + t]
+            total -= _math.log(max(float(p), 1e-12))
+        return total / batch
+
+    @staticmethod
+    def mse(predictions: List[float], targets: List[float]) -> float:
+        """Mean squared error."""
+        n = len(predictions)
+        if n == 0:
+            return 0.0
+        return sum((p - t) ** 2 for p, t in zip(predictions, targets)) / n
+
+    @staticmethod
+    def binary_cross_entropy(predictions: List[float],
+                              targets: List[float]) -> float:
+        """Element-wise BCE, predictions in (0,1)."""
+        n = len(predictions)
+        if n == 0:
+            return 0.0
+        total = 0.0
+        for p, t in zip(predictions, targets):
+            p = max(min(float(p), 1 - 1e-7), 1e-7)
+            total -= t * _math.log(p) + (1 - t) * _math.log(1 - p)
+        return total / n
+
+    @staticmethod
+    def kl_divergence(mean: List[float], logvar: List[float]) -> float:
+        """KL(q||p) for VAE: -0.5 * sum(1 + logvar - mean² - exp(logvar))."""
+        return -0.5 * sum(
+            1 + lv - m * m - _math.exp(lv)
+            for m, lv in zip(mean, logvar)
+        ) / len(mean)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# § Model — base class for custom models
+# ─────────────────────────────────────────────────────────────────────────────
+
+class Model:
+    """
+    Base class for custom DM models (similar to tf.keras.Model).
+
+    Subclass and implement:
+      - forward(x)  → output Tensor or list
+      - parameters() → list of (param_list, grad_list, state_dict)
+
+    Then call model.fit(dataset, epochs, loss_fn, optimizer).
+    """
+
+    def forward(self, x):
+        raise NotImplementedError("Subclass must implement forward()")
+
+    def parameters(self) -> List[dict]:
+        """
+        Return a list of parameter dicts, each with keys:
+          'param'  : List[float]   — the parameter values
+          'grad'   : List[float]   — gradient buffer (same length, zeroed)
+          'state'  : dict          — optimizer state (m, v, etc.)
+          'name'   : str           — human label (optional)
+        Subclass must override to return actual parameters.
+        """
+        return []
+
+    def zero_grad(self) -> None:
+        """Zero all gradient buffers."""
+        for p in self.parameters():
+            p["grad"] = [0.0] * len(p["param"])
+
+    def __call__(self, x):
+        return self.forward(x)
+
+    # ── Training loop ────────────────────────────────────────────────────────
+
+    def fit(self,
+            dataset,
+            epochs: int = 1,
+            loss_fn=None,
+            optimizer: str = "adam",
+            lr: float = 1e-3,
+            batch_size: int = 32,
+            verbose: bool = True,
+            callbacks: Optional[List] = None) -> List[float]:
+        """
+        High-level training loop.
+
+        Parameters
+        ----------
+        dataset   : iterable of (x, y) pairs — or a list of such pairs.
+        epochs    : number of full passes over the dataset.
+        loss_fn   : callable(predictions, targets) → scalar float.
+                    Defaults to dm.losses.cross_entropy.
+        optimizer : "adam" | "adagrad" | "sgd"
+        lr        : learning rate.
+        batch_size: mini-batch size (data is batched automatically if dataset
+                    is a plain list).
+        verbose   : print epoch loss.
+        callbacks : list of callables(epoch, loss) called after each epoch.
+
+        Returns
+        -------
+        history : list of epoch mean losses.
+        """
+        if loss_fn is None:
+            loss_fn = losses.mse
+
+        history: List[float] = []
+        params = self.parameters()
+
+        # initialise optimizer state if not present
+        for p in params:
+            if "state" not in p:
+                p["state"] = {}
+            st = p["state"]
+            n = len(p["param"])
+            if "t" not in st:       st["t"] = 0
+            if "m" not in st:       st["m"] = [0.0] * n
+            if "v" not in st:       st["v"] = [0.0] * n
+            if "g_sum" not in st:   st["g_sum"] = [0.0] * n
+            if "velocity" not in st:st["velocity"] = [0.0] * n
+
+        data = list(dataset)
+
+        for epoch in range(epochs):
+            epoch_loss = 0.0
+            steps = 0
+
+            # batch the data
+            for start in range(0, len(data), batch_size):
+                batch = data[start:start + batch_size]
+                xs = [b[0] for b in batch]
+                ys = [b[1] for b in batch]
+
+                # forward
+                preds = [self.forward(x) for x in xs]
+
+                # loss
+                loss_val = loss_fn(preds, ys)
+                epoch_loss += loss_val
+                steps += 1
+
+                # NOTE: full autograd is not yet implemented.
+                # Users should subclass and override _backward() to compute
+                # gradients manually, or use op.adam_step directly.
+                self._backward(xs, ys, preds, loss_val)
+
+                # optimizer step
+                for p in params:
+                    st = p["state"]
+                    st["t"] += 1
+                    if optimizer == "adam":
+                        p["param"], st["m"], st["v"] = op.adam_step(
+                            p["param"], p["grad"], st["m"], st["v"],
+                            lr=lr, t=st["t"])
+                    elif optimizer == "adagrad":
+                        p["param"], st["g_sum"] = op.adagrad_step(
+                            p["param"], p["grad"], st["g_sum"], lr=lr)
+                    elif optimizer == "sgd":
+                        p["param"], st["velocity"] = op.sgd_momentum_step(
+                            p["param"], p["grad"], st["velocity"], lr=lr)
+                    else:
+                        raise ValueError(f"Unknown optimizer: '{optimizer}'")
+
+                self.zero_grad()
+
+            mean_loss = epoch_loss / max(steps, 1)
+            history.append(mean_loss)
+
+            if verbose:
+                print(f"Epoch {epoch + 1}/{epochs}  loss={mean_loss:.6f}")
+
+            if callbacks:
+                for cb in callbacks:
+                    cb(epoch + 1, mean_loss)
+
+        return history
+
+    def _backward(self, xs, ys, preds, loss_val):
+        """
+        Override in subclass to compute gradients and store in param['grad'].
+        Default is a no-op (use manual gradient computation or autograd when
+        available).
+        """
+        pass
+
+    def predict(self, x):
+        """Run forward pass on a single input."""
+        return self.forward(x)
+
+    def evaluate(self, dataset, loss_fn=None) -> Tuple[float, float]:
+        """
+        Evaluate on a dataset.  Returns (mean_loss, accuracy).
+        accuracy is fraction of correct top-1 predictions (if targets are ints).
+        """
+        if loss_fn is None:
+            loss_fn = losses.mse
+        total_loss = 0.0
+        correct = 0
+        total = 0
+        for x, y in dataset:
+            pred = self.forward(x)
+            if isinstance(pred, (list, tuple)) and isinstance(y, int):
+                total_loss += losses.cross_entropy(pred, [y], len(pred))
+                predicted_class = max(range(len(pred)), key=lambda i: pred[i])
+                if predicted_class == y:
+                    correct += 1
+            else:
+                if not isinstance(pred, list):
+                    pred = [pred]
+                if not isinstance(y, list):
+                    y = [y]
+                total_loss += loss_fn(pred, y)
+            total += 1
+        mean_loss = total_loss / max(total, 1)
+        accuracy  = correct / max(total, 1)
+        return mean_loss, accuracy
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# § models — pre-built model wrappers (importable like TensorFlow)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class models:
+    """
+    Pre-built DM models.  Import and use like TensorFlow/Keras:
+
+        from dm import models
+        m = models.ResNet(layers=18, classes=1000)
+        logits = m.forward(image_tensor)
+
+    All models expose:
+        .forward(input_tensor_or_list) → List[float]
+        .save(path)  /  .load(path)
+        .weight_count → int
+    """
+
+    # ── Vision ─────────────────────────────────────────────────────────────
+
+    class ResNet(Model):
+        """ResNet-18 vision classifier.
+
+        Parameters
+        ----------
+        layers  : int  — only 18 supported currently.
+        classes : int  — number of output classes.
+        seed    : int  — weight initialization seed.
+        """
+        def __init__(self, layers: int = 18, classes: int = 1000,
+                     seed: int = 42):
+            if layers != 18:
+                raise ValueError("dm.models.ResNet currently supports layers=18 only")
+            self.layers  = layers
+            self.classes = classes
+            self.seed    = seed
+            self._weights: Optional[List[float]] = None
+
+        def forward(self, x) -> List[float]:
+            """
+            x : dm.Tensor  NCHW (1, 3, H, W)  or flat List[float] of 3*H*W values.
+            Returns: List[float] logits of length `classes`.
+            """
+            if isinstance(x, Tensor):
+                in_t = x
+            else:
+                in_t = Tensor(1, 3, int(_math.sqrt(len(x) // 3)),
+                               int(_math.sqrt(len(x) // 3)))
+                in_t.from_list(x)
+            out_t = Tensor(1, self.classes, 1, 1)
+            _check(_dm_op_resnet18_forward(in_t._ptr(), out_t._ptr(),
+                                            self.classes, self.seed),
+                   "dm.models.ResNet.forward")
+            return out_t.to_list()
+
+        @property
+        def weight_count(self) -> int:
+            """Approximate ResNet-18 parameter count."""
+            return 11_689_512  # standard ResNet-18
+
+        def save(self, path: str) -> None:
+            raise NotImplementedError("ResNet weight serialisation not yet implemented")
+
+        def load(self, path: str) -> None:
+            raise NotImplementedError("ResNet weight loading not yet implemented")
+
+    class ViT(Model):
+        """Vision Transformer (Dosovitskiy et al. 2021).
+
+        Variants: 'tiny', 'small', 'base', 'large', 'huge'
+        """
+        _VARIANTS = {"tiny": 0, "small": 1, "base": 2, "large": 3, "huge": 4}
+
+        def __init__(self, variant: str = "base", classes: int = 1000,
+                     img_size: int = 224, seed: int = 42):
+            if variant not in self._VARIANTS:
+                raise ValueError(f"ViT variant must be one of {list(self._VARIANTS)}")
+            self.variant   = variant
+            self._var_int  = self._VARIANTS[variant]
+            self.classes   = classes
+            self.img_size  = img_size
+            self.seed      = seed
+
+        def forward(self, x) -> List[float]:
+            if isinstance(x, Tensor):
+                in_t = x
+            else:
+                in_t = Tensor(1, 3, self.img_size, self.img_size)
+                in_t.from_list(x)
+            out_t = Tensor(1, self.classes, 1, 1)
+            _check(_dm_op_vit_forward(in_t._ptr(), out_t._ptr(),
+                                       self._var_int, self.classes, self.seed),
+                   "dm.models.ViT.forward")
+            return out_t.to_list()
+
+        @property
+        def weight_count(self) -> int:
+            return int(_dm_op_vit_param_count(self._var_int, self.img_size, 16,
+                                               self.classes))
+
+    class TinyViT(Model):
+        """TinyViT (Wu et al. 2022).  Variants: '5m', '11m', '21m'."""
+        _VARIANTS = {"5m": 0, "11m": 1, "21m": 2}
+
+        def __init__(self, variant: str = "21m", classes: int = 1000,
+                     img_size: int = 224):
+            if variant not in self._VARIANTS:
+                raise ValueError(f"TinyViT variant must be one of {list(self._VARIANTS)}")
+            self.variant  = variant
+            self._var_int = self._VARIANTS[variant]
+            self.classes  = classes
+            self.img_size = img_size
+            self._impl    = TinyViT(self._var_int, classes, img_size)
+
+        def load(self, path: str) -> None:
+            """Load weights from a .bin file."""
+            self._impl.load_weights(path)
+
+        def save(self, path: str) -> None:
+            raise NotImplementedError("Use dm_tinyvit_cfg_save via CLI for now")
+
+        def forward(self, x) -> List[float]:
+            """x: flat NHWC float list [1 × H × W × 3] in [0,1]."""
+            if isinstance(x, list):
+                return self._impl.forward(x, 1)
+            raise TypeError("TinyViT.forward expects a flat NHWC list")
+
+        @property
+        def weight_count(self) -> int:
+            return TinyViT.weight_count(self._var_int, self.classes, self.img_size)
+
+    class MobileNetTiny(Model):
+        """MobileNetV4-Tiny vision classifier."""
+
+        def __init__(self, image_size: int = 224, classes: int = 1000,
+                     seed: int = 1337):
+            self.image_size = image_size
+            self.classes    = classes
+            self.seed       = seed
+            self._impl      = MobileNetTiny(image_size, classes, seed)
+
+        def load_head(self, path: str) -> None:
+            self._impl.load_head(path)
+
+        def save_head(self, path: str) -> None:
+            self._impl.save_head(path)
+
+        def forward(self, x) -> List[float]:
+            """x: flat NCHW float list [3 × H × W] in [0,1]."""
+            if isinstance(x, list):
+                return self._impl.forward(x)
+            raise TypeError("MobileNetTiny.forward expects a flat NCHW list")
+
+        @property
+        def weight_count(self) -> int:
+            return 3_600_000  # approximate MobileNetV4-Tiny
+
+    # ── Language ──────────────────────────────────────────────────────────
+
+    class BERTModel(Model):
+        """BERT encoder (Devlin et al. 2019).
+
+        Variants: 'base' (110M params), 'large' (340M params).
+        """
+        _VARIANTS = {"base": 0, "large": 1}
+
+        def __init__(self, variant: str = "base",
+                     vocab_size: int = 30522,
+                     max_seq_len: int = 512):
+            if variant not in self._VARIANTS:
+                raise ValueError(f"BERT variant must be 'base' or 'large'")
+            self.variant     = variant
+            self._var_int    = self._VARIANTS[variant]
+            self.vocab_size  = vocab_size
+            self.max_seq_len = max_seq_len
+            self._impl       = BERT(self._var_int, vocab_size, max_seq_len)
+
+        def load(self, path: str) -> None:
+            self._impl.load_weights(path)
+
+        def forward(self, token_ids: List[int],
+                    segment_ids: Optional[List[int]] = None,
+                    attention_mask: Optional[List[int]] = None
+                    ) -> Tuple[List[float], List[float]]:
+            """
+            Returns (hidden_states [seq × H], cls_vector [H]).
+            """
+            if segment_ids is None:
+                segment_ids = [0] * len(token_ids)
+            return self._impl.forward(token_ids, segment_ids, attention_mask)
+
+        @property
+        def weight_count(self) -> int:
+            return BERT.weight_count(self._var_int, self.vocab_size, self.max_seq_len)
+
+    class TransformerModel(Model):
+        """Full encoder-decoder Transformer (Vaswani et al. 2017).
+
+        Variants: 'base' (65M), 'big' (213M).
+        """
+        _VARIANTS = {"base": 0, "big": 1}
+
+        def __init__(self, variant: str = "base",
+                     vocab_size: int = 32000,
+                     max_seq_len: int = 512):
+            if variant not in self._VARIANTS:
+                raise ValueError(f"Transformer variant must be 'base' or 'big'")
+            self.variant     = variant
+            self._var_int    = self._VARIANTS[variant]
+            self.vocab_size  = vocab_size
+            self.max_seq_len = max_seq_len
+            self._weights_ptr: Optional[ctypes.POINTER(c_float)] = None
+            self._weights_owner = False
+
+        @property
+        def weight_count(self) -> int:
+            return _dm_transformer_weight_count_raw(
+                self._var_int, self.vocab_size, self.max_seq_len)
+
+        def load(self, path: str) -> None:
+            self._free_weights()
+            v = c_int(0); vs = c_int(0); ms = c_int(0)
+            ptr = ctypes.POINTER(c_float)()
+            _check(_dm_transformer_load_raw(
+                _enc(path), ctypes.byref(v), ctypes.byref(vs),
+                ctypes.byref(ms), ctypes.byref(ptr)),
+                "dm.models.Transformer.load")
+            self._var_int    = v.value
+            self.vocab_size  = vs.value
+            self.max_seq_len = ms.value
+            self._weights_ptr  = ptr
+            self._weights_owner = True
+
+        def save(self, path: str) -> None:
+            if not self._weights_ptr:
+                raise RuntimeError("No weights to save")
+            _check(_dm_transformer_save_raw(
+                _enc(path), self._var_int,
+                self.vocab_size, self.max_seq_len, self._weights_ptr),
+                "dm.models.Transformer.save")
+
+        def _free_weights(self):
+            if self._weights_ptr and self._weights_owner:
+                _dm_transformer_free_weights(self._weights_ptr)
+                self._weights_ptr = None
+                self._weights_owner = False
+
+        def __del__(self):
+            self._free_weights()
+
+        def forward(self, src_tokens: List[int],
+                    tgt_tokens: List[int]) -> List[float]:
+            """
+            Returns flat logits list [tgt_seq × vocab_size].
+            """
+            if not self._weights_ptr:
+                raise RuntimeError("No weights loaded. Call load() first.")
+            tgt_seq = len(tgt_tokens)
+            logits = (c_float * (tgt_seq * self.vocab_size))()
+            src_arr = (c_int * len(src_tokens))(*src_tokens)
+            tgt_arr = (c_int * tgt_seq)(*tgt_tokens)
+            _check(_dm_transformer_forward_raw(
+                self._var_int, self.vocab_size, self.max_seq_len,
+                self._weights_ptr,
+                src_arr, len(src_tokens),
+                tgt_arr, tgt_seq,
+                logits),
+                "dm.models.Transformer.forward")
+            return list(logits)
+
+        def encode(self, src_tokens: List[int]) -> List[float]:
+            """Returns encoder output [src_seq × d_model]."""
+            if not self._weights_ptr:
+                raise RuntimeError("No weights loaded.")
+            # d_model from variant: base=512, big=1024
+            d_model = 512 if self._var_int == 0 else 1024
+            enc_out = (c_float * (len(src_tokens) * d_model))()
+            src_arr = (c_int * len(src_tokens))(*src_tokens)
+            _check(_dm_transformer_encode_raw(
+                self._var_int, self.vocab_size, self.max_seq_len,
+                self._weights_ptr, src_arr, len(src_tokens), enc_out),
+                "dm.models.Transformer.encode")
+            return list(enc_out)
+
+        def decode(self, tgt_tokens: List[int],
+                   enc_out: List[float], src_seq: int) -> List[float]:
+            """Returns logits [tgt_seq × vocab_size]."""
+            if not self._weights_ptr:
+                raise RuntimeError("No weights loaded.")
+            tgt_seq = len(tgt_tokens)
+            logits = (c_float * (tgt_seq * self.vocab_size))()
+            tgt_arr = (c_int * tgt_seq)(*tgt_tokens)
+            enc_arr = _fp(enc_out)
+            _check(_dm_transformer_decode_raw(
+                self._var_int, self.vocab_size, self.max_seq_len,
+                self._weights_ptr,
+                tgt_arr, tgt_seq,
+                enc_arr, src_seq, logits),
+                "dm.models.Transformer.decode")
+            return list(logits)
+
+        @staticmethod
+        def lr_schedule(d_model: int, step: int, warmup_steps: int = 4000) -> float:
+            """Eq. 3 warmup schedule from the paper."""
+            return float(_dm_transformer_lr_schedule_raw(d_model, step, warmup_steps))
+
+        @staticmethod
+        def positional_encoding(max_len: int, d_model: int) -> List[float]:
+            """Sinusoidal positional encoding table [max_len × d_model]."""
+            buf = (c_float * (max_len * d_model))()
+            _dm_transformer_positional_encoding_raw(max_len, d_model, buf)
+            return list(buf)
+
+        @staticmethod
+        def causal_mask(seq: int) -> List[float]:
+            """Upper-triangular causal mask [seq × seq]."""
+            buf = (c_float * (seq * seq))()
+            _dm_transformer_causal_mask_raw(seq, buf)
+            return list(buf)
+
+    # ── Generative ────────────────────────────────────────────────────────
+
+    class VAEModel(Model):
+        """Variational Auto-Encoder."""
+
+        def __init__(self, input_dim: int, hidden_dim: int = 256,
+                     latent_dim: int = 32, lr: float = 1e-3):
+            self._impl = VAE(input_dim, hidden_dim, latent_dim, lr)
+
+        def forward(self, x: List[float]) -> List[float]:
+            """Encode → reparameterise → decode.  Returns reconstruction."""
+            mean, logvar = self._impl.encode(x)
+            import random as _random
+            z = [m + _math.exp(lv * 0.5) * _random.gauss(0, 1)
+                 for m, lv in zip(mean, logvar)]
+            return self._impl.decode(z)
+
+        def encode(self, x: List[float]) -> Tuple[List[float], List[float]]:
+            return self._impl.encode(x)
+
+        def decode(self, z: List[float]) -> List[float]:
+            return self._impl.decode(z)
+
+        def train_step(self, x_batch: List[float]) -> float:
+            return self._impl.train_step(x_batch)
+
+    class GANModel(Model):
+        """Generative Adversarial Network."""
+
+        def __init__(self, input_dim: int, g_hidden: int = 256,
+                     noise_dim: int = 100, d_hidden: int = 256,
+                     maxout_k: int = 5, drop_prob: float = 0.5,
+                     lr: float = 0.01, momentum: float = 0.9,
+                     nesterov: bool = True):
+            self._impl = GAN(input_dim, g_hidden, noise_dim, d_hidden,
+                              maxout_k, drop_prob, lr, momentum, nesterov)
+            self.noise_dim = noise_dim
+
+        def forward(self, z: List[float]) -> List[float]:
+            """Generate fake sample from noise vector z."""
+            return self._impl.generate(z)
+
+        def generate(self, z_batch: List[float]) -> List[float]:
+            return self._impl.generate(z_batch)
+
+        def train_discriminator(self, real_x: List[float],
+                                 z: List[float]) -> float:
+            return self._impl.train_d_step(real_x, z)
+
+        def train_generator(self, z: List[float]) -> float:
+            return self._impl.train_g_step(z)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# § tokenizer — high-level named tokenizer factory (HuggingFace-style)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class tokenizer:
+    """
+    Named tokenizer factory.  Usage:
+
+        tok = dm.tokenizer.BPE()
+        tok.train("corpus.txt", vocab_size=8000, output="bpe.model")
+        ids = tok.encode("Hello world")
+        text = tok.decode(ids)
+
+    All tokenizer classes inherit from dm.Tokenizer and add a convenience
+    factory classmethod.
+    """
+
+    @staticmethod
+    def _make(type_str: str) -> Tokenizer:
+        return Tokenizer(type_str)
+
+    class BPE(Tokenizer):
+        """Byte-Pair Encoding tokenizer."""
+        def __init__(self): super().__init__("bpe")
+
+    class BPEDropout(Tokenizer):
+        """BPE with stochastic dropout regularisation."""
+        def __init__(self): super().__init__("bpe_dropout")
+
+    class Unigram(Tokenizer):
+        """Unigram language model subword tokenizer."""
+        def __init__(self): super().__init__("unigram")
+
+    class SentencePiece(Tokenizer):
+        """SentencePiece-lite tokenizer."""
+        def __init__(self): super().__init__("sentencepiece")
+
+    class WordPiece(Tokenizer):
+        """FastWordPiece tokenizer (BERT-style)."""
+        def __init__(self): super().__init__("wordpiece")
+
+    class GPE(Tokenizer):
+        """Grapheme Pair Encoding tokenizer."""
+        def __init__(self): super().__init__("gpe")
+
+    class ParityBPE(Tokenizer):
+        """Parity BPE tokenizer."""
+        def __init__(self): super().__init__("parity_bpe")
+
+    class MaximalMunch(Tokenizer):
+        """Maximal munch (greedy longest-match) tokenizer."""
+        def __init__(self): super().__init__("maximal_munch")
+
+    class Volt(Tokenizer):
+        """Vocabulary Learning via Optimal Transport (Volt)."""
+        def __init__(self): super().__init__("volt")
+
+        @staticmethod
+        def optimize(corpus_path: str, min_size: int = 1000,
+                     max_size: int = 32000, n_steps: int = 200,
+                     output_path: str = "volt.model") -> None:
+            """Run Volt vocab optimisation."""
+            Tokenizer.volt_run(corpus_path, min_size, max_size,
+                               n_steps, output_path)
+
+    class Faro(Tokenizer):
+        """FARO high-performance streaming tokenizer."""
+        def __init__(self): super().__init__("faro")
+
+    class TokenizerLab(Tokenizer):
+        """TokenizerLab — ablation study tokenizer."""
+        def __init__(self): super().__init__("tokenizer_lab")

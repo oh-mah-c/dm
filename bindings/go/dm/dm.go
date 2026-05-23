@@ -941,3 +941,494 @@ func OpSgdMomentumStep(param, grad, velocity []float32,
 		C.int(len(param)), C.float(lr), C.float(momentum),
 		C.float(weightDecay), C.int(n))
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Models — pre-built model wrappers
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Vision ────────────────────────────────────────────────────────────────
+
+// ResNet wraps the ResNet-18 image classifier.
+type ResNet struct {
+	Classes int
+	Seed    uint32
+}
+
+// NewResNet creates a ResNet-18 classifier.
+func NewResNet(classes int, seed uint32) *ResNet {
+	return &ResNet{Classes: classes, Seed: seed}
+}
+
+// Forward runs ResNet-18.  input is an NCHW tensor (1,3,H,W).
+func (m *ResNet) Forward(input *Tensor) ([]float32, error) {
+	out := NewTensor(1, m.Classes, 1, 1)
+	defer out.Free()
+	err := statusErr(
+		C.dm_op_resnet18_forward(&input.t, &out.t, C.int(m.Classes), C.uint(m.Seed)),
+		"dm.ResNet.Forward")
+	if err != nil {
+		return nil, err
+	}
+	return out.ToSlice(), nil
+}
+
+// ViTVariant enumerates Vision Transformer size variants.
+type ViTVariant int
+
+const (
+	ViTTiny  ViTVariant = 0
+	ViTSmall ViTVariant = 1
+	ViTBase  ViTVariant = 2
+	ViTLarge ViTVariant = 3
+	ViTHuge  ViTVariant = 4
+)
+
+// ViT wraps the Vision Transformer model.
+type ViT struct {
+	Variant  ViTVariant
+	Classes  int
+	ImgSize  int
+	Seed     uint32
+}
+
+// NewViT creates a ViT model.
+func NewViT(variant ViTVariant, classes, imgSize int, seed uint32) *ViT {
+	return &ViT{Variant: variant, Classes: classes, ImgSize: imgSize, Seed: seed}
+}
+
+// Forward runs ViT inference.  input is an NCHW tensor (1,3,H,W).
+func (m *ViT) Forward(input *Tensor) ([]float32, error) {
+	out := NewTensor(1, m.Classes, 1, 1)
+	defer out.Free()
+	err := statusErr(
+		C.dm_op_vit_forward(&input.t, &out.t,
+			C.int(m.Variant), C.int(m.Classes), C.uint(m.Seed)),
+		"dm.ViT.Forward")
+	if err != nil {
+		return nil, err
+	}
+	return out.ToSlice(), nil
+}
+
+// WeightCount returns the number of float32 parameters for this ViT config.
+func (m *ViT) WeightCount() int {
+	return int(C.dm_op_vit_param_count(C.int(m.Variant), C.int(m.ImgSize), 16, C.int(m.Classes)))
+}
+
+// MobileNetTiny wraps the MobileNetV4-Tiny classifier.
+type MobileNetTiny struct {
+	ImageSize int
+	Classes   int
+	Seed      uint32
+}
+
+// NewMobileNetTiny creates a MobileNetV4-Tiny model.
+func NewMobileNetTiny(imgSize, classes int, seed uint32) *MobileNetTiny {
+	return &MobileNetTiny{ImageSize: imgSize, Classes: classes, Seed: seed}
+}
+
+// Forward runs MobileNetTiny inference.  inputNCHW is a flat slice [3×H×W].
+func (m *MobileNetTiny) Forward(inputNCHW []float32) ([]float32, error) {
+	logits := make([]float32, m.Classes)
+	err := statusErr(
+		C.dm_mobilenet_tiny_forward_raw2(
+			(*C.float)(unsafe.Pointer(&inputNCHW[0])),
+			C.int(m.ImageSize), C.int(m.Classes), C.uint(m.Seed),
+			(*C.float)(unsafe.Pointer(&logits[0]))),
+		"dm.MobileNetTiny.Forward")
+	return logits, err
+}
+
+// ── Language ──────────────────────────────────────────────────────────────
+
+// BERTVariant enumerates BERT model sizes.
+type BERTVariant int
+
+const (
+	BERTBase  BERTVariant = 0
+	BERTLarge BERTVariant = 1
+)
+
+// BERTModel wraps the BERT encoder.
+type BERTModel struct {
+	Variant    BERTVariant
+	VocabSize  int
+	MaxSeqLen  int
+	weights    *C.float
+	ownsWeights bool
+}
+
+// NewBERT creates a BERT model handle.
+func NewBERT(variant BERTVariant, vocabSize, maxSeqLen int) *BERTModel {
+	return &BERTModel{Variant: variant, VocabSize: vocabSize, MaxSeqLen: maxSeqLen}
+}
+
+// Load reads weights from a file.
+func (m *BERTModel) Load(path string) error {
+	m.freeWeights()
+	cp := C.CString(path)
+	defer C.free(unsafe.Pointer(cp))
+	var v, vs, ms C.int
+	var ptr *C.float
+	rc := C.dm_bert_load_raw(cp, &v, &vs, &ms, &ptr)
+	if err := statusErr(rc, "dm.BERT.Load"); err != nil {
+		return err
+	}
+	m.Variant = BERTVariant(v)
+	m.VocabSize = int(vs)
+	m.MaxSeqLen = int(ms)
+	m.weights = ptr
+	m.ownsWeights = true
+	return nil
+}
+
+// Free releases loaded weights.
+func (m *BERTModel) Free() { m.freeWeights() }
+
+func (m *BERTModel) freeWeights() {
+	if m.weights != nil && m.ownsWeights {
+		C.dm_bert_free_weights(m.weights)
+		m.weights = nil
+	}
+}
+
+// WeightCount returns the total number of float32 parameters.
+func (m *BERTModel) WeightCount() int {
+	return int(C.dm_bert_weight_count_raw(C.int(m.Variant), C.int(m.VocabSize), C.int(m.MaxSeqLen)))
+}
+
+// Forward runs BERT encoding.  Returns (hidden [seq×H], cls [H]).
+func (m *BERTModel) Forward(tokenIDs, segmentIDs []int32) ([]float32, []float32, error) {
+	if m.weights == nil {
+		return nil, nil, errors.New("dm.BERT: no weights loaded")
+	}
+	seq := len(tokenIDs)
+	H := 768
+	if m.Variant == BERTLarge {
+		H = 1024
+	}
+	hidden := make([]float32, seq*H)
+	cls := make([]float32, H)
+	rc := C.dm_bert_forward_raw(
+		C.int(m.Variant), C.int(m.VocabSize), C.int(m.MaxSeqLen), m.weights,
+		(*C.int)(unsafe.Pointer(&tokenIDs[0])),
+		(*C.int)(unsafe.Pointer(&segmentIDs[0])),
+		C.int(seq),
+		(*C.float)(unsafe.Pointer(&hidden[0])),
+		(*C.float)(unsafe.Pointer(&cls[0])))
+	return hidden, cls, statusErr(rc, "dm.BERT.Forward")
+}
+
+// TransformerVariant enumerates Transformer sizes.
+type TransformerVariant int
+
+const (
+	TransformerBase TransformerVariant = 0
+	TransformerBig  TransformerVariant = 1
+)
+
+// TransformerModel wraps the full encoder-decoder Transformer.
+type TransformerModel struct {
+	Variant    TransformerVariant
+	VocabSize  int
+	MaxSeqLen  int
+	weights    *C.float
+	ownsWeights bool
+}
+
+// NewTransformer creates a Transformer model handle.
+func NewTransformer(variant TransformerVariant, vocabSize, maxSeqLen int) *TransformerModel {
+	return &TransformerModel{Variant: variant, VocabSize: vocabSize, MaxSeqLen: maxSeqLen}
+}
+
+// Free releases loaded weights.
+func (m *TransformerModel) Free() { m.freeWeights() }
+
+func (m *TransformerModel) freeWeights() {
+	if m.weights != nil && m.ownsWeights {
+		C.dm_transformer_free_weights(m.weights)
+		m.weights = nil
+	}
+}
+
+// Load reads weights from a .bin file.
+func (m *TransformerModel) Load(path string) error {
+	m.freeWeights()
+	cp := C.CString(path)
+	defer C.free(unsafe.Pointer(cp))
+	var v, vs, ms C.int
+	var ptr *C.float
+	rc := C.dm_transformer_load_raw(cp, &v, &vs, &ms, &ptr)
+	if err := statusErr(rc, "dm.Transformer.Load"); err != nil {
+		return err
+	}
+	m.Variant = TransformerVariant(v)
+	m.VocabSize = int(vs)
+	m.MaxSeqLen = int(ms)
+	m.weights = ptr
+	m.ownsWeights = true
+	return nil
+}
+
+// WeightCount returns the total number of float32 parameters.
+func (m *TransformerModel) WeightCount() int {
+	return int(C.dm_transformer_weight_count_raw(
+		C.int(m.Variant), C.int(m.VocabSize), C.int(m.MaxSeqLen)))
+}
+
+// Forward runs a full encoder-decoder pass.  Returns logits [tgtSeq × vocabSize].
+func (m *TransformerModel) Forward(srcTokens, tgtTokens []int32) ([]float32, error) {
+	if m.weights == nil {
+		return nil, errors.New("dm.Transformer: no weights loaded")
+	}
+	tgtSeq := len(tgtTokens)
+	logits := make([]float32, tgtSeq*m.VocabSize)
+	rc := C.dm_transformer_forward_raw(
+		C.int(m.Variant), C.int(m.VocabSize), C.int(m.MaxSeqLen), m.weights,
+		(*C.int)(unsafe.Pointer(&srcTokens[0])), C.int(len(srcTokens)),
+		(*C.int)(unsafe.Pointer(&tgtTokens[0])), C.int(tgtSeq),
+		(*C.float)(unsafe.Pointer(&logits[0])))
+	return logits, statusErr(rc, "dm.Transformer.Forward")
+}
+
+// Encode runs only the encoder stack.  Returns enc_out [srcSeq × dModel].
+func (m *TransformerModel) Encode(srcTokens []int32) ([]float32, error) {
+	if m.weights == nil {
+		return nil, errors.New("dm.Transformer: no weights loaded")
+	}
+	dModel := 512
+	if m.Variant == TransformerBig {
+		dModel = 1024
+	}
+	enc := make([]float32, len(srcTokens)*dModel)
+	rc := C.dm_transformer_encode_raw(
+		C.int(m.Variant), C.int(m.VocabSize), C.int(m.MaxSeqLen), m.weights,
+		(*C.int)(unsafe.Pointer(&srcTokens[0])), C.int(len(srcTokens)),
+		(*C.float)(unsafe.Pointer(&enc[0])))
+	return enc, statusErr(rc, "dm.Transformer.Encode")
+}
+
+// TransformerLRSchedule computes the paper's warmup learning-rate at a given step.
+func TransformerLRSchedule(dModel, step, warmupSteps int) float32 {
+	return float32(C.dm_transformer_lr_schedule_raw(C.int(dModel), C.int(step), C.int(warmupSteps)))
+}
+
+// TransformerPositionalEncoding returns sinusoidal PE table [maxLen × dModel].
+func TransformerPositionalEncoding(maxLen, dModel int) []float32 {
+	pe := make([]float32, maxLen*dModel)
+	C.dm_transformer_positional_encoding_raw(C.int(maxLen), C.int(dModel),
+		(*C.float)(unsafe.Pointer(&pe[0])))
+	return pe
+}
+
+// TransformerCausalMask returns an upper-triangular causal mask [seq × seq].
+func TransformerCausalMask(seq int) []float32 {
+	mask := make([]float32, seq*seq)
+	C.dm_transformer_causal_mask_raw(C.int(seq), (*C.float)(unsafe.Pointer(&mask[0])))
+	return mask
+}
+
+// ── Generative ────────────────────────────────────────────────────────────
+
+// VAEModel wraps a Variational Auto-Encoder.
+type VAEModel struct {
+	InputDim  int
+	LatentDim int
+	handle    unsafe.Pointer
+}
+
+// NewVAE creates a VAE with the given dimensions.
+func NewVAE(inputDim, hiddenDim, latentDim int, lr float32) (*VAEModel, error) {
+	h := C.dm_vae_create_raw(C.int(inputDim), C.int(hiddenDim),
+		C.int(latentDim), C.float(lr))
+	if h == nil {
+		return nil, errors.New("dm.VAE: allocation failed")
+	}
+	return &VAEModel{InputDim: inputDim, LatentDim: latentDim, handle: h}, nil
+}
+
+// Free releases the VAE.
+func (m *VAEModel) Free() {
+	if m.handle != nil {
+		C.dm_vae_free_raw(m.handle)
+		m.handle = nil
+	}
+}
+
+// TrainStep runs one forward+backward step.  Returns the ELBO loss.
+func (m *VAEModel) TrainStep(xBatch []float32) float32 {
+	batch := len(xBatch) / m.InputDim
+	return float32(C.dm_vae_train_step_raw(m.handle,
+		(*C.float)(unsafe.Pointer(&xBatch[0])), C.int(batch)))
+}
+
+// Encode returns (mean, logvar) for the input batch.
+func (m *VAEModel) Encode(xBatch []float32) ([]float32, []float32) {
+	batch := len(xBatch) / m.InputDim
+	mean := make([]float32, batch*m.LatentDim)
+	logvar := make([]float32, batch*m.LatentDim)
+	C.dm_vae_encode_raw(m.handle,
+		(*C.float)(unsafe.Pointer(&xBatch[0])), C.int(batch),
+		(*C.float)(unsafe.Pointer(&mean[0])),
+		(*C.float)(unsafe.Pointer(&logvar[0])))
+	return mean, logvar
+}
+
+// Decode reconstructs the input from latent vectors.
+func (m *VAEModel) Decode(zBatch []float32) []float32 {
+	batch := len(zBatch) / m.LatentDim
+	out := make([]float32, batch*m.InputDim)
+	C.dm_vae_decode_raw(m.handle,
+		(*C.float)(unsafe.Pointer(&zBatch[0])), C.int(batch),
+		(*C.float)(unsafe.Pointer(&out[0])))
+	return out
+}
+
+// GANModel wraps a Generative Adversarial Network.
+type GANModel struct {
+	InputDim int
+	NoiseDim int
+	handle   unsafe.Pointer
+}
+
+// NewGAN creates a GAN.
+func NewGAN(inputDim, gHidden, noiseDim, dHidden, maxoutK int,
+	dropProb, lr, momentum float32, nesterov bool) (*GANModel, error) {
+	n := 0
+	if nesterov {
+		n = 1
+	}
+	h := C.dm_gan_create_raw(
+		C.int(inputDim), C.int(gHidden), C.int(noiseDim), C.int(dHidden),
+		C.int(maxoutK), C.float(dropProb), C.float(lr), C.float(momentum), C.int(n))
+	if h == nil {
+		return nil, errors.New("dm.GAN: allocation failed")
+	}
+	return &GANModel{InputDim: inputDim, NoiseDim: noiseDim, handle: h}, nil
+}
+
+// Free releases the GAN.
+func (m *GANModel) Free() {
+	if m.handle != nil {
+		C.dm_gan_free_raw(m.handle)
+		m.handle = nil
+	}
+}
+
+// Generate produces fake samples from noise vectors.
+func (m *GANModel) Generate(zBatch []float32) []float32 {
+	batch := len(zBatch) / m.NoiseDim
+	out := make([]float32, batch*m.InputDim)
+	C.dm_gan_generate_raw(m.handle,
+		(*C.float)(unsafe.Pointer(&zBatch[0])), C.int(batch),
+		(*C.float)(unsafe.Pointer(&out[0])))
+	return out
+}
+
+// TrainDiscriminator runs one D step.  Returns D loss.
+func (m *GANModel) TrainDiscriminator(realX, zBatch []float32) float32 {
+	batch := len(realX) / m.InputDim
+	return float32(C.dm_gan_train_d_step_raw(m.handle,
+		(*C.float)(unsafe.Pointer(&realX[0])),
+		(*C.float)(unsafe.Pointer(&zBatch[0])), C.int(batch)))
+}
+
+// TrainGenerator runs one G step.  Returns G loss.
+func (m *GANModel) TrainGenerator(zBatch []float32) float32 {
+	batch := len(zBatch) / m.NoiseDim
+	return float32(C.dm_gan_train_g_step_raw(m.handle,
+		(*C.float)(unsafe.Pointer(&zBatch[0])), C.int(batch)))
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tokenizer wrappers — named factory structs (HuggingFace-style)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// TokenizerBPE is a Byte-Pair Encoding tokenizer.
+type TokenizerBPE struct{ Tokenizer }
+
+func NewTokenizerBPE() (*TokenizerBPE, error) {
+	t, err := NewTokenizer("bpe")
+	if err != nil {
+		return nil, err
+	}
+	return &TokenizerBPE{*t}, nil
+}
+
+// TokenizerBPEDropout is BPE with stochastic dropout.
+type TokenizerBPEDropout struct{ Tokenizer }
+
+func NewTokenizerBPEDropout() (*TokenizerBPEDropout, error) {
+	t, err := NewTokenizer("bpe_dropout")
+	if err != nil {
+		return nil, err
+	}
+	return &TokenizerBPEDropout{*t}, nil
+}
+
+// TokenizerUnigram is a unigram language model tokenizer.
+type TokenizerUnigram struct{ Tokenizer }
+
+func NewTokenizerUnigram() (*TokenizerUnigram, error) {
+	t, err := NewTokenizer("unigram")
+	if err != nil {
+		return nil, err
+	}
+	return &TokenizerUnigram{*t}, nil
+}
+
+// TokenizerSentencePiece is a SentencePiece-lite tokenizer.
+type TokenizerSentencePiece struct{ Tokenizer }
+
+func NewTokenizerSentencePiece() (*TokenizerSentencePiece, error) {
+	t, err := NewTokenizer("sentencepiece")
+	if err != nil {
+		return nil, err
+	}
+	return &TokenizerSentencePiece{*t}, nil
+}
+
+// TokenizerWordPiece is a FastWordPiece (BERT-style) tokenizer.
+type TokenizerWordPiece struct{ Tokenizer }
+
+func NewTokenizerWordPiece() (*TokenizerWordPiece, error) {
+	t, err := NewTokenizer("wordpiece")
+	if err != nil {
+		return nil, err
+	}
+	return &TokenizerWordPiece{*t}, nil
+}
+
+// TokenizerGPE is a Grapheme Pair Encoding tokenizer.
+type TokenizerGPE struct{ Tokenizer }
+
+func NewTokenizerGPE() (*TokenizerGPE, error) {
+	t, err := NewTokenizer("gpe")
+	if err != nil {
+		return nil, err
+	}
+	return &TokenizerGPE{*t}, nil
+}
+
+// TokenizerVolt is a Vocabulary-via-Optimal-Transport tokenizer.
+type TokenizerVolt struct{ Tokenizer }
+
+func NewTokenizerVolt() (*TokenizerVolt, error) {
+	t, err := NewTokenizer("volt")
+	if err != nil {
+		return nil, err
+	}
+	return &TokenizerVolt{*t}, nil
+}
+
+// VoltOptimize runs the Volt vocabulary optimisation procedure.
+func VoltOptimize(corpusPath string, minSize, maxSize, nSteps int, outputPath string) error {
+	cp := C.CString(corpusPath)
+	op := C.CString(outputPath)
+	defer C.free(unsafe.Pointer(cp))
+	defer C.free(unsafe.Pointer(op))
+	return statusErr(
+		C.dm_tokenizer_volt_run(cp, C.int(minSize), C.int(maxSize),
+			C.int(nSteps), op),
+		"dm.VoltOptimize")
+}

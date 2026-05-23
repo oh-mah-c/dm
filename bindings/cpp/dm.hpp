@@ -771,4 +771,409 @@ private:
     DM_Arena arena_{};
 };
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * dm::models — pre-built model wrappers
+ *
+ * Usage:
+ *   dm::models::ResNet model(18, 1000);
+ *   std::vector<float> logits = model.forward(tensor);
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+namespace models {
+
+/* ── Vision ──────────────────────────────────────────────────────────────── */
+
+/** ResNet-18 image classifier. */
+class ResNet {
+public:
+    explicit ResNet(int layers = 18, int classes = 1000, unsigned seed = 42)
+        : layers_(layers), classes_(classes), seed_(seed)
+    {
+        if (layers != 18)
+            throw std::invalid_argument("dm::models::ResNet: only layers=18 supported");
+    }
+
+    /** Forward pass.  Input: NCHW tensor (1,3,H,W).  Returns logits [classes]. */
+    std::vector<float> forward(const Tensor &input) {
+        Tensor out(1, classes_, 1, 1);
+        DM_Status rc = dm_op_resnet18_forward(input.raw(), out.raw(), classes_, seed_);
+        if (rc != DM_OK) throw std::runtime_error("ResNet.forward failed");
+        return out.to_vector();
+    }
+
+    int layers()  const { return layers_; }
+    int classes() const { return classes_; }
+
+private:
+    int      layers_;
+    int      classes_;
+    unsigned seed_;
+};
+
+/** Vision Transformer.  variant: 0=tiny 1=small 2=base 3=large 4=huge. */
+class ViT {
+public:
+    explicit ViT(int variant = 2, int classes = 1000, int img_size = 224,
+                 unsigned seed = 42)
+        : variant_(variant), classes_(classes), img_size_(img_size), seed_(seed)
+    {
+        if (variant < 0 || variant > 4)
+            throw std::invalid_argument("ViT variant must be 0-4");
+    }
+
+    std::vector<float> forward(const Tensor &input) {
+        Tensor out(1, classes_, 1, 1);
+        DM_Status rc = dm_op_vit_forward(input.raw(), out.raw(),
+                                          variant_, classes_, seed_);
+        if (rc != DM_OK) throw std::runtime_error("ViT.forward failed");
+        return out.to_vector();
+    }
+
+    size_t weight_count() const {
+        return dm_op_vit_param_count(variant_, img_size_, 16, classes_);
+    }
+
+private:
+    int      variant_, classes_, img_size_;
+    unsigned seed_;
+};
+
+/** TinyViT.  variant: 0=5M 1=11M 2=21M. */
+class TinyViT {
+public:
+    explicit TinyViT(int variant = 2, int classes = 1000, int img_size = 224)
+        : variant_(variant), classes_(classes), img_size_(img_size)
+    {
+        if (variant < 0 || variant > 2)
+            throw std::invalid_argument("TinyViT variant must be 0,1,2");
+    }
+
+    void load(const std::string &path) {
+        free_weights();
+        int v = 0, c = 0, s = 0;
+        float *ptr = nullptr;
+        DM_Status rc = dm_tinyvit_load(path.c_str(), &v, &c, &s, &ptr);
+        if (rc != DM_OK) throw std::runtime_error("TinyViT.load failed: " + path);
+        variant_ = v; classes_ = c; img_size_ = s;
+        weights_ = ptr; owner_ = true;
+    }
+
+    ~TinyViT() { free_weights(); }
+
+    /** input_nhwc: flat NHWC float vector [batch × H × W × 3] in [0,1]. */
+    std::vector<float> forward(const std::vector<float> &input_nhwc, int batch = 1) {
+        std::vector<float> logits(batch * classes_);
+        DM_Status rc = dm_tinyvit_forward(
+            (DM_TinyViTVariant)variant_, weights_,
+            const_cast<float *>(input_nhwc.data()),
+            batch, classes_, img_size_, logits.data());
+        if (rc != DM_OK) throw std::runtime_error("TinyViT.forward failed");
+        return logits;
+    }
+
+    size_t weight_count() const {
+        return dm_tinyvit_weight_count((DM_TinyViTVariant)variant_, classes_, img_size_);
+    }
+
+private:
+    void free_weights() {
+        if (weights_ && owner_) { dm_tinyvit_free_weights(weights_); weights_ = nullptr; }
+    }
+    int    variant_, classes_, img_size_;
+    float *weights_{nullptr};
+    bool   owner_{false};
+};
+
+/** MobileNetV4-Tiny image classifier. */
+class MobileNetTiny {
+public:
+    explicit MobileNetTiny(int img_size = 224, int classes = 1000, unsigned seed = 1337)
+        : img_size_(img_size), classes_(classes), seed_(seed) {}
+
+    /** input_nchw: flat NCHW float vector [3 × H × W] in [0,1]. */
+    std::vector<float> forward(const std::vector<float> &input_nchw) {
+        std::vector<float> logits(classes_);
+        DM_Status rc = dm_mobilenet_tiny_forward_raw2(
+            input_nchw.data(), img_size_, classes_, seed_, logits.data());
+        if (rc != DM_OK) throw std::runtime_error("MobileNetTiny.forward failed");
+        return logits;
+    }
+
+private:
+    int      img_size_, classes_;
+    unsigned seed_;
+};
+
+/* ── Language ─────────────────────────────────────────────────────────────── */
+
+/** BERT encoder.  variant: 0=base 1=large. */
+class BERTModel {
+public:
+    explicit BERTModel(int variant = 0, int vocab_size = 30522, int max_seq_len = 512)
+        : variant_(variant), vocab_size_(vocab_size), max_seq_len_(max_seq_len) {}
+
+    ~BERTModel() { free_weights(); }
+
+    void load(const std::string &path) {
+        free_weights();
+        int v = 0, vs = 0, ms = 0;
+        float *ptr = nullptr;
+        DM_Status rc = dm_bert_load_raw(path.c_str(), &v, &vs, &ms, &ptr);
+        if (rc != DM_OK) throw std::runtime_error("BERT.load failed: " + path);
+        variant_ = v; vocab_size_ = vs; max_seq_len_ = ms;
+        weights_ = ptr; owner_ = true;
+    }
+
+    void save(const std::string &path) const {
+        DM_Status rc = dm_bert_save_raw(path.c_str(), variant_,
+                                         vocab_size_, max_seq_len_, weights_);
+        if (rc != DM_OK) throw std::runtime_error("BERT.save failed");
+    }
+
+    /**
+     * Returns {hidden_states [seq×H], cls_vector [H]}.
+     */
+    std::pair<std::vector<float>, std::vector<float>>
+    forward(const std::vector<int> &token_ids,
+            const std::vector<int> &segment_ids,
+            const std::vector<int> *attention_mask = nullptr) const
+    {
+        if (!weights_) throw std::runtime_error("BERT: no weights loaded");
+        int seq = (int)token_ids.size();
+        int H   = (variant_ == 0) ? 768 : 1024;
+        std::vector<float> hidden(seq * H), cls_vec(H);
+        DM_Status rc;
+        if (attention_mask && (int)attention_mask->size() == seq) {
+            rc = dm_bert_forward_masked_raw(
+                variant_, vocab_size_, max_seq_len_, weights_,
+                token_ids.data(), segment_ids.data(), attention_mask->data(),
+                seq, hidden.data(), cls_vec.data());
+        } else {
+            rc = dm_bert_forward_raw(
+                variant_, vocab_size_, max_seq_len_, weights_,
+                token_ids.data(), segment_ids.data(),
+                seq, hidden.data(), cls_vec.data());
+        }
+        if (rc != DM_OK) throw std::runtime_error("BERT.forward failed");
+        return {hidden, cls_vec};
+    }
+
+    size_t weight_count() const {
+        return dm_bert_weight_count_raw(variant_, vocab_size_, max_seq_len_);
+    }
+
+private:
+    void free_weights() {
+        if (weights_ && owner_) { dm_bert_free_weights(weights_); weights_ = nullptr; }
+    }
+    int    variant_, vocab_size_, max_seq_len_;
+    float *weights_{nullptr};
+    bool   owner_{false};
+};
+
+/** Full encoder-decoder Transformer (Vaswani et al. 2017).
+ *  variant: 0=base 1=big. */
+class TransformerModel {
+public:
+    explicit TransformerModel(int variant = 0, int vocab_size = 32000,
+                               int max_seq_len = 512)
+        : variant_(variant), vocab_size_(vocab_size), max_seq_len_(max_seq_len) {}
+
+    ~TransformerModel() { free_weights(); }
+
+    void load(const std::string &path) {
+        free_weights();
+        int v = 0, vs = 0, ms = 0;
+        float *ptr = nullptr;
+        DM_Status rc = dm_transformer_load_raw(path.c_str(), &v, &vs, &ms, &ptr);
+        if (rc != DM_OK) throw std::runtime_error("Transformer.load failed: " + path);
+        variant_ = v; vocab_size_ = vs; max_seq_len_ = ms;
+        weights_ = ptr; owner_ = true;
+    }
+
+    void save(const std::string &path) const {
+        DM_Status rc = dm_transformer_save_raw(path.c_str(), variant_,
+                                                vocab_size_, max_seq_len_, weights_);
+        if (rc != DM_OK) throw std::runtime_error("Transformer.save failed");
+    }
+
+    /** Full forward pass.  Returns logits flat [tgt_seq × vocab_size]. */
+    std::vector<float> forward(const std::vector<int> &src_tokens,
+                                const std::vector<int> &tgt_tokens) const
+    {
+        if (!weights_) throw std::runtime_error("Transformer: no weights loaded");
+        int tgt_seq = (int)tgt_tokens.size();
+        std::vector<float> logits((size_t)tgt_seq * vocab_size_);
+        DM_Status rc = dm_transformer_forward_raw(
+            variant_, vocab_size_, max_seq_len_, weights_,
+            src_tokens.data(), (int)src_tokens.size(),
+            tgt_tokens.data(), tgt_seq, logits.data());
+        if (rc != DM_OK) throw std::runtime_error("Transformer.forward failed");
+        return logits;
+    }
+
+    /** Encode only. Returns enc_out [src_seq × d_model]. */
+    std::vector<float> encode(const std::vector<int> &src_tokens) const {
+        if (!weights_) throw std::runtime_error("Transformer: no weights loaded");
+        int d_model = (variant_ == 0) ? 512 : 1024;
+        std::vector<float> enc((size_t)src_tokens.size() * d_model);
+        DM_Status rc = dm_transformer_encode_raw(
+            variant_, vocab_size_, max_seq_len_, weights_,
+            src_tokens.data(), (int)src_tokens.size(), enc.data());
+        if (rc != DM_OK) throw std::runtime_error("Transformer.encode failed");
+        return enc;
+    }
+
+    size_t weight_count() const {
+        return dm_transformer_weight_count_raw(variant_, vocab_size_, max_seq_len_);
+    }
+
+    static float lr_schedule(int d_model, int step, int warmup = 4000) {
+        return dm_transformer_lr_schedule_raw(d_model, step, warmup);
+    }
+
+    static std::vector<float> positional_encoding(int max_len, int d_model) {
+        std::vector<float> pe((size_t)max_len * d_model);
+        dm_transformer_positional_encoding_raw(max_len, d_model, pe.data());
+        return pe;
+    }
+
+    static std::vector<float> causal_mask(int seq) {
+        std::vector<float> mask((size_t)seq * seq);
+        dm_transformer_causal_mask_raw(seq, mask.data());
+        return mask;
+    }
+
+private:
+    void free_weights() {
+        if (weights_ && owner_) { dm_transformer_free_weights(weights_); weights_ = nullptr; }
+    }
+    int    variant_, vocab_size_, max_seq_len_;
+    float *weights_{nullptr};
+    bool   owner_{false};
+};
+
+/* ── Generative ──────────────────────────────────────────────────────────── */
+
+/** Variational Auto-Encoder. */
+class VAEModel {
+public:
+    VAEModel(int input_dim, int hidden_dim = 256, int latent_dim = 32,
+             float lr = 1e-3f)
+        : input_dim_(input_dim), latent_dim_(latent_dim)
+    {
+        handle_ = dm_vae_create_raw(input_dim, hidden_dim, latent_dim, lr);
+        if (!handle_) throw std::bad_alloc{};
+    }
+    ~VAEModel() { if (handle_) dm_vae_free_raw(handle_); }
+
+    VAEModel(const VAEModel &) = delete;
+    VAEModel &operator=(const VAEModel &) = delete;
+
+    float train_step(const std::vector<float> &x_batch) {
+        int batch = (int)x_batch.size() / input_dim_;
+        return dm_vae_train_step_raw(handle_, x_batch.data(), batch);
+    }
+
+    std::pair<std::vector<float>, std::vector<float>>
+    encode(const std::vector<float> &x_batch) {
+        int batch = (int)x_batch.size() / input_dim_;
+        std::vector<float> mean(batch * latent_dim_), logvar(batch * latent_dim_);
+        dm_vae_encode_raw(handle_, x_batch.data(), batch, mean.data(), logvar.data());
+        return {mean, logvar};
+    }
+
+    std::vector<float> decode(const std::vector<float> &z_batch) {
+        int batch = (int)z_batch.size() / latent_dim_;
+        std::vector<float> out(batch * input_dim_);
+        dm_vae_decode_raw(handle_, z_batch.data(), batch, out.data());
+        return out;
+    }
+
+private:
+    void  *handle_;
+    int    input_dim_, latent_dim_;
+};
+
+/** Generative Adversarial Network. */
+class GANModel {
+public:
+    GANModel(int input_dim, int g_hidden = 256, int noise_dim = 100,
+             int d_hidden = 256, int maxout_k = 5, float drop_prob = 0.5f,
+             float lr = 0.01f, float momentum = 0.9f, bool nesterov = true)
+        : input_dim_(input_dim), noise_dim_(noise_dim)
+    {
+        handle_ = dm_gan_create_raw(input_dim, g_hidden, noise_dim, d_hidden,
+                                     maxout_k, drop_prob, lr, momentum,
+                                     nesterov ? 1 : 0);
+        if (!handle_) throw std::bad_alloc{};
+    }
+    ~GANModel() { if (handle_) dm_gan_free_raw(handle_); }
+
+    GANModel(const GANModel &) = delete;
+    GANModel &operator=(const GANModel &) = delete;
+
+    std::vector<float> generate(const std::vector<float> &z_batch) {
+        int batch = (int)z_batch.size() / noise_dim_;
+        std::vector<float> out(batch * input_dim_);
+        dm_gan_generate_raw(handle_, z_batch.data(), batch, out.data());
+        return out;
+    }
+
+    float train_discriminator(const std::vector<float> &real_x,
+                               const std::vector<float> &z_batch) {
+        int batch = (int)real_x.size() / input_dim_;
+        return dm_gan_train_d_step_raw(handle_, real_x.data(), z_batch.data(), batch);
+    }
+
+    float train_generator(const std::vector<float> &z_batch) {
+        int batch = (int)z_batch.size() / noise_dim_;
+        return dm_gan_train_g_step_raw(handle_, z_batch.data(), batch);
+    }
+
+private:
+    void *handle_;
+    int   input_dim_, noise_dim_;
+};
+
+} /* namespace models */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * dm::tokenizer — named tokenizer factory
+ *
+ * Usage:
+ *   dm::tokenizer::BPE tok;
+ *   tok.train("corpus.txt", 8000, "bpe.model");
+ *   auto ids = tok.encode("Hello world");
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+namespace tokenizer {
+
+/* Base: thin alias over dm::Tokenizer */
+using Base = ::dm::Tokenizer;
+
+struct BPE           : Base { BPE()           : Base("bpe")           {} };
+struct BPEDropout    : Base { BPEDropout()    : Base("bpe_dropout")   {} };
+struct Unigram       : Base { Unigram()       : Base("unigram")       {} };
+struct SentencePiece : Base { SentencePiece() : Base("sentencepiece") {} };
+struct WordPiece     : Base { WordPiece()     : Base("wordpiece")     {} };
+struct GPE           : Base { GPE()           : Base("gpe")           {} };
+struct ParityBPE     : Base { ParityBPE()     : Base("parity_bpe")   {} };
+struct MaximalMunch  : Base { MaximalMunch()  : Base("maximal_munch") {} };
+struct Volt          : Base {
+    Volt() : Base("volt") {}
+    static void optimize(const std::string &corpus, int min_size = 1000,
+                         int max_size = 32000, int n_steps = 200,
+                         const std::string &out = "volt.model") {
+        DM_Status rc = dm_tokenizer_volt_run(
+            corpus.c_str(), min_size, max_size, n_steps, out.c_str());
+        if (rc != DM_OK) throw std::runtime_error("Volt.optimize failed");
+    }
+};
+struct Faro         : Base { Faro()         : Base("faro")          {} };
+struct TokenizerLab : Base { TokenizerLab() : Base("tokenizer_lab") {} };
+
+} /* namespace tokenizer */
+
 } /* namespace dm */

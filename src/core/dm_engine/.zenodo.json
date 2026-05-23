@@ -1,0 +1,13 @@
+{
+    "description": "DM Framework is an end-to-end open source platform for machine learning. It has a comprehensive, flexible ecosystem of tools, libraries, and community resources that lets researchers push the state-of-the-art in ML and developers easily build and deploy ML-powered applications.",
+    "license": "Apache-2.0",
+    "title": "DM Framework",
+    "upload_type": "software",
+    "creators": [
+        {
+            "name": "DM Developers"
+        }
+    ],
+    "access_right": "open",
+    "notes": "Specific DM Framework versions can be found in the \"Versions\" list on the right side of this page."
+}

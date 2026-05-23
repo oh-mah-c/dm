@@ -200,6 +200,70 @@ public final class DM {
         void   dm_backend_set(int b);
         String dm_backend_name(int b);
 
+        // § 11  Models — ResNet, ViT
+        int    dm_op_resnet18_forward (Pointer input, Pointer logits, int classes, int seed);
+        int    dm_op_vit_forward      (Pointer input, Pointer logits, int variant,
+                                       int classes, int seed);
+        NativeLong dm_op_vit_param_count(int variant, int imgSize, int patchSize, int classes);
+
+        // § 11  MobileNet Tiny
+        int    dm_mobilenet_tiny_forward_raw2(float[] inputNchw, int imgSize,
+                                               int classes, int seed, float[] logitsOut);
+
+        // § 11  BERT raw
+        NativeLong dm_bert_weight_count_raw(int variant, int vocabSize, int maxSeqLen);
+        int    dm_bert_load_raw     (String path, IntByReference variantOut,
+                                     IntByReference vocabSizeOut, IntByReference maxSeqLenOut,
+                                     PointerByReference weightsOut);
+        int    dm_bert_save_raw     (String path, int variant, int vocabSize,
+                                     int maxSeqLen, Pointer weights);
+        void   dm_bert_free_weights (Pointer weights);
+        int    dm_bert_forward_raw  (int variant, int vocabSize, int maxSeqLen,
+                                     Pointer weights, int[] tokenIds, int[] segmentIds,
+                                     int seq, float[] hiddenOut, float[] clsOut);
+        int    dm_bert_forward_masked_raw(int variant, int vocabSize, int maxSeqLen,
+                                           Pointer weights, int[] tokenIds,
+                                           int[] segmentIds, int[] attentionMask,
+                                           int seq, float[] hiddenOut, float[] clsOut);
+
+        // § 11  Transformer raw
+        NativeLong dm_transformer_weight_count_raw(int variant, int vocabSize, int maxSeqLen);
+        int    dm_transformer_load_raw    (String path, IntByReference variantOut,
+                                           IntByReference vocabSizeOut,
+                                           IntByReference maxSeqLenOut,
+                                           PointerByReference weightsOut);
+        int    dm_transformer_save_raw    (String path, int variant, int vocabSize,
+                                           int maxSeqLen, Pointer weights);
+        void   dm_transformer_free_weights(Pointer weights);
+        int    dm_transformer_forward_raw (int variant, int vocabSize, int maxSeqLen,
+                                           Pointer weights,
+                                           int[] srcTokens, int srcSeq,
+                                           int[] tgtTokens, int tgtSeq, float[] logitsOut);
+        int    dm_transformer_encode_raw  (int variant, int vocabSize, int maxSeqLen,
+                                           Pointer weights, int[] srcTokens, int srcSeq,
+                                           float[] encOut);
+        float  dm_transformer_lr_schedule_raw(int dModel, int step, int warmupSteps);
+        void   dm_transformer_positional_encoding_raw(int maxLen, int dModel, float[] peOut);
+        void   dm_transformer_causal_mask_raw(int seq, float[] maskOut);
+
+        // § 11  VAE / GAN (raw opaque handles)
+        Pointer dm_vae_create_raw       (int inputDim, int hiddenDim, int latentDim, float lr);
+        void    dm_vae_free_raw         (Pointer vae);
+        float   dm_vae_train_step_raw   (Pointer vae, float[] xBatch, int batchSize);
+        void    dm_vae_encode_raw       (Pointer vae, float[] xBatch, int batchSize,
+                                          float[] meanOut, float[] logvarOut);
+        void    dm_vae_decode_raw       (Pointer vae, float[] zBatch, int batchSize,
+                                          float[] out);
+        Pointer dm_gan_create_raw       (int inputDim, int gHidden, int noiseDim,
+                                          int dHidden, int maxoutK, float dropProb,
+                                          float lr, float momentum, int nesterov);
+        void    dm_gan_free_raw         (Pointer gan);
+        void    dm_gan_generate_raw     (Pointer gan, float[] zBatch, int batchSize,
+                                          float[] out);
+        float   dm_gan_train_d_step_raw (Pointer gan, float[] realXBatch,
+                                          float[] zBatch, int batchSize);
+        float   dm_gan_train_g_step_raw (Pointer gan, float[] zBatch, int batchSize);
+
         // § 13  CLI
         int dm_cli_run(String command, int argc, String[] argv);
 
@@ -904,6 +968,347 @@ public final class DM {
         int n = 0;
         while (n < buf.length && buf[n] != 0) n++;
         return new String(buf, 0, n, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // § Models — pre-built model wrappers
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Pre-built model factory.  Usage:
+     * <pre>
+     *   DM.Models.ResNet model = new DM.Models.ResNet(18, 1000);
+     *   float[] logits = model.forward(tensor);
+     * </pre>
+     */
+    public static final class Models {
+
+        // ── Vision ────────────────────────────────────────────────────────────
+
+        /** ResNet-18 image classifier. */
+        public static final class ResNet {
+            public final int classes;
+            public final int seed;
+
+            public ResNet(int layers, int classes) { this(layers, classes, 42); }
+            public ResNet(int layers, int classes, int seed) {
+                if (layers != 18)
+                    throw new IllegalArgumentException("DM.Models.ResNet: only layers=18 supported");
+                this.classes = classes;
+                this.seed    = seed;
+            }
+
+            /** Forward pass.  input: NCHW Tensor (1,3,H,W).  Returns logits float[classes]. */
+            public float[] forward(Tensor input) {
+                Tensor out = new Tensor(1, classes, 1, 1);
+                try {
+                    check(N.dm_op_resnet18_forward(input.ptr(), out.ptr(), classes, seed),
+                          "DM.Models.ResNet.forward");
+                    return out.toArray();
+                } finally { out.close(); }
+            }
+        }
+
+        /** Vision Transformer.  variant: 0=tiny 1=small 2=base 3=large 4=huge. */
+        public static final class ViT {
+            public final int variant, classes, imgSize;
+            private final int seed;
+
+            public ViT(int variant, int classes, int imgSize) { this(variant, classes, imgSize, 42); }
+            public ViT(int variant, int classes, int imgSize, int seed) {
+                if (variant < 0 || variant > 4)
+                    throw new IllegalArgumentException("ViT variant must be 0-4");
+                this.variant = variant; this.classes = classes;
+                this.imgSize = imgSize; this.seed    = seed;
+            }
+
+            public float[] forward(Tensor input) {
+                Tensor out = new Tensor(1, classes, 1, 1);
+                try {
+                    check(N.dm_op_vit_forward(input.ptr(), out.ptr(), variant, classes, seed),
+                          "DM.Models.ViT.forward");
+                    return out.toArray();
+                } finally { out.close(); }
+            }
+
+            public long weightCount() {
+                return N.dm_op_vit_param_count(variant, imgSize, 16, classes).longValue();
+            }
+        }
+
+        /** MobileNetV4-Tiny image classifier. */
+        public static final class MobileNetTiny {
+            public final int imgSize, classes;
+            private final int seed;
+
+            public MobileNetTiny(int imgSize, int classes) { this(imgSize, classes, 1337); }
+            public MobileNetTiny(int imgSize, int classes, int seed) {
+                this.imgSize = imgSize; this.classes = classes; this.seed = seed;
+            }
+
+            /** inputNchw: float[3 × H × W] in [0,1]. */
+            public float[] forward(float[] inputNchw) {
+                float[] logits = new float[classes];
+                check(N.dm_mobilenet_tiny_forward_raw2(inputNchw, imgSize, classes, seed, logits),
+                      "DM.Models.MobileNetTiny.forward");
+                return logits;
+            }
+        }
+
+        // ── Language ──────────────────────────────────────────────────────────
+
+        /** BERT encoder (Devlin et al. 2019).  variant: 0=base 1=large. */
+        public static final class BERTModel implements AutoCloseable {
+            private int variant, vocabSize, maxSeqLen;
+            private Pointer weights;
+
+            public BERTModel(int variant, int vocabSize, int maxSeqLen) {
+                this.variant = variant; this.vocabSize = vocabSize;
+                this.maxSeqLen = maxSeqLen;
+            }
+            public BERTModel(int variant) { this(variant, 30522, 512); }
+
+            public void load(String path) {
+                freeWeights();
+                IntByReference vRef = new IntByReference(), vsRef = new IntByReference(),
+                               msRef = new IntByReference();
+                PointerByReference wRef = new PointerByReference();
+                check(N.dm_bert_load_raw(path, vRef, vsRef, msRef, wRef),
+                      "DM.Models.BERT.load");
+                variant = vRef.getValue(); vocabSize = vsRef.getValue();
+                maxSeqLen = msRef.getValue(); weights = wRef.getValue();
+            }
+
+            public void save(String path) {
+                if (weights == null) throw new IllegalStateException("No weights loaded");
+                check(N.dm_bert_save_raw(path, variant, vocabSize, maxSeqLen, weights),
+                      "DM.Models.BERT.save");
+            }
+
+            public long weightCount() {
+                return N.dm_bert_weight_count_raw(variant, vocabSize, maxSeqLen).longValue();
+            }
+
+            /**
+             * Forward pass.  Returns {hidden float[seq×H], cls float[H]}.
+             * @param attentionMask nullable int[seq]
+             */
+            public float[][] forward(int[] tokenIds, int[] segmentIds, int[] attentionMask) {
+                if (weights == null) throw new IllegalStateException("No weights loaded");
+                int seq = tokenIds.length;
+                int H   = (variant == 0) ? 768 : 1024;
+                float[] hidden = new float[seq * H], cls = new float[H];
+                int rc;
+                if (attentionMask != null)
+                    rc = N.dm_bert_forward_masked_raw(variant, vocabSize, maxSeqLen, weights,
+                             tokenIds, segmentIds, attentionMask, seq, hidden, cls);
+                else
+                    rc = N.dm_bert_forward_raw(variant, vocabSize, maxSeqLen, weights,
+                             tokenIds, segmentIds, seq, hidden, cls);
+                check(rc, "DM.Models.BERT.forward");
+                return new float[][]{hidden, cls};
+            }
+
+            public float[][] forward(int[] tokenIds, int[] segmentIds) {
+                return forward(tokenIds, segmentIds, null);
+            }
+
+            private void freeWeights() {
+                if (weights != null) { N.dm_bert_free_weights(weights); weights = null; }
+            }
+
+            @Override public void close() { freeWeights(); }
+        }
+
+        /** Full encoder-decoder Transformer (Vaswani et al. 2017).
+         *  variant: 0=base 1=big. */
+        public static final class TransformerModel implements AutoCloseable {
+            private int variant, vocabSize, maxSeqLen;
+            private Pointer weights;
+
+            public TransformerModel(int variant, int vocabSize, int maxSeqLen) {
+                this.variant = variant; this.vocabSize = vocabSize;
+                this.maxSeqLen = maxSeqLen;
+            }
+            public TransformerModel(int variant) { this(variant, 32000, 512); }
+
+            public void load(String path) {
+                freeWeights();
+                IntByReference vRef = new IntByReference(), vsRef = new IntByReference(),
+                               msRef = new IntByReference();
+                PointerByReference wRef = new PointerByReference();
+                check(N.dm_transformer_load_raw(path, vRef, vsRef, msRef, wRef),
+                      "DM.Models.Transformer.load");
+                variant = vRef.getValue(); vocabSize = vsRef.getValue();
+                maxSeqLen = msRef.getValue(); weights = wRef.getValue();
+            }
+
+            public void save(String path) {
+                if (weights == null) throw new IllegalStateException("No weights");
+                check(N.dm_transformer_save_raw(path, variant, vocabSize, maxSeqLen, weights),
+                      "DM.Models.Transformer.save");
+            }
+
+            public long weightCount() {
+                return N.dm_transformer_weight_count_raw(variant, vocabSize, maxSeqLen).longValue();
+            }
+
+            /** Full forward pass.  Returns logits float[tgtSeq × vocabSize]. */
+            public float[] forward(int[] srcTokens, int[] tgtTokens) {
+                if (weights == null) throw new IllegalStateException("No weights loaded");
+                float[] logits = new float[tgtTokens.length * vocabSize];
+                check(N.dm_transformer_forward_raw(variant, vocabSize, maxSeqLen, weights,
+                          srcTokens, srcTokens.length, tgtTokens, tgtTokens.length, logits),
+                      "DM.Models.Transformer.forward");
+                return logits;
+            }
+
+            /** Encode only.  Returns enc_out float[srcSeq × dModel]. */
+            public float[] encode(int[] srcTokens) {
+                if (weights == null) throw new IllegalStateException("No weights loaded");
+                int dModel = (variant == 0) ? 512 : 1024;
+                float[] enc = new float[srcTokens.length * dModel];
+                check(N.dm_transformer_encode_raw(variant, vocabSize, maxSeqLen, weights,
+                          srcTokens, srcTokens.length, enc),
+                      "DM.Models.Transformer.encode");
+                return enc;
+            }
+
+            public static float lrSchedule(int dModel, int step, int warmupSteps) {
+                return N.dm_transformer_lr_schedule_raw(dModel, step, warmupSteps);
+            }
+
+            public static float[] positionalEncoding(int maxLen, int dModel) {
+                float[] pe = new float[maxLen * dModel];
+                N.dm_transformer_positional_encoding_raw(maxLen, dModel, pe);
+                return pe;
+            }
+
+            public static float[] causalMask(int seq) {
+                float[] mask = new float[seq * seq];
+                N.dm_transformer_causal_mask_raw(seq, mask);
+                return mask;
+            }
+
+            private void freeWeights() {
+                if (weights != null) { N.dm_transformer_free_weights(weights); weights = null; }
+            }
+
+            @Override public void close() { freeWeights(); }
+        }
+
+        // ── Generative ────────────────────────────────────────────────────────
+
+        /** Variational Auto-Encoder. */
+        public static final class VAEModel implements AutoCloseable {
+            private final int inputDim, latentDim;
+            private Pointer handle;
+
+            public VAEModel(int inputDim, int hiddenDim, int latentDim, float lr) {
+                this.inputDim = inputDim; this.latentDim = latentDim;
+                handle = N.dm_vae_create_raw(inputDim, hiddenDim, latentDim, lr);
+                if (handle == null || Pointer.nativeValue(handle) == 0)
+                    throw new OutOfMemoryError("DM.Models.VAE: allocation failed");
+            }
+
+            public float trainStep(float[] xBatch) {
+                return N.dm_vae_train_step_raw(handle, xBatch, xBatch.length / inputDim);
+            }
+
+            public float[][] encode(float[] xBatch) {
+                int batch = xBatch.length / inputDim;
+                float[] mean = new float[batch * latentDim], logvar = new float[batch * latentDim];
+                N.dm_vae_encode_raw(handle, xBatch, batch, mean, logvar);
+                return new float[][]{mean, logvar};
+            }
+
+            public float[] decode(float[] zBatch) {
+                int batch = zBatch.length / latentDim;
+                float[] out = new float[batch * inputDim];
+                N.dm_vae_decode_raw(handle, zBatch, batch, out);
+                return out;
+            }
+
+            @Override public void close() {
+                if (handle != null) { N.dm_vae_free_raw(handle); handle = null; }
+            }
+        }
+
+        /** Generative Adversarial Network. */
+        public static final class GANModel implements AutoCloseable {
+            private final int inputDim, noiseDim;
+            private Pointer handle;
+
+            public GANModel(int inputDim, int gHidden, int noiseDim, int dHidden,
+                             int maxoutK, float dropProb, float lr, float momentum,
+                             boolean nesterov) {
+                this.inputDim = inputDim; this.noiseDim = noiseDim;
+                handle = N.dm_gan_create_raw(inputDim, gHidden, noiseDim, dHidden,
+                                              maxoutK, dropProb, lr, momentum,
+                                              nesterov ? 1 : 0);
+                if (handle == null || Pointer.nativeValue(handle) == 0)
+                    throw new OutOfMemoryError("DM.Models.GAN: allocation failed");
+            }
+
+            public float[] generate(float[] zBatch) {
+                int batch = zBatch.length / noiseDim;
+                float[] out = new float[batch * inputDim];
+                N.dm_gan_generate_raw(handle, zBatch, batch, out);
+                return out;
+            }
+
+            public float trainDiscriminator(float[] realX, float[] zBatch) {
+                return N.dm_gan_train_d_step_raw(handle, realX, zBatch,
+                                                  realX.length / inputDim);
+            }
+
+            public float trainGenerator(float[] zBatch) {
+                return N.dm_gan_train_g_step_raw(handle, zBatch, zBatch.length / noiseDim);
+            }
+
+            @Override public void close() {
+                if (handle != null) { N.dm_gan_free_raw(handle); handle = null; }
+            }
+        }
+
+        private Models() {}
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // § Tokenizers — named factory classes (HuggingFace-style)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Named tokenizer factory.  Usage:
+     * <pre>
+     *   DM.Tokenizers.BPE tok = new DM.Tokenizers.BPE();
+     *   tok.train("corpus.txt", 8000, "bpe.model");
+     *   int[] ids = tok.encode("Hello world");
+     * </pre>
+     */
+    public static final class Tokenizers {
+        public static final class BPE           extends Tokenizer { public BPE()           { super("bpe"); } }
+        public static final class BPEDropout    extends Tokenizer { public BPEDropout()    { super("bpe_dropout"); } }
+        public static final class Unigram       extends Tokenizer { public Unigram()       { super("unigram"); } }
+        public static final class SentencePiece extends Tokenizer { public SentencePiece() { super("sentencepiece"); } }
+        public static final class WordPiece     extends Tokenizer { public WordPiece()     { super("wordpiece"); } }
+        public static final class GPE           extends Tokenizer { public GPE()           { super("gpe"); } }
+        public static final class ParityBPE     extends Tokenizer { public ParityBPE()     { super("parity_bpe"); } }
+        public static final class MaximalMunch  extends Tokenizer { public MaximalMunch()  { super("maximal_munch"); } }
+        public static final class Volt          extends Tokenizer {
+            public Volt() { super("volt"); }
+            /** Run Volt vocabulary optimisation. */
+            public static void optimize(String corpusPath, int minSize, int maxSize,
+                                         int nSteps, String outputPath) {
+                check(N.dm_tokenizer_volt_run(corpusPath, minSize, maxSize,
+                                               nSteps, outputPath),
+                      "DM.Tokenizers.Volt.optimize");
+            }
+        }
+        public static final class Faro         extends Tokenizer { public Faro()         { super("faro"); } }
+        public static final class TokenizerLab extends Tokenizer { public TokenizerLab() { super("tokenizer_lab"); } }
+
+        private Tokenizers() {}
     }
 
     private DM() {}  // non-instantiable

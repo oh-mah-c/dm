@@ -1151,6 +1151,54 @@ DM_API void  dm_gan_generate_raw(void *gan, const float *z_batch, int batch_size
 DM_API float dm_gan_train_d_step_raw(void *gan, const float *real_x_batch, const float *z_batch, int batch_size);
 DM_API float dm_gan_train_g_step_raw(void *gan, const float *z_batch, int batch_size);
 
+/* ─────────────────────────────────────────────────────────────────────────
+ * § 11  Transformer (Vaswani et al. 2017) — raw FFI
+ *
+ * variant: 0=base (65M, d_model=512, N=6, h=8)
+ *          1=big  (213M, d_model=1024, N=6, h=16)
+ * ───────────────────────────────────────────────────────────────────────── */
+DM_API size_t    dm_transformer_weight_count_raw(int variant, int vocab_size, int max_seq_len);
+DM_API DM_Status dm_transformer_save_raw(const char *path,
+                                          int variant, int vocab_size, int max_seq_len,
+                                          const float *weights);
+DM_API DM_Status dm_transformer_load_raw(const char *path,
+                                          int *variant_out, int *vocab_size_out,
+                                          int *max_seq_len_out, float **weights_out);
+DM_API void      dm_transformer_free_weights(float *weights);
+DM_API DM_Status dm_transformer_forward_raw(int variant, int vocab_size, int max_seq_len,
+                                             const float *weights,
+                                             const int *src_tokens, int src_seq,
+                                             const int *tgt_tokens, int tgt_seq,
+                                             float *logits_out);
+DM_API DM_Status dm_transformer_encode_raw(int variant, int vocab_size, int max_seq_len,
+                                            const float *weights,
+                                            const int *src_tokens, int src_seq,
+                                            float *enc_out);
+DM_API DM_Status dm_transformer_decode_raw(int variant, int vocab_size, int max_seq_len,
+                                            const float *weights,
+                                            const int *tgt_tokens, int tgt_seq,
+                                            const float *enc_out, int src_seq,
+                                            float *logits_out);
+DM_API float     dm_transformer_lr_schedule_raw(int d_model, int step, int warmup_steps);
+DM_API void      dm_transformer_positional_encoding_raw(int max_len, int d_model,
+                                                         float *pe_out);
+DM_API void      dm_transformer_causal_mask_raw(int seq, float *mask_out);
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * § 11b  BERT — additional save wrapper
+ * ───────────────────────────────────────────────────────────────────────── */
+DM_API DM_Status dm_bert_save_raw(const char *path,
+                                   int variant, int vocab_size, int max_seq_len,
+                                   const float *weights);
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * § 11c  MobileNet Tiny — simple no-head forward
+ * ───────────────────────────────────────────────────────────────────────── */
+DM_API DM_Status dm_mobilenet_tiny_forward_raw2(const float *input_nchw,
+                                                 int image_size, int classes,
+                                                 unsigned int seed,
+                                                 float *logits_out);
+
 #ifdef __cplusplus
 }
 #endif

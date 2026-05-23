@@ -678,6 +678,8 @@ module.exports = {
   // § 18
   timerNow, peakRamMb, fileSizeMb, dirSizeMb, ensureDir, pathBasename,
   experimentWriteHeader, experimentGenerateReport,
+
+  // models + tokenizer — added below after Tensor/op class definitions
 };
 
 // ── § 8  Engine — Tensor class and op namespace ───────────────────────────────
@@ -895,3 +897,266 @@ const op = {
              velocity: _readFloats(vBuf, velocity.length) };
   },
 };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// § models — Pre-built model wrappers
+// ══════════════════════════════════════════════════════════════════════════════
+
+// First: add FFI entries for model/transformer/BERT raw APIs
+// These are appended to the lib object at runtime (ffi-napi allows this).
+const modelLib = ffi.Library(LIB_PATH, {
+  // ResNet + ViT
+  dm_op_resnet18_forward:   [ int_t,  [void_p, void_p, int_t, 'uint'] ],
+  dm_op_vit_forward:        [ int_t,  [void_p, void_p, int_t, int_t, 'uint'] ],
+  dm_op_vit_param_count:    [ size_t, [int_t, int_t, int_t, int_t] ],
+
+  // MobileNet Tiny
+  dm_mobilenet_tiny_forward_raw2: [ int_t, [floatp, int_t, int_t, 'uint', floatp] ],
+
+  // BERT
+  dm_bert_weight_count_raw: [ size_t, [int_t, int_t, int_t] ],
+  dm_bert_load_raw:         [ int_t,  [str_p, intp, intp, intp, ref.refType(floatp)] ],
+  dm_bert_free_weights:     [ 'void', [floatp] ],
+  dm_bert_forward_raw:      [ int_t,  [int_t, int_t, int_t, floatp, intp, intp, int_t, floatp, floatp] ],
+  dm_bert_forward_masked_raw: [ int_t, [int_t, int_t, int_t, floatp, intp, intp, intp, int_t, floatp, floatp] ],
+
+  // Transformer
+  dm_transformer_weight_count_raw:      [ size_t, [int_t, int_t, int_t] ],
+  dm_transformer_load_raw:              [ int_t, [str_p, intp, intp, intp, ref.refType(floatp)] ],
+  dm_transformer_save_raw:              [ int_t, [str_p, int_t, int_t, int_t, floatp] ],
+  dm_transformer_free_weights:          [ 'void', [floatp] ],
+  dm_transformer_forward_raw:           [ int_t, [int_t, int_t, int_t, floatp, intp, int_t, intp, int_t, floatp] ],
+  dm_transformer_encode_raw:            [ int_t, [int_t, int_t, int_t, floatp, intp, int_t, floatp] ],
+  dm_transformer_lr_schedule_raw:       [ float_t, [int_t, int_t, int_t] ],
+  dm_transformer_positional_encoding_raw: [ 'void', [int_t, int_t, floatp] ],
+  dm_transformer_causal_mask_raw:       [ 'void', [int_t, floatp] ],
+});
+
+const models = {
+  // ── Vision ────────────────────────────────────────────────────────────────
+
+  /**
+   * ResNet-18 classifier.
+   * @param {number} classes
+   * @param {number} [seed=42]
+   */
+  resNet(classes = 1000, seed = 42) {
+    return {
+      classes, seed,
+      /**
+       * Forward pass.  input is a dm.Tensor (NCHW 1,3,H,W).
+       * Returns Float32Array of logits.
+       */
+      forward(input) {
+        const out = new Tensor(1, classes, 1, 1);
+        try {
+          check(modelLib.dm_op_resnet18_forward(input._buf, out._buf, classes, seed),
+                'dm.models.resNet.forward');
+          return out.toArray();
+        } finally { out.free(); }
+      },
+    };
+  },
+
+  /**
+   * Vision Transformer.
+   * @param {number} variant  0=tiny 1=small 2=base 3=large 4=huge
+   * @param {number} classes
+   * @param {number} [imgSize=224]
+   * @param {number} [seed=42]
+   */
+  viT(variant = 2, classes = 1000, imgSize = 224, seed = 42) {
+    return {
+      variant, classes, imgSize, seed,
+      forward(input) {
+        const out = new Tensor(1, classes, 1, 1);
+        try {
+          check(modelLib.dm_op_vit_forward(input._buf, out._buf, variant, classes, seed),
+                'dm.models.viT.forward');
+          return out.toArray();
+        } finally { out.free(); }
+      },
+      get weightCount() {
+        return Number(modelLib.dm_op_vit_param_count(variant, imgSize, 16, classes));
+      },
+    };
+  },
+
+  /**
+   * MobileNetV4-Tiny classifier.
+   * @param {number} [imgSize=224]
+   * @param {number} [classes=1000]
+   * @param {number} [seed=1337]
+   */
+  mobileNetTiny(imgSize = 224, classes = 1000, seed = 1337) {
+    return {
+      imgSize, classes, seed,
+      /** inputNCHW: Float32Array of length 3*H*W */
+      forward(inputNCHW) {
+        const inBuf  = Buffer.from(inputNCHW.buffer);
+        const logits = Buffer.alloc(classes * 4);
+        check(modelLib.dm_mobilenet_tiny_forward_raw2(inBuf, imgSize, classes, seed,
+              logits), 'dm.models.mobileNetTiny.forward');
+        return _readFloats(logits, classes);
+      },
+    };
+  },
+
+  // ── Language ──────────────────────────────────────────────────────────────
+
+  /**
+   * BERT encoder.  variant: 0=base 1=large.
+   * @param {number} [variant=0]
+   * @param {number} [vocabSize=30522]
+   * @param {number} [maxSeqLen=512]
+   */
+  bert(variant = 0, vocabSize = 30522, maxSeqLen = 512) {
+    let weights = null;
+    let _variant = variant, _vocab = vocabSize, _seq = maxSeqLen;
+    return {
+      get variant()   { return _variant; },
+      get vocabSize() { return _vocab;   },
+      get maxSeqLen() { return _seq;     },
+      get weightCount() {
+        return Number(modelLib.dm_bert_weight_count_raw(_variant, _vocab, _seq));
+      },
+      load(path) {
+        if (weights) modelLib.dm_bert_free_weights(weights);
+        const vRef = ref.alloc(int_t), vsRef = ref.alloc(int_t), msRef = ref.alloc(int_t);
+        const wRef = ref.alloc(floatp);
+        check(modelLib.dm_bert_load_raw(path, vRef, vsRef, msRef, wRef), 'dm.models.bert.load');
+        _variant = vRef.deref(); _vocab = vsRef.deref(); _seq = msRef.deref();
+        weights = wRef.deref();
+      },
+      free() { if (weights) { modelLib.dm_bert_free_weights(weights); weights = null; } },
+      /**
+       * Forward pass.  Returns { hidden: Float32Array [seq×H], cls: Float32Array [H] }.
+       * @param {Int32Array} tokenIds
+       * @param {Int32Array} segmentIds
+       * @param {Int32Array|null} [attentionMask]
+       */
+      forward(tokenIds, segmentIds, attentionMask = null) {
+        if (!weights) throw new Error('dm.models.bert: no weights loaded');
+        const seq = tokenIds.length;
+        const H   = _variant === 0 ? 768 : 1024;
+        const hiddenBuf = Buffer.alloc(seq * H * 4);
+        const clsBuf    = Buffer.alloc(H * 4);
+        const tokBuf = Buffer.from(tokenIds.buffer);
+        const segBuf = Buffer.from(segmentIds.buffer);
+        if (attentionMask) {
+          const attBuf = Buffer.from(attentionMask.buffer);
+          check(modelLib.dm_bert_forward_masked_raw(
+            _variant, _vocab, _seq, weights, tokBuf, segBuf, attBuf, seq, hiddenBuf, clsBuf),
+            'dm.models.bert.forward');
+        } else {
+          check(modelLib.dm_bert_forward_raw(
+            _variant, _vocab, _seq, weights, tokBuf, segBuf, seq, hiddenBuf, clsBuf),
+            'dm.models.bert.forward');
+        }
+        return {
+          hidden: _readFloats(hiddenBuf, seq * H),
+          cls:    _readFloats(clsBuf, H),
+        };
+      },
+    };
+  },
+
+  /**
+   * Full encoder-decoder Transformer (Vaswani et al. 2017).
+   * variant: 0=base 1=big.
+   */
+  transformer(variant = 0, vocabSize = 32000, maxSeqLen = 512) {
+    let weights = null;
+    let _variant = variant, _vocab = vocabSize, _seq = maxSeqLen;
+    return {
+      get variant()   { return _variant; },
+      get vocabSize() { return _vocab;   },
+      get maxSeqLen() { return _seq;     },
+      get weightCount() {
+        return Number(modelLib.dm_transformer_weight_count_raw(_variant, _vocab, _seq));
+      },
+      load(path) {
+        if (weights) modelLib.dm_transformer_free_weights(weights);
+        const vRef = ref.alloc(int_t), vsRef = ref.alloc(int_t), msRef = ref.alloc(int_t);
+        const wRef = ref.alloc(floatp);
+        check(modelLib.dm_transformer_load_raw(path, vRef, vsRef, msRef, wRef),
+              'dm.models.transformer.load');
+        _variant = vRef.deref(); _vocab = vsRef.deref(); _seq = msRef.deref();
+        weights = wRef.deref();
+      },
+      save(path) {
+        if (!weights) throw new Error('dm.models.transformer: no weights');
+        check(modelLib.dm_transformer_save_raw(path, _variant, _vocab, _seq, weights),
+              'dm.models.transformer.save');
+      },
+      free() { if (weights) { modelLib.dm_transformer_free_weights(weights); weights = null; } },
+      /** Returns logits as Float32Array [tgtSeq × vocabSize]. */
+      forward(srcTokens, tgtTokens) {
+        if (!weights) throw new Error('dm.models.transformer: no weights loaded');
+        const tgtSeq = tgtTokens.length;
+        const logits = Buffer.alloc(tgtSeq * _vocab * 4);
+        check(modelLib.dm_transformer_forward_raw(
+          _variant, _vocab, _seq, weights,
+          Buffer.from(srcTokens.buffer), srcTokens.length,
+          Buffer.from(tgtTokens.buffer), tgtSeq,
+          logits), 'dm.models.transformer.forward');
+        return _readFloats(logits, tgtSeq * _vocab);
+      },
+      /** Encoder only.  Returns Float32Array [srcSeq × dModel]. */
+      encode(srcTokens) {
+        if (!weights) throw new Error('dm.models.transformer: no weights loaded');
+        const dModel = _variant === 0 ? 512 : 1024;
+        const enc = Buffer.alloc(srcTokens.length * dModel * 4);
+        check(modelLib.dm_transformer_encode_raw(
+          _variant, _vocab, _seq, weights,
+          Buffer.from(srcTokens.buffer), srcTokens.length,
+          enc), 'dm.models.transformer.encode');
+        return _readFloats(enc, srcTokens.length * dModel);
+      },
+      /** Warmup LR schedule (Eq. 3). */
+      lrSchedule(dModel, step, warmupSteps = 4000) {
+        return modelLib.dm_transformer_lr_schedule_raw(dModel, step, warmupSteps);
+      },
+      /** Sinusoidal positional encoding table [maxLen × dModel]. */
+      positionalEncoding(maxLen, dModel) {
+        const pe = Buffer.alloc(maxLen * dModel * 4);
+        modelLib.dm_transformer_positional_encoding_raw(maxLen, dModel, pe);
+        return _readFloats(pe, maxLen * dModel);
+      },
+      /** Causal (upper-triangular) mask [seq × seq]. */
+      causalMask(seq) {
+        const mask = Buffer.alloc(seq * seq * 4);
+        modelLib.dm_transformer_causal_mask_raw(seq, mask);
+        return _readFloats(mask, seq * seq);
+      },
+    };
+  },
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// § tokenizer — Named tokenizer factory (HuggingFace-style)
+// ══════════════════════════════════════════════════════════════════════════════
+
+const tokenizer = {
+  bpe()           { return new Tokenizer('bpe');           },
+  bpeDropout()    { return new Tokenizer('bpe_dropout');   },
+  unigram()       { return new Tokenizer('unigram');       },
+  sentencePiece() { return new Tokenizer('sentencepiece'); },
+  wordPiece()     { return new Tokenizer('wordpiece');     },
+  gpe()           { return new Tokenizer('gpe');           },
+  parityBpe()     { return new Tokenizer('parity_bpe');    },
+  maximalMunch()  { return new Tokenizer('maximal_munch'); },
+  volt()          { return new Tokenizer('volt');          },
+  faro()          { return new Tokenizer('faro');          },
+  tokenizerLab()  { return new Tokenizer('tokenizer_lab'); },
+
+  /** Run Volt vocabulary optimisation. */
+  voltOptimize(corpusPath, { minSize = 1000, maxSize = 32000,
+                              nSteps = 200, outputPath = 'volt.model' } = {}) {
+    check(lib.dm_tokenizer_volt_run(corpusPath, minSize, maxSize, nSteps, outputPath),
+          'dm.tokenizer.voltOptimize');
+  },
+};
+
+// Patch models and tokenizer into the already-exported module.exports object
+Object.assign(module.exports, { models, tokenizer });

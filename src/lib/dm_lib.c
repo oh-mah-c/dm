@@ -1527,6 +1527,17 @@ DM_API void dm_bert_free_weights(float *weights)
     free(weights);
 }
 
+DM_API DM_Status dm_bert_save_raw(const char *path,
+                                   int variant, int vocab_size, int max_seq_len,
+                                   const float *weights)
+{
+    /* dm_bert_config_init and dm_bert_save are declared in models/lm/bert.h,
+     * which is already included transitively. Use their actual signatures. */
+    BertConfig cfg;
+    dm_bert_config_init(&cfg, (BertVariant)variant, vocab_size, max_seq_len);
+    return dm_bert_save(path, &cfg, weights) == 0 ? DM_OK : DM_ERR_IO;
+}
+
 DM_API DM_Status dm_bert_forward_raw(int          variant,
                                      int          vocab_size,
                                      int          max_seq_len,
@@ -2222,10 +2233,168 @@ DM_API float dm_gan_train_g_step_raw(void *gan, const float *z_batch, int batch_
     DM_Tensor z;
     dm_tensor_alloc(&z, batch_size, g->noise_dim, 1, 1);
     for (int i = 0; i < batch_size * g->noise_dim; i++) z.data[i] = z_batch[i];
-    
+
     float loss = dm_gan_train_g_step(g, &z);
-    
+
     dm_tensor_free(&z);
     return loss;
+}
+
+/* =========================================================================
+ * § 19  Transformer (Vaswani et al. 2017) — raw FFI wrappers
+ *
+ * Forward-declare only the symbols we need to avoid including transformer.h
+ * (which would re-declare types already visible via dm.h).
+ * ========================================================================= */
+
+typedef enum { _TRANSFORMER_BASE = 0, _TRANSFORMER_BIG = 1 } _TransformerVariant;
+typedef struct {
+    _TransformerVariant variant;
+    int  num_layers; int  d_model; int  d_ff; int  num_heads;
+    int  d_k; int  vocab_size; int  max_seq_len;
+    float dropout; float label_smooth; int warmup_steps;
+} _TransformerConfig;
+
+extern void   dm_transformer_config_init(void *cfg, int variant, int vocab_size, int max_seq_len);
+extern size_t dm_transformer_weight_count(const void *cfg);
+extern int    dm_transformer_save(const char *path, const void *cfg, const float *w);
+extern int    dm_transformer_load(const char *path, void *cfg, float **w_out);
+extern int    dm_transformer_forward(const void *cfg, const float *w,
+                                     const int *src, int src_seq,
+                                     const int *tgt, int tgt_seq, float *logits);
+extern int    dm_transformer_encode(const void *cfg, const float *w,
+                                    const int *src, int src_seq, float *enc_out);
+extern int    dm_transformer_decode(const void *cfg, const float *w,
+                                    const int *tgt, int tgt_seq,
+                                    const float *enc_out, int src_seq, float *logits);
+extern float  dm_transformer_lr_schedule(int d_model, int step, int warmup_steps);
+extern void   dm_transformer_positional_encoding(int max_len, int d_model, float *pe_out);
+extern void   dm_transformer_causal_mask(int seq, float *mask_out);
+extern int    dm_transformer_sdp_attention(const float *Q, const float *K, const float *V,
+                                           const float *mask, int seq_q, int seq_k,
+                                           int d_k, int d_v, float *out, float *scratch);
+extern int    dm_transformer_mha(const float *WQ, const float *bQ,
+                                  const float *WK, const float *bK,
+                                  const float *WV, const float *bV,
+                                  const float *WO, const float *bO,
+                                  const float *Q_in, const float *K_in, const float *V_in,
+                                  const float *mask, int seq_q, int seq_k,
+                                  int d_model, int h, float *out);
+
+DM_API void dm_transformer_config_init_raw(int variant, int vocab_size, int max_seq_len,
+                                            void *cfg_out)
+{
+    dm_transformer_config_init(cfg_out, variant, vocab_size, max_seq_len);
+}
+
+DM_API size_t dm_transformer_weight_count_raw(int variant, int vocab_size, int max_seq_len)
+{
+    _TransformerConfig cfg;
+    dm_transformer_config_init(&cfg, variant, vocab_size, max_seq_len);
+    return dm_transformer_weight_count(&cfg);
+}
+
+DM_API DM_Status dm_transformer_save_raw(const char *path,
+                                          int variant, int vocab_size, int max_seq_len,
+                                          const float *weights)
+{
+    _TransformerConfig cfg;
+    dm_transformer_config_init(&cfg, variant, vocab_size, max_seq_len);
+    return dm_transformer_save(path, &cfg, weights) == 0 ? DM_OK : DM_ERR_IO;
+}
+
+DM_API DM_Status dm_transformer_load_raw(const char *path,
+                                          int *variant_out, int *vocab_size_out,
+                                          int *max_seq_len_out, float **weights_out)
+{
+    _TransformerConfig cfg;
+    int rc = dm_transformer_load(path, &cfg, weights_out);
+    if (rc != 0) return DM_ERR_IO;
+    if (variant_out)    *variant_out    = (int)cfg.variant;
+    if (vocab_size_out) *vocab_size_out = cfg.vocab_size;
+    if (max_seq_len_out)*max_seq_len_out= cfg.max_seq_len;
+    return DM_OK;
+}
+
+DM_API void dm_transformer_free_weights(float *weights) { free(weights); }
+
+DM_API DM_Status dm_transformer_forward_raw(int variant, int vocab_size, int max_seq_len,
+                                              const float *weights,
+                                              const int *src_tokens, int src_seq,
+                                              const int *tgt_tokens, int tgt_seq,
+                                              float *logits_out)
+{
+    _TransformerConfig cfg;
+    dm_transformer_config_init(&cfg, variant, vocab_size, max_seq_len);
+    return dm_transformer_forward(&cfg, weights,
+                                   src_tokens, src_seq,
+                                   tgt_tokens, tgt_seq,
+                                   logits_out) == 0 ? DM_OK : DM_ERR_GENERIC;
+}
+
+DM_API DM_Status dm_transformer_encode_raw(int variant, int vocab_size, int max_seq_len,
+                                            const float *weights,
+                                            const int *src_tokens, int src_seq,
+                                            float *enc_out)
+{
+    _TransformerConfig cfg;
+    dm_transformer_config_init(&cfg, variant, vocab_size, max_seq_len);
+    return dm_transformer_encode(&cfg, weights, src_tokens, src_seq, enc_out) == 0
+           ? DM_OK : DM_ERR_GENERIC;
+}
+
+DM_API DM_Status dm_transformer_decode_raw(int variant, int vocab_size, int max_seq_len,
+                                            const float *weights,
+                                            const int *tgt_tokens, int tgt_seq,
+                                            const float *enc_out, int src_seq,
+                                            float *logits_out)
+{
+    _TransformerConfig cfg;
+    dm_transformer_config_init(&cfg, variant, vocab_size, max_seq_len);
+    return dm_transformer_decode(&cfg, weights,
+                                  tgt_tokens, tgt_seq,
+                                  enc_out, src_seq, logits_out) == 0
+           ? DM_OK : DM_ERR_GENERIC;
+}
+
+DM_API float dm_transformer_lr_schedule_raw(int d_model, int step, int warmup_steps)
+{
+    return dm_transformer_lr_schedule(d_model, step, warmup_steps);
+}
+
+DM_API void dm_transformer_positional_encoding_raw(int max_len, int d_model, float *pe_out)
+{
+    dm_transformer_positional_encoding(max_len, d_model, pe_out);
+}
+
+DM_API void dm_transformer_causal_mask_raw(int seq, float *mask_out)
+{
+    dm_transformer_causal_mask(seq, mask_out);
+}
+
+/* =========================================================================
+ * § 20  MobileNet Tiny — raw forward FFI wrapper for internal use
+ * ========================================================================= */
+
+DM_API DM_Status dm_mobilenet_tiny_forward_raw2(const float *input_nchw,
+                                                  int image_size, int classes,
+                                                  unsigned int seed,
+                                                  float *logits_out)
+{
+    DM_Tensor in, logits;
+    if (dm_tensor_alloc(&in, 1, 3, image_size, image_size) != 0) return DM_ERR_MEMORY;
+    int n = 3 * image_size * image_size;
+    for (int i = 0; i < n; i++) in.data[i] = input_nchw[i];
+    if (dm_tensor_alloc(&logits, 1, classes, 1, 1) != 0) {
+        dm_tensor_free(&in); return DM_ERR_MEMORY;
+    }
+    extern int dm_mobilenet_tiny_forward(DM_Tensor *in, DM_Tensor *logits,
+                                          int classes, unsigned int seed);
+    int rc = dm_mobilenet_tiny_forward(&in, &logits, classes, seed);
+    if (rc == 0)
+        for (int i = 0; i < classes; i++) logits_out[i] = logits.data[i];
+    dm_tensor_free(&in);
+    dm_tensor_free(&logits);
+    return rc == 0 ? DM_OK : DM_ERR_GENERIC;
 }
 
