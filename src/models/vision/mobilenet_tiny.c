@@ -55,8 +55,8 @@ static float *make_weights(size_t n, unsigned int seed, float scale) {
     return w;
 }
 
-static int conv_relu(const DM_Tensor *in, DM_Tensor *out, int out_c, int kernel, int stride, unsigned int seed) {
-    float *w = make_weights((size_t)out_c * in->c * kernel * kernel, seed, 0.08f);
+static int conv_relu(const DM_Block *in, DM_Block *out, int out_c, int kernel, int stride, unsigned int seed) {
+    float *w = make_weights((size_t)out_c * DM_NCHW_C(in) * kernel * kernel, seed, 0.08f);
     int rc;
     if (!w) return -1;
     rc = dm_conv2d_same(in, out, w, NULL, out_c, kernel, stride);
@@ -65,8 +65,8 @@ static int conv_relu(const DM_Tensor *in, DM_Tensor *out, int out_c, int kernel,
     return rc;
 }
 
-static int depthwise_relu(const DM_Tensor *in, DM_Tensor *out, int kernel, int stride, unsigned int seed) {
-    float *w = make_weights((size_t)in->c * kernel * kernel, seed, 0.08f);
+static int depthwise_relu(const DM_Block *in, DM_Block *out, int kernel, int stride, unsigned int seed) {
+    float *w = make_weights((size_t)DM_NCHW_C(in) * kernel * kernel, seed, 0.08f);
     int rc;
     if (!w) return -1;
     rc = dm_depthwise_conv2d_same(in, out, w, NULL, kernel, stride);
@@ -75,8 +75,8 @@ static int depthwise_relu(const DM_Tensor *in, DM_Tensor *out, int kernel, int s
     return rc;
 }
 
-static int pointwise_relu(const DM_Tensor *in, DM_Tensor *out, int out_c, unsigned int seed, int activate) {
-    float *w = make_weights((size_t)out_c * in->c, seed, 0.08f);
+static int pointwise_relu(const DM_Block *in, DM_Block *out, int out_c, unsigned int seed, int activate) {
+    float *w = make_weights((size_t)out_c * DM_NCHW_C(in), seed, 0.08f);
     int rc;
     if (!w) return -1;
     rc = dm_pointwise_conv2d(in, out, w, NULL, out_c);
@@ -85,26 +85,26 @@ static int pointwise_relu(const DM_Tensor *in, DM_Tensor *out, int out_c, unsign
     return rc;
 }
 
-static int fused_ib(const DM_Tensor *in, DM_Tensor *out, int expanded_c, int out_c, int kernel, int stride, unsigned int seed) {
-    DM_Tensor x = {0};
+static int fused_ib(const DM_Block *in, DM_Block *out, int expanded_c, int out_c, int kernel, int stride, unsigned int seed) {
+    DM_Block x = {0};
     if (conv_relu(in, &x, expanded_c, kernel, stride, seed + 1) != 0) return -1;
-    if (pointwise_relu(&x, out, out_c, seed + 2, 1) != 0) { dm_tensor_free(&x); return -1; }
-    dm_tensor_free(&x);
+    if (pointwise_relu(&x, out, out_c, seed + 2, 1) != 0) { dm_block_free(&x); return -1; }
+    dm_block_free(&x);
     return 0;
 }
 
-static int add_residual_if_same(const DM_Tensor *in, DM_Tensor *out) {
+static int add_residual_if_same(const DM_Block *in, DM_Block *out) {
     size_t i, n;
-    if (!in || !out || in->n != out->n || in->c != out->c || in->h != out->h || in->w != out->w) return 0;
-    n = dm_tensor_count(out);
-    for (i = 0; i < n; i++) out->data[i] += in->data[i];
+    if (!in || !out || DM_NCHW_N(in) != DM_NCHW_N(out) || DM_NCHW_C(in) != DM_NCHW_C(out) || DM_NCHW_H(in) != DM_NCHW_H(out) || DM_NCHW_W(in) != DM_NCHW_W(out)) return 0;
+    n = (out)->count;
+    for (i = 0; i < n; i++) ((float*)((float*)out->data))[i] += ((float*)((float*)in->data))[i];
     return 1;
 }
 
-int dm_uib_block(const DM_Tensor *in, DM_Tensor *out, DM_UIBKind kind,
+int dm_uib_block(const DM_Block *in, DM_Block *out, DM_UIBKind kind,
                  int expanded_c, int out_c, int kernel1, int kernel2, int stride, unsigned int seed) {
-    DM_Tensor a = {0}, b = {0}, c = {0};
-    const DM_Tensor *cur = in;
+    DM_Block a = {0}, b = {0}, c = {0};
+    const DM_Block *cur = in;
     int rc = -1;
     int use_dw1 = (kind == DM_UIB_CONVNEXT || kind == DM_UIB_EXTRADW);
     int use_dw2 = (kind == DM_UIB_IB || kind == DM_UIB_EXTRADW);
@@ -124,35 +124,35 @@ int dm_uib_block(const DM_Tensor *in, DM_Tensor *out, DM_UIBKind kind,
     add_residual_if_same(in, out);
     rc = 0;
 done:
-    dm_tensor_free(&a); dm_tensor_free(&b); dm_tensor_free(&c);
+    dm_block_free(&a); dm_block_free(&b); dm_block_free(&c);
     return rc;
 }
 
-static int spatial_reduce(const DM_Tensor *in, DM_Tensor *out, int reduce, unsigned int seed) {
+static int spatial_reduce(const DM_Block *in, DM_Block *out, int reduce, unsigned int seed) {
     if (!reduce) {
-        size_t bytes = dm_tensor_count(in) * sizeof(float);
-        if (dm_tensor_alloc(out, in->n, in->c, in->h, in->w) != 0) return -1;
-        memcpy(out->data, in->data, bytes);
+        size_t bytes = (in)->count * sizeof(float);
+        if (dm_block_create(out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(in), DM_NCHW_C(in), DM_NCHW_H(in), DM_NCHW_W(in)}) != 0) return -1;
+        memcpy(((float*)out->data), ((float*)in->data), bytes);
         return 0;
     }
     return depthwise_relu(in, out, 3, 2, seed);
 }
 
-int dm_mobile_mqa_block(const DM_Tensor *in, DM_Tensor *out, int heads, int key_dim,
+int dm_mobile_mqa_block(const DM_Block *in, DM_Block *out, int heads, int key_dim,
                         int spatial_reduction, unsigned int seed) {
-    DM_Tensor kv_in = {0};
+    DM_Block kv_in = {0};
     float *wq = NULL, *wk = NULL, *wv = NULL, *wo = NULL;
     float *q = NULL, *k = NULL, *v = NULL, *cat = NULL;
     int tokens_q, tokens_kv, y, x, t, s, h, d, c, oc;
     float scale;
     if (!in || !out || heads <= 0 || key_dim <= 0) return -1;
     if (spatial_reduce(in, &kv_in, spatial_reduction, seed + 21) != 0) return -1;
-    tokens_q = in->h * in->w;
-    tokens_kv = kv_in.h * kv_in.w;
-    wq = make_weights((size_t)heads * key_dim * in->c, seed + 22, 0.05f);
-    wk = make_weights((size_t)key_dim * in->c, seed + 23, 0.05f);
-    wv = make_weights((size_t)key_dim * in->c, seed + 24, 0.05f);
-    wo = make_weights((size_t)in->c * heads * key_dim, seed + 25, 0.05f);
+    tokens_q = DM_NCHW_H(in) * DM_NCHW_W(in);
+    tokens_kv = DM_NCHW_H(&kv_in) * DM_NCHW_W(&kv_in);
+    wq = make_weights((size_t)heads * key_dim * DM_NCHW_C(in), seed + 22, 0.05f);
+    wk = make_weights((size_t)key_dim * DM_NCHW_C(in), seed + 23, 0.05f);
+    wv = make_weights((size_t)key_dim * DM_NCHW_C(in), seed + 24, 0.05f);
+    wo = make_weights((size_t)DM_NCHW_C(in) * heads * key_dim, seed + 25, 0.05f);
     q = (float *)calloc((size_t)heads * tokens_q * key_dim, sizeof(float));
     k = (float *)calloc((size_t)tokens_kv * key_dim, sizeof(float));
     v = (float *)calloc((size_t)tokens_kv * key_dim, sizeof(float));
@@ -160,16 +160,16 @@ int dm_mobile_mqa_block(const DM_Tensor *in, DM_Tensor *out, int heads, int key_
     if (!wq || !wk || !wv || !wo || !q || !k || !v || !cat) goto fail;
 
     for (h = 0; h < heads; h++) for (t = 0; t < tokens_q; t++) {
-        y = t / in->w; x = t % in->w;
-        for (d = 0; d < key_dim; d++) for (c = 0; c < in->c; c++)
-            q[((size_t)h * tokens_q + t) * key_dim + d] += dm_tensor_get(in, 0, c, y, x) * wq[((size_t)h * key_dim + d) * in->c + c];
+        y = t / DM_NCHW_W(in); x = t % DM_NCHW_W(in);
+        for (d = 0; d < key_dim; d++) for (c = 0; c < DM_NCHW_C(in); c++)
+            q[((size_t)h * tokens_q + t) * key_dim + d] += dm_tensor_get(in, 0, c, y, x) * wq[((size_t)h * key_dim + d) * DM_NCHW_C(in) + c];
     }
     for (t = 0; t < tokens_kv; t++) {
-        y = t / kv_in.w; x = t % kv_in.w;
-        for (d = 0; d < key_dim; d++) for (c = 0; c < kv_in.c; c++) {
+        y = t / DM_NCHW_W(&kv_in); x = t % DM_NCHW_W(&kv_in);
+        for (d = 0; d < key_dim; d++) for (c = 0; c < DM_NCHW_C(&kv_in); c++) {
             float val = dm_tensor_get(&kv_in, 0, c, y, x);
-            k[(size_t)t * key_dim + d] += val * wk[(size_t)d * kv_in.c + c];
-            v[(size_t)t * key_dim + d] += val * wv[(size_t)d * kv_in.c + c];
+            k[(size_t)t * key_dim + d] += val * wk[(size_t)d * DM_NCHW_C(&kv_in) + c];
+            v[(size_t)t * key_dim + d] += val * wv[(size_t)d * DM_NCHW_C(&kv_in) + c];
         }
     }
     scale = 1.0f / sqrtf((float)key_dim);
@@ -192,25 +192,25 @@ int dm_mobile_mqa_block(const DM_Tensor *in, DM_Tensor *out, int heads, int key_
         }
         free(scores);
     }
-    if (dm_tensor_alloc(out, in->n, in->c, in->h, in->w) != 0) goto fail;
+    if (dm_block_create(out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(in), DM_NCHW_C(in), DM_NCHW_H(in), DM_NCHW_W(in)}) != 0) goto fail;
     for (t = 0; t < tokens_q; t++) {
-        y = t / in->w; x = t % in->w;
-        for (oc = 0; oc < in->c; oc++) {
+        y = t / DM_NCHW_W(in); x = t % DM_NCHW_W(in);
+        for (oc = 0; oc < DM_NCHW_C(in); oc++) {
             float z = 0.0f;
             for (c = 0; c < heads * key_dim; c++) z += cat[(size_t)t * heads * key_dim + c] * wo[(size_t)oc * heads * key_dim + c];
             dm_tensor_set(out, 0, oc, y, x, z);
         }
     }
     add_residual_if_same(in, out);
-    dm_tensor_free(&kv_in); free(wq); free(wk); free(wv); free(wo); free(q); free(k); free(v); free(cat);
+    dm_block_free(&kv_in); free(wq); free(wk); free(wv); free(wo); free(q); free(k); free(v); free(cat);
     return 0;
 fail:
-    dm_tensor_free(&kv_in); free(wq); free(wk); free(wv); free(wo); free(q); free(k); free(v); free(cat);
+    dm_block_free(&kv_in); free(wq); free(wk); free(wv); free(wo); free(q); free(k); free(v); free(cat);
     return -1;
 }
 
-static int mobilenet_features(const DM_Tensor *input, DM_Tensor *features, unsigned int seed) {
-    DM_Tensor x1 = {0}, x2 = {0}, x3 = {0}, x4 = {0}, x5 = {0}, x6 = {0}, pool = {0};
+static int mobilenet_features(const DM_Block *input, DM_Block *features, unsigned int seed) {
+    DM_Block x1 = {0}, x2 = {0}, x3 = {0}, x4 = {0}, x5 = {0}, x6 = {0}, pool = {0};
     int rc = -1;
     if (fused_ib(input, &x1, 16, 16, 3, 2, seed + 100) != 0) goto done;
     if (dm_uib_block(&x1, &x2, DM_UIB_EXTRADW, 64, 24, 3, 3, 2, seed + 200) != 0) goto done;
@@ -221,13 +221,13 @@ static int mobilenet_features(const DM_Tensor *input, DM_Tensor *features, unsig
     if (dm_global_avg_pool(&x6, &pool) != 0) goto done;
     *features = pool;
     memset(&pool, 0, sizeof(pool));
-    if (features->c >= 6 && input && input->data && input->c >= 3) {
+    if (DM_NCHW_C(features) >= 6 && input && ((float*)input->data) && DM_NCHW_C(input) >= 3) {
         int ch, y, x;
-        float inv = 1.0f / (float)(input->h * input->w);
+        float inv = 1.0f / (float)(DM_NCHW_H(input) * DM_NCHW_W(input));
         for (ch = 0; ch < 3; ch++) {
             float mean = 0.0f, sq = 0.0f;
-            for (y = 0; y < input->h; y++) {
-                for (x = 0; x < input->w; x++) {
+            for (y = 0; y < DM_NCHW_H(input); y++) {
+                for (x = 0; x < DM_NCHW_W(input); x++) {
                     float v = dm_tensor_get(input, 0, ch, y, x);
                     mean += v;
                     sq += v * v;
@@ -235,30 +235,30 @@ static int mobilenet_features(const DM_Tensor *input, DM_Tensor *features, unsig
             }
             mean *= inv;
             sq *= inv;
-            features->data[ch] += mean;
-            features->data[ch + 3] += sqrtf(fmaxf(0.0f, sq - mean * mean));
+            ((float*)((float*)features->data))[ch] += mean;
+            ((float*)((float*)features->data))[ch + 3] += sqrtf(fmaxf(0.0f, sq - mean * mean));
         }
     }
     rc = 0;
 done:
-    dm_tensor_free(&x1); dm_tensor_free(&x2); dm_tensor_free(&x3); dm_tensor_free(&x4);
-    dm_tensor_free(&x5); dm_tensor_free(&x6); dm_tensor_free(&pool);
+    dm_block_free(&x1); dm_block_free(&x2); dm_block_free(&x3); dm_block_free(&x4);
+    dm_block_free(&x5); dm_block_free(&x6); dm_block_free(&pool);
     return rc;
 }
 
-int dm_mobilenet_tiny_forward(const DM_Tensor *input, DM_Tensor *logits, int classes, unsigned int seed) {
-    DM_Tensor features = {0};
+int dm_mobilenet_tiny_forward(const DM_Block *input, DM_Block *logits, int classes, unsigned int seed) {
+    DM_Block features = {0};
     float *w = NULL;
     int rc = -1;
     if (mobilenet_features(input, &features, seed) != 0) goto done;
-    w = make_weights((size_t)classes * features.c, seed + 700, 0.05f);
+    w = make_weights((size_t)classes * DM_NCHW_C(&features), seed + 700, 0.05f);
     if (!w) goto done;
     if (dm_linear(&features, logits, w, NULL, classes) != 0) goto done;
     dm_softmax(logits);
     rc = 0;
 done:
     free(w);
-    dm_tensor_free(&features);
+    dm_block_free(&features);
     return rc;
 }
 
@@ -322,24 +322,24 @@ static int head_load(TinyHead *h, const char *path) {
     return 0;
 }
 
-static int load_resized_features(const char *path, int size, unsigned int seed, DM_Tensor *features) {
-    DM_Tensor img = {0}, resized = {0};
+static int load_resized_features(const char *path, int size, unsigned int seed, DM_Block *features) {
+    DM_Block img = {0}, resized = {0};
     int rc = -1;
     if (dm_image_load_ppm_rgb_f32(path, &img) != 0) goto done;
     if (dm_image_resize_nearest(&img, &resized, size, size) != 0) goto done;
     if (mobilenet_features(&resized, features, seed) != 0) goto done;
     rc = 0;
 done:
-    dm_tensor_free(&img);
-    dm_tensor_free(&resized);
+    dm_block_free(&img);
+    dm_block_free(&resized);
     return rc;
 }
 
-static void head_logits(const TinyHead *h, const DM_Tensor *features, float *logits) {
+static void head_logits(const TinyHead *h, const DM_Block *features, float *logits) {
     int c, d;
     for (c = 0; c < h->classes; c++) {
         float z = h->b[c];
-        for (d = 0; d < h->feature_dim; d++) z += h->w[(size_t)c * (size_t)h->feature_dim + (size_t)d] * features->data[d];
+        for (d = 0; d < h->feature_dim; d++) z += h->w[(size_t)c * (size_t)h->feature_dim + (size_t)d] * ((float*)((float*)features->data))[d];
         logits[c] = z;
     }
 }
@@ -390,25 +390,25 @@ static int cmd_train(int argc, char **argv) {
         grad_b = (float *)calloc((size_t)head.classes, sizeof(float));
         if (!grad_w || !grad_b) { free(grad_w); free(grad_b); fclose(fp); head_free(&head); return 1; }
         while (fscanf(fp, "%4095s %d", path, &label) == 2) {
-            DM_Tensor feat = {0};
+            DM_Block feat = {0};
             float *logits;
             int c, d, pred = 0;
             if (label < 0 || label >= classes) continue;
             if (load_resized_features(path, size, seed, &feat) != 0) continue;
             logits = (float *)malloc(sizeof(float) * (size_t)classes);
-            if (!logits) { dm_tensor_free(&feat); fclose(fp); head_free(&head); return 1; }
+            if (!logits) { dm_block_free(&feat); fclose(fp); head_free(&head); return 1; }
             head_logits(&head, &feat, logits);
             for (c = 1; c < classes; c++) if (logits[c] > logits[pred]) pred = c;
             if (pred == label) correct++;
             total += head_softmax_loss(logits, classes, label);
             for (c = 0; c < classes; c++) {
                 float g = logits[c];
-                for (d = 0; d < head.feature_dim; d++) grad_w[(size_t)c * (size_t)head.feature_dim + (size_t)d] += g * feat.data[d];
+                for (d = 0; d < head.feature_dim; d++) grad_w[(size_t)c * (size_t)head.feature_dim + (size_t)d] += g * ((float*)((float*)feat.data))[d];
                 grad_b[c] += g;
             }
             samples++;
             free(logits);
-            dm_tensor_free(&feat);
+            dm_block_free(&feat);
         }
         fclose(fp);
         if (samples) {
@@ -436,7 +436,7 @@ static int cmd_infer(int argc, char **argv) {
     const char *input = NULL, *model_path = NULL;
     int classes = 10, size = 64, top = 5, i;
     unsigned int seed = 1;
-    DM_Tensor img = {0}, resized = {0}, logits = {0};
+    DM_Block img = {0}, resized = {0}, logits = {0};
     for (i = 2; i < argc; i++) {
         if ((strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--input") == 0) && i + 1 < argc) input = argv[++i];
         else if (strcmp(argv[i], "--classes") == 0 && i + 1 < argc) classes = atoi(argv[++i]);
@@ -449,7 +449,7 @@ static int cmd_infer(int argc, char **argv) {
     if (!input || classes <= 0 || size <= 0) return 2;
     if (model_path) {
         TinyHead head = {0};
-        DM_Tensor feat = {0};
+        DM_Block feat = {0};
         float *raw;
         int c;
         if (head_load(&head, model_path) != 0) return 1;
@@ -457,19 +457,19 @@ static int cmd_infer(int argc, char **argv) {
         size = head.image_size;
         seed = head.seed;
         if (load_resized_features(input, size, seed, &feat) != 0) { head_free(&head); return 1; }
-        if (dm_tensor_alloc(&logits, 1, classes, 1, 1) != 0) { dm_tensor_free(&feat); head_free(&head); return 1; }
+        if (dm_block_create(&logits, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){1, classes, 1, 1}) != 0) { dm_block_free(&feat); head_free(&head); return 1; }
         raw = (float *)malloc(sizeof(float) * (size_t)classes);
-        if (!raw) { dm_tensor_free(&feat); head_free(&head); dm_tensor_free(&logits); return 1; }
+        if (!raw) { dm_block_free(&feat); head_free(&head); dm_block_free(&logits); return 1; }
         head_logits(&head, &feat, raw);
         for (c = 0; c < classes; c++) dm_tensor_set(&logits, 0, c, 0, 0, raw[c]);
         dm_softmax(&logits);
         free(raw);
-        dm_tensor_free(&feat);
+        dm_block_free(&feat);
         head_free(&head);
     } else {
         if (dm_image_load_ppm_rgb_f32(input, &img) != 0) return 1;
-        if (dm_image_resize_nearest(&img, &resized, size, size) != 0) { dm_tensor_free(&img); return 1; }
-        if (dm_mobilenet_tiny_forward(&resized, &logits, classes, seed) != 0) { dm_tensor_free(&img); dm_tensor_free(&resized); return 1; }
+        if (dm_image_resize_nearest(&img, &resized, size, size) != 0) { dm_block_free(&img); return 1; }
+        if (dm_mobilenet_tiny_forward(&resized, &logits, classes, seed) != 0) { dm_block_free(&img); dm_block_free(&resized); return 1; }
     }
     printf("model=mobilenet_tiny_mnv4_style\n");
     printf("input=%s\nclasses=%d\nimage_size=%d\n", input, classes, size);
@@ -483,27 +483,27 @@ static int cmd_infer(int argc, char **argv) {
         printf("rank%d_class=%d prob=%.8f\n", i + 1, best, bv);
         dm_tensor_set(&logits, 0, best, 0, 0, -1.0f);
     }
-    dm_tensor_free(&img); dm_tensor_free(&resized); dm_tensor_free(&logits);
+    dm_block_free(&img); dm_block_free(&resized); dm_block_free(&logits);
     return 0;
 }
 
 static int cmd_bench_block(int argc, char **argv) {
     int h = 16, w = 16, c = 32, i;
-    DM_Tensor x = {0}, y = {0}, z = {0};
+    DM_Block x = {0}, y = {0}, z = {0};
     for (i = 2; i < argc; i++) {
         if (strcmp(argv[i], "--h") == 0 && i + 1 < argc) h = atoi(argv[++i]);
         else if (strcmp(argv[i], "--w") == 0 && i + 1 < argc) w = atoi(argv[++i]);
         else if (strcmp(argv[i], "--c") == 0 && i + 1 < argc) c = atoi(argv[++i]);
         else return 2;
     }
-    if (dm_tensor_alloc(&x, 1, c, h, w) != 0) return 1;
-    for (i = 0; i < (int)dm_tensor_count(&x); i++) x.data[i] = (float)(i % 17) / 17.0f;
-    if (dm_uib_block(&x, &y, DM_UIB_EXTRADW, c * 4, c, 3, 3, 1, 1) != 0) { dm_tensor_free(&x); return 1; }
-    if (dm_mobile_mqa_block(&y, &z, 4, 8, 1, 2) != 0) { dm_tensor_free(&x); dm_tensor_free(&y); return 1; }
-    printf("uib_out=%dx%dx%d\n", y.c, y.h, y.w);
-    printf("mobile_mqa_out=%dx%dx%d\n", z.c, z.h, z.w);
+    if (dm_block_create(&x, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){1, c, h, w}) != 0) return 1;
+    for (i = 0; i < (int)(&x)->count; i++) ((float*)((float*)x.data))[i] = (float)(i % 17) / 17.0f;
+    if (dm_uib_block(&x, &y, DM_UIB_EXTRADW, c * 4, c, 3, 3, 1, 1) != 0) { dm_block_free(&x); return 1; }
+    if (dm_mobile_mqa_block(&y, &z, 4, 8, 1, 2) != 0) { dm_block_free(&x); dm_block_free(&y); return 1; }
+    printf("uib_out=%dx%dx%d\n", DM_NCHW_C(&y), DM_NCHW_H(&y), DM_NCHW_W(&y));
+    printf("mobile_mqa_out=%dx%dx%d\n", DM_NCHW_C(&z), DM_NCHW_H(&z), DM_NCHW_W(&z));
     printf("operators=FusedIB,UIB_FFN,UIB_IB,UIB_ConvNext,UIB_ExtraDW,Mobile_MQA(shared_KV,SRA_stride2_DW)\n");
-    dm_tensor_free(&x); dm_tensor_free(&y); dm_tensor_free(&z);
+    dm_block_free(&x); dm_block_free(&y); dm_block_free(&z);
     return 0;
 }
 
@@ -786,11 +786,11 @@ static int run_tf_backend(int argc, char **argv, const char *tf_cmd) {
                     int loaded_samples = 0;
 
                     for (int b = 0; b < N; b++) {
-                        DM_Tensor img = {0}, resized = {0};
+                        DM_Block img = {0}, resized = {0};
                         if (dm_image_load_ppm_rgb_f32(batch_paths[b], &img) != 0 ||
                             dm_image_resize_nearest(&img, &resized, size, size) != 0) {
-                            dm_tensor_free(&img);
-                            dm_tensor_free(&resized);
+                            dm_block_free(&img);
+                            dm_block_free(&resized);
                             continue;
                         }
 
@@ -806,8 +806,8 @@ static int run_tf_backend(int argc, char **argv, const char *tf_cmd) {
                             }
                         }
                         loaded_samples++;
-                        dm_tensor_free(&img);
-                        dm_tensor_free(&resized);
+                        dm_block_free(&img);
+                        dm_block_free(&resized);
                     }
 
                     if (loaded_samples > 0) {
@@ -996,11 +996,11 @@ static int run_tf_backend(int argc, char **argv, const char *tf_cmd) {
                 int loaded_samples = 0;
 
                 for (int b = 0; b < N; b++) {
-                    DM_Tensor img = {0}, resized = {0};
+                    DM_Block img = {0}, resized = {0};
                     if (dm_image_load_ppm_rgb_f32(batch_paths[b], &img) != 0 ||
                         dm_image_resize_nearest(&img, &resized, size, size) != 0) {
-                        dm_tensor_free(&img);
-                        dm_tensor_free(&resized);
+                        dm_block_free(&img);
+                        dm_block_free(&resized);
                         continue;
                     }
 
@@ -1016,8 +1016,8 @@ static int run_tf_backend(int argc, char **argv, const char *tf_cmd) {
                         }
                     }
                     loaded_samples++;
-                    dm_tensor_free(&img);
-                    dm_tensor_free(&resized);
+                    dm_block_free(&img);
+                    dm_block_free(&resized);
                 }
 
                 if (loaded_samples > 0) {
@@ -1156,12 +1156,12 @@ static int run_tf_backend(int argc, char **argv, const char *tf_cmd) {
             }
         }
 
-        DM_Tensor img = {0}, resized = {0};
+        DM_Block img = {0}, resized = {0};
         if (dm_image_load_ppm_rgb_f32(input_image, &img) != 0 ||
             dm_image_resize_nearest(&img, &resized, size, size) != 0) {
             fprintf(stderr, "error: failed to load/resize image %s\n", input_image);
-            dm_tensor_free(&img);
-            dm_tensor_free(&resized);
+            dm_block_free(&img);
+            dm_block_free(&resized);
             TF_DeleteSession(session, status);
             TF_DeleteGraph(graph);
             TF_DeleteStatus(status);
@@ -1179,8 +1179,8 @@ static int run_tf_backend(int argc, char **argv, const char *tf_cmd) {
                 }
             }
         }
-        dm_tensor_free(&img);
-        dm_tensor_free(&resized);
+        dm_block_free(&img);
+        dm_block_free(&resized);
 
         int64_t img_dims[4] = {1, size, size, 3};
         TF_Tensor* img_tensor = TF_NewTensor(TF_FLOAT, img_dims, 4, img_data, sizeof(float) * 1 * size * size * 3, tensor_deallocator, NULL);
@@ -1288,31 +1288,31 @@ DM_API DM_Status dm_mobilenet_tiny_forward_raw(const float *img_nchw,
 {
     if (!img_nchw || !logits_out || img_size <= 0 || classes <= 0) return DM_ERR_INVALID_PARAM;
 
-    DM_Tensor input = {0};
-    if (dm_tensor_alloc(&input, 1, 3, img_size, img_size) != 0) return DM_ERR_MEMORY;
-    memcpy(input.data, img_nchw, 3 * img_size * img_size * sizeof(float));
+    DM_Block input = {0};
+    if (dm_block_create(&input, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){1, 3, img_size, img_size}) != 0) return DM_ERR_MEMORY;
+    memcpy(((float*)input.data), img_nchw, 3 * img_size * img_size * sizeof(float));
 
-    DM_Tensor features = {0};
+    DM_Block features = {0};
     int rc = mobilenet_features(&input, &features, seed);
-    dm_tensor_free(&input);
+    dm_block_free(&input);
     if (rc != 0) {
-        dm_tensor_free(&features);
+        dm_block_free(&features);
         return DM_ERR_GENERIC;
     }
 
-    DM_Tensor logits = {0};
-    if (dm_tensor_alloc(&logits, 1, classes, 1, 1) != 0) {
-        dm_tensor_free(&features);
+    DM_Block logits = {0};
+    if (dm_block_create(&logits, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){1, classes, 1, 1}) != 0) {
+        dm_block_free(&features);
         return DM_ERR_MEMORY;
     }
 
     float *w_to_use = (float *)head_w;
     float *w_alloc = NULL;
     if (!w_to_use) {
-        w_alloc = make_weights((size_t)classes * features.c, seed + 700, 0.05f);
+        w_alloc = make_weights((size_t)classes * DM_NCHW_C(&features), seed + 700, 0.05f);
         if (!w_alloc) {
-            dm_tensor_free(&features);
-            dm_tensor_free(&logits);
+            dm_block_free(&features);
+            dm_block_free(&logits);
             return DM_ERR_MEMORY;
         }
         w_to_use = w_alloc;
@@ -1320,17 +1320,17 @@ DM_API DM_Status dm_mobilenet_tiny_forward_raw(const float *img_nchw,
 
     if (dm_linear(&features, &logits, w_to_use, head_b, classes) != 0) {
         free(w_alloc);
-        dm_tensor_free(&features);
-        dm_tensor_free(&logits);
+        dm_block_free(&features);
+        dm_block_free(&logits);
         return DM_ERR_GENERIC;
     }
     dm_softmax(&logits);
 
-    memcpy(logits_out, logits.data, classes * sizeof(float));
+    memcpy(logits_out, ((float*)logits.data), classes * sizeof(float));
 
     free(w_alloc);
-    dm_tensor_free(&features);
-    dm_tensor_free(&logits);
+    dm_block_free(&features);
+    dm_block_free(&logits);
     return DM_OK;
 }
 

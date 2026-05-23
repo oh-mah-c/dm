@@ -285,3 +285,40 @@ void dm_dataset_free(DM_Dataset *ds) {
     }
     free(ds);
 }
+
+int dm_dataset_to_block(const DM_Dataset *ds, DM_Block *block) {
+    if (!ds || !block) return -1;
+    
+    DM_Role role = DM_ROLE_TRANSACTION;
+    if (ds->type == DM_TYPE_SEQUENCE_UTILITY) {
+        role = DM_ROLE_SEQUENCE;
+    }
+    
+    int64_t shape[1] = {(int64_t)ds->count};
+    
+    // We create an EXTERNAL kind block with the DATASET layout.
+    // We treat it as OBJECT dtype since it holds a pointer to DM_Dataset internally.
+    int rc = dm_block_create(block, DM_KIND_EXTERNAL, DM_DTYPE_OBJECT, DM_LAYOUT_DATASET, DM_BACKEND_CPU, 1, shape);
+    if (rc != 0) return rc;
+    
+    block->role = role;
+    block->handle = (void*)ds; // Store pointer to dataset in handle
+    block->owns_data = 0;      // Block does not own the dataset memory
+    
+    // Set some useful metadata
+    char count_str[32];
+    snprintf(count_str, sizeof(count_str), "%zu", ds->count);
+    dm_block_set_meta(block, "dataset_count", count_str);
+    
+    char max_id_str[32];
+    snprintf(max_id_str, sizeof(max_id_str), "%u", ds->max_id);
+    dm_block_set_meta(block, "dataset_max_id", max_id_str);
+    
+    return 0;
+}
+
+DM_Dataset* dm_block_to_dataset(const DM_Block *block) {
+    if (!block) return NULL;
+    if (block->layout != DM_LAYOUT_DATASET) return NULL;
+    return (DM_Dataset*)block->handle;
+}

@@ -1,4 +1,7 @@
 #include "core/dm_engine.h"
+#include "lowering/dm_lowering.h"
+#include "lowering/dm_lower_tf.h"
+
 #include "tensorflow/c/c_api.h"
 #include "tensorflow/c/eager/c_api.h"
 
@@ -44,51 +47,46 @@ static void free_dealloc(void *data, size_t len, void *arg) {
     free(data);
 }
 
+
 /* ── Handle helpers ─────────────────────────────────────────────────────── */
 
-/* Wrap a DM_Tensor's data buffer as a [n,c,h,w] TFE handle (zero-copy). */
-static TFE_TensorHandle *dm_to_tf(const DM_Tensor *t) {
+static TFE_TensorHandle *dm_to_tf(const DM_Block *t) {
     if (!t || !t->data) return NULL;
     dm_tf_init();
-    int64_t dims[4] = {t->n, t->c, t->h, t->w};
-    size_t sz = (size_t)t->n * t->c * t->h * t->w * sizeof(float);
-    TF_Tensor *tft = TF_NewTensor(TF_FLOAT, dims, 4, t->data, sz, noop_dealloc, NULL);
-    TF_Status *s = TF_NewStatus();
-    TFE_TensorHandle *h = TFE_NewTensorHandle(tft, s);
-    TF_DeleteTensor(tft);
-    TF_DeleteStatus(s);
-    return h;
+    DM_Block tf_b;
+    // Note: CPU -> TF is a zero-copy wrap using TF_NewTensor with noop_dealloc.
+    if (dm_lower_block(t, &tf_b, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) return NULL;
+    // dm_engine.c manually manages and frees TFE handles via TFE_DeleteTensorHandle.
+    // We intentionally clear owns_handle so it doesn't try to free it if dm_block_free were called.
+    tf_b.owns_handle = 0;
+    return (TFE_TensorHandle *)tf_b.handle;
 }
 
-/* Copy resolved TFE handle data back into a pre-allocated DM_Tensor. */
-static void tf_to_dm(TFE_TensorHandle *h, DM_Tensor *out) {
+static void tf_to_dm(TFE_TensorHandle *h, DM_Block *out) {
     if (!h || !out || !out->data) return;
-    TF_Status *s = TF_NewStatus();
-    TF_Tensor *tft = TFE_TensorHandleResolve(h, s);
-    if (TF_GetCode(s) == TF_OK)
-        memcpy(out->data, TF_TensorData(tft), TF_TensorByteSize(tft));
-    else
-        fprintf(stderr, "[dm_engine] resolve failed: %s\n", TF_Message(s));
-    TF_DeleteTensor(tft);
-    TF_DeleteStatus(s);
+    DM_Block tf_src;
+    memset(&tf_src, 0, sizeof(DM_Block));
+    tf_src.backend = DM_BACKEND_TENSORFLOW;
+    tf_src.kind = DM_KIND_EXTERNAL;
+    tf_src.layout = DM_LAYOUT_TF_HANDLE;
+    tf_src.handle = h;
+    tf_src.owns_handle = 0; // The caller retains ownership of h
+    
+    // dm_raise_block triggers TFE_TensorHandleResolve and memcpy internally
+    dm_raise_block(&tf_src, out, DM_BACKEND_CPU, DM_LOWER_COPY);
 }
 
-/* Wrap an arbitrary float buffer as an N-dimensional TFE handle (zero-copy). */
 static TFE_TensorHandle *raw_to_tf(const float *data, const int64_t *dims, int ndim) {
     dm_tf_init();
-    size_t count = 1;
-    for (int i = 0; i < ndim; i++) count *= (size_t)dims[i];
-    TF_Tensor *tft = TF_NewTensor(TF_FLOAT, dims, ndim,
-                                  (void *)data, count * sizeof(float),
-                                  noop_dealloc, NULL);
-    TF_Status *s = TF_NewStatus();
-    TFE_TensorHandle *h = TFE_NewTensorHandle(tft, s);
-    TF_DeleteTensor(tft);
-    TF_DeleteStatus(s);
-    return h;
+    DM_Block b;
+    if (dm_block_view(&b, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, ndim, dims, (void*)data) != 0) return NULL;
+    
+    DM_Block tf_b;
+    if (dm_lower_block(&b, &tf_b, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) return NULL;
+    tf_b.owns_handle = 0;
+    return (TFE_TensorHandle *)tf_b.handle;
 }
 
-/* Copy resolved TFE handle into a flat float buffer (caller provides). */
 static void tf_to_raw(TFE_TensorHandle *h, float *out) {
     if (!h || !out) return;
     TF_Status *s = TF_NewStatus();
@@ -99,7 +97,6 @@ static void tf_to_raw(TFE_TensorHandle *h, float *out) {
     TF_DeleteStatus(s);
 }
 
-/* Wrap a scalar int32 as a TFE handle (used for reduction axes). */
 static TFE_TensorHandle *scalar_int32_to_tf(int32_t v) {
     dm_tf_init();
     int64_t dims[1] = {1};
@@ -113,7 +110,6 @@ static TFE_TensorHandle *scalar_int32_to_tf(int32_t v) {
     return h;
 }
 
-/* Wrap an int32 array as a TFE handle (used for reduction axes lists). */
 static TFE_TensorHandle *int32_array_to_tf(const int32_t *arr, int n) {
     dm_tf_init();
     int64_t dims[1] = {n};
@@ -296,65 +292,53 @@ static TFE_TensorHandle *execute_depthwise_conv2d(TFE_TensorHandle *input,
  * Tensor lifecycle
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-size_t dm_tensor_count(const DM_Tensor *t) {
-    if (!t || t->n <= 0 || t->c <= 0 || t->h <= 0 || t->w <= 0) return 0;
-    return (size_t)t->n * (size_t)t->c * (size_t)t->h * (size_t)t->w;
+size_t dm_tensor_count(const DM_Block *t) {
+    if (!t) return 0;
+    return (size_t)DM_NCHW_N(t) * DM_NCHW_C(t) * DM_NCHW_H(t) * DM_NCHW_W(t);
 }
 
-int dm_tensor_alloc(DM_Tensor *t, int n, int c, int h, int w) {
-    if (!t || n <= 0 || c <= 0 || h <= 0 || w <= 0) return -1;
-    memset(t, 0, sizeof(*t));
-    t->n = n; t->c = c; t->h = h; t->w = w;
-    size_t count = dm_tensor_count(t);
-    t->data = (float *)calloc(count, sizeof(float));
-    return t->data ? 0 : -1;
+int dm_tensor_alloc(DM_Block *t, int n, int c, int h, int w) {
+    return dm_block_create(t, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){n, c, h, w});
 }
 
-void dm_tensor_free(DM_Tensor *t) {
-    if (!t) return;
-    free(t->data);
-    memset(t, 0, sizeof(*t));
+void dm_tensor_free(DM_Block *t) {
+    dm_block_free(t);
 }
 
-void dm_tensor_fill(DM_Tensor *t, float value) {
+void dm_tensor_fill(DM_Block *t, float value) {
+    if (!t || !t->data) return;
     size_t n = dm_tensor_count(t);
-    for (size_t i = 0; i < n; i++) t->data[i] = value;
+    for (size_t i = 0; i < n; i++) ((float*)t->data)[i] = value;
 }
 
-static size_t idx4(const DM_Tensor *t, int n, int c, int y, int x) {
-    return (((size_t)n * (size_t)t->c + (size_t)c) * (size_t)t->h + (size_t)y)
-           * (size_t)t->w + (size_t)x;
+static size_t idx4(const DM_Block *t, int n, int c, int y, int x) {
+    return (((size_t)n * (size_t)DM_NCHW_C(t) + (size_t)c) * (size_t)DM_NCHW_H(t) + (size_t)y) * (size_t)DM_NCHW_W(t) + (size_t)x;
 }
 
-float dm_tensor_get(const DM_Tensor *t, int n, int c, int y, int x) {
-    return t->data[idx4(t, n, c, y, x)];
+float dm_tensor_get(const DM_Block *t, int n, int c, int y, int x) {
+    if (!t || !t->data) return 0.0f;
+    size_t idx = (((size_t)n * DM_NCHW_C(t) + c) * DM_NCHW_H(t) + y) * DM_NCHW_W(t) + x;
+    return ((float*)t->data)[idx];
 }
 
-void dm_tensor_set(DM_Tensor *t, int n, int c, int y, int x, float v) {
-    t->data[idx4(t, n, c, y, x)] = v;
+void dm_tensor_set(DM_Block *t, int n, int c, int y, int x, float v) {
+    if (!t || !t->data) return;
+    size_t idx = (((size_t)n * DM_NCHW_C(t) + c) * DM_NCHW_H(t) + y) * DM_NCHW_W(t) + x;
+    ((float*)t->data)[idx] = v;
 }
 
-static int out_size_same(int in, int stride) {
-    return (in + stride - 1) / stride;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * Convolutions  (dm_engine / TFE backend)
- * ═══════════════════════════════════════════════════════════════════════════ */
-
-/* dm_conv2d_same — Standard 2-D convolution, SAME padding.
- * weight layout: w[out_c][in_c][ky][kx]  (OIHW)
- */
-int dm_conv2d_same(const DM_Tensor *in, DM_Tensor *out,
+int dm_conv2d_same(const DM_Block *in, DM_Block *out,
                    const float *w, const float *b,
                    int out_c, int kernel, int stride) {
+    if (!dm_block_is_nchw4(in) || !dm_block_is_nchw4(out)) return -1;
+
     if (!in || !out || !w || out_c <= 0 || kernel <= 0 || stride <= 0) return -1;
-    int oh = out_size_same(in->h, stride);
-    int ow = out_size_same(in->w, stride);
-    if (dm_tensor_alloc(out, in->n, out_c, oh, ow) != 0) return -1;
+    int oh = out_size_same(DM_NCHW_H(in), stride);
+    int ow = out_size_same(DM_NCHW_W(in), stride);
+    if (dm_block_create(out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(in), out_c, oh, ow}) != 0) return -1;
 
     TFE_TensorHandle *h_in  = dm_to_tf(in);
-    TFE_TensorHandle *h_w   = conv_weight_to_tf(w, out_c, in->c, kernel);
+    TFE_TensorHandle *h_w   = conv_weight_to_tf(w, out_c, DM_NCHW_C(in), kernel);
     if (!h_in || !h_w) goto conv2d_err;
 
     TFE_TensorHandle *h_out = execute_conv2d(h_in, h_w, stride);
@@ -384,23 +368,25 @@ conv2d_err:
 }
 
 /* dm_depthwise_conv2d_same — Depthwise separable conv, SAME padding. */
-int dm_depthwise_conv2d_same(const DM_Tensor *in, DM_Tensor *out,
+int dm_depthwise_conv2d_same(const DM_Block *in, DM_Block *out,
                               const float *w, const float *b,
                               int kernel, int stride) {
+    if (!dm_block_is_nchw4(in) || !dm_block_is_nchw4(out)) return -1;
+
     if (!in || !out || !w || kernel <= 0 || stride <= 0) return -1;
-    int oh = out_size_same(in->h, stride);
-    int ow = out_size_same(in->w, stride);
-    if (dm_tensor_alloc(out, in->n, in->c, oh, ow) != 0) return -1;
+    int oh = out_size_same(DM_NCHW_H(in), stride);
+    int ow = out_size_same(DM_NCHW_W(in), stride);
+    if (dm_block_create(out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(in), DM_NCHW_C(in), oh, ow}) != 0) return -1;
 
     TFE_TensorHandle *h_in  = dm_to_tf(in);
-    TFE_TensorHandle *h_w   = depthwise_weight_to_tf(w, in->c, kernel);
+    TFE_TensorHandle *h_w   = depthwise_weight_to_tf(w, DM_NCHW_C(in), kernel);
     if (!h_in || !h_w) goto dw_err;
 
     TFE_TensorHandle *h_out = execute_depthwise_conv2d(h_in, h_w, stride);
     if (!h_out) goto dw_err;
 
     if (b) {
-        int64_t bdims[1] = {in->c};
+        int64_t bdims[1] = {DM_NCHW_C(in)};
         TFE_TensorHandle *h_b    = raw_to_tf(b, bdims, 1);
         TFE_TensorHandle *h_out2 = execute_bias_add(h_out, h_b);
         TFE_DeleteTensorHandle(h_b);
@@ -422,14 +408,14 @@ dw_err:
 }
 
 /* dm_pointwise_conv2d — 1×1 convolution (channel mixing). */
-int dm_pointwise_conv2d(const DM_Tensor *in, DM_Tensor *out,
+int dm_pointwise_conv2d(const DM_Block *in, DM_Block *out,
                          const float *w, const float *b, int out_c) {
     if (!in || !out || !w || out_c <= 0) return -1;
-    if (dm_tensor_alloc(out, in->n, out_c, in->h, in->w) != 0) return -1;
+    if (dm_block_create(out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(in), out_c, DM_NCHW_H(in), DM_NCHW_W(in)}) != 0) return -1;
 
     TFE_TensorHandle *h_in = dm_to_tf(in);
     /* 1×1 conv: filter shape [out_c, in_c, 1, 1] */
-    int64_t wdims[4] = {out_c, in->c, 1, 1};
+    int64_t wdims[4] = {out_c, DM_NCHW_C(in), 1, 1};
     TFE_TensorHandle *h_w  = raw_to_tf(w, wdims, 4);
     if (!h_in || !h_w) goto pw_err;
 
@@ -462,7 +448,7 @@ pw_err:
  * Activations
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-void dm_relu6(DM_Tensor *t) {
+void dm_relu6(DM_Block *t) {
     if (!t) return;
     TFE_TensorHandle *in_h  = dm_to_tf(t);
     if (!in_h) return;
@@ -471,7 +457,7 @@ void dm_relu6(DM_Tensor *t) {
     TFE_DeleteTensorHandle(in_h);
 }
 
-void dm_relu(DM_Tensor *t) {
+void dm_relu(DM_Block *t) {
     if (!t) return;
     TFE_TensorHandle *in_h  = dm_to_tf(t);
     if (!in_h) return;
@@ -491,7 +477,7 @@ void dm_gelu_inplace(float *x, int n) {
     TFE_DeleteTensorHandle(h);
 }
 
-void dm_tanh_inplace(DM_Tensor *t) {
+void dm_tanh_inplace(DM_Block *t) {
     if (!t) return;
     TFE_TensorHandle *in_h  = dm_to_tf(t);
     if (!in_h) return;
@@ -500,7 +486,7 @@ void dm_tanh_inplace(DM_Tensor *t) {
     TFE_DeleteTensorHandle(in_h);
 }
 
-void dm_sigmoid_inplace(DM_Tensor *t) {
+void dm_sigmoid_inplace(DM_Block *t) {
     if (!t) return;
     TFE_TensorHandle *in_h  = dm_to_tf(t);
     if (!in_h) return;
@@ -513,10 +499,10 @@ void dm_sigmoid_inplace(DM_Tensor *t) {
  * Elementwise add
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-int dm_tensor_add(DM_Tensor *out, const DM_Tensor *in) {
+int dm_tensor_add(DM_Block *out, const DM_Block *in) {
     if (!out || !in ||
-        out->n != in->n || out->c != in->c ||
-        out->h != in->h || out->w != in->w) return -1;
+        DM_NCHW_N(out) != DM_NCHW_N(in) || DM_NCHW_C(out) != DM_NCHW_C(in) ||
+        DM_NCHW_H(out) != DM_NCHW_H(in) || DM_NCHW_W(out) != DM_NCHW_W(in)) return -1;
     TFE_TensorHandle *h_out = dm_to_tf(out);
     TFE_TensorHandle *h_in  = dm_to_tf(in);
     if (!h_out || !h_in) {
@@ -535,11 +521,11 @@ int dm_tensor_add(DM_Tensor *out, const DM_Tensor *in) {
  * Pooling
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-int dm_max_pool2d_same(const DM_Tensor *in, DM_Tensor *out, int kernel, int stride) {
+int dm_max_pool2d_same(const DM_Block *in, DM_Block *out, int kernel, int stride) {
     if (!in || !out || kernel <= 0 || stride <= 0) return -1;
-    int oh = out_size_same(in->h, stride);
-    int ow = out_size_same(in->w, stride);
-    if (dm_tensor_alloc(out, in->n, in->c, oh, ow) != 0) return -1;
+    int oh = out_size_same(DM_NCHW_H(in), stride);
+    int ow = out_size_same(DM_NCHW_W(in), stride);
+    if (dm_block_create(out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(in), DM_NCHW_C(in), oh, ow}) != 0) return -1;
 
     dm_tf_init();
     TF_Status *s = TF_NewStatus();
@@ -572,12 +558,12 @@ int dm_max_pool2d_same(const DM_Tensor *in, DM_Tensor *out, int kernel, int stri
  * Batch Normalization — FusedBatchNorm (inference mode, is_training=false)
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-int dm_batch_norm(DM_Tensor *t,
+int dm_batch_norm(DM_Block *t,
                   const float *gamma, const float *beta,
                   const float *mean,  const float *var,
                   float eps) {
     if (!t || !gamma || !beta || !mean || !var) return -1;
-    int C = t->c;
+    int C = DM_NCHW_C(t);
 
     dm_tf_init();
     TF_Status *s = TF_NewStatus();
@@ -624,9 +610,9 @@ int dm_batch_norm(DM_Tensor *t,
  * Global Average Pooling — Mean over spatial dims (h=2, w=3 in NCHW)
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-int dm_global_avg_pool(const DM_Tensor *in, DM_Tensor *out) {
+int dm_global_avg_pool(const DM_Block *in, DM_Block *out) {
     if (!in || !out) return -1;
-    if (dm_tensor_alloc(out, in->n, in->c, 1, 1) != 0) return -1;
+    if (dm_block_create(out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(in), DM_NCHW_C(in), 1, 1}) != 0) return -1;
 
     dm_tf_init();
     TF_Status *s = TF_NewStatus();
@@ -663,14 +649,14 @@ int dm_global_avg_pool(const DM_Tensor *in, DM_Tensor *out) {
  * b:   float[out_c]  or NULL
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-int dm_linear(const DM_Tensor *in, DM_Tensor *out,
+int dm_linear(const DM_Block *in, DM_Block *out,
               const float *w, const float *b, int out_c) {
-    if (!in || !out || !w || in->h != 1 || in->w != 1 || out_c <= 0) return -1;
-    if (dm_tensor_alloc(out, in->n, out_c, 1, 1) != 0) return -1;
+    if (!in || !out || !w || DM_NCHW_H(in) != 1 || DM_NCHW_W(in) != 1 || out_c <= 0) return -1;
+    if (dm_block_create(out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(in), out_c, 1, 1}) != 0) return -1;
 
     /* Reshape to 2-D: [n, in_c] and [out_c, in_c] */
-    int64_t adims[2] = {in->n, in->c};
-    int64_t bdims[2] = {out_c, in->c};
+    int64_t adims[2] = {DM_NCHW_N(in), DM_NCHW_C(in)};
+    int64_t bdims[2] = {out_c, DM_NCHW_C(in)};
     TFE_TensorHandle *h_a = raw_to_tf(in->data, adims, 2);
     TFE_TensorHandle *h_b = raw_to_tf(w,        bdims, 2);
     if (!h_a || !h_b) {
@@ -709,7 +695,7 @@ int dm_linear(const DM_Tensor *in, DM_Tensor *out,
 /* dm_softmax — operates on t with shape [n, c, 1, 1].
  * Softmax over the class (channel) axis (axis=1 in NCHW).
  */
-void dm_softmax(DM_Tensor *t) {
+void dm_softmax(DM_Block *t) {
     if (!t) return;
 
     dm_tf_init();
@@ -717,7 +703,7 @@ void dm_softmax(DM_Tensor *t) {
     TFE_Op *op = TFE_NewOp(tf_ctx, "Softmax", s);
 
     /* Reshape to [n, c] for the Softmax op (axis=-1 = axis 1) */
-    int64_t dims2[2] = {t->n, t->c};
+    int64_t dims2[2] = {DM_NCHW_N(t), DM_NCHW_C(t)};
     TFE_TensorHandle *h_in = raw_to_tf(t->data, dims2, 2);
     TFE_OpAddInput(op, h_in, s);
 
@@ -902,25 +888,24 @@ void dm_matmul_nn(const float *A, const float *B, float *C, int M, int K, int N)
 
 /* ── Backward passes ────────────────────────────────────────────────────── */
 
-int dm_linear_backward(const DM_Tensor *in, const DM_Tensor *grad_out,
-                        DM_Tensor *grad_in,
+int dm_linear_backward(const DM_Block *in, const DM_Block *grad_out,
+                         DM_Block *grad_in,
                         float *grad_w, float *grad_b,
                         const float *w, int out_c) {
     if (!in || !grad_out) return -1;
-    if (grad_in && dm_tensor_alloc(grad_in, in->n, in->c, 1, 1) != 0) return -1;
-    if (grad_in) dm_tensor_fill(grad_in, 0.0f);
+    if (grad_in && dm_block_create(grad_in, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(in), DM_NCHW_C(in), 1, 1}) != 0) return -1;
+    if (grad_in) memset(((float*)(grad_in)->data), 0, (grad_in)->count * sizeof(float));
 
-    for (int n = 0; n < in->n; n++) {
+    for (int n = 0; n < DM_NCHW_N(in); n++) {
         for (int oc = 0; oc < out_c; oc++) {
-            float go = dm_tensor_get(grad_out, n, oc, 0, 0);
+            float go = ((float*)(grad_out)->data)[(((size_t)n * DM_NCHW_C(grad_out) + oc) * DM_NCHW_H(grad_out) + 0) * DM_NCHW_W(grad_out) + 0];
             if (grad_b) grad_b[oc] += go;
-            for (int ic = 0; ic < in->c; ic++) {
-                float iv = dm_tensor_get(in, n, ic, 0, 0);
-                if (grad_w) grad_w[(size_t)oc * (size_t)in->c + ic] += go * iv;
+            for (int ic = 0; ic < DM_NCHW_C(in); ic++) {
+                float iv = ((float*)(in)->data)[(((size_t)n * DM_NCHW_C(in) + ic) * DM_NCHW_H(in) + 0) * DM_NCHW_W(in) + 0];
+                if (grad_w) grad_w[(size_t)oc * (size_t)DM_NCHW_C(in) + ic] += go * iv;
                 if (grad_in && w) {
-                    float cur = dm_tensor_get(grad_in, n, ic, 0, 0);
-                    dm_tensor_set(grad_in, n, ic, 0, 0,
-                                  cur + go * w[(size_t)oc * (size_t)in->c + ic]);
+                    float cur = ((float*)(grad_in)->data)[(((size_t)n * DM_NCHW_C(grad_in) + ic) * DM_NCHW_H(grad_in) + 0) * DM_NCHW_W(grad_in) + 0];
+                    ((float*)(grad_in)->data)[(((size_t)n * DM_NCHW_C(grad_in) + ic) * DM_NCHW_H(grad_in) + 0) * DM_NCHW_W(grad_in) + 0] = cur + go * w[(size_t)oc * DM_NCHW_C(in) + ic];
                 }
             }
         }
@@ -928,86 +913,86 @@ int dm_linear_backward(const DM_Tensor *in, const DM_Tensor *grad_out,
     return 0;
 }
 
-void dm_tanh_backward(const DM_Tensor *out, const DM_Tensor *grad_out,
-                       DM_Tensor *grad_in) {
-    if (dm_tensor_alloc(grad_in, out->n, out->c, out->h, out->w) != 0) return;
-    size_t count = dm_tensor_count(out);
+void dm_tanh_backward(const DM_Block *out, const DM_Block *grad_out,
+                         DM_Block *grad_in) {
+    if (dm_block_create(grad_in, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(out), DM_NCHW_C(out), DM_NCHW_H(out), DM_NCHW_W(out)}) != 0) return;
+    size_t count = (out)->count;
     for (size_t i = 0; i < count; i++) {
-        float o = out->data[i];
-        grad_in->data[i] = grad_out->data[i] * (1.0f - o * o);
+        float o = ((float*)out->data)[i];
+        ((float*)grad_in->data)[i] = ((float*)grad_out->data)[i] * (1.0f - o * o);
     }
 }
 
-void dm_relu_backward(const DM_Tensor *in, const DM_Tensor *grad_out,
-                       DM_Tensor *grad_in) {
-    size_t count = dm_tensor_count(in);
+void dm_relu_backward(const DM_Block *in, const DM_Block *grad_out,
+                         DM_Block *grad_in) {
+    size_t count = (in)->count;
     for (size_t i = 0; i < count; i++)
-        grad_in->data[i] = in->data[i] > 0.0f ? grad_out->data[i] : 0.0f;
+        ((float*)grad_in->data)[i] = ((float*)in->data)[i] > 0.0f ? ((float*)grad_out->data)[i] : 0.0f;
 }
 
 /* ── Maxout ─────────────────────────────────────────────────────────────── */
 
-int dm_maxout(const DM_Tensor *in, DM_Tensor *out, int k, int *argmax) {
-    if (k <= 0 || in->c % k != 0) return -1;
-    int out_c = in->c / k;
-    if (out->n != in->n || out->c != out_c ||
-        out->h != in->h || out->w != in->w) return -1;
+int dm_maxout(const DM_Block *in,  DM_Block *out, int k, int *argmax) {
+    if (k <= 0 || DM_NCHW_C(in) % k != 0) return -1;
+    int out_c = DM_NCHW_C(in) / k;
+    if (DM_NCHW_N(out) != DM_NCHW_N(in) || DM_NCHW_C(out) != out_c ||
+        DM_NCHW_H(out) != DM_NCHW_H(in) || DM_NCHW_W(out) != DM_NCHW_W(in)) return -1;
 
-    int spatial = in->h * in->w;
-    for (int n = 0; n < in->n; n++)
+    int spatial = DM_NCHW_H(in) * DM_NCHW_W(in);
+    for (int n = 0; n < DM_NCHW_N(in); n++)
         for (int c = 0; c < out_c; c++)
             for (int s = 0; s < spatial; s++) {
                 float mx = -1e30f; int mi = -1;
                 for (int j = 0; j < k; j++) {
                     int ic  = c * k + j;
-                    int idx = (n * in->c + ic) * spatial + s;
-                    if (in->data[idx] > mx || mi == -1) { mx = in->data[idx]; mi = idx; }
+                    int idx = (n * DM_NCHW_C(in) + ic) * spatial + s;
+                    if (((float*)in->data)[idx] > mx || mi == -1) { mx = ((float*)in->data)[idx]; mi = idx; }
                 }
                 int oi = (n * out_c + c) * spatial + s;
-                out->data[oi] = mx;
+                ((float*)out->data)[oi] = mx;
                 if (argmax) argmax[oi] = mi;
             }
     return 0;
 }
 
-int dm_maxout_backward(const DM_Tensor *grad_out, DM_Tensor *grad_in,
+int dm_maxout_backward(const DM_Block *grad_out, DM_Block *grad_in,
                         int k, const int *argmax) {
-    if (grad_in->c % k != 0 || grad_in->c / k != grad_out->c) return -1;
+    if (DM_NCHW_C(grad_in) % k != 0 || DM_NCHW_C(grad_in) / k != DM_NCHW_C(grad_out)) return -1;
     if (!argmax) return -1;
-    size_t in_count  = dm_tensor_count(grad_in);
-    size_t out_count = dm_tensor_count(grad_out);
-    for (size_t i = 0; i < in_count; i++) grad_in->data[i] = 0.0f;
+    size_t in_count  = (grad_in)->count;
+    size_t out_count = (grad_out)->count;
+    for (size_t i = 0; i < in_count; i++) ((float*)grad_in->data)[i] = 0.0f;
     for (size_t i = 0; i < out_count; i++) {
         int mi = argmax[i];
         if (mi >= 0 && (size_t)mi < in_count)
-            grad_in->data[mi] += grad_out->data[i];
+            ((float*)grad_in->data)[mi] += ((float*)grad_out->data)[i];
     }
     return 0;
 }
 
 /* ── Dropout ────────────────────────────────────────────────────────────── */
 
-void dm_dropout(const DM_Tensor *in, DM_Tensor *out, float drop_prob, int *mask) {
-    size_t count = dm_tensor_count(in);
+void dm_dropout(const DM_Block *in,  DM_Block *out, float drop_prob, int *mask) {
+    size_t count = (in)->count;
     float scale = 1.0f / (1.0f - drop_prob);
     for (size_t i = 0; i < count; i++) {
         float r = (float)rand() / (float)RAND_MAX;
         if (r < drop_prob) {
-            out->data[i] = 0.0f;
+            ((float*)out->data)[i] = 0.0f;
             if (mask) mask[i] = 0;
         } else {
-            out->data[i] = in->data[i] * scale;
+            ((float*)out->data)[i] = ((float*)in->data)[i] * scale;
             if (mask) mask[i] = 1;
         }
     }
 }
 
-void dm_dropout_backward(const DM_Tensor *grad_out, DM_Tensor *grad_in,
+void dm_dropout_backward(const DM_Block *grad_out, DM_Block *grad_in,
                           float drop_prob, const int *mask) {
-    size_t count = dm_tensor_count(grad_out);
+    size_t count = (grad_out)->count;
     float scale = 1.0f / (1.0f - drop_prob);
     for (size_t i = 0; i < count; i++)
-        grad_in->data[i] = (mask && mask[i]) ? grad_out->data[i] * scale : 0.0f;
+        ((float*)grad_in->data)[i] = (mask && mask[i]) ? ((float*)grad_out->data)[i] * scale : 0.0f;
 }
 
 /* ── Optimisers ─────────────────────────────────────────────────────────── */

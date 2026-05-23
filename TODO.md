@@ -1,63 +1,33 @@
-# DM — TODO
+# Migration of `dm_engine` and Models to `DM_Block`
 
-## 🟡 Medium Priority
+This plan has been refined to follow a **4-Phase safe migration strategy**. Instead of deleting `DM_Tensor` immediately and causing widespread compilation errors, we will introduce a temporary shim, migrate components incrementally, and only delete the legacy API when all tests pass.
 
-### Automatic differentiation (autograd)
-- [ ] Implement reverse-mode autograd on `DM_Tensor`
-- [ ] `dm.GradientTape` context manager (Python)
-- [ ] Backward pass for: conv2d, softmax, batch_norm, layer_norm (relu/linear already have backward)
-- [ ] Optimizer `.step()` that pulls from tape automatically
+## Phase 0: Foundations & Shims (Done)
+- **DM_Block Enhancements**:
+  - Add `int owns_handle;` to `DM_Block` to explicitly control handle lifecycle.
+  - Add shape helper functions to `dm_block.h`: `dm_block_dim()`, `dm_block_is_nchw4()`.
+  - Add macros for easy dimension access: `DM_NCHW_N`, `DM_NCHW_C`, etc.
+- **Lowering Policy**:
+  - Define `DM_LowerPolicy` (`COPY`, `VIEW`, `MOVE`) in `dm_lowering.h` and update `dm_lower_block` signatures.
+- **Deprecation Shim**:
+  - Mark `DM_Tensor` related functions with a deprecation notice. We will retain the `DM_Tensor` struct temporarily so legacy code compiles while we migrate it.
 
-### Model saving / serialization (custom models)
-- [ ] Define a `.dmw` weight file format (header + raw float32 blobs) for custom `dm.Model` subclasses
-- [ ] `model.save("weights.dmw")` / `model.load("weights.dmw")`
-- [ ] Export to ONNX (optional, stretch goal)
+## Phase 1: Refactor Engine Primitives (Done)
+- Update `dm_engine.h` and `dm_engine.c`.
+- Change `dm_op_conv2d_same`, `dm_op_matmul_nt`, etc., to accept `DM_Block *`.
+- Inside `dm_engine.c`, use `dm_lower_block(..., DM_LOWER_VIEW)` to fetch TensorFlow handles.
+- Add strict validation (layout, dtype, kind) inside primitive ops.
 
----
+## Phase 2: Refactor Models
+- Update signatures in `src/models/` (e.g., `dm_resnet18_forward`, `dm_tinyvit_forward`) to accept `DM_Block *`.
+- Replace all legacy `->n`, `->c`, `->h`, `->w` accesses with the new shape macros/helpers.
+- Replace internal tensor allocations with `dm_block_create`.
 
-## 🟢 Low Priority / Future
+## Phase 3: Update Ecosystem
+- Update CLI, benchmarks, and examples (e.g., `resnet18 bench`) to use `DM_Block` from end to end.
+- Verify everything compiles cleanly and runs correctly.
 
-### Backend — Vulkan cooperative matrix GEMM
-- [ ] Implement real Vulkan coop-matrix GEMM shader (currently stubbed in `src/core/dm_backend.c`)
-- [ ] Wire `DM_BACKEND_VULKAN_COOP_MAT` path in `dm_matmul_dispatch()`
-
-### Backend — ROCm/HIP (Tier 3)
-- [ ] Implement `probe_rocm()` via `dlsym` on `hipInit`
-- [ ] Implement `dm_rocm_matmul()` dispatch path
-
-### Dataset API
-- [ ] `dm.Dataset.from_csv(path)` — already partially exists, expose to all bindings
-- [ ] `dm.Dataset.from_images(dir)` image folder loader
-- [ ] `dm.DataLoader` with shuffle, batch, prefetch
-
-### `@tf.function` equivalent
-- [ ] Lazy/deferred execution graph for fusing ops before dispatch
-- [ ] Useful for Vulkan: batch multiple ops into one command buffer
-
----
-
-## ✅ Completed
-
-- [x] All `dm_engine` primitives exposed as first-class public API in all 6 bindings (C, C++, Python, Go, JS, Java)
-- [x] Backend dispatch system: CPU (Tier 0) → Vulkan compute (Tier 1) → TensorFlow/XLA (Tier 2)
-- [x] `DM_BACKEND` env var override (`cpu | vulkan | tensorflow | auto`)
-- [x] Runtime TF detection via `dlsym(RTLD_DEFAULT, "TFE_NewContext")` — no hard link required
-- [x] `dm.backend_init/get/set/query/name` in all language bindings
-- [x] `DM_BackendInfo` struct (6-field plain C, ABI-safe across all bindings)
-- [x] 130+ classical data mining algorithms (FP-Growth, ECLAT, PrefixSpan, SPADE, …)
-- [x] 8 tokenizers (BPE, BPE-Dropout, SentencePiece-lite, Unigram, FastWordPiece, Volt, GPE, MaximalMunch)
-- [x] Pre-built models: ResNet, ViT, TinyViT-5M/11M/21M, MobileNet-Tiny, BERT, Transformer, GAN, VAE, TinyStories
-- [x] Portable backend: "Portable by design. Accelerated when possible. Vendor-locked never."
-- [x] **Python** `dm.models.*` — ResNet, ViT, TinyViT, MobileNetTiny, BERTModel, TransformerModel, VAEModel, GANModel
-- [x] **Python** `dm.tokenizer.*` — BPE, BPEDropout, Unigram, SentencePiece, WordPiece, GPE, ParityBPE, MaximalMunch, Volt, Faro, TokenizerLab
-- [x] **Python** `dm.losses` — cross_entropy, mse, binary_cross_entropy, kl_divergence
-- [x] **Python** `dm.Model` base class — forward, parameters, zero_grad, fit(), evaluate(), predict()
-- [x] **C++** `dm::models::ResNet/ViT/TinyViT/MobileNetTiny/BERTModel/TransformerModel/VAEModel/GANModel`
-- [x] **C++** `dm::tokenizer::BPE/BPEDropout/Unigram/SentencePiece/WordPiece/GPE/ParityBPE/MaximalMunch/Volt/Faro/TokenizerLab`
-- [x] **Go** `dm.NewResNet/NewViT/NewMobileNetTiny/NewBERT/NewTransformer/NewVAE/NewGAN`
-- [x] **Go** `dm.NewTokenizerBPE/BPEDropout/Unigram/SentencePiece/WordPiece/GPE/Volt`
-- [x] **JS** `dm.models.resNet/viT/mobileNetTiny/bert/transformer` + `dm.tokenizer.bpe/bpeDropout/unigram/...`
-- [x] **Java** `DM.Models.ResNet/ViT/MobileNetTiny/BERTModel/TransformerModel/VAEModel/GANModel`
-- [x] **Java** `DM.Tokenizers.BPE/BPEDropout/Unigram/SentencePiece/WordPiece/GPE/ParityBPE/MaximalMunch/Volt/Faro/TokenizerLab`
-- [x] `dm.h` extended with `dm_transformer_*_raw`, `dm_bert_save_raw`, `dm_mobilenet_tiny_forward_raw2` declarations
-- [x] `dm_lib.c` extended with Transformer raw FFI wrappers (all 8 functions)
+## Phase 4: Eradicate Legacy API
+- Delete `DM_Tensor` from `include/dm.h` and `include/core/dm_engine.h`.
+- Delete `dm_tensor_alloc`, `dm_tensor_free`, `dm_tensor_set`.
+- Update README to note the breaking v0.x change.

@@ -28,6 +28,7 @@ typedef enum {
     DM_BACKEND_TENSORFLOW      = 3,   /* TFE — XLA/cuDNN/oneDNN               */
     DM_BACKEND_CUDA            = 4,   /* CUDA/Tensor Core (future)            */
     DM_BACKEND_ROCM            = 5,   /* ROCm/HIP (future)                    */
+    DM_BACKEND_EXTERNAL        = 6,   /* External handle / custom backend     */
     DM_BACKEND_AUTO            = 255  /* runtime picks best available         */
 } DM_Backend;
 

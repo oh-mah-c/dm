@@ -36,11 +36,13 @@ SOURCES = $(SRC_DIR)/main.c \
           $(SRC_DIR)/tokenizer/tokenizer_lab.c \
           $(SRC_DIR)/tokenizer/unigram_subword.c \
           $(SRC_DIR)/tokenizer/volt.c \
+          $(SRC_DIR)/tokenizer/dm_tokenizer_block.c \
           $(RUNTIME_SOURCES) \
           $(GENERATOR_SOURCES) \
           $(ENCODING_SOURCES) \
           $(MODEL_SOURCES) \
           $(GPU_SOURCES) \
+          $(wildcard $(SRC_DIR)/lowering/*.c) \
           $(wildcard $(SRC_DIR)/algorithms/*.c)
 MFHOI_COMMON_SOURCES = $(SRC_DIR)/algorithms/mfhoi_common.c \
                        $(SRC_DIR)/core/experiment.c \
@@ -116,11 +118,13 @@ RUN_SOURCES = $(SRC_DIR)/tools/dm_run.c \
               $(SRC_DIR)/tokenizer/tokenizer_lab.c \
               $(SRC_DIR)/tokenizer/unigram_subword.c \
               $(SRC_DIR)/tokenizer/volt.c \
+              $(SRC_DIR)/tokenizer/dm_tokenizer_block.c \
               $(RUNTIME_SOURCES) \
               $(GENERATOR_SOURCES) \
               $(ENCODING_SOURCES) \
               $(MODEL_SOURCES) \
               $(GPU_SOURCES) \
+              $(wildcard $(SRC_DIR)/lowering/*.c) \
               $(wildcard $(SRC_DIR)/algorithms/*.c)
 RUN_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(RUN_SOURCES))
 
@@ -328,6 +332,10 @@ $(OBJ_DIR)/models/vision/mobilenet_tiny.o: $(SRC_DIR)/models/vision/mobilenet_ti
 	$(CC) $(CFLAGS) $(TF_IFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/models/vision/tinyvit.o: $(SRC_DIR)/models/vision/tinyvit.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(TF_IFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/lowering/dm_lower_tf.o: $(SRC_DIR)/lowering/dm_lower_tf.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(TF_IFLAGS) -c $< -o $@
 

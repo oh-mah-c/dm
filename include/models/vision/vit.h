@@ -2,7 +2,7 @@
 #define DM_VIT_H
 
 /*
- * vit.h — Vision Transformer (ViT) public API
+ * DM_NCHW_H(&vit) — Vision Transformer (ViT) public API
  *
  * Paper: Dosovitskiy et al., "An Image is Worth 16x16 Words: Transformers
  *        for Image Recognition at Scale," ICLR 2021. arXiv:2010.11929v2
@@ -14,7 +14,7 @@
  *   ViT-H/14  — 32 layers, D=1280, MLP=5120, heads=16, params≈632M
  *
  * Layout used throughout: sequences are stored as row-major float arrays
- * [seq_len × d_model].  The NCHW DM_Tensor is only used for input/output.
+ * [seq_len × d_model].  The NCHW DM_Block is only used for input/output.
  */
 
 #include "core/dm_engine.h"
@@ -48,7 +48,7 @@ void dm_vit_config_init(ViTConfig *cfg, ViTVariant v,
 
 /*
  * Full forward pass.  Weights are provided as a single contiguous float
- * array (random / loaded from file) whose layout is documented in vit.c.
+ * array (random / loaded from file) whose layout is documented in DM_NCHW_C(&vit).
  * If weights == NULL, random Gaussian weights are generated internally
  * using the supplied seed.
  *
@@ -56,19 +56,19 @@ void dm_vit_config_init(ViTConfig *cfg, ViTVariant v,
  * Output : logits tensor shape (1, num_classes, 1, 1)
  * Returns: 0 on success, -1 on error.
  */
-int dm_vit_forward(const DM_Tensor *input, DM_Tensor *logits,
+int dm_vit_forward(const DM_Block *input, DM_Block *logits,
                    const ViTConfig *cfg, const float *weights,
                    unsigned int seed);
 
 /* Convenience wrapper that allocates cfg from variant. */
-int dm_vit_forward_variant(const DM_Tensor *input, DM_Tensor *logits,
+int dm_vit_forward_variant(const DM_Block *input, DM_Block *logits,
                             ViTVariant v, int num_classes,
                             const float *weights, unsigned int seed);
 
 /* Count total number of float parameters for the given config. */
 size_t dm_vit_param_count(const ViTConfig *cfg);
 
-/* CLI entry point: registered in main.c as "vit" */
+/* CLI entry point: registered in DM_NCHW_C(&main) as "vit" */
 int dm_vit_cli(int argc, char **argv);
 
 #endif /* DM_VIT_H */

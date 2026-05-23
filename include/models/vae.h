@@ -41,12 +41,12 @@ void dm_vae_init(DM_VAE *vae, int input_dim, int hidden_dim, int latent_dim, flo
 void dm_vae_free(DM_VAE *vae);
 
 /* Forward pass and loss computation. Returns the total loss (BCE + KL) for the batch */
-float dm_vae_train_step(DM_VAE *vae, const DM_Tensor *x);
+float dm_vae_train_step(DM_VAE *vae, const DM_Block *x);
 
 /* Inference: encode */
-void dm_vae_encode(DM_VAE *vae, const DM_Tensor *x, DM_Tensor *mean, DM_Tensor *logvar);
+void dm_vae_encode(DM_VAE *vae, const DM_Block *x, DM_Block *mean, DM_Block *logvar);
 
 /* Inference: decode */
-void dm_vae_decode(DM_VAE *vae, const DM_Tensor *z, DM_Tensor *out);
+void dm_vae_decode(DM_VAE *vae, const DM_Block *z, DM_Block *out);
 
 #endif /* DM_VAE_H */

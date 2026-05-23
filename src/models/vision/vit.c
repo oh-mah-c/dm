@@ -1,5 +1,5 @@
 /*
- * vit.c — Vision Transformer (ViT), Dosovitskiy et al., ICLR 2021
+ * DM_NCHW_C(&vit) — Vision Transformer (ViT), Dosovitskiy et al., ICLR 2021
  * arXiv:2010.11929v2
  *
  * Architecture (§3.1, Eq.1-4):
@@ -117,9 +117,9 @@ static float *make_rand_weights(size_t n, float std) {
 }
 
 /* ── Patch extraction: image NCHW → sequence [N × (P²·C)] ─────────────── */
-static float *extract_patches(const DM_Tensor *img, int P, int *out_N, int *out_patch_dim)
+static float *extract_patches(const DM_Block *img, int P, int *out_N, int *out_patch_dim)
 {
-    int H = img->h, W = img->w, C = img->c;
+    int H = DM_NCHW_H(img), W = DM_NCHW_W(img), C = DM_NCHW_C(img);
     int gh = H / P, gw = W / P;
     int N = gh * gw;
     int pd = P * P * C;
@@ -213,7 +213,7 @@ static int mlp_forward(float *x, float *hidden,
 }
 
 /* ── Full forward pass ──────────────────────────────────────────────────── */
-int dm_vit_forward(const DM_Tensor *input, DM_Tensor *logits,
+int dm_vit_forward(const DM_Block *input, DM_Block *logits,
                    const ViTConfig *cfg, const float *weights,
                    unsigned int seed)
 {
@@ -327,24 +327,24 @@ int dm_vit_forward(const DM_Tensor *input, DM_Tensor *logits,
     dm_layer_norm_seq(z, 1, D, hln_g, hln_b, 1e-6f);
 
     /* logits = z[0:1] @ hw^T + hb  → [1 × K] */
-    if (dm_tensor_alloc(logits, 1, K, 1, 1) != 0) {
+    if (dm_block_create(logits, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){1, K, 1, 1}) != 0) {
         free(z); free(mhsa_buf); free(mlp_hidden); free(z_res); free(rw);
         return -1;
     }
-    dm_matmul_nt(z, hw, logits->data, 1, K, D);
-    for (int j = 0; j < K; j++) logits->data[j] += hb[j];
+    dm_matmul_nt(z, hw, ((float*)logits->data), 1, K, D);
+    for (int j = 0; j < K; j++) ((float*)((float*)logits->data))[j] += hb[j];
 
     free(z); free(mhsa_buf); free(mlp_hidden); free(z_res); free(rw);
     return 0;
 }
 
-int dm_vit_forward_variant(const DM_Tensor *input, DM_Tensor *logits,
+int dm_vit_forward_variant(const DM_Block *input, DM_Block *logits,
                             ViTVariant v, int num_classes,
                             const float *weights, unsigned int seed)
 {
     ViTConfig cfg;
     dm_vit_config_init(&cfg, v, num_classes,
-                       input ? input->h : 224);
+                       input ? DM_NCHW_H(input) : 224);
     return dm_vit_forward(input, logits, &cfg, weights, seed);
 }
 
@@ -388,11 +388,11 @@ int dm_vit_cli(int argc, char **argv)
            cfg.d_model, cfg.num_layers, cfg.num_heads, classes, seed);
     printf("Total params: %zu\n", dm_vit_param_count(&cfg));
 
-    DM_Tensor in = {0}, out = {0};
-    if (dm_tensor_alloc(&in, 1, 3, size, size) != 0) {
+    DM_Block in = {0}, out = {0};
+    if (dm_block_create(&in, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){1, 3, size, size}) != 0) {
         fprintf(stderr, "alloc failed\n"); return 1;
     }
-    dm_tensor_fill(&in, 1.0f);
+    { size_t __n = (&in)->count; float *__d = (float*)(&in)->data; for(size_t __i=0; __i<__n; __i++) __d[__i] = 1.0f; }
 
     dm_bench_reset();
     dm_bench_start(DM_PHASE_TOTAL);
@@ -402,23 +402,23 @@ int dm_vit_cli(int argc, char **argv)
     dm_bench_stop(DM_PHASE_TOTAL);
 
     if (rc == 0) {
-        printf("Raw logit range: [%.4f, %.4f]\n", out.data[0], out.data[classes-1]);
+        printf("Raw logit range: [%.4f, %.4f]\n", ((float*)((float*)out.data))[0], ((float*)((float*)out.data))[classes-1]);
         dm_softmax(&out);
         /* top-5 */
         printf("Top-5 predictions:\n");
         for (int r = 0; r < 5 && r < classes; r++) {
             int best = -1; float bv = -1e30f;
             for (int j = 0; j < classes; j++)
-                if (out.data[j] > bv) { bv = out.data[j]; best = j; }
+                if (((float*)((float*)out.data))[j] > bv) { bv = ((float*)((float*)out.data))[j]; best = j; }
             printf("  rank %d  class %4d  prob %.6f\n", r+1, best, bv);
-            out.data[best] = -1e30f;
+            ((float*)((float*)out.data))[best] = -1e30f;
         }
         dm_bench_print_report("vit", "synthetic");
     } else {
         fprintf(stderr, "Forward pass failed\n");
     }
 
-    dm_tensor_free(&in);
-    dm_tensor_free(&out);
+    dm_block_free(&in);
+    dm_block_free(&out);
     return rc == 0 ? 0 : 1;
 }

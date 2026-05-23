@@ -49,10 +49,10 @@ void dm_gan_free(DM_GAN *gan) {
     free(gan->d_vw1); free(gan->d_vb1); free(gan->d_vw2); free(gan->d_vb2);
 }
 
-void dm_gan_generate(DM_GAN *gan, const DM_Tensor *z, DM_Tensor *out) {
-    int batch_size = z->n;
-    DM_Tensor g_h1;
-    dm_tensor_alloc(&g_h1, batch_size, gan->g_hidden_dim, 1, 1);
+void dm_gan_generate(DM_GAN *gan, const DM_Block *z, DM_Block *out) {
+    int batch_size = DM_NCHW_N(z);
+    DM_Block g_h1;
+    dm_block_create(&g_h1, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->g_hidden_dim, 1, 1});
     
     dm_linear(z, &g_h1, gan->g_w1, gan->g_b1, gan->g_hidden_dim);
     dm_relu(&g_h1);
@@ -60,12 +60,12 @@ void dm_gan_generate(DM_GAN *gan, const DM_Tensor *z, DM_Tensor *out) {
     dm_linear(&g_h1, out, gan->g_w2, gan->g_b2, gan->input_dim);
     dm_sigmoid_inplace(out);
     
-    dm_tensor_free(&g_h1);
+    dm_block_free(&g_h1);
 }
 
-static float forward_discriminator(DM_GAN *gan, const DM_Tensor *x, int *argmax, int *mask, 
-                                   DM_Tensor *d_h1_pre, DM_Tensor *d_h1_max, DM_Tensor *d_h1_drop, DM_Tensor *d_out) {
-    int batch_size = x->n;
+static float forward_discriminator(DM_GAN *gan, const DM_Block *x, int *argmax, int *mask, 
+                                   DM_Block *d_h1_pre, DM_Block *d_h1_max, DM_Block *d_h1_drop, DM_Block *d_out) {
+    int batch_size = DM_NCHW_N(x);
     dm_linear(x, d_h1_pre, gan->d_w1, gan->d_b1, gan->d_hidden_dim * gan->maxout_k);
     
     dm_maxout(d_h1_pre, d_h1_max, gan->maxout_k, argmax);
@@ -74,8 +74,8 @@ static float forward_discriminator(DM_GAN *gan, const DM_Tensor *x, int *argmax,
         dm_dropout(d_h1_max, d_h1_drop, gan->drop_prob, mask);
     } else {
         // inference mode
-        size_t count = dm_tensor_count(d_h1_max);
-        for (size_t i = 0; i < count; i++) d_h1_drop->data[i] = d_h1_max->data[i];
+        size_t count = (d_h1_max)->count;
+        for (size_t i = 0; i < count; i++) ((float*)((float*)d_h1_drop->data))[i] = ((float*)((float*)d_h1_max->data))[i];
     }
     
     dm_linear(d_h1_drop, d_out, gan->d_w2, gan->d_b2, 1);
@@ -85,31 +85,31 @@ static float forward_discriminator(DM_GAN *gan, const DM_Tensor *x, int *argmax,
     return loss; // calculated by caller
 }
 
-float dm_gan_train_d_step(DM_GAN *gan, const DM_Tensor *real_x, const DM_Tensor *z) {
-    int batch_size = real_x->n;
+float dm_gan_train_d_step(DM_GAN *gan, const DM_Block *real_x, const DM_Block *z) {
+    int batch_size = DM_NCHW_N(real_x);
     float loss = 0.0f;
     
     // G(z)
-    DM_Tensor fake_x, g_h1;
-    dm_tensor_alloc(&g_h1, batch_size, gan->g_hidden_dim, 1, 1);
-    dm_tensor_alloc(&fake_x, batch_size, gan->input_dim, 1, 1);
+    DM_Block fake_x, g_h1;
+    dm_block_create(&g_h1, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->g_hidden_dim, 1, 1});
+    dm_block_create(&fake_x, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->input_dim, 1, 1});
     dm_linear(z, &g_h1, gan->g_w1, gan->g_b1, gan->g_hidden_dim);
     dm_relu(&g_h1);
     dm_linear(&g_h1, &fake_x, gan->g_w2, gan->g_b2, gan->input_dim);
     dm_sigmoid_inplace(&fake_x);
     
     // Tensors for D
-    DM_Tensor d_h1_pre, d_h1_max, d_h1_drop, d_out, d_grad_out, d_grad_drop, d_grad_max, d_grad_pre, d_grad_x;
-    dm_tensor_alloc(&d_h1_pre, batch_size, gan->d_hidden_dim * gan->maxout_k, 1, 1);
-    dm_tensor_alloc(&d_h1_max, batch_size, gan->d_hidden_dim, 1, 1);
-    dm_tensor_alloc(&d_h1_drop, batch_size, gan->d_hidden_dim, 1, 1);
-    dm_tensor_alloc(&d_out, batch_size, 1, 1, 1);
+    DM_Block d_h1_pre, d_h1_max, d_h1_drop, d_out, d_grad_out, d_grad_drop, d_grad_max, d_grad_pre, d_grad_x;
+    dm_block_create(&d_h1_pre, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->d_hidden_dim * gan->maxout_k, 1, 1});
+    dm_block_create(&d_h1_max, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->d_hidden_dim, 1, 1});
+    dm_block_create(&d_h1_drop, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->d_hidden_dim, 1, 1});
+    dm_block_create(&d_out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, 1, 1, 1});
     
-    dm_tensor_alloc(&d_grad_out, batch_size, 1, 1, 1);
-    dm_tensor_alloc(&d_grad_drop, batch_size, gan->d_hidden_dim, 1, 1);
-    dm_tensor_alloc(&d_grad_max, batch_size, gan->d_hidden_dim, 1, 1);
-    dm_tensor_alloc(&d_grad_pre, batch_size, gan->d_hidden_dim * gan->maxout_k, 1, 1);
-    dm_tensor_alloc(&d_grad_x, batch_size, gan->input_dim, 1, 1);
+    dm_block_create(&d_grad_out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, 1, 1, 1});
+    dm_block_create(&d_grad_drop, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->d_hidden_dim, 1, 1});
+    dm_block_create(&d_grad_max, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->d_hidden_dim, 1, 1});
+    dm_block_create(&d_grad_pre, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->d_hidden_dim * gan->maxout_k, 1, 1});
+    dm_block_create(&d_grad_x, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->input_dim, 1, 1});
     
     int *argmax = malloc(sizeof(int) * batch_size * gan->d_hidden_dim);
     int *mask = malloc(sizeof(int) * batch_size * gan->d_hidden_dim);
@@ -117,10 +117,10 @@ float dm_gan_train_d_step(DM_GAN *gan, const DM_Tensor *real_x, const DM_Tensor 
     // D(real_x)
     forward_discriminator(gan, real_x, argmax, mask, &d_h1_pre, &d_h1_max, &d_h1_drop, &d_out);
     for (int i = 0; i < batch_size; i++) {
-        float p = d_out.data[i];
+        float p = ((float*)((float*)d_out.data))[i];
         if (p < 1e-7f) p = 1e-7f;
         loss -= logf(p);
-        d_grad_out.data[i] = (p - 1.0f) / batch_size;
+        ((float*)((float*)d_grad_out.data))[i] = (p - 1.0f) / batch_size;
     }
     dm_linear_backward(&d_h1_drop, &d_grad_out, &d_grad_drop, gan->d_gw2, gan->d_gb2, gan->d_w2, 1);
     dm_dropout_backward(&d_grad_drop, &d_grad_max, gan->drop_prob, mask);
@@ -130,10 +130,10 @@ float dm_gan_train_d_step(DM_GAN *gan, const DM_Tensor *real_x, const DM_Tensor 
     // D(fake_x)
     forward_discriminator(gan, &fake_x, argmax, mask, &d_h1_pre, &d_h1_max, &d_h1_drop, &d_out);
     for (int i = 0; i < batch_size; i++) {
-        float p = d_out.data[i];
+        float p = ((float*)((float*)d_out.data))[i];
         if (p > 1.0f - 1e-7f) p = 1.0f - 1e-7f;
         loss -= logf(1.0f - p);
-        d_grad_out.data[i] = (p - 0.0f) / batch_size;
+        ((float*)((float*)d_grad_out.data))[i] = (p - 0.0f) / batch_size;
     }
     dm_linear_backward(&d_h1_drop, &d_grad_out, &d_grad_drop, gan->d_gw2, gan->d_gb2, gan->d_w2, 1);
     dm_dropout_backward(&d_grad_drop, &d_grad_max, gan->drop_prob, mask);
@@ -146,37 +146,37 @@ float dm_gan_train_d_step(DM_GAN *gan, const DM_Tensor *real_x, const DM_Tensor 
     dm_sgd_momentum_step(gan->d_b2, gan->d_gb2, gan->d_vb2, 1, gan->lr, gan->momentum, 0.0f, gan->nesterov);
     
     free(argmax); free(mask);
-    dm_tensor_free(&fake_x); dm_tensor_free(&g_h1);
-    dm_tensor_free(&d_h1_pre); dm_tensor_free(&d_h1_max); dm_tensor_free(&d_h1_drop); dm_tensor_free(&d_out);
-    dm_tensor_free(&d_grad_out); dm_tensor_free(&d_grad_drop); dm_tensor_free(&d_grad_max); dm_tensor_free(&d_grad_pre); dm_tensor_free(&d_grad_x);
+    dm_block_free(&fake_x); dm_block_free(&g_h1);
+    dm_block_free(&d_h1_pre); dm_block_free(&d_h1_max); dm_block_free(&d_h1_drop); dm_block_free(&d_out);
+    dm_block_free(&d_grad_out); dm_block_free(&d_grad_drop); dm_block_free(&d_grad_max); dm_block_free(&d_grad_pre); dm_block_free(&d_grad_x);
     
     return loss / batch_size;
 }
 
-float dm_gan_train_g_step(DM_GAN *gan, const DM_Tensor *z) {
-    int batch_size = z->n;
+float dm_gan_train_g_step(DM_GAN *gan, const DM_Block *z) {
+    int batch_size = DM_NCHW_N(z);
     float loss = 0.0f;
     
     // G(z)
-    DM_Tensor fake_x, g_h1;
-    dm_tensor_alloc(&g_h1, batch_size, gan->g_hidden_dim, 1, 1);
-    dm_tensor_alloc(&fake_x, batch_size, gan->input_dim, 1, 1);
+    DM_Block fake_x, g_h1;
+    dm_block_create(&g_h1, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->g_hidden_dim, 1, 1});
+    dm_block_create(&fake_x, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->input_dim, 1, 1});
     dm_linear(z, &g_h1, gan->g_w1, gan->g_b1, gan->g_hidden_dim);
     dm_relu(&g_h1);
     dm_linear(&g_h1, &fake_x, gan->g_w2, gan->g_b2, gan->input_dim);
     dm_sigmoid_inplace(&fake_x);
     
-    DM_Tensor d_h1_pre, d_h1_max, d_h1_drop, d_out, d_grad_out, d_grad_drop, d_grad_max, d_grad_pre, d_grad_x;
-    dm_tensor_alloc(&d_h1_pre, batch_size, gan->d_hidden_dim * gan->maxout_k, 1, 1);
-    dm_tensor_alloc(&d_h1_max, batch_size, gan->d_hidden_dim, 1, 1);
-    dm_tensor_alloc(&d_h1_drop, batch_size, gan->d_hidden_dim, 1, 1);
-    dm_tensor_alloc(&d_out, batch_size, 1, 1, 1);
+    DM_Block d_h1_pre, d_h1_max, d_h1_drop, d_out, d_grad_out, d_grad_drop, d_grad_max, d_grad_pre, d_grad_x;
+    dm_block_create(&d_h1_pre, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->d_hidden_dim * gan->maxout_k, 1, 1});
+    dm_block_create(&d_h1_max, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->d_hidden_dim, 1, 1});
+    dm_block_create(&d_h1_drop, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->d_hidden_dim, 1, 1});
+    dm_block_create(&d_out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, 1, 1, 1});
     
-    dm_tensor_alloc(&d_grad_out, batch_size, 1, 1, 1);
-    dm_tensor_alloc(&d_grad_drop, batch_size, gan->d_hidden_dim, 1, 1);
-    dm_tensor_alloc(&d_grad_max, batch_size, gan->d_hidden_dim, 1, 1);
-    dm_tensor_alloc(&d_grad_pre, batch_size, gan->d_hidden_dim * gan->maxout_k, 1, 1);
-    dm_tensor_alloc(&d_grad_x, batch_size, gan->input_dim, 1, 1);
+    dm_block_create(&d_grad_out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, 1, 1, 1});
+    dm_block_create(&d_grad_drop, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->d_hidden_dim, 1, 1});
+    dm_block_create(&d_grad_max, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->d_hidden_dim, 1, 1});
+    dm_block_create(&d_grad_pre, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->d_hidden_dim * gan->maxout_k, 1, 1});
+    dm_block_create(&d_grad_x, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->input_dim, 1, 1});
     
     int *argmax = malloc(sizeof(int) * batch_size * gan->d_hidden_dim);
     int *mask = malloc(sizeof(int) * batch_size * gan->d_hidden_dim);
@@ -184,10 +184,10 @@ float dm_gan_train_g_step(DM_GAN *gan, const DM_Tensor *z) {
     // D(fake_x)
     forward_discriminator(gan, &fake_x, argmax, mask, &d_h1_pre, &d_h1_max, &d_h1_drop, &d_out);
     for (int i = 0; i < batch_size; i++) {
-        float p = d_out.data[i];
+        float p = ((float*)((float*)d_out.data))[i];
         if (p < 1e-7f) p = 1e-7f;
         loss -= logf(p);
-        d_grad_out.data[i] = (p - 1.0f) / batch_size;
+        ((float*)((float*)d_grad_out.data))[i] = (p - 1.0f) / batch_size;
     }
     
     // Backprop through D (no parameter updates)
@@ -205,13 +205,13 @@ float dm_gan_train_g_step(DM_GAN *gan, const DM_Tensor *z) {
     free(dummy_gw1); free(dummy_gb1);
     
     // Backprop through G
-    DM_Tensor g_grad_h1, g_grad_pre_relu;
-    dm_tensor_alloc(&g_grad_h1, batch_size, gan->g_hidden_dim, 1, 1);
-    dm_tensor_alloc(&g_grad_pre_relu, batch_size, gan->g_hidden_dim, 1, 1);
+    DM_Block g_grad_h1, g_grad_pre_relu;
+    dm_block_create(&g_grad_h1, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->g_hidden_dim, 1, 1});
+    dm_block_create(&g_grad_pre_relu, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch_size, gan->g_hidden_dim, 1, 1});
     
     for (int i = 0; i < batch_size * gan->input_dim; i++) {
-        float o = fake_x.data[i];
-        d_grad_x.data[i] = d_grad_x.data[i] * o * (1.0f - o);
+        float o = ((float*)((float*)fake_x.data))[i];
+        ((float*)((float*)d_grad_x.data))[i] = ((float*)((float*)d_grad_x.data))[i] * o * (1.0f - o);
     }
     dm_linear_backward(&g_h1, &d_grad_x, &g_grad_h1, gan->g_gw2, gan->g_gb2, gan->g_w2, gan->input_dim);
     dm_relu_backward(&g_h1, &g_grad_h1, &g_grad_pre_relu);
@@ -223,10 +223,10 @@ float dm_gan_train_g_step(DM_GAN *gan, const DM_Tensor *z) {
     dm_sgd_momentum_step(gan->g_b2, gan->g_gb2, gan->g_vb2, gan->input_dim, gan->lr, gan->momentum, 0.0f, gan->nesterov);
     
     free(argmax); free(mask);
-    dm_tensor_free(&fake_x); dm_tensor_free(&g_h1);
-    dm_tensor_free(&d_h1_pre); dm_tensor_free(&d_h1_max); dm_tensor_free(&d_h1_drop); dm_tensor_free(&d_out);
-    dm_tensor_free(&d_grad_out); dm_tensor_free(&d_grad_drop); dm_tensor_free(&d_grad_max); dm_tensor_free(&d_grad_pre); dm_tensor_free(&d_grad_x);
-    dm_tensor_free(&g_grad_h1); dm_tensor_free(&g_grad_pre_relu);
+    dm_block_free(&fake_x); dm_block_free(&g_h1);
+    dm_block_free(&d_h1_pre); dm_block_free(&d_h1_max); dm_block_free(&d_h1_drop); dm_block_free(&d_out);
+    dm_block_free(&d_grad_out); dm_block_free(&d_grad_drop); dm_block_free(&d_grad_max); dm_block_free(&d_grad_pre); dm_block_free(&d_grad_x);
+    dm_block_free(&g_grad_h1); dm_block_free(&g_grad_pre_relu);
     
     return loss / batch_size;
 }

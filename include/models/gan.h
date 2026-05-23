@@ -40,12 +40,12 @@ void dm_gan_init(DM_GAN *gan, int input_dim, int g_hidden, int noise_dim, int d_
 void dm_gan_free(DM_GAN *gan);
 
 /* Generate fake samples given noise z */
-void dm_gan_generate(DM_GAN *gan, const DM_Tensor *z, DM_Tensor *out);
+void dm_gan_generate(DM_GAN *gan, const DM_Block *z, DM_Block *out);
 
 /* Returns D loss */
-float dm_gan_train_d_step(DM_GAN *gan, const DM_Tensor *real_x, const DM_Tensor *z);
+float dm_gan_train_d_step(DM_GAN *gan, const DM_Block *real_x, const DM_Block *z);
 
 /* Returns G loss */
-float dm_gan_train_g_step(DM_GAN *gan, const DM_Tensor *z);
+float dm_gan_train_g_step(DM_GAN *gan, const DM_Block *z);
 
 #endif /* DM_GAN_H */

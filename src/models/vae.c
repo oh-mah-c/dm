@@ -58,55 +58,55 @@ void dm_vae_free(DM_VAE *vae) {
     free(vae->v_dec_w1); free(vae->v_dec_b1); free(vae->v_dec_w2); free(vae->v_dec_b2);
 }
 
-void dm_vae_encode(DM_VAE *vae, const DM_Tensor *x, DM_Tensor *mean, DM_Tensor *logvar) {
-    DM_Tensor h1;
+void dm_vae_encode(DM_VAE *vae, const DM_Block *x, DM_Block *mean, DM_Block *logvar) {
+    DM_Block h1;
     dm_linear(x, &h1, vae->enc_w1, vae->enc_b1, vae->hidden_dim);
     dm_tanh_inplace(&h1);
     
-    DM_Tensor h2;
+    DM_Block h2;
     dm_linear(&h1, &h2, vae->enc_w2, vae->enc_b2, 2 * vae->latent_dim);
     
-    dm_tensor_alloc(mean, x->n, vae->latent_dim, 1, 1);
-    dm_tensor_alloc(logvar, x->n, vae->latent_dim, 1, 1);
+    dm_block_create(mean, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(x), vae->latent_dim, 1, 1});
+    dm_block_create(logvar, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(x), vae->latent_dim, 1, 1});
     
-    for (int n = 0; n < x->n; n++) {
+    for (int n = 0; n < DM_NCHW_N(x); n++) {
         for (int i = 0; i < vae->latent_dim; i++) {
             dm_tensor_set(mean, n, i, 0, 0, dm_tensor_get(&h2, n, i, 0, 0));
             dm_tensor_set(logvar, n, i, 0, 0, dm_tensor_get(&h2, n, vae->latent_dim + i, 0, 0));
         }
     }
     
-    dm_tensor_free(&h1);
-    dm_tensor_free(&h2);
+    dm_block_free(&h1);
+    dm_block_free(&h2);
 }
 
-void dm_vae_decode(DM_VAE *vae, const DM_Tensor *z, DM_Tensor *out) {
-    DM_Tensor h1;
+void dm_vae_decode(DM_VAE *vae, const DM_Block *z, DM_Block *out) {
+    DM_Block h1;
     dm_linear(z, &h1, vae->dec_w1, vae->dec_b1, vae->hidden_dim);
     dm_tanh_inplace(&h1);
     
     dm_linear(&h1, out, vae->dec_w2, vae->dec_b2, vae->input_dim);
     dm_sigmoid_inplace(out);
     
-    dm_tensor_free(&h1);
+    dm_block_free(&h1);
 }
 
-float dm_vae_train_step(DM_VAE *vae, const DM_Tensor *x) {
-    int batch = x->n;
+float dm_vae_train_step(DM_VAE *vae, const DM_Block *x) {
+    int batch = DM_NCHW_N(x);
     
     // --- FORWARD PASS ---
-    DM_Tensor enc_h1;
+    DM_Block enc_h1;
     dm_linear(x, &enc_h1, vae->enc_w1, vae->enc_b1, vae->hidden_dim);
     dm_tanh_inplace(&enc_h1);
     
-    DM_Tensor enc_h2;
+    DM_Block enc_h2;
     dm_linear(&enc_h1, &enc_h2, vae->enc_w2, vae->enc_b2, 2 * vae->latent_dim);
     
-    DM_Tensor mean, logvar, z, eps;
-    dm_tensor_alloc(&mean, batch, vae->latent_dim, 1, 1);
-    dm_tensor_alloc(&logvar, batch, vae->latent_dim, 1, 1);
-    dm_tensor_alloc(&z, batch, vae->latent_dim, 1, 1);
-    dm_tensor_alloc(&eps, batch, vae->latent_dim, 1, 1);
+    DM_Block mean, logvar, z, eps;
+    dm_block_create(&mean, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch, vae->latent_dim, 1, 1});
+    dm_block_create(&logvar, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch, vae->latent_dim, 1, 1});
+    dm_block_create(&z, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch, vae->latent_dim, 1, 1});
+    dm_block_create(&eps, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch, vae->latent_dim, 1, 1});
     
     float kl_loss = 0.0f;
     for (int n = 0; n < batch; n++) {
@@ -125,17 +125,17 @@ float dm_vae_train_step(DM_VAE *vae, const DM_Tensor *x) {
     }
     kl_loss /= batch;
     
-    DM_Tensor dec_h1;
+    DM_Block dec_h1;
     dm_linear(&z, &dec_h1, vae->dec_w1, vae->dec_b1, vae->hidden_dim);
     dm_tanh_inplace(&dec_h1);
     
-    DM_Tensor out;
+    DM_Block out;
     dm_linear(&dec_h1, &out, vae->dec_w2, vae->dec_b2, vae->input_dim);
     dm_sigmoid_inplace(&out);
     
     float recon_loss = 0.0f;
-    DM_Tensor g_out;
-    dm_tensor_alloc(&g_out, batch, vae->input_dim, 1, 1);
+    DM_Block g_out;
+    dm_block_create(&g_out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch, vae->input_dim, 1, 1});
     
     for (int n = 0; n < batch; n++) {
         for (int i = 0; i < vae->input_dim; i++) {
@@ -153,17 +153,17 @@ float dm_vae_train_step(DM_VAE *vae, const DM_Tensor *x) {
     recon_loss /= batch;
     
     // --- BACKWARD PASS ---
-    DM_Tensor g_dec_h1;
+    DM_Block g_dec_h1;
     dm_linear_backward(&dec_h1, &g_out, &g_dec_h1, vae->g_dec_w2, vae->g_dec_b2, vae->dec_w2, vae->input_dim);
     
-    DM_Tensor g_dec_h1_pre;
+    DM_Block g_dec_h1_pre;
     dm_tanh_backward(&dec_h1, &g_dec_h1, &g_dec_h1_pre);
     
-    DM_Tensor g_z;
+    DM_Block g_z;
     dm_linear_backward(&z, &g_dec_h1_pre, &g_z, vae->g_dec_w1, vae->g_dec_b1, vae->dec_w1, vae->hidden_dim);
     
-    DM_Tensor g_enc_h2;
-    dm_tensor_alloc(&g_enc_h2, batch, 2 * vae->latent_dim, 1, 1);
+    DM_Block g_enc_h2;
+    dm_block_create(&g_enc_h2, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){batch, 2 * vae->latent_dim, 1, 1});
     for (int n = 0; n < batch; n++) {
         for (int i = 0; i < vae->latent_dim; i++) {
             float m = dm_tensor_get(&mean, n, i, 0, 0);
@@ -181,10 +181,10 @@ float dm_vae_train_step(DM_VAE *vae, const DM_Tensor *x) {
         }
     }
     
-    DM_Tensor g_enc_h1;
+    DM_Block g_enc_h1;
     dm_linear_backward(&enc_h1, &g_enc_h2, &g_enc_h1, vae->g_enc_w2, vae->g_enc_b2, vae->enc_w2, 2 * vae->latent_dim);
     
-    DM_Tensor g_enc_h1_pre;
+    DM_Block g_enc_h1_pre;
     dm_tanh_backward(&enc_h1, &g_enc_h1, &g_enc_h1_pre);
     
     dm_linear_backward(x, &g_enc_h1_pre, NULL, vae->g_enc_w1, vae->g_enc_b1, vae->enc_w1, vae->hidden_dim);
@@ -206,21 +206,21 @@ float dm_vae_train_step(DM_VAE *vae, const DM_Tensor *x) {
     dm_adam_step(vae->dec_b2, vae->g_dec_b2, vae->s_dec_b2, vae->v_dec_b2, vae->input_dim, vae->lr, beta1, beta2, eps_adam, 0.0f, vae->t);
     
     // Free tensors
-    dm_tensor_free(&enc_h1);
-    dm_tensor_free(&enc_h2);
-    dm_tensor_free(&mean);
-    dm_tensor_free(&logvar);
-    dm_tensor_free(&z);
-    dm_tensor_free(&eps);
-    dm_tensor_free(&dec_h1);
-    dm_tensor_free(&out);
-    dm_tensor_free(&g_out);
-    dm_tensor_free(&g_dec_h1);
-    dm_tensor_free(&g_dec_h1_pre);
-    dm_tensor_free(&g_z);
-    dm_tensor_free(&g_enc_h2);
-    dm_tensor_free(&g_enc_h1);
-    dm_tensor_free(&g_enc_h1_pre);
+    dm_block_free(&enc_h1);
+    dm_block_free(&enc_h2);
+    dm_block_free(&mean);
+    dm_block_free(&logvar);
+    dm_block_free(&z);
+    dm_block_free(&eps);
+    dm_block_free(&dec_h1);
+    dm_block_free(&out);
+    dm_block_free(&g_out);
+    dm_block_free(&g_dec_h1);
+    dm_block_free(&g_dec_h1_pre);
+    dm_block_free(&g_z);
+    dm_block_free(&g_enc_h2);
+    dm_block_free(&g_enc_h1);
+    dm_block_free(&g_enc_h1_pre);
     
     return recon_loss + kl_loss;
 }

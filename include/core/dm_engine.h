@@ -17,6 +17,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "core/dm_block.h"
 
 /* ── Tensor data structure ───────────────────────────────────────────────── */
 /*
@@ -33,23 +34,23 @@ typedef struct {
 
 /* ── Lifecycle ───────────────────────────────────────────────────────────── */
 
-int    dm_tensor_alloc(DM_Tensor *t, int n, int c, int h, int w);
-void   dm_tensor_free (DM_Tensor *t);
-void   dm_tensor_fill (DM_Tensor *t, float value);
-float  dm_tensor_get  (const DM_Tensor *t, int n, int c, int y, int x);
-void   dm_tensor_set  (DM_Tensor *t, int n, int c, int y, int x, float v);
-size_t dm_tensor_count(const DM_Tensor *t);
+int    dm_tensor_alloc(DM_Block *t, int n, int c, int h, int w);
+void   dm_tensor_free (DM_Block *t);
+void   dm_tensor_fill (DM_Block *t, float value);
+float  dm_tensor_get  (const DM_Block *t, int n, int c, int y, int x);
+void   dm_tensor_set  (DM_Block *t, int n, int c, int y, int x, float v);
+size_t dm_tensor_count(const DM_Block *t);
 
 #else  /* dm.h was included first — lifecycle decls come from there */
 
 /* Re-export the internal (non-DM_API) versions so internal code can call
  * them without the DM_API visibility attribute. */
-int    dm_tensor_alloc(DM_Tensor *t, int n, int c, int h, int w);
-void   dm_tensor_free (DM_Tensor *t);
-void   dm_tensor_fill (DM_Tensor *t, float value);
-float  dm_tensor_get  (const DM_Tensor *t, int n, int c, int y, int x);
-void   dm_tensor_set  (DM_Tensor *t, int n, int c, int y, int x, float v);
-size_t dm_tensor_count(const DM_Tensor *t);
+int    dm_tensor_alloc(DM_Block *t, int n, int c, int h, int w);
+void   dm_tensor_free (DM_Block *t);
+void   dm_tensor_fill (DM_Block *t, float value);
+float  dm_tensor_get  (const DM_Block *t, int n, int c, int y, int x);
+void   dm_tensor_set  (DM_Block *t, int n, int c, int y, int x, float v);
+size_t dm_tensor_count(const DM_Block *t);
 
 #endif /* DM_H */
 
@@ -57,34 +58,34 @@ size_t dm_tensor_count(const DM_Tensor *t);
  * Weight layout for dm_conv2d_same:  w[out_c][in_c][ky][kx]  (OIHW)
  * Weight layout for dm_depthwise:    w[c][ky][kx]            (transposed internally)
  */
-int dm_conv2d_same(const DM_Tensor *in, DM_Tensor *out,
+int dm_conv2d_same(const DM_Block *in, DM_Block *out,
                    const float *w, const float *b,
                    int out_c, int kernel, int stride);
 
-int dm_depthwise_conv2d_same(const DM_Tensor *in, DM_Tensor *out,
+int dm_depthwise_conv2d_same(const DM_Block *in, DM_Block *out,
                               const float *w, const float *b,
                               int kernel, int stride);
 
-int dm_pointwise_conv2d(const DM_Tensor *in, DM_Tensor *out,
+int dm_pointwise_conv2d(const DM_Block *in, DM_Block *out,
                          const float *w, const float *b, int out_c);
 
 /* ── Activations (TFE) ────────────────────────────────────────────────────── */
-void dm_relu6          (DM_Tensor *t);
-void dm_relu           (DM_Tensor *t);
-void dm_tanh_inplace   (DM_Tensor *t);
-void dm_sigmoid_inplace(DM_Tensor *t);
+void dm_relu6          (DM_Block *t);
+void dm_relu           (DM_Block *t);
+void dm_tanh_inplace   (DM_Block *t);
+void dm_sigmoid_inplace(DM_Block *t);
 void dm_gelu_inplace   (float *x, int n);   /* raw float buffer */
 
 /* ── Elementwise (TFE AddV2) ─────────────────────────────────────────────── */
-int dm_tensor_add(DM_Tensor *out, const DM_Tensor *in);
+int dm_tensor_add(DM_Block *out, const DM_Block *in);
 
 /* ── Pooling (TFE MaxPool / Mean, NCHW, SAME) ───────────────────────────── */
-int dm_max_pool2d_same(const DM_Tensor *in, DM_Tensor *out,
+int dm_max_pool2d_same(const DM_Block *in, DM_Block *out,
                         int kernel, int stride);
-int dm_global_avg_pool(const DM_Tensor *in, DM_Tensor *out);
+int dm_global_avg_pool(const DM_Block *in, DM_Block *out);
 
 /* ── Normalisation (TFE FusedBatchNorm / Mean pipeline) ─────────────────── */
-int dm_batch_norm(DM_Tensor *t,
+int dm_batch_norm(DM_Block *t,
                   const float *gamma, const float *beta,
                   const float *mean,  const float *var, float eps);
 
@@ -94,11 +95,11 @@ int dm_layer_norm_seq(float *x, int seq_len, int d_model,
 
 /* ── Linear / Fully-connected (TFE MatMul + AddV2) ─────────────────────── */
 /* in:  [n, in_c, 1, 1]  →  out: [n, out_c, 1, 1] */
-int dm_linear(const DM_Tensor *in, DM_Tensor *out,
+int dm_linear(const DM_Block *in, DM_Block *out,
               const float *w, const float *b, int out_c);
 
 /* ── Softmax (TFE) ───────────────────────────────────────────────────────── */
-void dm_softmax     (DM_Tensor *t);               /* [n,c,1,1] over channel dim */
+void dm_softmax     (DM_Block *t);               /* [n,c,1,1] over channel dim */
 void dm_softmax_rows(float *x, int rows, int cols); /* raw [rows×cols] in-place  */
 
 /* ── Matrix multiplications (TFE MatMul) ────────────────────────────────── */
@@ -110,24 +111,24 @@ void dm_matmul_nn(const float *A, const float *B, float *C, int M, int K, int N)
 /* ── Training primitives (pure-C — no TFE needed) ───────────────────────── */
 
 /* Backward passes */
-int  dm_linear_backward(const DM_Tensor *in, const DM_Tensor *grad_out,
-                         DM_Tensor *grad_in,
+int  dm_linear_backward(const DM_Block *in, const DM_Block *grad_out,
+                         DM_Block *grad_in,
                          float *grad_w, float *grad_b,
                          const float *w, int out_c);
-void dm_tanh_backward  (const DM_Tensor *out, const DM_Tensor *grad_out,
-                         DM_Tensor *grad_in);
-void dm_relu_backward  (const DM_Tensor *in,  const DM_Tensor *grad_out,
-                         DM_Tensor *grad_in);
+void dm_tanh_backward  (const DM_Block *out, const DM_Block *grad_out,
+                         DM_Block *grad_in);
+void dm_relu_backward  (const DM_Block *in,  const DM_Block *grad_out,
+                         DM_Block *grad_in);
 
 /* Maxout */
-int dm_maxout         (const DM_Tensor *in,  DM_Tensor *out, int k, int *argmax);
-int dm_maxout_backward(const DM_Tensor *grad_out, DM_Tensor *grad_in,
+int dm_maxout         (const DM_Block *in,  DM_Block *out, int k, int *argmax);
+int dm_maxout_backward(const DM_Block *grad_out, DM_Block *grad_in,
                         int k, const int *argmax);
 
 /* Dropout */
-void dm_dropout         (const DM_Tensor *in,  DM_Tensor *out,
+void dm_dropout         (const DM_Block *in,  DM_Block *out,
                           float drop_prob, int *mask);
-void dm_dropout_backward(const DM_Tensor *grad_out, DM_Tensor *grad_in,
+void dm_dropout_backward(const DM_Block *grad_out, DM_Block *grad_in,
                           float drop_prob, const int *mask);
 
 /* Optimiser steps */

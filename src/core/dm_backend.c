@@ -190,6 +190,7 @@ const char *dm_backend_name(DM_Backend b)
         case DM_BACKEND_TENSORFLOW:      return "tensorflow";
         case DM_BACKEND_CUDA:            return "cuda";
         case DM_BACKEND_ROCM:            return "rocm";
+        case DM_BACKEND_EXTERNAL:        return "external";
         case DM_BACKEND_AUTO:            return "auto";
         default:                         return "unknown";
     }

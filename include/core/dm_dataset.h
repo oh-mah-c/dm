@@ -3,6 +3,7 @@
 
 #include "dm_common.h"
 #include "dm_dataset_types.h"
+#include "core/dm_block.h"
 
 typedef enum {
     DM_TYPE_TRANSACTIONAL, 
@@ -32,5 +33,8 @@ typedef struct {
  */
 DM_Dataset* dm_dataset_load(const char *path, DM_DatasetType type);
 void dm_dataset_free(DM_Dataset *ds);
+
+int dm_dataset_to_block(const DM_Dataset *ds, DM_Block *block);
+DM_Dataset* dm_block_to_dataset(const DM_Block *block);
 
 #endif // DM_DATASET_H
