@@ -207,7 +207,124 @@ _dm_lm_generate = _fn("dm_lm_generate", DM_Status, DM_LM, c_char_p, c_int, c_cha
 _dm_lm_load     = _fn("dm_lm_load",     DM_Status, DM_LM, c_char_p)
 _dm_lm_free     = _fn("dm_lm_free",     None,      DM_LM)
 
-# § 8  VAE
+# ─────────────────────────────────────────────────────────────────────────────
+# § 8  Engine — dm_engine ops (TFE backend, NCHW float32)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _DM_Tensor(ctypes.Structure):
+    """Mirror of the C DM_Tensor struct."""
+    _fields_ = [
+        ("n",    c_int),
+        ("c",    c_int),
+        ("h",    c_int),
+        ("w",    c_int),
+        ("data", ctypes.POINTER(c_float)),
+    ]
+
+_DM_Tensor_p = ctypes.POINTER(_DM_Tensor)
+
+# Tensor lifecycle
+_dm_tensor_alloc = _fn("dm_tensor_alloc", DM_Status, _DM_Tensor_p, c_int, c_int, c_int, c_int)
+_dm_tensor_free  = _fn("dm_tensor_free",  None,      _DM_Tensor_p)
+_dm_tensor_fill  = _fn("dm_tensor_fill",  None,      _DM_Tensor_p, c_float)
+_dm_tensor_get   = _fn("dm_tensor_get",   c_float,   _DM_Tensor_p, c_int, c_int, c_int, c_int)
+_dm_tensor_set   = _fn("dm_tensor_set",   None,      _DM_Tensor_p, c_int, c_int, c_int, c_int, c_float)
+_dm_tensor_count = _fn("dm_tensor_count", c_size_t,  _DM_Tensor_p)
+
+# Convolutions
+_dm_op_conv2d_same    = _fn("dm_op_conv2d_same",    DM_Status,
+                             _DM_Tensor_p, _DM_Tensor_p,
+                             ctypes.POINTER(c_float), ctypes.POINTER(c_float),
+                             c_int, c_int, c_int)
+_dm_op_depthwise_conv = _fn("dm_op_depthwise_conv", DM_Status,
+                             _DM_Tensor_p, _DM_Tensor_p,
+                             ctypes.POINTER(c_float), ctypes.POINTER(c_float),
+                             c_int, c_int)
+_dm_op_pointwise_conv = _fn("dm_op_pointwise_conv", DM_Status,
+                             _DM_Tensor_p, _DM_Tensor_p,
+                             ctypes.POINTER(c_float), ctypes.POINTER(c_float), c_int)
+
+# Linear
+_dm_op_linear = _fn("dm_op_linear", DM_Status,
+                     _DM_Tensor_p, _DM_Tensor_p,
+                     ctypes.POINTER(c_float), ctypes.POINTER(c_float), c_int)
+
+# Pooling
+_dm_op_global_avg_pool  = _fn("dm_op_global_avg_pool",  DM_Status, _DM_Tensor_p, _DM_Tensor_p)
+_dm_op_max_pool2d_same  = _fn("dm_op_max_pool2d_same",  DM_Status, _DM_Tensor_p, _DM_Tensor_p, c_int, c_int)
+
+# Normalisation
+_dm_op_batch_norm  = _fn("dm_op_batch_norm", DM_Status,
+                          _DM_Tensor_p,
+                          ctypes.POINTER(c_float), ctypes.POINTER(c_float),
+                          ctypes.POINTER(c_float), ctypes.POINTER(c_float), c_float)
+_dm_op_layer_norm  = _fn("dm_op_layer_norm", DM_Status,
+                          ctypes.POINTER(c_float), c_int, c_int,
+                          ctypes.POINTER(c_float), ctypes.POINTER(c_float), c_float)
+
+# Elementwise
+_dm_op_tensor_add = _fn("dm_op_tensor_add", DM_Status, _DM_Tensor_p, _DM_Tensor_p)
+
+# Activations
+_dm_op_relu    = _fn("dm_op_relu",    None, _DM_Tensor_p)
+_dm_op_relu6   = _fn("dm_op_relu6",   None, _DM_Tensor_p)
+_dm_op_tanh    = _fn("dm_op_tanh",    None, _DM_Tensor_p)
+_dm_op_sigmoid = _fn("dm_op_sigmoid", None, _DM_Tensor_p)
+_dm_op_gelu    = _fn("dm_op_gelu",    None, ctypes.POINTER(c_float), c_int)
+
+# Softmax
+_dm_op_softmax      = _fn("dm_op_softmax",      None, _DM_Tensor_p)
+_dm_op_softmax_rows = _fn("dm_op_softmax_rows", None, ctypes.POINTER(c_float), c_int, c_int)
+
+# Matrix multiplication
+_dm_op_matmul_nt = _fn("dm_op_matmul_nt", None,
+                         ctypes.POINTER(c_float), ctypes.POINTER(c_float),
+                         ctypes.POINTER(c_float), c_int, c_int, c_int)
+_dm_op_matmul_nn = _fn("dm_op_matmul_nn", None,
+                         ctypes.POINTER(c_float), ctypes.POINTER(c_float),
+                         ctypes.POINTER(c_float), c_int, c_int, c_int)
+
+# Backward passes
+_dm_op_linear_backward = _fn("dm_op_linear_backward", DM_Status,
+                               _DM_Tensor_p, _DM_Tensor_p, _DM_Tensor_p,
+                               ctypes.POINTER(c_float), ctypes.POINTER(c_float),
+                               ctypes.POINTER(c_float), c_int)
+_dm_op_relu_backward   = _fn("dm_op_relu_backward", None,
+                               _DM_Tensor_p, _DM_Tensor_p, _DM_Tensor_p)
+_dm_op_tanh_backward   = _fn("dm_op_tanh_backward", None,
+                               _DM_Tensor_p, _DM_Tensor_p, _DM_Tensor_p)
+
+# Maxout
+_dm_op_maxout          = _fn("dm_op_maxout",          DM_Status,
+                               _DM_Tensor_p, _DM_Tensor_p, c_int,
+                               ctypes.POINTER(c_int))
+_dm_op_maxout_backward = _fn("dm_op_maxout_backward", DM_Status,
+                               _DM_Tensor_p, _DM_Tensor_p, c_int,
+                               ctypes.POINTER(c_int))
+
+# Dropout
+_dm_op_dropout          = _fn("dm_op_dropout",          None,
+                                _DM_Tensor_p, _DM_Tensor_p, c_float,
+                                ctypes.POINTER(c_int))
+_dm_op_dropout_backward = _fn("dm_op_dropout_backward", None,
+                                _DM_Tensor_p, _DM_Tensor_p, c_float,
+                                ctypes.POINTER(c_int))
+
+# Optimisers
+_dm_op_adam_step = _fn("dm_op_adam_step", None,
+                         ctypes.POINTER(c_float), ctypes.POINTER(c_float),
+                         ctypes.POINTER(c_float), ctypes.POINTER(c_float),
+                         c_int, c_float, c_float, c_float, c_float, c_float, c_int)
+_dm_op_adagrad_step = _fn("dm_op_adagrad_step", None,
+                            ctypes.POINTER(c_float), ctypes.POINTER(c_float),
+                            ctypes.POINTER(c_float),
+                            c_int, c_float, c_float, c_float)
+_dm_op_sgd_momentum_step = _fn("dm_op_sgd_momentum_step", None,
+                                 ctypes.POINTER(c_float), ctypes.POINTER(c_float),
+                                 ctypes.POINTER(c_float),
+                                 c_int, c_float, c_float, c_float, c_int)
+
+# § 9  VAE (was § 8 before engine section was added)
 _dm_vae_create_raw      = _fn("dm_vae_create_raw", c_void_p, c_int, c_int, c_int, c_float)
 _dm_vae_free_raw        = _fn("dm_vae_free_raw", None, c_void_p)
 _dm_vae_train_step_raw  = _fn("dm_vae_train_step_raw", c_float, c_void_p, ctypes.POINTER(c_float), c_int)
@@ -1071,3 +1188,304 @@ class GAN:
             raise ValueError("Batch size must be a multiple of noise_dim")
         z_arr = (c_float * len(z_batch))(*z_batch)
         return float(_dm_gan_train_g_step_raw(self._handle, z_arr, batch_size))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# § 8  Engine — Python wrappers
+#
+# Users can build custom models by composing Tensor + op.* primitives,
+# exactly like TensorFlow layers but backed by dm_engine (TFE).
+#
+# Quick example:
+#   import dm
+#   x = dm.Tensor(1, 3, 224, 224)   # NCHW batch=1, RGB 224×224
+#   y = dm.Tensor(1, 64, 112, 112)
+#   dm.op.conv2d_same(x, y, weights, bias, 64, 3, 2)
+#   dm.op.relu(y)
+# ─────────────────────────────────────────────────────────────────────────────
+
+import array as _array
+import types as _types
+
+
+class Tensor:
+    """
+    NCHW float32 tensor backed by dm_engine.
+
+    Layout: (n, c, h, w) — row-major, contiguous float32.
+    The underlying C buffer is owned by this object.
+    """
+
+    def __init__(self, n: int, c: int, h: int, w: int, *, fill: float = 0.0):
+        self._t = _DM_Tensor()
+        _check(_dm_tensor_alloc(ctypes.byref(self._t), n, c, h, w),
+               "dm.Tensor")
+        if fill != 0.0:
+            _dm_tensor_fill(ctypes.byref(self._t), fill)
+
+    def __del__(self):
+        if getattr(self, "_t", None) and self._t.data:
+            _dm_tensor_free(ctypes.byref(self._t))
+
+    def __enter__(self):  return self
+    def __exit__(self, *_): self.__del__()
+
+    @property
+    def n(self) -> int:  return self._t.n
+    @property
+    def c(self) -> int:  return self._t.c
+    @property
+    def h(self) -> int:  return self._t.h
+    @property
+    def w(self) -> int:  return self._t.w
+    @property
+    def count(self) -> int: return int(_dm_tensor_count(ctypes.byref(self._t)))
+
+    def fill(self, value: float) -> None:
+        _dm_tensor_fill(ctypes.byref(self._t), value)
+
+    def get(self, n: int, c: int, y: int, x: int) -> float:
+        return float(_dm_tensor_get(ctypes.byref(self._t), n, c, y, x))
+
+    def set(self, n: int, c: int, y: int, x: int, v: float) -> None:
+        _dm_tensor_set(ctypes.byref(self._t), n, c, y, x, v)
+
+    def to_list(self) -> List[float]:
+        """Return a flat copy of the data buffer as a Python list."""
+        n = self.count
+        return list(self._t.data[0:n])
+
+    def from_list(self, values: List[float]) -> None:
+        """Overwrite the tensor data from a flat Python list."""
+        n = self.count
+        if len(values) != n:
+            raise ValueError(f"Expected {n} values, got {len(values)}")
+        for i, v in enumerate(values):
+            self._t.data[i] = v
+
+    def _ptr(self):
+        """Internal: return ctypes pointer to the raw DM_Tensor struct."""
+        return ctypes.byref(self._t)
+
+    def __repr__(self) -> str:
+        return f"dm.Tensor(n={self.n}, c={self.c}, h={self.h}, w={self.w})"
+
+
+def _fp(values):
+    """Convert a list/bytes/array to a ctypes float pointer (no copy on array.array)."""
+    if isinstance(values, ctypes.Array):
+        return values
+    arr = (c_float * len(values))(*values)
+    return arr
+
+
+def _ip(values):
+    """Convert a list to a ctypes int pointer."""
+    if isinstance(values, ctypes.Array):
+        return values
+    return (c_int * len(values))(*values)
+
+
+# ── op namespace ──────────────────────────────────────────────────────────────
+
+class op:
+    """
+    Neural-op primitives — the dm_engine public API.
+
+    All ops dispatch through TFE so they inherit XLA/cuDNN/oneDNN acceleration.
+    Functions that operate on Tensor objects mutate `out` in-place.
+    """
+
+    @staticmethod
+    def conv2d_same(in_: Tensor, out: Tensor,
+                    w: List[float], b: List[float],
+                    out_c: int, kernel: int, stride: int) -> None:
+        """Standard conv2d, SAME padding.  w: OIHW [out_c][in_c][ky][kx]."""
+        _check(_dm_op_conv2d_same(in_._ptr(), out._ptr(),
+                                   _fp(w), _fp(b), out_c, kernel, stride),
+               "dm.op.conv2d_same")
+
+    @staticmethod
+    def depthwise_conv(in_: Tensor, out: Tensor,
+                       w: List[float], b: List[float],
+                       kernel: int, stride: int) -> None:
+        """Depthwise separable conv, SAME.  w: [c][ky][kx]."""
+        _check(_dm_op_depthwise_conv(in_._ptr(), out._ptr(),
+                                      _fp(w), _fp(b), kernel, stride),
+               "dm.op.depthwise_conv")
+
+    @staticmethod
+    def pointwise_conv(in_: Tensor, out: Tensor,
+                       w: List[float], b: List[float], out_c: int) -> None:
+        """1×1 conv.  w: [out_c][in_c]."""
+        _check(_dm_op_pointwise_conv(in_._ptr(), out._ptr(),
+                                      _fp(w), _fp(b), out_c),
+               "dm.op.pointwise_conv")
+
+    @staticmethod
+    def linear(in_: Tensor, out: Tensor,
+               w: List[float], b: List[float], out_c: int) -> None:
+        """Fully-connected.  in: [n,in_c,1,1] → out: [n,out_c,1,1]."""
+        _check(_dm_op_linear(in_._ptr(), out._ptr(),
+                              _fp(w), _fp(b), out_c),
+               "dm.op.linear")
+
+    @staticmethod
+    def global_avg_pool(in_: Tensor, out: Tensor) -> None:
+        _check(_dm_op_global_avg_pool(in_._ptr(), out._ptr()),
+               "dm.op.global_avg_pool")
+
+    @staticmethod
+    def max_pool2d_same(in_: Tensor, out: Tensor,
+                        kernel: int, stride: int) -> None:
+        _check(_dm_op_max_pool2d_same(in_._ptr(), out._ptr(), kernel, stride),
+               "dm.op.max_pool2d_same")
+
+    @staticmethod
+    def batch_norm(t: Tensor,
+                   gamma: List[float], beta: List[float],
+                   mean: List[float],  var: List[float],
+                   eps: float = 1e-5) -> None:
+        _check(_dm_op_batch_norm(t._ptr(),
+                                  _fp(gamma), _fp(beta), _fp(mean), _fp(var), eps),
+               "dm.op.batch_norm")
+
+    @staticmethod
+    def layer_norm(x: List[float], seq_len: int, d_model: int,
+                   gamma: List[float], beta: List[float],
+                   eps: float = 1e-5) -> List[float]:
+        """Layer norm in-place on a flat float list [seq_len × d_model].  Returns updated list."""
+        arr = _fp(x)
+        _check(_dm_op_layer_norm(arr, seq_len, d_model,
+                                  _fp(gamma), _fp(beta), eps),
+               "dm.op.layer_norm")
+        return list(arr)
+
+    @staticmethod
+    def add(out: Tensor, in_: Tensor) -> None:
+        _check(_dm_op_tensor_add(out._ptr(), in_._ptr()), "dm.op.add")
+
+    @staticmethod
+    def relu(t: Tensor) -> None:    _dm_op_relu(t._ptr())
+    @staticmethod
+    def relu6(t: Tensor) -> None:   _dm_op_relu6(t._ptr())
+    @staticmethod
+    def tanh(t: Tensor) -> None:    _dm_op_tanh(t._ptr())
+    @staticmethod
+    def sigmoid(t: Tensor) -> None: _dm_op_sigmoid(t._ptr())
+
+    @staticmethod
+    def gelu(x: List[float]) -> List[float]:
+        """GELU in-place on a flat float list.  Returns updated list."""
+        arr = _fp(x)
+        _dm_op_gelu(arr, len(x))
+        return list(arr)
+
+    @staticmethod
+    def softmax(t: Tensor) -> None:
+        """Softmax over the channel dim of an [n,c,1,1] tensor."""
+        _dm_op_softmax(t._ptr())
+
+    @staticmethod
+    def softmax_rows(x: List[float], rows: int, cols: int) -> List[float]:
+        """Softmax over rows of a flat [rows × cols] buffer.  Returns updated list."""
+        arr = _fp(x)
+        _dm_op_softmax_rows(arr, rows, cols)
+        return list(arr)
+
+    @staticmethod
+    def matmul_nt(A: List[float], B: List[float],
+                  M: int, N: int, K: int) -> List[float]:
+        """C = A × Bᵀ   A[M×K], B[N×K] → C[M×N]."""
+        C = (c_float * (M * N))()
+        _dm_op_matmul_nt(_fp(A), _fp(B), C, M, N, K)
+        return list(C)
+
+    @staticmethod
+    def matmul_nn(A: List[float], B: List[float],
+                  M: int, K: int, N: int) -> List[float]:
+        """C = A × B    A[M×K], B[K×N] → C[M×N]."""
+        C = (c_float * (M * N))()
+        _dm_op_matmul_nn(_fp(A), _fp(B), C, M, K, N)
+        return list(C)
+
+    @staticmethod
+    def linear_backward(in_: Tensor, grad_out: Tensor, grad_in: Tensor,
+                         grad_w: List[float], grad_b: List[float],
+                         w: List[float], out_c: int) -> Tuple["List[float]", "List[float]"]:
+        """Returns (updated_grad_w, updated_grad_b)."""
+        gw = _fp(grad_w)
+        gb = _fp(grad_b)
+        _check(_dm_op_linear_backward(in_._ptr(), grad_out._ptr(), grad_in._ptr(),
+                                       gw, gb, _fp(w), out_c),
+               "dm.op.linear_backward")
+        return list(gw), list(gb)
+
+    @staticmethod
+    def relu_backward(in_: Tensor, grad_out: Tensor, grad_in: Tensor) -> None:
+        _dm_op_relu_backward(in_._ptr(), grad_out._ptr(), grad_in._ptr())
+
+    @staticmethod
+    def tanh_backward(out: Tensor, grad_out: Tensor, grad_in: Tensor) -> None:
+        _dm_op_tanh_backward(out._ptr(), grad_out._ptr(), grad_in._ptr())
+
+    @staticmethod
+    def maxout(in_: Tensor, out: Tensor, k: int) -> List[int]:
+        """Returns argmax buffer (int[n×c])."""
+        argmax = (c_int * (in_.n * (in_.c // k)))()
+        _check(_dm_op_maxout(in_._ptr(), out._ptr(), k, argmax), "dm.op.maxout")
+        return list(argmax)
+
+    @staticmethod
+    def maxout_backward(grad_out: Tensor, grad_in: Tensor,
+                         k: int, argmax: List[int]) -> None:
+        _check(_dm_op_maxout_backward(grad_out._ptr(), grad_in._ptr(),
+                                       k, _ip(argmax)),
+               "dm.op.maxout_backward")
+
+    @staticmethod
+    def dropout(in_: Tensor, out: Tensor,
+                drop_prob: float) -> List[int]:
+        """Returns mask buffer (int[n×c×h×w])."""
+        mask = (c_int * in_.count)()
+        _dm_op_dropout(in_._ptr(), out._ptr(), drop_prob, mask)
+        return list(mask)
+
+    @staticmethod
+    def dropout_backward(grad_out: Tensor, grad_in: Tensor,
+                          drop_prob: float, mask: List[int]) -> None:
+        _dm_op_dropout_backward(grad_out._ptr(), grad_in._ptr(),
+                                 drop_prob, _ip(mask))
+
+    @staticmethod
+    def adam_step(param: List[float], grad: List[float],
+                  m: List[float], v: List[float],
+                  lr: float = 1e-3, beta1: float = 0.9, beta2: float = 0.999,
+                  eps: float = 1e-8, weight_decay: float = 0.0,
+                  t: int = 1) -> Tuple["List[float]", "List[float]", "List[float]"]:
+        """In-place Adam step.  Returns (updated_param, updated_m, updated_v)."""
+        p = _fp(param); g = _fp(grad); mv = _fp(m); vv = _fp(v)
+        _dm_op_adam_step(p, g, mv, vv, len(param), lr, beta1, beta2, eps,
+                          weight_decay, t)
+        return list(p), list(mv), list(vv)
+
+    @staticmethod
+    def adagrad_step(param: List[float], grad: List[float], g_sum: List[float],
+                     lr: float = 1e-2, eps: float = 1e-8,
+                     weight_decay: float = 0.0) -> Tuple["List[float]", "List[float]"]:
+        """In-place Adagrad step.  Returns (updated_param, updated_g_sum)."""
+        p = _fp(param); g = _fp(grad); gs = _fp(g_sum)
+        _dm_op_adagrad_step(p, g, gs, len(param), lr, eps, weight_decay)
+        return list(p), list(gs)
+
+    @staticmethod
+    def sgd_momentum_step(param: List[float], grad: List[float],
+                           velocity: List[float],
+                           lr: float = 1e-2, momentum: float = 0.9,
+                           weight_decay: float = 0.0,
+                           nesterov: bool = False) -> Tuple["List[float]", "List[float]"]:
+        """In-place SGD+momentum step.  Returns (updated_param, updated_velocity)."""
+        p = _fp(param); g = _fp(grad); vel = _fp(velocity)
+        _dm_op_sgd_momentum_step(p, g, vel, len(param), lr, momentum,
+                                  weight_decay, int(nesterov))
+        return list(p), list(vel)

@@ -328,7 +328,23 @@ private:
 };
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Tensor
+ * Engine — Tensor and neural-op primitives
+ *
+ * dm_engine is the compute core: every op dispatches through the TensorFlow
+ * Eager C API (TFE_*).  Users compose custom models from these primitives
+ * the same way they would compose TensorFlow layers.
+ *
+ * Layout conventions:
+ *   Tensors           — NCHW (n,c,h,w), row-major, contiguous float32
+ *   Conv weights      — OIHW [out_c][in_c][ky][kx]
+ *   Depthwise weights — [c][ky][kx]
+ *   Linear weights    — [out][in]
+ *   Sequence buffers  — row-major [seq_len × d_model]
+ *
+ * Quick example:
+ *   dm::Tensor x(1, 3, 224, 224), y(1, 64, 112, 112);
+ *   dm::op::conv2d_same(x, y, weights, bias, 64, 3, 2);
+ *   dm::op::relu(y);
  * ───────────────────────────────────────────────────────────────────────── */
 
 class Tensor {
@@ -361,6 +377,209 @@ public:
 private:
     DM_Tensor t_{};
 };
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * op — free functions matching the dm_op_* C API
+ *
+ * All functions throw std::runtime_error on failure (consistent with the
+ * rest of dm.hpp).  Void ops (activations, optimisers) never throw.
+ * ───────────────────────────────────────────────────────────────────────── */
+namespace op {
+
+/* ── Convolutions ────────────────────────────────────────────────────────── */
+
+/** Standard conv2d, SAME padding.  w: OIHW [out_c][in_c][ky][kx]. */
+inline void conv2d_same(const Tensor &in, Tensor &out,
+                         const float *w, const float *b,
+                         int out_c, int kernel, int stride)
+{
+    check(dm_op_conv2d_same(&in.raw(), &out.raw(), w, b, out_c, kernel, stride),
+          "dm::op::conv2d_same");
+}
+
+/** Depthwise separable conv, SAME padding.  w: [c][ky][kx]. */
+inline void depthwise_conv(const Tensor &in, Tensor &out,
+                            const float *w, const float *b,
+                            int kernel, int stride)
+{
+    check(dm_op_depthwise_conv(&in.raw(), &out.raw(), w, b, kernel, stride),
+          "dm::op::depthwise_conv");
+}
+
+/** Pointwise (1×1) conv.  w: [out_c][in_c]. */
+inline void pointwise_conv(const Tensor &in, Tensor &out,
+                             const float *w, const float *b, int out_c)
+{
+    check(dm_op_pointwise_conv(&in.raw(), &out.raw(), w, b, out_c),
+          "dm::op::pointwise_conv");
+}
+
+/* ── Linear / FC ─────────────────────────────────────────────────────────── */
+
+/** Fully-connected.  in: [n,in_c,1,1] → out: [n,out_c,1,1].  w: [out_c×in_c]. */
+inline void linear(const Tensor &in, Tensor &out,
+                   const float *w, const float *b, int out_c)
+{
+    check(dm_op_linear(&in.raw(), &out.raw(), w, b, out_c), "dm::op::linear");
+}
+
+/* ── Pooling ─────────────────────────────────────────────────────────────── */
+
+inline void global_avg_pool(const Tensor &in, Tensor &out) {
+    check(dm_op_global_avg_pool(&in.raw(), &out.raw()), "dm::op::global_avg_pool");
+}
+
+inline void max_pool2d_same(const Tensor &in, Tensor &out, int kernel, int stride) {
+    check(dm_op_max_pool2d_same(&in.raw(), &out.raw(), kernel, stride),
+          "dm::op::max_pool2d_same");
+}
+
+/* ── Normalisation ───────────────────────────────────────────────────────── */
+
+inline void batch_norm(Tensor &t,
+                        const float *gamma, const float *beta,
+                        const float *mean,  const float *var, float eps = 1e-5f)
+{
+    check(dm_op_batch_norm(&t.raw(), gamma, beta, mean, var, eps),
+          "dm::op::batch_norm");
+}
+
+/**
+ * Layer norm for sequence models.
+ * x: row-major float32 [seq_len × d_model], mutated in-place.
+ */
+inline void layer_norm(float *x, int seq_len, int d_model,
+                        const float *gamma, const float *beta, float eps = 1e-5f)
+{
+    check(dm_op_layer_norm(x, seq_len, d_model, gamma, beta, eps),
+          "dm::op::layer_norm");
+}
+
+/* ── Elementwise ─────────────────────────────────────────────────────────── */
+
+inline void add(Tensor &out, const Tensor &in) {
+    check(dm_op_tensor_add(&out.raw(), &in.raw()), "dm::op::add");
+}
+
+/* ── Activations (in-place) ──────────────────────────────────────────────── */
+
+inline void relu    (Tensor &t) { dm_op_relu(&t.raw());    }
+inline void relu6   (Tensor &t) { dm_op_relu6(&t.raw());   }
+inline void tanh_   (Tensor &t) { dm_op_tanh(&t.raw());    }   /* tanh_ avoids <cmath> clash */
+inline void sigmoid (Tensor &t) { dm_op_sigmoid(&t.raw()); }
+
+/** GELU on a raw float buffer (for sequence models). */
+inline void gelu(float *x, int n) { dm_op_gelu(x, n); }
+
+/* ── Softmax ─────────────────────────────────────────────────────────────── */
+
+/** Softmax over the channel dim of an [n,c,1,1] tensor. */
+inline void softmax(Tensor &t) { dm_op_softmax(&t.raw()); }
+
+/** Softmax over rows of a raw [rows × cols] buffer (in-place). */
+inline void softmax_rows(float *x, int rows, int cols) {
+    dm_op_softmax_rows(x, rows, cols);
+}
+
+/* ── Matrix multiplication ───────────────────────────────────────────────── */
+
+/** C = A × Bᵀ   A[M×K], B[N×K] → C[M×N]. */
+inline void matmul_nt(const float *A, const float *B, float *C,
+                       int M, int N, int K) {
+    dm_op_matmul_nt(A, B, C, M, N, K);
+}
+
+/** C = A × B    A[M×K], B[K×N] → C[M×N]. */
+inline void matmul_nn(const float *A, const float *B, float *C,
+                       int M, int K, int N) {
+    dm_op_matmul_nn(A, B, C, M, K, N);
+}
+
+/* ── Backward passes ─────────────────────────────────────────────────────── */
+
+inline void linear_backward(const Tensor &in, const Tensor &grad_out,
+                              Tensor &grad_in,
+                              float *grad_w, float *grad_b,
+                              const float *w, int out_c)
+{
+    check(dm_op_linear_backward(&in.raw(), &grad_out.raw(), &grad_in.raw(),
+                                 grad_w, grad_b, w, out_c),
+          "dm::op::linear_backward");
+}
+
+inline void relu_backward(const Tensor &in, const Tensor &grad_out,
+                           Tensor &grad_in)
+{
+    dm_op_relu_backward(&in.raw(), &grad_out.raw(), &grad_in.raw());
+}
+
+inline void tanh_backward(const Tensor &out, const Tensor &grad_out,
+                           Tensor &grad_in)
+{
+    dm_op_tanh_backward(&out.raw(), &grad_out.raw(), &grad_in.raw());
+}
+
+/* ── Maxout ──────────────────────────────────────────────────────────────── */
+
+/**
+ * Maxout pooling.  in: [n, k×c, 1, 1] → out: [n, c, 1, 1].
+ * argmax: caller-allocated int[n×c].
+ */
+inline void maxout(const Tensor &in, Tensor &out, int k, int *argmax) {
+    check(dm_op_maxout(&in.raw(), &out.raw(), k, argmax), "dm::op::maxout");
+}
+inline void maxout_backward(const Tensor &grad_out, Tensor &grad_in,
+                              int k, const int *argmax)
+{
+    check(dm_op_maxout_backward(&grad_out.raw(), &grad_in.raw(), k, argmax),
+          "dm::op::maxout_backward");
+}
+
+/* ── Dropout ─────────────────────────────────────────────────────────────── */
+
+/** mask: caller-allocated int[n×c×h×w]. */
+inline void dropout(const Tensor &in, Tensor &out, float drop_prob, int *mask) {
+    dm_op_dropout(&in.raw(), &out.raw(), drop_prob, mask);
+}
+inline void dropout_backward(const Tensor &grad_out, Tensor &grad_in,
+                               float drop_prob, const int *mask)
+{
+    dm_op_dropout_backward(&grad_out.raw(), &grad_in.raw(), drop_prob, mask);
+}
+
+/* ── Optimisers ──────────────────────────────────────────────────────────── */
+
+/**
+ * Adam parameter update.
+ * param, grad, m, v: float[n].  t: current step (1-indexed).
+ */
+inline void adam_step(float *param, float *grad, float *m, float *v,
+                       int n, float lr = 1e-3f,
+                       float beta1 = 0.9f, float beta2 = 0.999f,
+                       float eps = 1e-8f, float weight_decay = 0.f, int t = 1)
+{
+    dm_op_adam_step(param, grad, m, v, n, lr, beta1, beta2, eps, weight_decay, t);
+}
+
+/** Adagrad parameter update.  param, grad, g_sum: float[n]. */
+inline void adagrad_step(float *param, float *grad, float *g_sum,
+                          int n, float lr = 1e-2f,
+                          float eps = 1e-8f, float weight_decay = 0.f)
+{
+    dm_op_adagrad_step(param, grad, g_sum, n, lr, eps, weight_decay);
+}
+
+/** SGD + momentum.  param, grad, velocity: float[n]. */
+inline void sgd_momentum_step(float *param, float *grad, float *velocity,
+                               int n, float lr = 1e-2f,
+                               float momentum = 0.9f, float weight_decay = 0.f,
+                               bool nesterov = false)
+{
+    dm_op_sgd_momentum_step(param, grad, velocity, n, lr, momentum,
+                             weight_decay, nesterov ? 1 : 0);
+}
+
+} /* namespace op */
 
 /* ─────────────────────────────────────────────────────────────────────────
  * Benchmark

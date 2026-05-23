@@ -19,6 +19,12 @@
 #include <stdint.h>
 
 /* ── Tensor data structure ───────────────────────────────────────────────── */
+/*
+ * DM_Tensor is also declared in include/dm.h (§ 8).  When dm.h has been
+ * included first, skip the re-declaration to avoid "conflicting types"
+ * errors in translation units that include both headers (e.g. dm_lib.c).
+ */
+#ifndef DM_H   /* dm.h defines DM_H */
 
 typedef struct {
     int    n, c, h, w;
@@ -33,6 +39,19 @@ void   dm_tensor_fill (DM_Tensor *t, float value);
 float  dm_tensor_get  (const DM_Tensor *t, int n, int c, int y, int x);
 void   dm_tensor_set  (DM_Tensor *t, int n, int c, int y, int x, float v);
 size_t dm_tensor_count(const DM_Tensor *t);
+
+#else  /* dm.h was included first — lifecycle decls come from there */
+
+/* Re-export the internal (non-DM_API) versions so internal code can call
+ * them without the DM_API visibility attribute. */
+int    dm_tensor_alloc(DM_Tensor *t, int n, int c, int h, int w);
+void   dm_tensor_free (DM_Tensor *t);
+void   dm_tensor_fill (DM_Tensor *t, float value);
+float  dm_tensor_get  (const DM_Tensor *t, int n, int c, int y, int x);
+void   dm_tensor_set  (DM_Tensor *t, int n, int c, int y, int x, float v);
+size_t dm_tensor_count(const DM_Tensor *t);
+
+#endif /* DM_H */
 
 /* ── Convolutions (TFE Conv2D / DepthwiseConv2dNative, NCHW, SAME) ────────
  * Weight layout for dm_conv2d_same:  w[out_c][in_c][ky][kx]  (OIHW)

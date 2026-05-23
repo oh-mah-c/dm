@@ -134,6 +134,66 @@ public final class DM {
                                   String outputPath, int seed);
         void    dm_datagen_free  (Pointer gen);
 
+        // § 8  Engine — dm_engine ops (TFE backend, NCHW float32)
+        // Tensor lifecycle (DM_Tensor passed as raw Pointer to its struct memory)
+        int        dm_tensor_alloc (Pointer t, int n, int c, int h, int w);
+        void       dm_tensor_free  (Pointer t);
+        void       dm_tensor_fill  (Pointer t, float value);
+        float      dm_tensor_get   (Pointer t, int n, int c, int y, int x);
+        void       dm_tensor_set   (Pointer t, int n, int c, int y, int x, float v);
+        NativeLong dm_tensor_count (Pointer t);
+        // Convolutions
+        int dm_op_conv2d_same   (Pointer in, Pointer out, float[] w, float[] b,
+                                  int outC, int kernel, int stride);
+        int dm_op_depthwise_conv(Pointer in, Pointer out, float[] w, float[] b,
+                                  int kernel, int stride);
+        int dm_op_pointwise_conv(Pointer in, Pointer out, float[] w, float[] b, int outC);
+        // Linear
+        int dm_op_linear(Pointer in, Pointer out, float[] w, float[] b, int outC);
+        // Pooling
+        int dm_op_global_avg_pool  (Pointer in, Pointer out);
+        int dm_op_max_pool2d_same  (Pointer in, Pointer out, int kernel, int stride);
+        // Normalisation
+        int dm_op_batch_norm(Pointer t, float[] gamma, float[] beta,
+                              float[] mean, float[] var, float eps);
+        int dm_op_layer_norm(float[] x, int seqLen, int dModel,
+                              float[] gamma, float[] beta, float eps);
+        // Elementwise
+        int dm_op_tensor_add(Pointer out, Pointer in);
+        // Activations
+        void dm_op_relu   (Pointer t);
+        void dm_op_relu6  (Pointer t);
+        void dm_op_tanh   (Pointer t);
+        void dm_op_sigmoid(Pointer t);
+        void dm_op_gelu   (float[] x, int n);
+        // Softmax
+        void dm_op_softmax     (Pointer t);
+        void dm_op_softmax_rows(float[] x, int rows, int cols);
+        // Matrix multiplication
+        void dm_op_matmul_nt(float[] A, float[] B, float[] C, int M, int N, int K);
+        void dm_op_matmul_nn(float[] A, float[] B, float[] C, int M, int K, int N);
+        // Backward passes
+        int  dm_op_linear_backward(Pointer in, Pointer gradOut, Pointer gradIn,
+                                    float[] gradW, float[] gradB, float[] w, int outC);
+        void dm_op_relu_backward  (Pointer in,  Pointer gradOut, Pointer gradIn);
+        void dm_op_tanh_backward  (Pointer out, Pointer gradOut, Pointer gradIn);
+        // Maxout
+        int dm_op_maxout         (Pointer in,  Pointer out, int k, int[] argmax);
+        int dm_op_maxout_backward(Pointer gradOut, Pointer gradIn, int k, int[] argmax);
+        // Dropout
+        void dm_op_dropout         (Pointer in,  Pointer out, float dropProb, int[] mask);
+        void dm_op_dropout_backward(Pointer gradOut, Pointer gradIn,
+                                    float dropProb, int[] mask);
+        // Optimisers
+        void dm_op_adam_step(float[] param, float[] grad, float[] m, float[] v,
+                              int n, float lr, float beta1, float beta2,
+                              float eps, float weightDecay, int t);
+        void dm_op_adagrad_step(float[] param, float[] grad, float[] gSum,
+                                 int n, float lr, float eps, float weightDecay);
+        void dm_op_sgd_momentum_step(float[] param, float[] grad, float[] velocity,
+                                      int n, float lr, float momentum,
+                                      float weightDecay, int nesterov);
+
         // § 13  CLI
         int dm_cli_run(String command, int argc, String[] argv);
 
@@ -500,6 +560,220 @@ public final class DM {
         }
         @Override public void close() {
             if (h != null) { N.dm_gpu_free(h); h = null; }
+        }
+    }
+
+    // ── § 8  Engine — Tensor and op primitives ────────────────────────────────
+    //
+    // Build custom neural models by composing Tensor + Op.* primitives.
+    // All ops dispatch through the TensorFlow Eager C API (TFE_*) so XLA,
+    // cuDNN, and oneDNN acceleration is available automatically.
+    //
+    // Layout: NCHW (n, c, h, w), row-major, contiguous float32.
+    //
+    // Example:
+    //   try (DM.Tensor x = new DM.Tensor(1, 3, 224, 224);
+    //        DM.Tensor y = new DM.Tensor(1, 64, 112, 112)) {
+    //       DM.Op.conv2dSame(x, y, weights, bias, 64, 3, 2);
+    //       DM.Op.relu(y);
+    //   }
+
+    /**
+     * NCHW float32 tensor backed by dm_engine.  Use try-with-resources.
+     *
+     * The struct layout is: int n, c, h, w + pointer data.
+     * We allocate raw native memory for the struct via JNA Memory.
+     */
+    public static final class Tensor implements AutoCloseable {
+        // DM_Tensor struct: 4 ints (16 bytes) + 1 native pointer
+        private static final int STRUCT_SIZE = 4 * 4 + com.sun.jna.Native.POINTER_SIZE;
+        final com.sun.jna.Memory mem;
+
+        public Tensor(int n, int c, int h, int w) {
+            mem = new com.sun.jna.Memory(STRUCT_SIZE);
+            mem.clear();
+            check(N.dm_tensor_alloc(mem, n, c, h, w), "DM.Tensor");
+        }
+
+        @Override public void close() { N.dm_tensor_free(mem); }
+
+        public int n() { return mem.getInt(0); }
+        public int c() { return mem.getInt(4); }
+        public int h() { return mem.getInt(8); }
+        public int w() { return mem.getInt(12); }
+        public int count() { return (int) N.dm_tensor_count(mem).longValue(); }
+
+        public void  fill(float v)                  { N.dm_tensor_fill(mem, v); }
+        public float get(int n, int c, int y, int x){ return N.dm_tensor_get(mem, n, c, y, x); }
+        public void  set(int n, int c, int y, int x, float v) { N.dm_tensor_set(mem, n, c, y, x, v); }
+
+        /** Copy all elements into a new float[]. */
+        public float[] toArray() {
+            int total = count();
+            float[] out = new float[total];
+            for (int i = 0; i < total; i++) out[i] = get(i/c()/h()/w(), (i/h()/w())%c(), (i/w())%h(), i%w());
+            return out;
+        }
+
+        Pointer ptr() { return mem; }
+    }
+
+    /**
+     * Neural-op primitives.  All methods are static; pass Tensor objects as operands.
+     * Methods named with a trailing underscore avoid Java keyword conflicts (tanh_, etc.).
+     */
+    public static final class Op {
+        private Op() {}
+
+        // ── Convolutions ──────────────────────────────────────────────────────
+        /** Standard conv2d, SAME padding.  w: OIHW [outC][inC][ky][kx]. */
+        public static void conv2dSame(Tensor in, Tensor out,
+                                       float[] w, float[] b,
+                                       int outC, int kernel, int stride) {
+            check(N.dm_op_conv2d_same(in.ptr(), out.ptr(), w, b, outC, kernel, stride),
+                  "DM.Op.conv2dSame");
+        }
+        /** Depthwise separable conv, SAME.  w: [c][ky][kx]. */
+        public static void depthwiseConv(Tensor in, Tensor out,
+                                          float[] w, float[] b,
+                                          int kernel, int stride) {
+            check(N.dm_op_depthwise_conv(in.ptr(), out.ptr(), w, b, kernel, stride),
+                  "DM.Op.depthwiseConv");
+        }
+        /** 1×1 conv.  w: [outC][inC]. */
+        public static void pointwiseConv(Tensor in, Tensor out,
+                                          float[] w, float[] b, int outC) {
+            check(N.dm_op_pointwise_conv(in.ptr(), out.ptr(), w, b, outC),
+                  "DM.Op.pointwiseConv");
+        }
+
+        // ── Linear ────────────────────────────────────────────────────────────
+        /** Fully-connected.  in: [n,inC,1,1] → out: [n,outC,1,1].  w: [outC×inC]. */
+        public static void linear(Tensor in, Tensor out,
+                                   float[] w, float[] b, int outC) {
+            check(N.dm_op_linear(in.ptr(), out.ptr(), w, b, outC), "DM.Op.linear");
+        }
+
+        // ── Pooling ───────────────────────────────────────────────────────────
+        public static void globalAvgPool(Tensor in, Tensor out) {
+            check(N.dm_op_global_avg_pool(in.ptr(), out.ptr()), "DM.Op.globalAvgPool");
+        }
+        public static void maxPool2dSame(Tensor in, Tensor out, int kernel, int stride) {
+            check(N.dm_op_max_pool2d_same(in.ptr(), out.ptr(), kernel, stride),
+                  "DM.Op.maxPool2dSame");
+        }
+
+        // ── Normalisation ─────────────────────────────────────────────────────
+        public static void batchNorm(Tensor t,
+                                      float[] gamma, float[] beta,
+                                      float[] mean,  float[] var, float eps) {
+            check(N.dm_op_batch_norm(t.ptr(), gamma, beta, mean, var, eps),
+                  "DM.Op.batchNorm");
+        }
+        /** Layer norm on x[seqLen × dModel], mutated in-place. */
+        public static void layerNorm(float[] x, int seqLen, int dModel,
+                                      float[] gamma, float[] beta, float eps) {
+            check(N.dm_op_layer_norm(x, seqLen, dModel, gamma, beta, eps),
+                  "DM.Op.layerNorm");
+        }
+
+        // ── Elementwise ───────────────────────────────────────────────────────
+        public static void add(Tensor out, Tensor in) {
+            check(N.dm_op_tensor_add(out.ptr(), in.ptr()), "DM.Op.add");
+        }
+
+        // ── Activations ───────────────────────────────────────────────────────
+        public static void relu   (Tensor t) { N.dm_op_relu(t.ptr());    }
+        public static void relu6  (Tensor t) { N.dm_op_relu6(t.ptr());   }
+        public static void tanh_  (Tensor t) { N.dm_op_tanh(t.ptr());    }
+        public static void sigmoid(Tensor t) { N.dm_op_sigmoid(t.ptr()); }
+        /** GELU in-place on a raw float[]. */
+        public static void gelu(float[] x)   { N.dm_op_gelu(x, x.length); }
+
+        // ── Softmax ───────────────────────────────────────────────────────────
+        /** Softmax over the channel dim of an [n,c,1,1] tensor. */
+        public static void softmax(Tensor t)                           { N.dm_op_softmax(t.ptr()); }
+        /** Softmax over rows of a raw [rows × cols] buffer (in-place). */
+        public static void softmaxRows(float[] x, int rows, int cols) { N.dm_op_softmax_rows(x, rows, cols); }
+
+        // ── Matrix multiplication ─────────────────────────────────────────────
+        /** C = A × Bᵀ  (A[M×K], B[N×K] → new C[M×N]). */
+        public static float[] matmulNT(float[] A, float[] B, int M, int N, int K) {
+            float[] C = new float[M * N];
+            N.dm_op_matmul_nt(A, B, C, M, N, K);
+            return C;
+        }
+        /** C = A × B  (A[M×K], B[K×N] → new C[M×N]). */
+        public static float[] matmulNN(float[] A, float[] B, int M, int K, int N_) {
+            float[] C = new float[M * N_];
+            N.dm_op_matmul_nn(A, B, C, M, K, N_);
+            return C;
+        }
+
+        // ── Backward passes ───────────────────────────────────────────────────
+        public static void linearBackward(Tensor in, Tensor gradOut, Tensor gradIn,
+                                           float[] gradW, float[] gradB,
+                                           float[] w, int outC) {
+            check(N.dm_op_linear_backward(in.ptr(), gradOut.ptr(), gradIn.ptr(),
+                                           gradW, gradB, w, outC),
+                  "DM.Op.linearBackward");
+        }
+        public static void reluBackward(Tensor in, Tensor gradOut, Tensor gradIn) {
+            N.dm_op_relu_backward(in.ptr(), gradOut.ptr(), gradIn.ptr());
+        }
+        public static void tanhBackward(Tensor out_, Tensor gradOut, Tensor gradIn) {
+            N.dm_op_tanh_backward(out_.ptr(), gradOut.ptr(), gradIn.ptr());
+        }
+
+        // ── Maxout ────────────────────────────────────────────────────────────
+        /** Returns the argmax buffer int[n×(c/k)]. */
+        public static int[] maxout(Tensor in, Tensor out, int k) {
+            int[] argmax = new int[in.n() * in.c() / k];
+            check(N.dm_op_maxout(in.ptr(), out.ptr(), k, argmax), "DM.Op.maxout");
+            return argmax;
+        }
+        public static void maxoutBackward(Tensor gradOut, Tensor gradIn,
+                                           int k, int[] argmax) {
+            check(N.dm_op_maxout_backward(gradOut.ptr(), gradIn.ptr(), k, argmax),
+                  "DM.Op.maxoutBackward");
+        }
+
+        // ── Dropout ───────────────────────────────────────────────────────────
+        /** Returns the mask int[n×c×h×w]. */
+        public static int[] dropout(Tensor in, Tensor out, float dropProb) {
+            int[] mask = new int[in.count()];
+            N.dm_op_dropout(in.ptr(), out.ptr(), dropProb, mask);
+            return mask;
+        }
+        public static void dropoutBackward(Tensor gradOut, Tensor gradIn,
+                                            float dropProb, int[] mask) {
+            N.dm_op_dropout_backward(gradOut.ptr(), gradIn.ptr(), dropProb, mask);
+        }
+
+        // ── Optimisers ────────────────────────────────────────────────────────
+        /**
+         * In-place Adam update.
+         * param, grad, m, v: float[n].  t: current step (1-indexed).
+         */
+        public static void adamStep(float[] param, float[] grad,
+                                     float[] m, float[] v,
+                                     float lr, float beta1, float beta2,
+                                     float eps, float weightDecay, int t) {
+            N.dm_op_adam_step(param, grad, m, v, param.length,
+                              lr, beta1, beta2, eps, weightDecay, t);
+        }
+        /** In-place Adagrad update.  gSum: running squared-gradient buffer. */
+        public static void adagradStep(float[] param, float[] grad, float[] gSum,
+                                        float lr, float eps, float weightDecay) {
+            N.dm_op_adagrad_step(param, grad, gSum, param.length, lr, eps, weightDecay);
+        }
+        /** In-place SGD+momentum update. */
+        public static void sgdMomentumStep(float[] param, float[] grad,
+                                            float[] velocity,
+                                            float lr, float momentum,
+                                            float weightDecay, boolean nesterov) {
+            N.dm_op_sgd_momentum_step(param, grad, velocity, param.length,
+                                       lr, momentum, weightDecay, nesterov ? 1 : 0);
         }
     }
 

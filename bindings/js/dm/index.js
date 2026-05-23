@@ -129,6 +129,55 @@ const lib = ffi.Library(LIB_PATH, {
   dm_lm_load:     [ int_t,  [void_p, str_p] ],
   dm_lm_free:     [ 'void', [void_p] ],
 
+  // § 8  Engine — dm_engine ops (TFE backend, NCHW float32)
+  // Tensor lifecycle
+  dm_tensor_alloc: [ int_t, [void_p, int_t, int_t, int_t, int_t] ],
+  dm_tensor_free:  [ 'void', [void_p] ],
+  dm_tensor_fill:  [ 'void', [void_p, float_t] ],
+  dm_tensor_get:   [ float_t, [void_p, int_t, int_t, int_t, int_t] ],
+  dm_tensor_set:   [ 'void', [void_p, int_t, int_t, int_t, int_t, float_t] ],
+  dm_tensor_count: [ size_t, [void_p] ],
+  // Convolutions
+  dm_op_conv2d_same:    [ int_t, [void_p, void_p, floatp, floatp, int_t, int_t, int_t] ],
+  dm_op_depthwise_conv: [ int_t, [void_p, void_p, floatp, floatp, int_t, int_t] ],
+  dm_op_pointwise_conv: [ int_t, [void_p, void_p, floatp, floatp, int_t] ],
+  // Linear
+  dm_op_linear: [ int_t, [void_p, void_p, floatp, floatp, int_t] ],
+  // Pooling
+  dm_op_global_avg_pool:  [ int_t, [void_p, void_p] ],
+  dm_op_max_pool2d_same:  [ int_t, [void_p, void_p, int_t, int_t] ],
+  // Normalisation
+  dm_op_batch_norm: [ int_t, [void_p, floatp, floatp, floatp, floatp, float_t] ],
+  dm_op_layer_norm: [ int_t, [floatp, int_t, int_t, floatp, floatp, float_t] ],
+  // Elementwise
+  dm_op_tensor_add: [ int_t, [void_p, void_p] ],
+  // Activations
+  dm_op_relu:    [ 'void', [void_p] ],
+  dm_op_relu6:   [ 'void', [void_p] ],
+  dm_op_tanh:    [ 'void', [void_p] ],
+  dm_op_sigmoid: [ 'void', [void_p] ],
+  dm_op_gelu:    [ 'void', [floatp, int_t] ],
+  // Softmax
+  dm_op_softmax:      [ 'void', [void_p] ],
+  dm_op_softmax_rows: [ 'void', [floatp, int_t, int_t] ],
+  // Matrix multiplication
+  dm_op_matmul_nt: [ 'void', [floatp, floatp, floatp, int_t, int_t, int_t] ],
+  dm_op_matmul_nn: [ 'void', [floatp, floatp, floatp, int_t, int_t, int_t] ],
+  // Backward passes
+  dm_op_linear_backward: [ int_t, [void_p, void_p, void_p, floatp, floatp, floatp, int_t] ],
+  dm_op_relu_backward:   [ 'void', [void_p, void_p, void_p] ],
+  dm_op_tanh_backward:   [ 'void', [void_p, void_p, void_p] ],
+  // Maxout
+  dm_op_maxout:          [ int_t, [void_p, void_p, int_t, intp] ],
+  dm_op_maxout_backward: [ int_t, [void_p, void_p, int_t, intp] ],
+  // Dropout
+  dm_op_dropout:          [ 'void', [void_p, void_p, float_t, intp] ],
+  dm_op_dropout_backward: [ 'void', [void_p, void_p, float_t, intp] ],
+  // Optimisers
+  dm_op_adam_step:         [ 'void', [floatp, floatp, floatp, floatp, int_t, float_t, float_t, float_t, float_t, float_t, int_t] ],
+  dm_op_adagrad_step:      [ 'void', [floatp, floatp, floatp, int_t, float_t, float_t, float_t] ],
+  dm_op_sgd_momentum_step: [ 'void', [floatp, floatp, floatp, int_t, float_t, float_t, float_t, int_t] ],
+
   // § 9  Benchmark
   dm_bench_reset:      [ 'void', [] ],
   dm_bench_start:      [ 'void', [int_t] ],
@@ -535,6 +584,10 @@ module.exports = {
   // § 6
   LM,
 
+  // § 8  Engine
+  Tensor,
+  op,
+
   // § 9
   benchReset, benchStart, benchStop, benchRecord, getBenchReport, benchPrint,
 
@@ -553,4 +606,220 @@ module.exports = {
   // § 18
   timerNow, peakRamMb, fileSizeMb, dirSizeMb, ensureDir, pathBasename,
   experimentWriteHeader, experimentGenerateReport,
+};
+
+// ── § 8  Engine — Tensor class and op namespace ───────────────────────────────
+//
+// Build custom models by composing Tensor and op.* primitives, just like
+// TensorFlow layers — ops dispatch through TFE so XLA/cuDNN/oneDNN are used.
+//
+// Layout: NCHW (n, c, h, w), row-major, contiguous float32.
+//
+// Example:
+//   const x = new dm.Tensor(1, 3, 224, 224);
+//   const y = new dm.Tensor(1, 64, 112, 112);
+//   dm.op.conv2dSame(x, y, weights, bias, 64, 3, 2);
+//   dm.op.relu(y);
+//   x.free(); y.free();
+
+// DM_Tensor struct layout: int n, c, h, w + float* data
+const DM_TENSOR_SIZE = 4 * 4 + ref.sizeof.pointer; // 4 ints + 1 pointer
+
+function _tensorPtr(buf) { return buf; }
+
+/** Allocate a DM_Tensor struct in a Buffer and call dm_tensor_alloc. */
+class Tensor {
+  constructor(n, c, h, w) {
+    // Allocate struct: 4 ints (n,c,h,w) + pointer (data)
+    this._buf = Buffer.alloc(DM_TENSOR_SIZE);
+    const s = lib.dm_tensor_alloc(this._buf, n, c, h, w);
+    check(s, 'dm.Tensor');
+    this._freed = false;
+  }
+
+  free() {
+    if (!this._freed) { lib.dm_tensor_free(this._buf); this._freed = true; }
+  }
+
+  get n() { return this._buf.readInt32LE(0); }
+  get c() { return this._buf.readInt32LE(4); }
+  get h() { return this._buf.readInt32LE(8); }
+  get w() { return this._buf.readInt32LE(12); }
+  get count() { return lib.dm_tensor_count(this._buf); }
+
+  fill(v)              { lib.dm_tensor_fill(this._buf, v); }
+  get_(n, c, y, x)     { return lib.dm_tensor_get(this._buf, n, c, y, x); }
+  set_(n, c, y, x, v)  { lib.dm_tensor_set(this._buf, n, c, y, x, v); }
+}
+
+/** Convert a JS number[] to a Float32Array Buffer. */
+function _floatBuf(arr) {
+  const buf = Buffer.alloc(arr.length * 4);
+  for (let i = 0; i < arr.length; i++) buf.writeFloatLE(arr[i], i * 4);
+  return buf;
+}
+
+/** Convert a JS number[] (ints) to an Int32Array Buffer. */
+function _intBuf(arr) {
+  const buf = Buffer.alloc(arr.length * 4);
+  for (let i = 0; i < arr.length; i++) buf.writeInt32LE(arr[i], i * 4);
+  return buf;
+}
+
+/** Read n floats from a Buffer back into a plain array. */
+function _readFloats(buf, n) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(buf.readFloatLE(i * 4));
+  return out;
+}
+
+/** Read n ints from a Buffer back into a plain array. */
+function _readInts(buf, n) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(buf.readInt32LE(i * 4));
+  return out;
+}
+
+const op = {
+  // ── Convolutions ────────────────────────────────────────────────────────────
+  conv2dSame(in_, out, w, b, outC, kernel, stride) {
+    check(lib.dm_op_conv2d_same(in_._buf, out._buf, _floatBuf(w), _floatBuf(b),
+                                outC, kernel, stride), 'dm.op.conv2dSame');
+  },
+  depthwiseConv(in_, out, w, b, kernel, stride) {
+    check(lib.dm_op_depthwise_conv(in_._buf, out._buf, _floatBuf(w), _floatBuf(b),
+                                   kernel, stride), 'dm.op.depthwiseConv');
+  },
+  pointwiseConv(in_, out, w, b, outC) {
+    check(lib.dm_op_pointwise_conv(in_._buf, out._buf, _floatBuf(w), _floatBuf(b),
+                                   outC), 'dm.op.pointwiseConv');
+  },
+
+  // ── Linear ──────────────────────────────────────────────────────────────────
+  linear(in_, out, w, b, outC) {
+    check(lib.dm_op_linear(in_._buf, out._buf, _floatBuf(w), _floatBuf(b),
+                           outC), 'dm.op.linear');
+  },
+
+  // ── Pooling ──────────────────────────────────────────────────────────────────
+  globalAvgPool(in_, out) {
+    check(lib.dm_op_global_avg_pool(in_._buf, out._buf), 'dm.op.globalAvgPool');
+  },
+  maxPool2dSame(in_, out, kernel, stride) {
+    check(lib.dm_op_max_pool2d_same(in_._buf, out._buf, kernel, stride),
+          'dm.op.maxPool2dSame');
+  },
+
+  // ── Normalisation ────────────────────────────────────────────────────────────
+  batchNorm(t, gamma, beta, mean, variance, eps = 1e-5) {
+    check(lib.dm_op_batch_norm(t._buf, _floatBuf(gamma), _floatBuf(beta),
+                               _floatBuf(mean), _floatBuf(variance), eps),
+          'dm.op.batchNorm');
+  },
+  /** x: Float32 array of length seqLen×dModel, mutated in-place. Returns updated x. */
+  layerNorm(x, seqLen, dModel, gamma, beta, eps = 1e-5) {
+    const xBuf = _floatBuf(x);
+    check(lib.dm_op_layer_norm(xBuf, seqLen, dModel,
+                               _floatBuf(gamma), _floatBuf(beta), eps),
+          'dm.op.layerNorm');
+    return _readFloats(xBuf, x.length);
+  },
+
+  // ── Elementwise ───────────────────────────────────────────────────────────────
+  add(out, in_) {
+    check(lib.dm_op_tensor_add(out._buf, in_._buf), 'dm.op.add');
+  },
+
+  // ── Activations ───────────────────────────────────────────────────────────────
+  relu   (t) { lib.dm_op_relu(t._buf);    },
+  relu6  (t) { lib.dm_op_relu6(t._buf);   },
+  tanh   (t) { lib.dm_op_tanh(t._buf);    },
+  sigmoid(t) { lib.dm_op_sigmoid(t._buf); },
+  /** Applies GELU in-place to a JS number[]. Returns updated array. */
+  gelu(x) {
+    const xBuf = _floatBuf(x);
+    lib.dm_op_gelu(xBuf, x.length);
+    return _readFloats(xBuf, x.length);
+  },
+
+  // ── Softmax ───────────────────────────────────────────────────────────────────
+  softmax(t)               { lib.dm_op_softmax(t._buf); },
+  /** Applies softmax row-wise to a flat [rows × cols] array. Returns updated array. */
+  softmaxRows(x, rows, cols) {
+    const xBuf = _floatBuf(x);
+    lib.dm_op_softmax_rows(xBuf, rows, cols);
+    return _readFloats(xBuf, x.length);
+  },
+
+  // ── Matrix multiplication ──────────────────────────────────────────────────────
+  /** C = A × Bᵀ  (A[M×K], B[N×K] → C[M×N]) */
+  matmulNT(A, B, M, N, K) {
+    const C = Buffer.alloc(M * N * 4);
+    lib.dm_op_matmul_nt(_floatBuf(A), _floatBuf(B), C, M, N, K);
+    return _readFloats(C, M * N);
+  },
+  /** C = A × B  (A[M×K], B[K×N] → C[M×N]) */
+  matmulNN(A, B, M, K, N) {
+    const C = Buffer.alloc(M * N * 4);
+    lib.dm_op_matmul_nn(_floatBuf(A), _floatBuf(B), C, M, K, N);
+    return _readFloats(C, M * N);
+  },
+
+  // ── Backward passes ───────────────────────────────────────────────────────────
+  linearBackward(in_, gradOut, gradIn, gradW, gradB, w, outC) {
+    const gw = _floatBuf(gradW), gb = _floatBuf(gradB);
+    check(lib.dm_op_linear_backward(in_._buf, gradOut._buf, gradIn._buf,
+                                    gw, gb, _floatBuf(w), outC),
+          'dm.op.linearBackward');
+    return { gradW: _readFloats(gw, gradW.length), gradB: _readFloats(gb, gradB.length) };
+  },
+  reluBackward(in_, gradOut, gradIn)       { lib.dm_op_relu_backward(in_._buf, gradOut._buf, gradIn._buf); },
+  tanhBackward(out_, gradOut, gradIn)      { lib.dm_op_tanh_backward(out_._buf, gradOut._buf, gradIn._buf); },
+
+  // ── Maxout ────────────────────────────────────────────────────────────────────
+  maxout(in_, out, k) {
+    const argmax = Buffer.alloc(in_.n * (in_.c / k) * 4);
+    check(lib.dm_op_maxout(in_._buf, out._buf, k, argmax), 'dm.op.maxout');
+    return _readInts(argmax, in_.n * (in_.c / k));
+  },
+  maxoutBackward(gradOut, gradIn, k, argmax) {
+    check(lib.dm_op_maxout_backward(gradOut._buf, gradIn._buf, k, _intBuf(argmax)),
+          'dm.op.maxoutBackward');
+  },
+
+  // ── Dropout ───────────────────────────────────────────────────────────────────
+  dropout(in_, out, dropProb) {
+    const mask = Buffer.alloc(in_.count * 4);
+    lib.dm_op_dropout(in_._buf, out._buf, dropProb, mask);
+    return _readInts(mask, in_.count);
+  },
+  dropoutBackward(gradOut, gradIn, dropProb, mask) {
+    lib.dm_op_dropout_backward(gradOut._buf, gradIn._buf, dropProb, _intBuf(mask));
+  },
+
+  // ── Optimisers ────────────────────────────────────────────────────────────────
+  adamStep(param, grad, m, v, { lr = 1e-3, beta1 = 0.9, beta2 = 0.999,
+                                 eps = 1e-8, weightDecay = 0, t = 1 } = {}) {
+    const pBuf = _floatBuf(param), gBuf = _floatBuf(grad);
+    const mBuf = _floatBuf(m), vBuf = _floatBuf(v);
+    lib.dm_op_adam_step(pBuf, gBuf, mBuf, vBuf, param.length,
+                        lr, beta1, beta2, eps, weightDecay, t);
+    return { param: _readFloats(pBuf, param.length),
+             m:     _readFloats(mBuf, m.length),
+             v:     _readFloats(vBuf, v.length) };
+  },
+  adagradStep(param, grad, gSum, { lr = 1e-2, eps = 1e-8, weightDecay = 0 } = {}) {
+    const pBuf = _floatBuf(param), gBuf = _floatBuf(grad), gsBuf = _floatBuf(gSum);
+    lib.dm_op_adagrad_step(pBuf, gBuf, gsBuf, param.length, lr, eps, weightDecay);
+    return { param: _readFloats(pBuf, param.length),
+             gSum:  _readFloats(gsBuf, gSum.length) };
+  },
+  sgdMomentumStep(param, grad, velocity,
+                  { lr = 1e-2, momentum = 0.9, weightDecay = 0, nesterov = false } = {}) {
+    const pBuf = _floatBuf(param), gBuf = _floatBuf(grad), vBuf = _floatBuf(velocity);
+    lib.dm_op_sgd_momentum_step(pBuf, gBuf, vBuf, param.length,
+                                lr, momentum, weightDecay, nesterov ? 1 : 0);
+    return { param:    _readFloats(pBuf, param.length),
+             velocity: _readFloats(vBuf, velocity.length) };
+  },
 };

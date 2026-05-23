@@ -118,7 +118,7 @@ extern int dm_image_load_ppm_rgb_f32  (const char *path, DM_Tensor *out);
 extern int dm_image_resize_nearest    (const DM_Tensor *in, DM_Tensor *out, int h, int w);
 extern int dm_image_patchify          (const DM_Tensor *in, DM_Tensor *out, int ph, int pw);
 
-/* §8 Tensor neural-network ops (internal names differ from dm_op_*) */
+/* §8 Engine — internal dm_engine symbols (dm_op_* wrappers below) */
 extern int  dm_conv2d_same          (const DM_Tensor *in, DM_Tensor *out,
                                      const float *w, const float *b,
                                      int out_c, int kernel, int stride);
@@ -130,8 +130,58 @@ extern int  dm_pointwise_conv2d     (const DM_Tensor *in, DM_Tensor *out,
 extern int  dm_linear               (const DM_Tensor *in, DM_Tensor *out,
                                      const float *w, const float *b, int out_c);
 extern int  dm_global_avg_pool      (const DM_Tensor *in, DM_Tensor *out);
+extern int  dm_max_pool2d_same      (const DM_Tensor *in, DM_Tensor *out,
+                                     int kernel, int stride);
+extern int  dm_tensor_add           (DM_Tensor *out, const DM_Tensor *in);
+extern int  dm_batch_norm           (DM_Tensor *t,
+                                     const float *gamma, const float *beta,
+                                     const float *mean,  const float *var, float eps);
+extern int  dm_layer_norm_seq       (float *x, int seq_len, int d_model,
+                                     const float *gamma, const float *beta, float eps);
+extern void dm_relu                 (DM_Tensor *t);
 extern void dm_relu6                (DM_Tensor *t);
+extern void dm_tanh_inplace         (DM_Tensor *t);
+extern void dm_sigmoid_inplace      (DM_Tensor *t);
+extern void dm_gelu_inplace         (float *x, int n);
 extern void dm_softmax              (DM_Tensor *t);
+extern void dm_softmax_rows         (float *x, int rows, int cols);
+extern void dm_matmul_nt            (const float *A, const float *B, float *C,
+                                     int M, int N, int K);
+extern void dm_matmul_nn            (const float *A, const float *B, float *C,
+                                     int M, int K, int N);
+/* Backward passes */
+extern int  dm_linear_backward      (const DM_Tensor *in,
+                                     const DM_Tensor *grad_out,
+                                     DM_Tensor *grad_in,
+                                     float *grad_w, float *grad_b,
+                                     const float *w, int out_c);
+extern void dm_relu_backward        (const DM_Tensor *in,
+                                     const DM_Tensor *grad_out,
+                                     DM_Tensor *grad_in);
+extern void dm_tanh_backward        (const DM_Tensor *out,
+                                     const DM_Tensor *grad_out,
+                                     DM_Tensor *grad_in);
+/* Maxout */
+extern int  dm_maxout               (const DM_Tensor *in, DM_Tensor *out,
+                                     int k, int *argmax);
+extern int  dm_maxout_backward      (const DM_Tensor *grad_out,
+                                     DM_Tensor *grad_in,
+                                     int k, const int *argmax);
+/* Dropout */
+extern void dm_dropout              (const DM_Tensor *in, DM_Tensor *out,
+                                     float drop_prob, int *mask);
+extern void dm_dropout_backward     (const DM_Tensor *grad_out,
+                                     DM_Tensor *grad_in,
+                                     float drop_prob, const int *mask);
+/* Optimisers */
+extern void dm_adam_step            (float *param, float *grad, float *m, float *v,
+                                     int n, float lr, float beta1, float beta2,
+                                     float eps, float weight_decay, int t);
+extern void dm_adagrad_step         (float *param, float *grad, float *g_sum,
+                                     int n, float lr, float eps, float weight_decay);
+extern void dm_sgd_momentum_step    (float *param, float *grad, float *velocity,
+                                     int n, float lr, float momentum,
+                                     float weight_decay, int nesterov);
 
 /* §9 Benchmark renamed functions */
 extern void dm_bench_record_results (size_t num_itemsets, size_t total_items);
@@ -1565,12 +1615,17 @@ DM_API DM_Status dm_image_patchify_raw(const float *in_nhwc,
 }
 
 /* =========================================================================
- * § 8  Tensor neural-network ops
+ * § 8  Engine — dm_engine public API shims
  *
- * dm_tensor_alloc/free/fill/get/set/count are exported by tensor.c directly.
- * Only the renamed dm_op_* wrappers are defined here.
+ * dm_tensor_alloc/free/fill/get/set/count are exported by dm_engine.c directly
+ * under the same public names, so no wrappers are needed for them.
+ *
+ * The dm_op_* public names below are thin wrappers around the internal
+ * dm_engine symbols.  Users compose custom models from these primitives
+ * the same way they would compose TensorFlow layers.
  * ========================================================================= */
 
+/* ── Convolutions ────────────────────────────────────────────────────────── */
 DM_API DM_Status dm_op_conv2d_same(const DM_Tensor *in, DM_Tensor *out,
                                     const float *w, const float *b,
                                     int out_c, int kernel, int stride)
@@ -1594,33 +1649,118 @@ DM_API DM_Status dm_op_pointwise_conv(const DM_Tensor *in, DM_Tensor *out,
            ? DM_OK : DM_ERR_GENERIC;
 }
 
+/* ── Linear ──────────────────────────────────────────────────────────────── */
 DM_API DM_Status dm_op_linear(const DM_Tensor *in, DM_Tensor *out,
                                const float *w, const float *b, int out_c)
 {
     return dm_linear(in, out, w, b, out_c) == 0 ? DM_OK : DM_ERR_GENERIC;
 }
 
+/* ── Pooling ─────────────────────────────────────────────────────────────── */
 DM_API DM_Status dm_op_global_avg_pool(const DM_Tensor *in, DM_Tensor *out) {
     return dm_global_avg_pool(in, out) == 0 ? DM_OK : DM_ERR_GENERIC;
 }
 
-DM_API void dm_op_relu6  (DM_Tensor *t) { dm_relu6(t);   }
-DM_API void dm_op_softmax(DM_Tensor *t) { dm_softmax(t); }
-
-DM_API void dm_op_relu(DM_Tensor *t) {
-    dm_relu(t);
+DM_API DM_Status dm_op_max_pool2d_same(const DM_Tensor *in, DM_Tensor *out,
+                                        int kernel, int stride) {
+    return dm_max_pool2d_same(in, out, kernel, stride) == 0 ? DM_OK : DM_ERR_GENERIC;
 }
 
+/* ── Normalisation ───────────────────────────────────────────────────────── */
+DM_API DM_Status dm_op_batch_norm(DM_Tensor *t,
+                                   const float *gamma, const float *beta,
+                                   const float *mean,  const float *var, float eps) {
+    return dm_batch_norm(t, gamma, beta, mean, var, eps) == 0 ? DM_OK : DM_ERR_GENERIC;
+}
+
+DM_API DM_Status dm_op_layer_norm(float *x, int seq_len, int d_model,
+                                   const float *gamma, const float *beta, float eps) {
+    return dm_layer_norm_seq(x, seq_len, d_model, gamma, beta, eps) == 0
+           ? DM_OK : DM_ERR_GENERIC;
+}
+
+/* ── Elementwise ─────────────────────────────────────────────────────────── */
 DM_API DM_Status dm_op_tensor_add(DM_Tensor *out, const DM_Tensor *in) {
     return dm_tensor_add(out, in) == 0 ? DM_OK : DM_ERR_GENERIC;
 }
 
-DM_API DM_Status dm_op_max_pool2d_same(const DM_Tensor *in, DM_Tensor *out, int kernel, int stride) {
-    return dm_max_pool2d_same(in, out, kernel, stride) == 0 ? DM_OK : DM_ERR_GENERIC;
+/* ── Activations ─────────────────────────────────────────────────────────── */
+DM_API void dm_op_relu    (DM_Tensor *t) { dm_relu(t);            }
+DM_API void dm_op_relu6   (DM_Tensor *t) { dm_relu6(t);           }
+DM_API void dm_op_tanh    (DM_Tensor *t) { dm_tanh_inplace(t);    }
+DM_API void dm_op_sigmoid (DM_Tensor *t) { dm_sigmoid_inplace(t); }
+DM_API void dm_op_gelu    (float *x, int n) { dm_gelu_inplace(x, n); }
+
+/* ── Softmax ─────────────────────────────────────────────────────────────── */
+DM_API void dm_op_softmax      (DM_Tensor *t)              { dm_softmax(t);            }
+DM_API void dm_op_softmax_rows (float *x, int rows, int cols) { dm_softmax_rows(x, rows, cols); }
+
+/* ── Matrix multiplication ───────────────────────────────────────────────── */
+DM_API void dm_op_matmul_nt(const float *A, const float *B, float *C,
+                              int M, int N, int K) {
+    dm_matmul_nt(A, B, C, M, N, K);
+}
+DM_API void dm_op_matmul_nn(const float *A, const float *B, float *C,
+                              int M, int K, int N) {
+    dm_matmul_nn(A, B, C, M, K, N);
 }
 
-DM_API DM_Status dm_op_batch_norm(DM_Tensor *t, const float *gamma, const float *beta, const float *mean, const float *var, float eps) {
-    return dm_batch_norm(t, gamma, beta, mean, var, eps) == 0 ? DM_OK : DM_ERR_GENERIC;
+/* ── Backward passes ─────────────────────────────────────────────────────── */
+DM_API DM_Status dm_op_linear_backward(const DM_Tensor *in,
+                                        const DM_Tensor *grad_out,
+                                        DM_Tensor *grad_in,
+                                        float *grad_w, float *grad_b,
+                                        const float *w, int out_c) {
+    return dm_linear_backward(in, grad_out, grad_in, grad_w, grad_b, w, out_c) == 0
+           ? DM_OK : DM_ERR_GENERIC;
+}
+DM_API void dm_op_relu_backward(const DM_Tensor *in, const DM_Tensor *grad_out,
+                                 DM_Tensor *grad_in) {
+    dm_relu_backward(in, grad_out, grad_in);
+}
+DM_API void dm_op_tanh_backward(const DM_Tensor *out, const DM_Tensor *grad_out,
+                                 DM_Tensor *grad_in) {
+    dm_tanh_backward(out, grad_out, grad_in);
+}
+
+/* ── Maxout ──────────────────────────────────────────────────────────────── */
+DM_API DM_Status dm_op_maxout(const DM_Tensor *in, DM_Tensor *out,
+                               int k, int *argmax) {
+    return dm_maxout(in, out, k, argmax) == 0 ? DM_OK : DM_ERR_GENERIC;
+}
+DM_API DM_Status dm_op_maxout_backward(const DM_Tensor *grad_out,
+                                        DM_Tensor *grad_in,
+                                        int k, const int *argmax) {
+    return dm_maxout_backward(grad_out, grad_in, k, argmax) == 0
+           ? DM_OK : DM_ERR_GENERIC;
+}
+
+/* ── Dropout ─────────────────────────────────────────────────────────────── */
+DM_API void dm_op_dropout(const DM_Tensor *in, DM_Tensor *out,
+                           float drop_prob, int *mask) {
+    dm_dropout(in, out, drop_prob, mask);
+}
+DM_API void dm_op_dropout_backward(const DM_Tensor *grad_out,
+                                    DM_Tensor *grad_in,
+                                    float drop_prob, const int *mask) {
+    dm_dropout_backward(grad_out, grad_in, drop_prob, mask);
+}
+
+/* ── Optimisers ──────────────────────────────────────────────────────────── */
+DM_API void dm_op_adam_step(float *param, float *grad, float *m, float *v,
+                             int n, float lr, float beta1, float beta2,
+                             float eps, float weight_decay, int t) {
+    dm_adam_step(param, grad, m, v, n, lr, beta1, beta2, eps, weight_decay, t);
+}
+DM_API void dm_op_adagrad_step(float *param, float *grad, float *g_sum,
+                                int n, float lr, float eps, float weight_decay) {
+    dm_adagrad_step(param, grad, g_sum, n, lr, eps, weight_decay);
+}
+DM_API void dm_op_sgd_momentum_step(float *param, float *grad, float *velocity,
+                                     int n, float lr, float momentum,
+                                     float weight_decay, int nesterov) {
+    dm_sgd_momentum_step(param, grad, velocity, n, lr, momentum,
+                         weight_decay, nesterov);
 }
 
 extern int dm_resnet18_forward(const DM_Tensor *input, DM_Tensor *logits, int classes, unsigned int seed);

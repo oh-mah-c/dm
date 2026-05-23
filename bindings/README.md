@@ -229,6 +229,85 @@ try (DM.Tokenizer tok = new DM.Tokenizer("bpe")) {
 
 ---
 
+## dm_engine — Building custom models
+
+`dm_engine` is the neural-compute core of dm.  Every op dispatches through
+the **TensorFlow Eager C API** (`TFE_*`), so XLA, cuDNN, and oneDNN
+acceleration is available automatically — no extra configuration.
+
+Users can compose custom architectures from these primitives exactly the same
+way they would compose TensorFlow layers:
+
+```python
+# Python
+import dm
+
+x = dm.Tensor(1, 3, 224, 224)   # NCHW batch=1, RGB 224×224
+y = dm.Tensor(1, 64, 112, 112)
+dm.op.conv2d_same(x, y, w, b, 64, 3, 2)
+dm.op.relu(y)
+x.free(); y.free()   # or use as context manager
+```
+
+```cpp
+// C++
+dm::Tensor x(1, 3, 224, 224), y(1, 64, 112, 112);
+dm::op::conv2d_same(x, y, w, b, 64, 3, 2);
+dm::op::relu(y);
+```
+
+```go
+// Go
+x, _ := dm.NewTensor(1, 3, 224, 224)
+y, _ := dm.NewTensor(1, 64, 112, 112)
+defer x.Free(); defer y.Free()
+dm.OpConv2dSame(x, y, w, b, 64, 3, 2)
+dm.OpRelu(y)
+```
+
+```js
+// JavaScript
+const x = new dm.Tensor(1, 3, 224, 224);
+const y = new dm.Tensor(1, 64, 112, 112);
+dm.op.conv2dSame(x, y, w, b, 64, 3, 2);
+dm.op.relu(y);
+x.free(); y.free();
+```
+
+```java
+// Java
+try (DM.Tensor x = new DM.Tensor(1, 3, 224, 224);
+     DM.Tensor y = new DM.Tensor(1, 64, 112, 112)) {
+    DM.Op.conv2dSame(x, y, w, b, 64, 3, 2);
+    DM.Op.relu(y);
+}
+```
+
+### Available primitives
+
+| Category | Operations |
+|----------|------------|
+| **Tensor** | `alloc`, `free`, `fill`, `get`, `set`, `count` |
+| **Convolutions** | `conv2d_same` (OIHW), `depthwise_conv` ([c][k][k]), `pointwise_conv` (1×1) |
+| **Linear** | `linear` — [n,in,1,1] → [n,out,1,1] |
+| **Pooling** | `global_avg_pool`, `max_pool2d_same` |
+| **Normalisation** | `batch_norm` (TFE FusedBatchNorm), `layer_norm` (seq models) |
+| **Elementwise** | `add` (residual connections) |
+| **Activations** | `relu`, `relu6`, `tanh`, `sigmoid`, `gelu` |
+| **Softmax** | `softmax` (tensor), `softmax_rows` (raw buffer) |
+| **MatMul** | `matmul_nt` (A×Bᵀ), `matmul_nn` (A×B) |
+| **Backward** | `linear_backward`, `relu_backward`, `tanh_backward` |
+| **Maxout** | `maxout` + `maxout_backward` |
+| **Dropout** | `dropout` + `dropout_backward` |
+| **Optimisers** | `adam_step`, `adagrad_step`, `sgd_momentum_step` |
+
+All ops dispatch through `TFE_*` (backed by TF C++ runtime) except the
+optimiser steps and backward passes, which are pure-C (no TFE needed).
+
+**Tensor layout:** NCHW (`n, c, h, w`), row-major, contiguous `float32`.
+
+---
+
 ## API surface covered by all bindings
 
 | Section | Feature |
@@ -240,7 +319,7 @@ try (DM.Tokenizer tok = new DM.Tokenizer("bpe")) {
 | § 5 | `Vision` — MobileNetV4-Tiny train/eval/predict + **TinyViT-5M/11M/21M** |
 | § 6 | `LM` — **Transformer** (Vaswani et al. 2017) enc-dec, TinyTransformer, TinyStories, and **BERT encoder inference** (`model_type="bert"`; space-separated token IDs in, pooled `[CLS]` values out). BERT follows Devlin, Chang, Lee, and Toutanova, "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding," NAACL-HLT 2019, ACL Anthology N19-1423. |
 | § 7 | Image load/resize/patchify (via C API directly) |
-| § 8 | `Tensor` + neural ops (C++ wrapper; raw C elsewhere) |
+| § 8 | **Engine** — `Tensor` + full neural-op suite: convolutions, linear, pooling, batch/layer norm, activations (relu/relu6/tanh/sigmoid/gelu), softmax, matmul, backward passes, maxout, dropout, Adam/Adagrad/SGD optimisers |
 | § 9 | `Benchmark` — phase timing, report, print |
 | § 10 | `BitSet` — set/clear/get/and/or/not/popcount |
 | § 11 | `DataGen` — MEDM synthetic, Textbook corpus |

@@ -588,3 +588,276 @@ func splitLines(s string) []string {
 	}
 	return out
 }
+
+// ── § 8  Engine — dm_engine ops (TFE backend, NCHW float32) ──────────────────
+//
+// Users compose custom models from these primitives the same way they would
+// compose TensorFlow layers — everything dispatches through TFE so XLA,
+// cuDNN, and oneDNN acceleration is automatic.
+//
+// Layout conventions:
+//   Tensors      — NCHW (n, c, h, w), row-major, contiguous float32
+//   Conv weights — OIHW [out_c][in_c][ky][kx]
+//   Linear weights — [out][in]
+//
+// Quick example:
+//   x := dm.NewTensor(1, 3, 224, 224)
+//   y := dm.NewTensor(1, 64, 112, 112)
+//   defer x.Free(); defer y.Free()
+//   dm.OpConv2dSame(x, y, weights, bias, 64, 3, 2)
+//   dm.OpRelu(y)
+
+// Tensor wraps a C DM_Tensor (NCHW float32, owned).
+type Tensor struct {
+	t C.DM_Tensor
+}
+
+// NewTensor allocates a new NCHW float32 tensor.
+func NewTensor(n, ch, h, w int) (*Tensor, error) {
+	t := &Tensor{}
+	s := C.dm_tensor_alloc(&t.t, C.int(n), C.int(ch), C.int(h), C.int(w))
+	if err := statusErr(s, "dm.NewTensor"); err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+// Free releases the native buffer.
+func (t *Tensor) Free() { C.dm_tensor_free(&t.t) }
+
+func (t *Tensor) N() int     { return int(t.t.n) }
+func (t *Tensor) C() int     { return int(t.t.c) }
+func (t *Tensor) H() int     { return int(t.t.h) }
+func (t *Tensor) W() int     { return int(t.t.w) }
+func (t *Tensor) Count() int { return int(C.dm_tensor_count(&t.t)) }
+
+// Fill sets every element to v.
+func (t *Tensor) Fill(v float32) { C.dm_tensor_fill(&t.t, C.float(v)) }
+
+// Get returns element at (n, c, y, x).
+func (t *Tensor) Get(n, c, y, x int) float32 {
+	return float32(C.dm_tensor_get(&t.t, C.int(n), C.int(c), C.int(y), C.int(x)))
+}
+
+// Set writes v at (n, c, y, x).
+func (t *Tensor) Set(n, c, y, x int, v float32) {
+	C.dm_tensor_set(&t.t, C.int(n), C.int(c), C.int(y), C.int(x), C.float(v))
+}
+
+// ToSlice copies the tensor data into a new []float32.
+func (t *Tensor) ToSlice() []float32 {
+	n := t.Count()
+	out := make([]float32, n)
+	for i := range out {
+		out[i] = float32(*(*C.float)(unsafe.Pointer(
+			uintptr(unsafe.Pointer(t.t.data)) + uintptr(i)*unsafe.Sizeof(C.float(0)))))
+	}
+	return out
+}
+
+func floatSlice(v []float32) *C.float {
+	if len(v) == 0 {
+		return nil
+	}
+	return (*C.float)(unsafe.Pointer(&v[0]))
+}
+
+func intSlice(v []int32) *C.int {
+	if len(v) == 0 {
+		return nil
+	}
+	return (*C.int)(unsafe.Pointer(&v[0]))
+}
+
+// ── Convolutions ──────────────────────────────────────────────────────────────
+
+// OpConv2dSame runs a standard conv2d with SAME padding. w: OIHW layout.
+func OpConv2dSame(in, out *Tensor, w, b []float32, outC, kernel, stride int) error {
+	return statusErr(
+		C.dm_op_conv2d_same(&in.t, &out.t, floatSlice(w), floatSlice(b),
+			C.int(outC), C.int(kernel), C.int(stride)),
+		"dm.OpConv2dSame")
+}
+
+// OpDepthwiseConv runs a depthwise separable conv with SAME padding. w: [c][ky][kx].
+func OpDepthwiseConv(in, out *Tensor, w, b []float32, kernel, stride int) error {
+	return statusErr(
+		C.dm_op_depthwise_conv(&in.t, &out.t, floatSlice(w), floatSlice(b),
+			C.int(kernel), C.int(stride)),
+		"dm.OpDepthwiseConv")
+}
+
+// OpPointwiseConv runs a 1×1 conv. w: [out_c][in_c].
+func OpPointwiseConv(in, out *Tensor, w, b []float32, outC int) error {
+	return statusErr(
+		C.dm_op_pointwise_conv(&in.t, &out.t, floatSlice(w), floatSlice(b), C.int(outC)),
+		"dm.OpPointwiseConv")
+}
+
+// ── Linear ────────────────────────────────────────────────────────────────────
+
+// OpLinear is a fully-connected layer. in: [n,in_c,1,1] → out: [n,out_c,1,1].
+func OpLinear(in, out *Tensor, w, b []float32, outC int) error {
+	return statusErr(
+		C.dm_op_linear(&in.t, &out.t, floatSlice(w), floatSlice(b), C.int(outC)),
+		"dm.OpLinear")
+}
+
+// ── Pooling ───────────────────────────────────────────────────────────────────
+
+// OpGlobalAvgPool computes global average pooling over H×W.
+func OpGlobalAvgPool(in, out *Tensor) error {
+	return statusErr(C.dm_op_global_avg_pool(&in.t, &out.t), "dm.OpGlobalAvgPool")
+}
+
+// OpMaxPool2dSame computes max pooling with SAME padding.
+func OpMaxPool2dSame(in, out *Tensor, kernel, stride int) error {
+	return statusErr(
+		C.dm_op_max_pool2d_same(&in.t, &out.t, C.int(kernel), C.int(stride)),
+		"dm.OpMaxPool2dSame")
+}
+
+// ── Normalisation ─────────────────────────────────────────────────────────────
+
+// OpBatchNorm applies batch normalisation in-place.
+func OpBatchNorm(t *Tensor, gamma, beta, mean, variance []float32, eps float32) error {
+	return statusErr(
+		C.dm_op_batch_norm(&t.t,
+			floatSlice(gamma), floatSlice(beta),
+			floatSlice(mean), floatSlice(variance), C.float(eps)),
+		"dm.OpBatchNorm")
+}
+
+// OpLayerNorm applies layer normalisation in-place on x [seqLen × dModel].
+func OpLayerNorm(x []float32, seqLen, dModel int,
+	gamma, beta []float32, eps float32) error {
+	return statusErr(
+		C.dm_op_layer_norm(floatSlice(x), C.int(seqLen), C.int(dModel),
+			floatSlice(gamma), floatSlice(beta), C.float(eps)),
+		"dm.OpLayerNorm")
+}
+
+// ── Elementwise ───────────────────────────────────────────────────────────────
+
+// OpAdd computes out += in element-wise.
+func OpAdd(out, in *Tensor) error {
+	return statusErr(C.dm_op_tensor_add(&out.t, &in.t), "dm.OpAdd")
+}
+
+// ── Activations ───────────────────────────────────────────────────────────────
+
+func OpRelu   (t *Tensor) { C.dm_op_relu(&t.t)    }
+func OpRelu6  (t *Tensor) { C.dm_op_relu6(&t.t)   }
+func OpTanh   (t *Tensor) { C.dm_op_tanh(&t.t)    }
+func OpSigmoid(t *Tensor) { C.dm_op_sigmoid(&t.t) }
+
+// OpGelu applies GELU in-place to the raw slice.
+func OpGelu(x []float32) { C.dm_op_gelu(floatSlice(x), C.int(len(x))) }
+
+// ── Softmax ───────────────────────────────────────────────────────────────────
+
+// OpSoftmax applies softmax over the channel dim of an [n,c,1,1] tensor.
+func OpSoftmax(t *Tensor) { C.dm_op_softmax(&t.t) }
+
+// OpSoftmaxRows applies softmax row-wise over a [rows × cols] raw slice.
+func OpSoftmaxRows(x []float32, rows, cols int) {
+	C.dm_op_softmax_rows(floatSlice(x), C.int(rows), C.int(cols))
+}
+
+// ── Matrix multiplication ─────────────────────────────────────────────────────
+
+// OpMatmulNT computes C = A × Bᵀ  (A[M×K], B[N×K] → C[M×N]).
+func OpMatmulNT(A, B []float32, M, N, K int) []float32 {
+	C_ := make([]float32, M*N)
+	C.dm_op_matmul_nt(floatSlice(A), floatSlice(B), floatSlice(C_),
+		C.int(M), C.int(N), C.int(K))
+	return C_
+}
+
+// OpMatmulNN computes C = A × B  (A[M×K], B[K×N] → C[M×N]).
+func OpMatmulNN(A, B []float32, M, K, N int) []float32 {
+	C_ := make([]float32, M*N)
+	C.dm_op_matmul_nn(floatSlice(A), floatSlice(B), floatSlice(C_),
+		C.int(M), C.int(K), C.int(N))
+	return C_
+}
+
+// ── Backward passes ───────────────────────────────────────────────────────────
+
+func OpLinearBackward(in, gradOut, gradIn *Tensor,
+	gradW, gradB, w []float32, outC int) error {
+	return statusErr(
+		C.dm_op_linear_backward(&in.t, &gradOut.t, &gradIn.t,
+			floatSlice(gradW), floatSlice(gradB), floatSlice(w), C.int(outC)),
+		"dm.OpLinearBackward")
+}
+
+func OpReluBackward(in, gradOut, gradIn *Tensor) {
+	C.dm_op_relu_backward(&in.t, &gradOut.t, &gradIn.t)
+}
+
+func OpTanhBackward(out_, gradOut, gradIn *Tensor) {
+	C.dm_op_tanh_backward(&out_.t, &gradOut.t, &gradIn.t)
+}
+
+// ── Maxout ────────────────────────────────────────────────────────────────────
+
+// OpMaxout applies maxout pooling (groups of k) and returns the argmax buffer.
+func OpMaxout(in, out *Tensor, k int) ([]int32, error) {
+	argmax := make([]int32, in.N()*in.C()/k)
+	err := statusErr(
+		C.dm_op_maxout(&in.t, &out.t, C.int(k), intSlice(argmax)),
+		"dm.OpMaxout")
+	return argmax, err
+}
+
+func OpMaxoutBackward(gradOut, gradIn *Tensor, k int, argmax []int32) error {
+	return statusErr(
+		C.dm_op_maxout_backward(&gradOut.t, &gradIn.t, C.int(k), intSlice(argmax)),
+		"dm.OpMaxoutBackward")
+}
+
+// ── Dropout ───────────────────────────────────────────────────────────────────
+
+// OpDropout applies inverted dropout and returns the mask buffer.
+func OpDropout(in, out *Tensor, dropProb float32) []int32 {
+	mask := make([]int32, in.Count())
+	C.dm_op_dropout(&in.t, &out.t, C.float(dropProb), intSlice(mask))
+	return mask
+}
+
+func OpDropoutBackward(gradOut, gradIn *Tensor, dropProb float32, mask []int32) {
+	C.dm_op_dropout_backward(&gradOut.t, &gradIn.t, C.float(dropProb), intSlice(mask))
+}
+
+// ── Optimisers ────────────────────────────────────────────────────────────────
+
+// OpAdamStep performs an in-place Adam update. t is the 1-indexed step number.
+func OpAdamStep(param, grad, m, v []float32,
+	lr, beta1, beta2, eps, weightDecay float32, t int) {
+	C.dm_op_adam_step(
+		floatSlice(param), floatSlice(grad), floatSlice(m), floatSlice(v),
+		C.int(len(param)), C.float(lr),
+		C.float(beta1), C.float(beta2), C.float(eps),
+		C.float(weightDecay), C.int(t))
+}
+
+// OpAdagradStep performs an in-place Adagrad update.
+func OpAdagradStep(param, grad, gSum []float32, lr, eps, weightDecay float32) {
+	C.dm_op_adagrad_step(
+		floatSlice(param), floatSlice(grad), floatSlice(gSum),
+		C.int(len(param)), C.float(lr), C.float(eps), C.float(weightDecay))
+}
+
+// OpSgdMomentumStep performs an in-place SGD+momentum update.
+func OpSgdMomentumStep(param, grad, velocity []float32,
+	lr, momentum, weightDecay float32, nesterov bool) {
+	n := 0
+	if nesterov {
+		n = 1
+	}
+	C.dm_op_sgd_momentum_step(
+		floatSlice(param), floatSlice(grad), floatSlice(velocity),
+		C.int(len(param)), C.float(lr), C.float(momentum),
+		C.float(weightDecay), C.int(n))
+}

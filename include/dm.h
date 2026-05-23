@@ -500,7 +500,27 @@ DM_API DM_Status dm_image_patchify_raw(const float *in_nhwc,
                                        int         *out_patches);
 
 /* ─────────────────────────────────────────────────────────────────────────
- * § 8  Tensor (dm_engine — ops dispatch through TFE; DM_Tensor is NCHW float32)
+ * § 8  Engine — dm_engine core (TFE backend, NCHW float32)
+ *
+ * dm_engine is the compute core of dm.  Every op dispatches through the
+ * TensorFlow Eager C API (TFE_*), so callers automatically inherit the
+ * optimised TF C++ backend (XLA, cuDNN, oneDNN …).
+ *
+ * Users can build their own models by composing these primitives directly:
+ *
+ *   DM_Tensor x, y;
+ *   dm_tensor_alloc(&x, 1, 3, 224, 224);   // NCHW batch=1, RGB 224×224
+ *   dm_tensor_alloc(&y, 1, 64, 112, 112);
+ *   dm_op_conv2d_same(&x, &y, weights, bias, 64, 3, 2);
+ *   dm_op_relu(&y);
+ *   dm_tensor_free(&x);  dm_tensor_free(&y);
+ *
+ * Layout conventions:
+ *   Tensors           — NCHW  (n, c, h, w), row-major, contiguous float32
+ *   Conv weights      — OIHW  [out_c][in_c][ky][kx]
+ *   Depthwise weights — [c][ky][kx]  (transposed to [ky][kx][c][1] internally)
+ *   Linear weights    — [out][in]
+ *   Sequence buffers  — row-major [seq_len × d_model]
  * ───────────────────────────────────────────────────────────────────────── */
 
 typedef struct {
@@ -508,6 +528,7 @@ typedef struct {
     float *data;
 } DM_Tensor;
 
+/* ── Tensor lifecycle ───────────────────────────────────────────────────── */
 DM_API DM_Status dm_tensor_alloc (DM_Tensor *t, int n, int c, int h, int w);
 DM_API void      dm_tensor_free  (DM_Tensor *t);
 DM_API void      dm_tensor_fill  (DM_Tensor *t, float value);
@@ -515,7 +536,9 @@ DM_API float     dm_tensor_get   (const DM_Tensor *t, int n, int c, int y, int x
 DM_API void      dm_tensor_set   (DM_Tensor *t, int n, int c, int y, int x, float v);
 DM_API size_t    dm_tensor_count (const DM_Tensor *t);
 
-/* Primitive neural ops */
+/* ── Convolutions ──────────────────────────────────────────────────────────
+ * All use SAME padding. Filter layout: OIHW for conv2d, [c][k][k] for depthwise.
+ * ───────────────────────────────────────────────────────────────────────── */
 DM_API DM_Status dm_op_conv2d_same   (const DM_Tensor *in, DM_Tensor *out,
                                       const float *w, const float *b,
                                       int out_c, int kernel, int stride);
@@ -524,20 +547,124 @@ DM_API DM_Status dm_op_depthwise_conv(const DM_Tensor *in, DM_Tensor *out,
                                       int kernel, int stride);
 DM_API DM_Status dm_op_pointwise_conv(const DM_Tensor *in, DM_Tensor *out,
                                       const float *w, const float *b, int out_c);
-DM_API DM_Status dm_op_linear        (const DM_Tensor *in, DM_Tensor *out,
-                                      const float *w, const float *b, int out_c);
-DM_API DM_Status dm_op_global_avg_pool(const DM_Tensor *in, DM_Tensor *out);
-DM_API void      dm_op_relu6         (DM_Tensor *t);
-DM_API void      dm_op_softmax       (DM_Tensor *t);
-DM_API void      dm_op_relu          (DM_Tensor *t);
-DM_API DM_Status dm_op_tensor_add    (DM_Tensor *out, const DM_Tensor *in);
-DM_API DM_Status dm_op_max_pool2d_same(const DM_Tensor *in, DM_Tensor *out, int kernel, int stride);
-DM_API DM_Status dm_op_batch_norm    (DM_Tensor *t, const float *gamma, const float *beta, const float *mean, const float *var, float eps);
-DM_API DM_Status dm_op_resnet18_forward(const DM_Tensor *input, DM_Tensor *logits, int classes, unsigned int seed);
-DM_API DM_Status dm_op_resnet_basic_block(const DM_Tensor *in, DM_Tensor *out, int out_c, int stride, unsigned int seed);
-/* variant: 0=tiny 1=small 2=base 3=large 4=huge */
-DM_API DM_Status dm_op_vit_forward(const DM_Tensor *input, DM_Tensor *logits,
-                                    int variant, int num_classes, unsigned int seed);
+
+/* ── Linear / fully-connected ─────────────────────────────────────────────
+ * in:  [n, in_c, 1, 1]  →  out: [n, out_c, 1, 1]
+ * w:   [out_c × in_c],  b: [out_c]
+ * ───────────────────────────────────────────────────────────────────────── */
+DM_API DM_Status dm_op_linear(const DM_Tensor *in, DM_Tensor *out,
+                               const float *w, const float *b, int out_c);
+
+/* ── Pooling ───────────────────────────────────────────────────────────── */
+DM_API DM_Status dm_op_global_avg_pool  (const DM_Tensor *in, DM_Tensor *out);
+DM_API DM_Status dm_op_max_pool2d_same  (const DM_Tensor *in, DM_Tensor *out,
+                                         int kernel, int stride);
+
+/* ── Normalisation ─────────────────────────────────────────────────────── */
+DM_API DM_Status dm_op_batch_norm (DM_Tensor *t,
+                                   const float *gamma, const float *beta,
+                                   const float *mean,  const float *var, float eps);
+/**
+ * Layer normalisation over sequence rows.
+ * x: row-major float32 [seq_len × d_model], updated in-place.
+ */
+DM_API DM_Status dm_op_layer_norm (float *x, int seq_len, int d_model,
+                                   const float *gamma, const float *beta, float eps);
+
+/* ── Elementwise ops ────────────────────────────────────────────────────── */
+DM_API DM_Status dm_op_tensor_add   (DM_Tensor *out, const DM_Tensor *in);
+
+/* ── Activations (in-place) ────────────────────────────────────────────── */
+DM_API void dm_op_relu    (DM_Tensor *t);
+DM_API void dm_op_relu6   (DM_Tensor *t);
+DM_API void dm_op_tanh    (DM_Tensor *t);
+DM_API void dm_op_sigmoid (DM_Tensor *t);
+/**
+ * GELU in-place on a raw float buffer (used for sequence models).
+ * x: float[n], mutated in-place.
+ */
+DM_API void dm_op_gelu (float *x, int n);
+
+/* ── Softmax ────────────────────────────────────────────────────────────── */
+DM_API void dm_op_softmax      (DM_Tensor *t);                   /* [n,c,1,1] over c */
+DM_API void dm_op_softmax_rows (float *x, int rows, int cols);   /* raw [rows×cols]  */
+
+/* ── Matrix multiplication ─────────────────────────────────────────────── */
+/** C = A × Bᵀ   A[M×K], B[N×K] → C[M×N] */
+DM_API void dm_op_matmul_nt (const float *A, const float *B, float *C,
+                              int M, int N, int K);
+/** C = A × B    A[M×K], B[K×N] → C[M×N] */
+DM_API void dm_op_matmul_nn (const float *A, const float *B, float *C,
+                              int M, int K, int N);
+
+/* ── Training: backward passes ─────────────────────────────────────────── */
+DM_API DM_Status dm_op_linear_backward (const DM_Tensor *in,
+                                        const DM_Tensor *grad_out,
+                                        DM_Tensor *grad_in,
+                                        float *grad_w, float *grad_b,
+                                        const float *w, int out_c);
+DM_API void dm_op_relu_backward  (const DM_Tensor *in,
+                                  const DM_Tensor *grad_out,
+                                  DM_Tensor *grad_in);
+DM_API void dm_op_tanh_backward  (const DM_Tensor *out,
+                                  const DM_Tensor *grad_out,
+                                  DM_Tensor *grad_in);
+
+/* ── Training: Maxout ──────────────────────────────────────────────────── */
+/**
+ * Maxout pooling: in[n, k*c, 1, 1] → out[n, c, 1, 1], groups of k.
+ * argmax: caller-allocated int[n × c].
+ */
+DM_API DM_Status dm_op_maxout          (const DM_Tensor *in, DM_Tensor *out,
+                                        int k, int *argmax);
+DM_API DM_Status dm_op_maxout_backward (const DM_Tensor *grad_out,
+                                        DM_Tensor *grad_in,
+                                        int k, const int *argmax);
+
+/* ── Training: Dropout ─────────────────────────────────────────────────── */
+/**
+ * Inverted dropout during training (mask: caller-allocated int[n×c×h×w]).
+ * During inference, call with drop_prob=0 or skip.
+ */
+DM_API void dm_op_dropout          (const DM_Tensor *in, DM_Tensor *out,
+                                    float drop_prob, int *mask);
+DM_API void dm_op_dropout_backward (const DM_Tensor *grad_out,
+                                    DM_Tensor *grad_in,
+                                    float drop_prob, const int *mask);
+
+/* ── Optimiser steps (pure-C, no TFE dependency) ───────────────────────── */
+/**
+ * Adam step.
+ * param, grad, m, v: float[n] arrays (m/v are running moment buffers).
+ * t: current step (1-indexed).
+ */
+DM_API void dm_op_adam_step    (float *param, float *grad, float *m, float *v,
+                                int n, float lr,
+                                float beta1, float beta2, float eps,
+                                float weight_decay, int t);
+/**
+ * Adagrad step.
+ * param, grad, g_sum: float[n] arrays (g_sum is the running squared-gradient buffer).
+ */
+DM_API void dm_op_adagrad_step (float *param, float *grad, float *g_sum,
+                                int n, float lr, float eps, float weight_decay);
+/**
+ * SGD with momentum (Nesterov-optional).
+ * param, grad, velocity: float[n] arrays.
+ * nesterov: 1 to use Nesterov lookahead.
+ */
+DM_API void dm_op_sgd_momentum_step (float *param, float *grad, float *velocity,
+                                     int n, float lr, float momentum,
+                                     float weight_decay, int nesterov);
+
+/* ── Pre-built model ops (use dm_engine internally) ────────────────────── */
+DM_API DM_Status dm_op_resnet18_forward   (const DM_Tensor *input, DM_Tensor *logits,
+                                            int classes, unsigned int seed);
+DM_API DM_Status dm_op_resnet_basic_block (const DM_Tensor *in, DM_Tensor *out,
+                                            int out_c, int stride, unsigned int seed);
+/** variant: 0=tiny 1=small 2=base 3=large 4=huge */
+DM_API DM_Status dm_op_vit_forward    (const DM_Tensor *input, DM_Tensor *logits,
+                                        int variant, int num_classes, unsigned int seed);
 DM_API size_t    dm_op_vit_param_count(int variant, int img_size, int patch_size,
                                         int num_classes);
 
