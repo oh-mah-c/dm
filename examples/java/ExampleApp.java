@@ -144,6 +144,17 @@ public class ExampleApp {
         var r = DM.getBenchReport();
         System.out.println(r);
 
+        // ── Vision ───────────────────────────────────────────────────────────
+        section("Vision — MobileNetV4-Tiny predict");
+        try (DM.Vision vis = new DM.Vision("mobilenet_tiny")) {
+            vis.initModel("/tmp/mobilenet_ckpt", 1000, 224, 1.0f, 0.001f);
+            float[] dummyImg = new float[224 * 224 * 3];
+            float[] probs = vis.predict(dummyImg, 224, 224, 1000);
+            System.out.printf("Predicted probs length: %d%n", probs.length);
+        } catch (Exception e) {
+            System.out.println("(skipped — Vision init failed: " + e.getMessage() + ")");
+        }
+
         // ── Language Model ───────────────────────────────────────────────────
         section("Language Model — TinyStories");
         try (DM.LM lm = new DM.LM("tinystories")) {

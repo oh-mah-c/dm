@@ -129,6 +129,27 @@ int main() {
         std::cout << "[bench] total=" << r.phase_ms[3] << "ms "
                   << "patterns=" << r.num_patterns << "\n";
 
+        // ── Vision ──────────────────────────────────────────────────────────
+        try {
+            dm::Vision vis("mobilenet_tiny");
+            vis.init("/tmp/mobilenet_ckpt", 1000, 224, 1.0f, 0.001f);
+            std::vector<float> dummy_img(224 * 224 * 3, 0.5f);
+            auto probs = vis.predict(dummy_img.data(), 224, 224, 1000);
+            std::cout << "[vision] predicted probs length: " << probs.size() << "\n";
+        } catch (const std::exception &e) {
+            std::cout << "[vision] skipped — init failed: " << e.what() << "\n";
+        }
+
+        // ── Language Model ──────────────────────────────────────────────────
+        try {
+            dm::LM lm("tinystories");
+            lm.load("/tmp/tinystories_ckpt");
+            std::string text = lm.generate("Once upon a time", 64);
+            std::cout << "[lm] generated: " << text << "\n";
+        } catch (const std::exception &e) {
+            std::cout << "[lm] skipped — no checkpoint: " << e.what() << "\n";
+        }
+
     } catch (const std::exception &e) {
         std::cerr << "ERROR: " << e.what() << "\n";
         return 1;

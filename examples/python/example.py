@@ -130,6 +130,17 @@ def main():
     r = dm.bench_report()
     print(r)
 
+    # ── Vision ───────────────────────────────────────────────────────────────
+    section("Vision — MobileNetV4-Tiny predict")
+    try:
+        with dm.Vision("mobilenet_tiny") as vis:
+            vis.init_model("/tmp/mobilenet_ckpt", classes=1000, image_size=224)
+            dummy_img = [0.5] * (224 * 224 * 3)
+            probs = vis.predict(dummy_img, 224, 224, 1000)
+            print(f"Predicted probs length: {len(probs)}")
+    except Exception as e:
+        print(f"(skipped — Vision init failed: {e})")
+
     # ── Language model ───────────────────────────────────────────────────────
     section("Language Model — TinyStories generate")
     try:

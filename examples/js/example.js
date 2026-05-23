@@ -166,6 +166,35 @@ async function main() {
                 `throughput=${r.throughputMbS.toFixed(2)}MB/s`);
   }
 
+  // ── Vision ────────────────────────────────────────────────────────────────
+  section('Vision — MobileNetV4-Tiny predict');
+  {
+    const vis = new dm.Vision('mobilenet_tiny');
+    try {
+      vis.initModel('/tmp/mobilenet_ckpt', 1000, 224);
+      const dummyRgb = new Float32Array(224 * 224 * 3);
+      const probs = vis.predict(dummyRgb, 224, 224, 1000);
+      console.log(`Predicted probs length: ${probs.length}`);
+    } catch (e) {
+      console.log(`(skipped — Vision init failed: ${e.message})`);
+    }
+    vis.close();
+  }
+
+  // ── Language Model ────────────────────────────────────────────────────────
+  section('Language Model — TinyStories generate');
+  {
+    const lm = new dm.LM('tinystories');
+    try {
+      lm.load('/tmp/tinystories_ckpt');
+      const text = lm.generate('Once upon a time', 64);
+      console.log(`Generated: ${text}`);
+    } catch (e) {
+      console.log(`(skipped — no checkpoint: ${e.message})`);
+    }
+    lm.close();
+  }
+
   // ── Experiment helpers ────────────────────────────────────────────────────
   section('Experiment helpers');
   console.log(`timer_now   = ${dm.timerNow().toFixed(3)} s`);

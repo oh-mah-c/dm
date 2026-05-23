@@ -796,9 +796,11 @@ public:
     /** Forward pass.  Input: NCHW tensor (1,3,H,W).  Returns logits [classes]. */
     std::vector<float> forward(const Tensor &input) {
         Tensor out(1, classes_, 1, 1);
-        DM_Status rc = dm_op_resnet18_forward(input.raw(), out.raw(), classes_, seed_);
+        DM_Status rc = dm_op_resnet18_forward(&input.raw(), &out.raw(), classes_, seed_);
         if (rc != DM_OK) throw std::runtime_error("ResNet.forward failed");
-        return out.to_vector();
+        std::vector<float> vec(out.count());
+        std::copy(out.data(), out.data() + out.count(), vec.begin());
+        return vec;
     }
 
     int layers()  const { return layers_; }
@@ -823,10 +825,12 @@ public:
 
     std::vector<float> forward(const Tensor &input) {
         Tensor out(1, classes_, 1, 1);
-        DM_Status rc = dm_op_vit_forward(input.raw(), out.raw(),
+        DM_Status rc = dm_op_vit_forward(&input.raw(), &out.raw(),
                                           variant_, classes_, seed_);
         if (rc != DM_OK) throw std::runtime_error("ViT.forward failed");
-        return out.to_vector();
+        std::vector<float> vec(out.count());
+        std::copy(out.data(), out.data() + out.count(), vec.begin());
+        return vec;
     }
 
     size_t weight_count() const {
@@ -850,11 +854,12 @@ public:
 
     void load(const std::string &path) {
         free_weights();
-        int v = 0, c = 0, s = 0;
+        DM_TinyViTVariant v_enum;
+        int c = 0, s = 0;
         float *ptr = nullptr;
-        DM_Status rc = dm_tinyvit_load(path.c_str(), &v, &c, &s, &ptr);
+        DM_Status rc = dm_tinyvit_load(path.c_str(), &v_enum, &c, &s, &ptr);
         if (rc != DM_OK) throw std::runtime_error("TinyViT.load failed: " + path);
-        variant_ = v; classes_ = c; img_size_ = s;
+        variant_ = (int)v_enum; classes_ = c; img_size_ = s;
         weights_ = ptr; owner_ = true;
     }
 

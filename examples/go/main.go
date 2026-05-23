@@ -196,6 +196,47 @@ func main() {
 			r.PhaseMS[dm.BenchPhaseTotal], r.NumPatterns, r.ThroughputMBPerS)
 	}
 
+	// ── Vision ────────────────────────────────────────────────────────────────
+	section("Vision — MobileNetV4-Tiny predict")
+	{
+		vis, err := dm.NewVision("mobilenet_tiny")
+		if err != nil {
+			fmt.Println("Vision create:", err)
+		} else {
+			err = vis.Init("/tmp/mobilenet_ckpt", 1000, 224, 1.0, 0.001)
+			if err != nil {
+				fmt.Printf("(skipped — Vision init failed: %v)\n", err)
+			} else {
+				dummyImg := make([]float32, 224*224*3)
+				probs, err := vis.Predict(dummyImg, 224, 224, 1000)
+				if err == nil {
+					fmt.Printf("Predicted probs length: %d\n", len(probs))
+				}
+			}
+			vis.Close()
+		}
+	}
+
+	// ── Language Model ────────────────────────────────────────────────────────
+	section("Language Model — TinyStories generate")
+	{
+		lm, err := dm.NewLM("tinystories")
+		if err != nil {
+			fmt.Println("LM create:", err)
+		} else {
+			err = lm.Load("/tmp/tinystories_ckpt")
+			if err != nil {
+				fmt.Printf("(skipped — no checkpoint: %v)\n", err)
+			} else {
+				text, err := lm.Generate("Once upon a time", 64)
+				if err == nil {
+					fmt.Printf("Generated: %s\n", text)
+				}
+			}
+			lm.Close()
+		}
+	}
+
 	// ── Experiment helpers ────────────────────────────────────────────────────
 	section("Experiment helpers")
 	fmt.Printf("timer_now   = %.3f s\n", dm.TimerNow())

@@ -129,6 +129,44 @@ skip_tok:
     dm_bench_stop(DM_BENCH_PHASE_TOTAL);
     dm_bench_print("c_example", "mixed");
 
+    /* ── § 5  Vision ────────────────────────────────────────────────── */
+    {
+        DM_Vision vis = dm_vision_create("mobilenet_tiny");
+        if (vis) {
+            DM_Status s = dm_vision_init(vis, "/tmp/mobilenet_ckpt", 1000, 224, 1.0f, 0.001f);
+            if (s != DM_OK) {
+                printf("[vision] skipped — init failed: %s\n", dm_strerror(s));
+            } else {
+                float *dummy = calloc(224 * 224 * 3, sizeof(float));
+                float probs[1000] = {0};
+                s = dm_vision_predict(vis, dummy, 224, 224, probs, 1000);
+                if (s == DM_OK) {
+                    printf("[vision] predicted probs length: 1000\n");
+                }
+                free(dummy);
+            }
+            dm_vision_free(vis);
+        }
+    }
+
+    /* ── § 6  Language Model ────────────────────────────────────────── */
+    {
+        DM_LM lm = dm_lm_create("tinystories");
+        if (lm) {
+            DM_Status s = dm_lm_load(lm, "/tmp/tinystories_ckpt");
+            if (s != DM_OK) {
+                printf("[lm] skipped — no checkpoint: %s\n", dm_strerror(s));
+            } else {
+                char buf[512] = {0};
+                s = dm_lm_generate(lm, "Once upon a time", 64, buf, sizeof(buf));
+                if (s == DM_OK) {
+                    printf("[lm] generated: %s\n", buf);
+                }
+            }
+            dm_lm_free(lm);
+        }
+    }
+
     /* ── § 13  CLI passthrough ─────────────────────────────────────── */
     printf("\n--- dm CLI: algorithm list (first 3 lines) ---\n");
     char buf[16384];
