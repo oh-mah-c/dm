@@ -24,6 +24,8 @@
 #define DM_BUILDING_LIB
 #include "dm.h"
 #include "models/lm/bert.h"
+#include "models/vae.h"
+#include "models/gan.h"
 
 typedef struct DM_Spec DM_Spec;
 typedef struct DM_Ledger DM_Ledger;
@@ -440,7 +442,7 @@ DM_API DM_Status dm_algorithm_list(char *buf, int buf_size) {
         "huim_abc","huim_aco","huim_bpso","huim_bpso_tree","huim_hc","huim_sa",
         "huim_afsa","huimsu","bio_huif_ba","bio_huif_ga","bio_huif_pso",
         "fhuqi_miner","vhuqi","uapriori","ubmffp","ufh","ulb_miner",
-        "hupspm","uspan","up_growth","up_hist",
+        "hupspm","uspan","prefixspan","spade","up_growth","up_hist",
         "hoimto","skyline_miner","skymine","ltm","sfui_uf","sfu_ce","medm_gen",
         "msapriori","tkq","tkhoim","tmku","topkphm",
         "fhoi","fhoi_miner","dfhoi","aura_hoi","hep","hiep","nam_hep","cloe_hoi",
@@ -1959,3 +1961,124 @@ DM_API void dm_experiment_append_row(const char *csv_path,
     ir.strong_extra_reduction_percent = row->strong_extra_reduction_percent;
     dm_csv_append_raw_row(csv_path, &ir);
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * § 9  Variational Auto-Encoder (VAE)
+ * ───────────────────────────────────────────────────────────────────────── */
+
+DM_API void* dm_vae_create_raw(int input_dim, int hidden_dim, int latent_dim, float lr) {
+    DM_VAE *vae = (DM_VAE*)malloc(sizeof(DM_VAE));
+    if (!vae) return NULL;
+    dm_vae_init(vae, input_dim, hidden_dim, latent_dim, lr);
+    return vae;
+}
+
+DM_API void dm_vae_free_raw(void *vae) {
+    if (!vae) return;
+    dm_vae_free((DM_VAE*)vae);
+    free(vae);
+}
+
+DM_API float dm_vae_train_step_raw(void *vae, const float *x_batch, int batch_size) {
+    if (!vae || !x_batch) return 0.0f;
+    DM_VAE *v = (DM_VAE*)vae;
+    DM_Tensor x;
+    dm_tensor_alloc(&x, batch_size, v->input_dim, 1, 1);
+    for (int i = 0; i < batch_size * v->input_dim; i++) x.data[i] = x_batch[i];
+    float loss = dm_vae_train_step(v, &x);
+    dm_tensor_free(&x);
+    return loss;
+}
+
+DM_API void dm_vae_encode_raw(void *vae, const float *x_batch, int batch_size, float *mean_out, float *logvar_out) {
+    if (!vae || !x_batch || !mean_out || !logvar_out) return;
+    DM_VAE *v = (DM_VAE*)vae;
+    DM_Tensor x, mean, logvar;
+    dm_tensor_alloc(&x, batch_size, v->input_dim, 1, 1);
+    for (int i = 0; i < batch_size * v->input_dim; i++) x.data[i] = x_batch[i];
+    dm_vae_encode(v, &x, &mean, &logvar);
+    for (int i = 0; i < batch_size * v->latent_dim; i++) {
+        mean_out[i] = mean.data[i];
+        logvar_out[i] = logvar.data[i];
+    }
+    dm_tensor_free(&x);
+    dm_tensor_free(&mean);
+    dm_tensor_free(&logvar);
+}
+
+DM_API void dm_vae_decode_raw(void *vae, const float *z_batch, int batch_size, float *out) {
+    if (!vae || !z_batch || !out) return;
+    DM_VAE *v = (DM_VAE*)vae;
+    DM_Tensor z, dec_out;
+    dm_tensor_alloc(&z, batch_size, v->latent_dim, 1, 1);
+    for (int i = 0; i < batch_size * v->latent_dim; i++) z.data[i] = z_batch[i];
+    dm_vae_decode(v, &z, &dec_out);
+    for (int i = 0; i < batch_size * v->input_dim; i++) {
+        out[i] = dec_out.data[i];
+    }
+    dm_tensor_free(&z);
+    dm_tensor_free(&dec_out);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * § 10  Generative Adversarial Network (GAN)
+ * ───────────────────────────────────────────────────────────────────────── */
+
+DM_API void* dm_gan_create_raw(int input_dim, int g_hidden, int noise_dim, int d_hidden, int maxout_k, float drop_prob, float lr, float momentum, int nesterov) {
+    DM_GAN *gan = (DM_GAN*)malloc(sizeof(DM_GAN));
+    if (!gan) return NULL;
+    dm_gan_init(gan, input_dim, g_hidden, noise_dim, d_hidden, maxout_k, drop_prob, lr, momentum, nesterov);
+    return gan;
+}
+
+DM_API void dm_gan_free_raw(void *gan) {
+    if (!gan) return;
+    dm_gan_free((DM_GAN*)gan);
+    free(gan);
+}
+
+DM_API void dm_gan_generate_raw(void *gan, const float *z_batch, int batch_size, float *out) {
+    if (!gan || !z_batch || !out) return;
+    DM_GAN *g = (DM_GAN*)gan;
+    DM_Tensor z, dec_out;
+    dm_tensor_alloc(&z, batch_size, g->noise_dim, 1, 1);
+    for (int i = 0; i < batch_size * g->noise_dim; i++) z.data[i] = z_batch[i];
+    dm_tensor_alloc(&dec_out, batch_size, g->input_dim, 1, 1);
+    
+    dm_gan_generate(g, &z, &dec_out);
+    for (int i = 0; i < batch_size * g->input_dim; i++) {
+        out[i] = dec_out.data[i];
+    }
+    dm_tensor_free(&z);
+    dm_tensor_free(&dec_out);
+}
+
+DM_API float dm_gan_train_d_step_raw(void *gan, const float *real_x_batch, const float *z_batch, int batch_size) {
+    if (!gan || !real_x_batch || !z_batch) return 0.0f;
+    DM_GAN *g = (DM_GAN*)gan;
+    DM_Tensor x, z;
+    dm_tensor_alloc(&x, batch_size, g->input_dim, 1, 1);
+    dm_tensor_alloc(&z, batch_size, g->noise_dim, 1, 1);
+    for (int i = 0; i < batch_size * g->input_dim; i++) x.data[i] = real_x_batch[i];
+    for (int i = 0; i < batch_size * g->noise_dim; i++) z.data[i] = z_batch[i];
+    
+    float loss = dm_gan_train_d_step(g, &x, &z);
+    
+    dm_tensor_free(&x);
+    dm_tensor_free(&z);
+    return loss;
+}
+
+DM_API float dm_gan_train_g_step_raw(void *gan, const float *z_batch, int batch_size) {
+    if (!gan || !z_batch) return 0.0f;
+    DM_GAN *g = (DM_GAN*)gan;
+    DM_Tensor z;
+    dm_tensor_alloc(&z, batch_size, g->noise_dim, 1, 1);
+    for (int i = 0; i < batch_size * g->noise_dim; i++) z.data[i] = z_batch[i];
+    
+    float loss = dm_gan_train_g_step(g, &z);
+    
+    dm_tensor_free(&z);
+    return loss;
+}
+

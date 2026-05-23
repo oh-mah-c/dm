@@ -43,4 +43,19 @@ void dm_matmul_nt(const float *A, const float *B, float *C, int M, int N, int K)
 void dm_matmul_nn(const float *A, const float *B, float *C, int M, int K, int N);
 void dm_softmax_rows(float *x, int rows, int cols);
 
+/* Training Primitives */
+int dm_linear_backward(const DM_Tensor *in, const DM_Tensor *grad_out, DM_Tensor *grad_in, 
+                       float *grad_w, float *grad_b, const float *w, int out_c);
+void dm_tanh_inplace(DM_Tensor *t);
+void dm_tanh_backward(const DM_Tensor *out, const DM_Tensor *grad_out, DM_Tensor *grad_in);
+void dm_sigmoid_inplace(DM_Tensor *t);
+void dm_relu_backward(const DM_Tensor *in, const DM_Tensor *grad_out, DM_Tensor *grad_in);
+int  dm_maxout(const DM_Tensor *in, DM_Tensor *out, int k, int *argmax);
+int  dm_maxout_backward(const DM_Tensor *grad_out, DM_Tensor *grad_in, int k, const int *argmax);
+void dm_dropout(const DM_Tensor *in, DM_Tensor *out, float drop_prob, int *mask);
+void dm_dropout_backward(const DM_Tensor *grad_out, DM_Tensor *grad_in, float drop_prob, const int *mask);
+void dm_adagrad_step(float *param, float *grad, float *g_sum, int n, float lr, float eps, float weight_decay);
+void dm_adam_step(float *param, float *grad, float *m, float *v, int n, float lr, float beta1, float beta2, float eps, float weight_decay, int t);
+void dm_sgd_momentum_step(float *param, float *grad, float *velocity, int n, float lr, float momentum, float weight_decay, int nesterov);
+
 #endif /* DM_TENSOR_H */

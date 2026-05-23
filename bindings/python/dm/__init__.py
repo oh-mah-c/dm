@@ -200,14 +200,28 @@ _dm_bert_forward_masked_raw  = _fn("dm_bert_forward_masked_raw",  DM_Status,
                                    ctypes.POINTER(c_float), ctypes.POINTER(c_float))
 
 
-# § 6  LM
+# § 7  LM
 _dm_lm_create   = _fn("dm_lm_create",   DM_LM,     c_char_p)
 _dm_lm_train    = _fn("dm_lm_train",    DM_Status, DM_LM, c_char_p, c_char_p, c_int, c_int, c_float)
 _dm_lm_generate = _fn("dm_lm_generate", DM_Status, DM_LM, c_char_p, c_int, c_char_p, c_int)
 _dm_lm_load     = _fn("dm_lm_load",     DM_Status, DM_LM, c_char_p)
 _dm_lm_free     = _fn("dm_lm_free",     None,      DM_LM)
 
-# § 9  Benchmark
+# § 8  VAE
+_dm_vae_create_raw      = _fn("dm_vae_create_raw", c_void_p, c_int, c_int, c_int, c_float)
+_dm_vae_free_raw        = _fn("dm_vae_free_raw", None, c_void_p)
+_dm_vae_train_step_raw  = _fn("dm_vae_train_step_raw", c_float, c_void_p, ctypes.POINTER(c_float), c_int)
+_dm_vae_encode_raw      = _fn("dm_vae_encode_raw", None, c_void_p, ctypes.POINTER(c_float), c_int, ctypes.POINTER(c_float), ctypes.POINTER(c_float))
+_dm_vae_decode_raw      = _fn("dm_vae_decode_raw", None, c_void_p, ctypes.POINTER(c_float), c_int, ctypes.POINTER(c_float))
+
+# § 9  GAN
+_dm_gan_create_raw      = _fn("dm_gan_create_raw", c_void_p, c_int, c_int, c_int, c_int, c_int, c_float, c_float, c_float, c_int)
+_dm_gan_free_raw        = _fn("dm_gan_free_raw", None, c_void_p)
+_dm_gan_generate_raw    = _fn("dm_gan_generate_raw", None, c_void_p, ctypes.POINTER(c_float), c_int, ctypes.POINTER(c_float))
+_dm_gan_train_d_step_raw = _fn("dm_gan_train_d_step_raw", c_float, c_void_p, ctypes.POINTER(c_float), ctypes.POINTER(c_float), c_int)
+_dm_gan_train_g_step_raw = _fn("dm_gan_train_g_step_raw", c_float, c_void_p, ctypes.POINTER(c_float), c_int)
+
+# § 10  Benchmark
 class _DM_BenchReport(ctypes.Structure):
     _fields_ = [
         ("phase_times_ms",       c_double * 4),
@@ -964,3 +978,96 @@ class BERT:
 
         return list(hidden_out), list(cls_out)
 
+
+# ── VAE ───────────────────────────────────────────────────────────────────────
+
+class VAE:
+    """Auto-Encoding Variational Bayes (VAE) with Adam optimizer."""
+
+    def __init__(self, input_dim: int, hidden_dim: int, latent_dim: int, lr: float = 0.001):
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.latent_dim = latent_dim
+        self.lr = lr
+        self._handle = _dm_vae_create_raw(input_dim, hidden_dim, latent_dim, lr)
+        if not self._handle:
+            raise MemoryError("Failed to allocate VAE model")
+
+    def __del__(self):
+        if getattr(self, "_handle", None):
+            _dm_vae_free_raw(self._handle)
+            self._handle = None
+
+    def train_step(self, x_batch: List[float]) -> float:
+        """Run one training step with a flat batch of input vectors. Returns loss."""
+        batch_size = len(x_batch) // self.input_dim
+        if batch_size * self.input_dim != len(x_batch):
+            raise ValueError("Batch size must be a multiple of input_dim")
+        x_arr = (c_float * len(x_batch))(*x_batch)
+        return float(_dm_vae_train_step_raw(self._handle, x_arr, batch_size))
+
+    def encode(self, x_batch: List[float]) -> Tuple[List[float], List[float]]:
+        """Encode input vectors into mean and logvar."""
+        batch_size = len(x_batch) // self.input_dim
+        if batch_size * self.input_dim != len(x_batch):
+            raise ValueError("Batch size must be a multiple of input_dim")
+        x_arr = (c_float * len(x_batch))(*x_batch)
+        mean_out = (c_float * (batch_size * self.latent_dim))()
+        logvar_out = (c_float * (batch_size * self.latent_dim))()
+        _dm_vae_encode_raw(self._handle, x_arr, batch_size, mean_out, logvar_out)
+        return list(mean_out), list(logvar_out)
+
+    def decode(self, z_batch: List[float]) -> List[float]:
+        """Decode latent vectors back into the input space."""
+        batch_size = len(z_batch) // self.latent_dim
+        if batch_size * self.latent_dim != len(z_batch):
+            raise ValueError("Batch size must be a multiple of latent_dim")
+        z_arr = (c_float * len(z_batch))(*z_batch)
+        out = (c_float * (batch_size * self.input_dim))()
+        _dm_vae_decode_raw(self._handle, z_arr, batch_size, out)
+        return list(out)
+
+
+# ── GAN ───────────────────────────────────────────────────────────────────────
+
+class GAN:
+    """Generative Adversarial Network (GAN) with SGD Momentum / Nesterov optimizer."""
+
+    def __init__(self, input_dim: int, g_hidden: int, noise_dim: int, d_hidden: int, maxout_k: int = 5, drop_prob: float = 0.5, lr: float = 0.01, momentum: float = 0.9, nesterov: bool = True):
+        self.input_dim = input_dim
+        self.noise_dim = noise_dim
+        self._handle = _dm_gan_create_raw(input_dim, g_hidden, noise_dim, d_hidden, maxout_k, drop_prob, lr, momentum, 1 if nesterov else 0)
+        if not self._handle:
+            raise MemoryError("Failed to allocate GAN model")
+
+    def __del__(self):
+        if getattr(self, "_handle", None):
+            _dm_gan_free_raw(self._handle)
+            self._handle = None
+
+    def generate(self, z_batch: List[float]) -> List[float]:
+        """Generate fake samples from latent noise vectors z."""
+        batch_size = len(z_batch) // self.noise_dim
+        if batch_size * self.noise_dim != len(z_batch):
+            raise ValueError("Batch size must be a multiple of noise_dim")
+        z_arr = (c_float * len(z_batch))(*z_batch)
+        out = (c_float * (batch_size * self.input_dim))()
+        _dm_gan_generate_raw(self._handle, z_arr, batch_size, out)
+        return list(out)
+
+    def train_d_step(self, real_x_batch: List[float], z_batch: List[float]) -> float:
+        """Run one training step for the Discriminator. Returns D loss."""
+        batch_size = len(real_x_batch) // self.input_dim
+        if batch_size * self.input_dim != len(real_x_batch) or batch_size * self.noise_dim != len(z_batch):
+            raise ValueError("Invalid batch dimensions for real_x or z")
+        x_arr = (c_float * len(real_x_batch))(*real_x_batch)
+        z_arr = (c_float * len(z_batch))(*z_batch)
+        return float(_dm_gan_train_d_step_raw(self._handle, x_arr, z_arr, batch_size))
+
+    def train_g_step(self, z_batch: List[float]) -> float:
+        """Run one training step for the Generator. Returns G loss."""
+        batch_size = len(z_batch) // self.noise_dim
+        if batch_size * self.noise_dim != len(z_batch):
+            raise ValueError("Batch size must be a multiple of noise_dim")
+        z_arr = (c_float * len(z_batch))(*z_batch)
+        return float(_dm_gan_train_g_step_raw(self._handle, z_arr, batch_size))

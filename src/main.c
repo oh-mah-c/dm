@@ -145,6 +145,8 @@
 #include "models/vision/mobilenet_tiny.h"
 #include "models/vision/resnet.h"
 #include "models/vision/vit.h"
+#include "algorithms/prefixspan.h"
+#include "algorithms/spade.h"
 #include "generator/textbook_generator.h"
 #include <stdio.h>
 #include <string.h>
@@ -163,6 +165,8 @@ extern DM_Algorithm huim_abc_algo;
 extern DM_Algorithm skyline_miner_algo;
 extern DM_Algorithm thui_algo;
 extern DM_Algorithm thue_algo;
+extern DM_Algorithm prefixspan_algo;
+extern DM_Algorithm spade_algo;
 extern DM_Algorithm tku_ce_algo;
 extern DM_Algorithm tku_ce_plus_algo;
 extern DM_Algorithm fhmds_algo;
@@ -544,6 +548,8 @@ int main(int argc, char **argv) {
     dm_register_algorithm(&skyline_miner_algo);
     dm_register_algorithm(&thui_algo);
     dm_register_algorithm(&thue_algo);
+    dm_register_algorithm(&prefixspan_algo);
+    dm_register_algorithm(&spade_algo);
     dm_register_algorithm(&tku_ce_algo);
     dm_register_algorithm(&tku_ce_plus_algo);
     dm_register_algorithm(&fhmds_algo);
@@ -721,6 +727,8 @@ int main(int argc, char **argv) {
     DM_HUI_Miner_Params huiminer_params;
     DM_UP_Growth_Params upgrowth_params;
     DM_IHUP_Params ihup_params;
+    DM_PrefixSpan_Params prefixspan_params;
+    DM_SPADE_Params spade_params;
     DM_HUIM_SU_Params huimsu_params;
     DM_ULB_Miner_Params ulbminer_params;
     DM_UFH_Params ufh_params;
@@ -843,6 +851,12 @@ int main(int argc, char **argv) {
     } else if (strcmp(algo_id, "ihup") == 0) {
         ihup_params.min_utility = min_support;
         params = &ihup_params;
+    } else if (strcmp(algo_id, "prefixspan") == 0) {
+        prefixspan_params.min_support = min_support;
+        params = &prefixspan_params;
+    } else if (strcmp(algo_id, "spade") == 0) {
+        spade_params.min_support = min_support;
+        params = &spade_params;
     } else if (strcmp(algo_id, "huimsu") == 0) {
         huimsu_params.min_utility = min_support;
         params = &huimsu_params;

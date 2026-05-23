@@ -90,11 +90,13 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 
 ### Sequential Utility Pattern Mining
 55. **USpan** - High utility sequential pattern mining using projected databases and sequence-weighted utility pruning.
-56. **HUPSPM** - High utility-probability sequential pattern mining for uncertain sequence utility databases.
-57. **HUP-Miner** - Mines high average utility nonoverlapping patterns from sequence utility databases using nonoverlapping SPC-style support, HUBP upper-bound pruning, and pattern join candidate generation (Geng et al. 2026).
+56. **PrefixSpan** - Mining sequential patterns efficiently using prefix-projected pattern growth, finding frequent itemsets across sequences using an optimized pseudo-projection technique (Pei et al., 2001).
+57. **SPADE** - Fast discovery of sequential patterns using vertical id-lists and combinatorial equivalence classes, bypassing database scans via efficient lattice intersections (Zaki, 2001).
+58. **HUPSPM** - High utility-probability sequential pattern mining for uncertain sequence utility databases.
+59. **HUP-Miner** - Mines high average utility nonoverlapping patterns from sequence utility databases using nonoverlapping SPC-style support, HUBP upper-bound pruning, and pattern join candidate generation (Geng et al. 2026).
 
 ### Top-K Closed Sequential Pattern Mining
-58. **KCloTreeMiner** - Mines top-K closed sequential patterns over SPMF sequence datasets using SP-Tree-style projection, max-support candidate ordering, closed coverage, pattern absorption, and generic/group/redundancy-aware modes (Rizvee et al. 2025).
+60. **KCloTreeMiner** - Mines top-K closed sequential patterns over SPMF sequence datasets using SP-Tree-style projection, max-support candidate ordering, closed coverage, pattern absorption, and generic/group/redundancy-aware modes (Rizvee et al. 2025).
 
 ### Frequent Closed Itemset Mining (FCIM)
 14. **A-Close** - Uses frequent itemset generators to derive closed itemsets.
@@ -188,6 +190,10 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 77. **TinyViT** — Compact Vision Transformer backbone with patch embedding, multi-head self-attention, and MLP blocks implemented in C99, suited for resource-constrained classification.
 78. **ViT (Vision Transformer)** — Full C99 implementation of Dosovitskiy et al.'s ViT (ICLR 2021). Supports five variants: Tiny (D=192, L=5), Small (D=384, L=6), Base (D=768, L=12), Large (D=1024, L=24), Huge (D=1280, L=32). Architecture: patch embedding → [CLS] + 1D position embeddings → L×(LN→MHSA→residual, LN→MLP-GELU→residual) → LN → linear head. Exposed via `libdm.so` FFI (`dm_op_vit_forward`) and CLI (`./bin/dm.exe vit bench --variant small`).
 
+### Generative Models
+79. **VAE (Variational Autoencoder)** — Full C99 pure implementation of the Auto-Encoding Variational Bayes (Kingma & Welling) model. Includes a symmetric MLP encoder/decoder architecture and analytically derived backpropagation for expected reconstruction loss and KL divergence, combined with an implementation of the **Adam Optimizer** (Kingma & Ba) with state/momentum tracking. Accessible via the `libdm.so` python bindings `dm.VAE()`.
+80. **GAN (Generative Adversarial Network)** — Full C99 faithful implementation of the original Generative Adversarial Nets (Goodfellow et al., 2014) model. It precisely implements the mathematical specification including Maxout networks (Goodfellow et al., 2013), Dropout, non-saturating Minimax gradients, and training using **Nesterov Accelerated Gradient (NAG)** / SGD with Momentum (Sutskever et al., 2013). Accessible via the `libdm.so` python bindings `dm.GAN()`.
+
 ---
 
 ## 🚀 Getting Started
@@ -207,7 +213,7 @@ gcc -Iinclude -Iinclude/core -Wall -Wextra -O2 -pthread src/main.c src/core/*.c 
 ```bash
 ./bin/dm.exe <algorithm> <dataset_path> <format> <min_support> [min_io] [ins_threshold] [prn_threshold] [decay_base] [decay_life]
 ```
-* **`<algorithm>` / direct subcommand**: `ais`, `apriori`, `eclat`, `fpgrowth`, `tree_projection`, `aclose`, `close`, `closet`, `closetplus`, `fpclose`, `charm`, `dci_closed`, `lcm`, `lcmver2`, `nafcp`, `fcfia`, `max_miner`, `genmax`, `fpmax`, `mafia`, `hep`, `fhoi`, `dfhoi`, `tkhoim`, `hoimto`, `mfhoi`, `fhoi_miner`, `weak_mfhoi_miner`, `strong_mfhoi_miner`, `mhoui`, `houi_miner`, `weak_mhoui_miner`, `strong_mhoui_miner`, `direct_mhoui_miner`, `regular_mine`, `negfin`, `prepost`, `prepostplus`, `dic`, `ltm`, `sam`, `carpenter`, `dbv_miner`, `defme`, `talky_g`, `pascal`, `zart`, `apriori_rare`, `apriori_inverse`, `cori`, `rp_tree`, `estdec`, `clostream`, `cfi_stream`, `uapriori`, `msapriori`, `ffiminer`, `ubmffp`, `dfigrowth`, `sum`, `mlhui_miner`, `fchm`, `vhuqi`, `fhuqi_miner`, `tkq`, `thue`, `mheinu`, `dphim`, `closed_fhuim_kinana`, `uspan`, `hupspm`, `hup_miner`, `hiep`, `maximal_munch`, `bpe`, `bpe_dropout`, `unigram`, `sentencepiece`, `tokenizer_lab`, `gpe`, `parity_bpe`, `fast_wordpiece`, `resnet18`, `mobilenet_tiny`, `vit`.
+* **`<algorithm>` / direct subcommand**: `ais`, `apriori`, `eclat`, `fpgrowth`, `tree_projection`, `aclose`, `close`, `closet`, `closetplus`, `fpclose`, `charm`, `dci_closed`, `lcm`, `lcmver2`, `nafcp`, `fcfia`, `max_miner`, `genmax`, `fpmax`, `mafia`, `hep`, `fhoi`, `dfhoi`, `tkhoim`, `hoimto`, `mfhoi`, `fhoi_miner`, `weak_mfhoi_miner`, `strong_mfhoi_miner`, `mhoui`, `houi_miner`, `weak_mhoui_miner`, `strong_mhoui_miner`, `direct_mhoui_miner`, `regular_mine`, `negfin`, `prepost`, `prepostplus`, `dic`, `ltm`, `sam`, `carpenter`, `dbv_miner`, `defme`, `talky_g`, `pascal`, `zart`, `apriori_rare`, `apriori_inverse`, `cori`, `rp_tree`, `estdec`, `clostream`, `cfi_stream`, `uapriori`, `msapriori`, `ffiminer`, `ubmffp`, `dfigrowth`, `sum`, `mlhui_miner`, `fchm`, `vhuqi`, `fhuqi_miner`, `tkq`, `thue`, `mheinu`, `dphim`, `closed_fhuim_kinana`, `prefixspan`, `spade`, `uspan`, `hupspm`, `hup_miner`, `hiep`, `maximal_munch`, `bpe`, `bpe_dropout`, `unigram`, `sentencepiece`, `tokenizer_lab`, `gpe`, `parity_bpe`, `fast_wordpiece`, `resnet18`, `mobilenet_tiny`, `vit`.
 * **`vhuqi`** uses `<min_support>` as the absolute minimum utility threshold and accepts optional `[qrc]`, defaulting to `3`.
 * **`fhuqi_miner`** requires quantity format `4`: `./bin/dm.exe fhuqi_miner <quantity_dataset> 4 <theta> <qrc> <all|min|max> <profit_file>`.
 * **`tkq`** requires quantity format `4`: `./bin/dm.exe tkq <quantity_dataset> 4 <k> <qrc> <all|min|max> <profit_file>`.
@@ -514,6 +520,21 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 **[128]** K. Wu, J. Zhang, H. Peng, M. Liu, B. Xiao, J. Fu, and L. Yuan, "TinyViT: Fast Pretraining Distillation for Small Vision Transformers," in *Proc. European Conference on Computer Vision (ECCV)*, 2022, pp. 68–85. https://doi.org/10.1007/978-3-031-20083-0_5 *(TinyViT)*
 
 **[129]** A. Dosovitskiy, L. Beyer, A. Kolesnikov, D. Weissenborn, X. Zhai, T. Unterthiner, M. Dehghani, M. Minderer, G. Heigold, S. Gelly, J. Uszkoreit, and N. Houlsby, "An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale," in *Proc. International Conference on Learning Representations (ICLR)*, 2021. https://arxiv.org/abs/2010.11929 *(ViT)*
+
+**[130]** J. Pei, J. Han, B. Mortazavi-Asl, H. Pinto, Q. Chen, U. Dayal, and M.-C. Hsu, "PrefixSpan: Mining Sequential Patterns Efficiently by Prefix-Projected Pattern Growth," in *Proc. 17th International Conference on Data Engineering (ICDE)*, 2001, pp. 215-224. https://doi.org/10.1109/ICDE.2001.914830 *(PrefixSpan)*
+
+**[131]** M. J. Zaki, "SPADE: An Efficient Algorithm for Mining Frequent Sequences," *Machine Learning*, vol. 42, pp. 31-60, 2001. https://doi.org/10.1023/A:1007652502315 *(SPADE)*
+
+**[132]** D. P. Kingma and M. Welling, "Auto-Encoding Variational Bayes," in *Proc. International Conference on Learning Representations (ICLR)*, 2014. https://arxiv.org/abs/1312.6114 *(VAE)*
+
+**[133]** D. P. Kingma and J. Ba, "Adam: A Method for Stochastic Optimization," in *Proc. International Conference on Learning Representations (ICLR)*, 2015. https://arxiv.org/abs/1412.6980 *(Adam)*
+
+**[134]** I. Goodfellow, J. Pouget-Abadie, M. Mirza, B. Xu, D. Warde-Farley, S. Ozair, A. Courville, and Y. Bengio, "Generative Adversarial Nets," in *Advances in Neural Information Processing Systems (NIPS)*, 2014. *(GAN)*
+
+**[135]** I. Goodfellow, D. Warde-Farley, M. Mirza, A. Courville, and Y. Bengio, "Maxout Networks," in *Proc. International Conference on Machine Learning (ICML)*, 2013. *(Maxout)*
+
+**[136]** I. Sutskever, J. Martens, G. Dahl, and G. Hinton, "On the importance of initialization and momentum in deep learning," in *Proc. International Conference on Machine Learning (ICML)*, 2013. *(SGD Momentum / Nesterov)*
+
 
 ---
 

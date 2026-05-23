@@ -969,6 +969,24 @@ DM_API void dm_experiment_append_row(const char            *csv_path,
 /** Scan results_root for CSV files and emit a Markdown summary report. */
 DM_API void dm_experiment_generate_report(const char *results_root);
 
+/* ─────────────────────────────────────────────────────────────────────────
+ * § 9  Variational Auto-Encoder (VAE)
+ * ───────────────────────────────────────────────────────────────────────── */
+DM_API void* dm_vae_create_raw(int input_dim, int hidden_dim, int latent_dim, float lr);
+DM_API void  dm_vae_free_raw(void *vae);
+DM_API float dm_vae_train_step_raw(void *vae, const float *x_batch, int batch_size);
+DM_API void  dm_vae_encode_raw(void *vae, const float *x_batch, int batch_size, float *mean_out, float *logvar_out);
+DM_API void  dm_vae_decode_raw(void *vae, const float *z_batch, int batch_size, float *out);
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * § 10  Generative Adversarial Network (GAN)
+ * ───────────────────────────────────────────────────────────────────────── */
+DM_API void* dm_gan_create_raw(int input_dim, int g_hidden, int noise_dim, int d_hidden, int maxout_k, float drop_prob, float lr, float momentum, int nesterov);
+DM_API void  dm_gan_free_raw(void *gan);
+DM_API void  dm_gan_generate_raw(void *gan, const float *z_batch, int batch_size, float *out);
+DM_API float dm_gan_train_d_step_raw(void *gan, const float *real_x_batch, const float *z_batch, int batch_size);
+DM_API float dm_gan_train_g_step_raw(void *gan, const float *z_batch, int batch_size);
+
 #ifdef __cplusplus
 }
 #endif

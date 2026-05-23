@@ -313,3 +313,173 @@ void dm_softmax_rows(float *x, int rows, int cols)
         for (c = 0; c < cols; c++) row[c] /= sum;
     }
 }
+
+/* ─── Training Primitives ────────────────────────────────────────────────── */
+int dm_linear_backward(const DM_Tensor *in, const DM_Tensor *grad_out, DM_Tensor *grad_in, 
+                       float *grad_w, float *grad_b, const float *w, int out_c) {
+    if (!in || !grad_out) return -1;
+    int n, oc, ic;
+    if (grad_in && dm_tensor_alloc(grad_in, in->n, in->c, 1, 1) != 0) return -1;
+    if (grad_in) dm_tensor_fill(grad_in, 0.0f);
+    
+    for (n = 0; n < in->n; n++) {
+        for (oc = 0; oc < out_c; oc++) {
+            float go = dm_tensor_get(grad_out, n, oc, 0, 0);
+            if (grad_b) grad_b[oc] += go;
+            for (ic = 0; ic < in->c; ic++) {
+                float in_val = dm_tensor_get(in, n, ic, 0, 0);
+                if (grad_w) grad_w[(size_t)oc * (size_t)in->c + (size_t)ic] += go * in_val;
+                if (grad_in && w) {
+                    float current_gi = dm_tensor_get(grad_in, n, ic, 0, 0);
+                    dm_tensor_set(grad_in, n, ic, 0, 0, current_gi + go * w[(size_t)oc * (size_t)in->c + (size_t)ic]);
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+void dm_tanh_inplace(DM_Tensor *t) {
+    size_t count = dm_tensor_count(t);
+    for (size_t i = 0; i < count; i++) {
+        t->data[i] = tanhf(t->data[i]);
+    }
+}
+
+void dm_tanh_backward(const DM_Tensor *out, const DM_Tensor *grad_out, DM_Tensor *grad_in) {
+    if (dm_tensor_alloc(grad_in, out->n, out->c, out->h, out->w) != 0) return;
+    size_t count = dm_tensor_count(out);
+    for (size_t i = 0; i < count; i++) {
+        float o = out->data[i];
+        grad_in->data[i] = grad_out->data[i] * (1.0f - o * o);
+    }
+}
+
+void dm_sigmoid_inplace(DM_Tensor *t) {
+    size_t count = dm_tensor_count(t);
+    for (size_t i = 0; i < count; i++) {
+        t->data[i] = 1.0f / (1.0f + expf(-t->data[i]));
+    }
+}
+
+void dm_adagrad_step(float *param, float *grad, float *g_sum, int n, float lr, float eps, float weight_decay) {
+    for (int i = 0; i < n; i++) {
+        float g = grad[i];
+        if (weight_decay > 0.0f) g += weight_decay * param[i];
+        g_sum[i] += g * g;
+        param[i] -= (lr / (sqrtf(g_sum[i]) + eps)) * g;
+        grad[i] = 0.0f;
+    }
+}
+
+void dm_adam_step(float *param, float *grad, float *m, float *v, int n, 
+                  float lr, float beta1, float beta2, float eps, float weight_decay, int t) {
+    float beta1_t = 1.0f - powf(beta1, (float)t);
+    float beta2_t = 1.0f - powf(beta2, (float)t);
+    
+    for (int i = 0; i < n; i++) {
+        float g = grad[i];
+        if (weight_decay > 0.0f) g += weight_decay * param[i];
+        
+        m[i] = beta1 * m[i] + (1.0f - beta1) * g;
+        v[i] = beta2 * v[i] + (1.0f - beta2) * g * g;
+        
+        float m_hat = m[i] / beta1_t;
+        float v_hat = v[i] / beta2_t;
+        
+        param[i] -= lr * m_hat / (sqrtf(v_hat) + eps);
+        grad[i] = 0.0f; // reset grad
+    }
+}
+
+void dm_sgd_momentum_step(float *param, float *grad, float *velocity, int n, float lr, float momentum, float weight_decay, int nesterov) {
+    for (int i = 0; i < n; i++) {
+        float g = grad[i];
+        if (weight_decay > 0.0f) g += weight_decay * param[i];
+        velocity[i] = momentum * velocity[i] - lr * g;
+        if (nesterov) {
+            param[i] += momentum * velocity[i] - lr * g;
+        } else {
+            param[i] += velocity[i];
+        }
+        grad[i] = 0.0f;
+    }
+}
+
+void dm_relu_backward(const DM_Tensor *in, const DM_Tensor *grad_out, DM_Tensor *grad_in) {
+    size_t count = dm_tensor_count(in);
+    for (size_t i = 0; i < count; i++) {
+        grad_in->data[i] = in->data[i] > 0.0f ? grad_out->data[i] : 0.0f;
+    }
+}
+
+int dm_maxout(const DM_Tensor *in, DM_Tensor *out, int k, int *argmax) {
+    if (k <= 0 || in->c % k != 0) return -1;
+    int out_c = in->c / k;
+    if (out->n != in->n || out->c != out_c || out->h != in->h || out->w != in->w) return -1;
+    
+    int spatial = in->h * in->w;
+    for (int n = 0; n < in->n; n++) {
+        for (int c = 0; c < out_c; c++) {
+            for (int s = 0; s < spatial; s++) {
+                float max_val = -1e30f;
+                int max_idx = -1;
+                for (int j = 0; j < k; j++) {
+                    int in_c = c * k + j;
+                    int in_idx = (n * in->c + in_c) * spatial + s;
+                    float val = in->data[in_idx];
+                    if (val > max_val || max_idx == -1) {
+                        max_val = val;
+                        max_idx = in_idx;
+                    }
+                }
+                int out_idx = (n * out_c + c) * spatial + s;
+                out->data[out_idx] = max_val;
+                if (argmax) argmax[out_idx] = max_idx;
+            }
+        }
+    }
+    return 0;
+}
+
+int dm_maxout_backward(const DM_Tensor *grad_out, DM_Tensor *grad_in, int k, const int *argmax) {
+    if (grad_in->c % k != 0 || grad_in->c / k != grad_out->c) return -1;
+    if (!argmax) return -1;
+    
+    size_t in_count = dm_tensor_count(grad_in);
+    for (size_t i = 0; i < in_count; i++) {
+        grad_in->data[i] = 0.0f;
+    }
+    
+    size_t out_count = dm_tensor_count(grad_out);
+    for (size_t i = 0; i < out_count; i++) {
+        int max_idx = argmax[i];
+        if (max_idx >= 0 && (size_t)max_idx < in_count) {
+            grad_in->data[max_idx] += grad_out->data[i];
+        }
+    }
+    return 0;
+}
+
+void dm_dropout(const DM_Tensor *in, DM_Tensor *out, float drop_prob, int *mask) {
+    size_t count = dm_tensor_count(in);
+    float scale = 1.0f / (1.0f - drop_prob);
+    for (size_t i = 0; i < count; i++) {
+        float r = (float)rand() / (float)RAND_MAX;
+        if (r < drop_prob) {
+            out->data[i] = 0.0f;
+            if (mask) mask[i] = 0;
+        } else {
+            out->data[i] = in->data[i] * scale;
+            if (mask) mask[i] = 1;
+        }
+    }
+}
+
+void dm_dropout_backward(const DM_Tensor *grad_out, DM_Tensor *grad_in, float drop_prob, const int *mask) {
+    size_t count = dm_tensor_count(grad_out);
+    float scale = 1.0f / (1.0f - drop_prob);
+    for (size_t i = 0; i < count; i++) {
+        grad_in->data[i] = mask && mask[i] ? grad_out->data[i] * scale : 0.0f;
+    }
+}
