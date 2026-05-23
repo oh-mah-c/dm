@@ -41,6 +41,31 @@ inline std::string version() { return dm_version(); }
 inline void init() { check(dm_init(), "dm::init"); }
 
 /* ─────────────────────────────────────────────────────────────────────────
+ * Backend selection
+ *
+ * dm_engine picks the best available backend automatically.
+ * Override with the DM_BACKEND env var or backend_set().
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/** Detect available backends and select the best one (idempotent). */
+inline void backend_init() { dm_backend_init(); }
+
+/** Return the currently active backend. */
+inline DM_Backend backend_get() { return dm_backend_get(); }
+
+/**
+ * Override the active backend.
+ * Pass DM_BACKEND_AUTO to re-run auto-detection.
+ */
+inline void backend_set(DM_Backend b) { dm_backend_set(b); }
+
+/** Return a full capability snapshot. */
+inline DM_BackendInfo backend_query() { return dm_backend_query(); }
+
+/** Human-readable name for a backend constant. */
+inline std::string backend_name(DM_Backend b) { return dm_backend_name(b); }
+
+/* ─────────────────────────────────────────────────────────────────────────
  * Dataset
  * ───────────────────────────────────────────────────────────────────────── */
 

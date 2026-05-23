@@ -229,11 +229,80 @@ try (DM.Tokenizer tok = new DM.Tokenizer("bpe")) {
 
 ---
 
+## Backend selection
+
+dm automatically picks the best available compute backend at startup and
+routes every op through it:
+
+| Tier | Backend | Description |
+|------|---------|-------------|
+| 0 | **CPU** | Pure-C fallback — always available, no dependencies |
+| 1 | **Vulkan compute** | Portable GPU compute shader (any Vulkan GPU) |
+| 2 | **TensorFlow** | TFE/XLA/cuDNN/oneDNN — XLA Tensor Core on NVIDIA |
+| 3 | **CUDA / ROCm** | Vendor-optimised stubs (future work) |
+
+Detection runs **highest-tier first**: TF > Vulkan > CPU.  Override with:
+
+```bash
+export DM_BACKEND=cpu          # force CPU-only
+export DM_BACKEND=vulkan       # force Vulkan portable
+export DM_BACKEND=tensorflow   # force TFE (default when TF library present)
+export DM_BACKEND=auto         # re-run auto-detection (default)
+```
+
+Or override at runtime:
+
+```python
+# Python
+import dm
+dm.init()                              # also calls dm.backend_init()
+info = dm.backend_query()
+print(dm.backend_name(info['active'])) # → "tensorflow" / "vulkan" / "cpu"
+dm.backend_set(dm.DM_BACKEND_CPU)     # force CPU for this session
+```
+
+```cpp
+// C++
+dm::init();   // calls dm::backend_init() internally
+auto info = dm::backend_query();
+// info.active, info.tf_available, info.vulkan_available, …
+dm::backend_set(DM_BACKEND_VULKAN_COMPUTE);
+std::cout << dm::backend_name(dm::backend_get()) << "\n";
+```
+
+```go
+// Go
+dm.Init()   // calls dm.BackendInit() internally
+info := dm.BackendQuery()
+fmt.Println(dm.BackendName(info.Active))
+dm.BackendSet(dm.DM_BACKEND_CPU)
+```
+
+```js
+// JavaScript
+dm.init();
+const info = dm.backendQuery();
+console.log(dm.backendName(info.active));   // "tensorflow" / "vulkan" / "cpu"
+dm.backendSet(dm.DM_BACKEND_CPU);
+```
+
+```java
+// Java
+DM.init();   // calls DM.backendInit() internally
+DM.BackendInfo info = DM.backendQuery();
+System.out.println(info);               // BackendInfo{active=tensorflow, tf=true, …}
+DM.backendSet(DM.DM_BACKEND_CPU);
+```
+
+**Design principle:** *Portable by default. Accelerated when possible. Vendor-locked never.*
+
+---
+
 ## dm_engine — Building custom models
 
-`dm_engine` is the neural-compute core of dm.  Every op dispatches through
-the **TensorFlow Eager C API** (`TFE_*`), so XLA, cuDNN, and oneDNN
-acceleration is available automatically — no extra configuration.
+`dm_engine` is the compute core of dm.  Ops automatically use the active
+backend (TFE when TensorFlow is available, Vulkan when not, pure-C CPU as
+the always-available fallback).
 
 Users can compose custom architectures from these primitives exactly the same
 way they would compose TensorFlow layers:

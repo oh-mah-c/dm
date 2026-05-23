@@ -99,6 +99,15 @@ def _fn(name: str, restype, *argtypes):
     return f
 
 
+# § 8a  Backend selection constants
+DM_BACKEND_CPU             = 0
+DM_BACKEND_VULKAN_COMPUTE  = 1
+DM_BACKEND_VULKAN_COOP_MAT = 2
+DM_BACKEND_TENSORFLOW      = 3
+DM_BACKEND_CUDA            = 4
+DM_BACKEND_ROCM            = 5
+DM_BACKEND_AUTO            = 255
+
 # § 1  Core
 _dm_version        = _fn("dm_version",        c_char_p)
 _dm_version_number = _fn("dm_version_number", ctypes.c_uint32)
@@ -324,6 +333,28 @@ _dm_op_sgd_momentum_step = _fn("dm_op_sgd_momentum_step", None,
                                  ctypes.POINTER(c_float),
                                  c_int, c_float, c_float, c_float, c_int)
 
+# § 8a  Backend dispatch
+
+class _DM_BackendInfo(ctypes.Structure):
+    """ctypes mirror of DM_BackendInfo (6 int fields)."""
+    _fields_ = [
+        ("active",             c_int),
+        ("tf_available",       c_int),
+        ("vulkan_available",   c_int),
+        ("coop_mat_available", c_int),
+        ("cuda_available",     c_int),
+        ("rocm_available",     c_int),
+    ]
+
+_dm_backend_init  = _fn("dm_backend_init",  None)
+_dm_backend_get   = _fn("dm_backend_get",   c_int)
+_dm_backend_set   = _fn("dm_backend_set",   None, c_int)
+_dm_backend_name  = _fn("dm_backend_name",  c_char_p, c_int)
+# dm_backend_query returns DM_BackendInfo by value
+_lib.dm_backend_query.restype  = _DM_BackendInfo
+_lib.dm_backend_query.argtypes = []
+_dm_backend_query = _lib.dm_backend_query
+
 # § 9  VAE (was § 8 before engine section was added)
 _dm_vae_create_raw      = _fn("dm_vae_create_raw", c_void_p, c_int, c_int, c_int, c_float)
 _dm_vae_free_raw        = _fn("dm_vae_free_raw", None, c_void_p)
@@ -429,6 +460,52 @@ def init() -> None:
 
 def strerror(code: int) -> str:
     return _dm_strerror(code).decode()
+
+
+# ── § 8a  Backend selection ───────────────────────────────────────────────────
+
+def backend_init() -> None:
+    """Detect available backends and select the best one (idempotent).
+
+    Respects the DM_BACKEND environment variable:
+      cpu, vulkan, tensorflow, auto
+    """
+    _dm_backend_init()
+
+
+def backend_get() -> int:
+    """Return the currently active backend constant (DM_BACKEND_*)."""
+    return int(_dm_backend_get())
+
+
+def backend_set(b: int) -> None:
+    """Override the active backend.
+
+    Pass DM_BACKEND_AUTO to re-run auto-detection.
+    """
+    _dm_backend_set(b)
+
+
+def backend_query() -> dict:
+    """Return a dict with full backend capability info.
+
+    Keys: active, tf_available, vulkan_available, coop_mat_available,
+          cuda_available, rocm_available
+    """
+    qi = _dm_backend_query()
+    return {
+        "active":             int(qi.active),
+        "tf_available":       bool(qi.tf_available),
+        "vulkan_available":   bool(qi.vulkan_available),
+        "coop_mat_available": bool(qi.coop_mat_available),
+        "cuda_available":     bool(qi.cuda_available),
+        "rocm_available":     bool(qi.rocm_available),
+    }
+
+
+def backend_name(b: int) -> str:
+    """Return a human-readable name for a DM_BACKEND_* constant."""
+    return _dm_backend_name(b).decode()
 
 
 # ── § 2  Dataset ──────────────────────────────────────────────────────────────

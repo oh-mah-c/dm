@@ -82,12 +82,29 @@ const DM_BenchReport = StructType({
 
 // ── FFI bindings ──────────────────────────────────────────────────────────────
 
+// DM_BackendInfo struct layout (matches C: 6 ints)
+const DM_BackendInfo = StructType({
+  active:             int_t,
+  tf_available:       int_t,
+  vulkan_available:   int_t,
+  coop_mat_available: int_t,
+  cuda_available:     int_t,
+  rocm_available:     int_t,
+});
+
 const lib = ffi.Library(LIB_PATH, {
   // § 1  Core
   dm_version:        [ str_p,   [] ],
   dm_version_number: [ 'uint32', [] ],
   dm_init:           [ int_t,   [] ],
   dm_strerror:       [ str_p,   [int_t] ],
+
+  // § 8  Backend
+  dm_backend_init:  [ 'void',      [] ],
+  dm_backend_get:   [ int_t,       [] ],
+  dm_backend_set:   [ 'void',      [int_t] ],
+  dm_backend_query: [ DM_BackendInfo, [] ],
+  dm_backend_name:  [ str_p,       [int_t] ],
 
   // § 2  Dataset
   dm_dataset_open:    [ void_p, [str_p, str_p] ],
@@ -243,6 +260,56 @@ function nullTermArray(strings) {
   ptrs.forEach((p, i) => ref.writePointer(arr, i * ref.sizeof.pointer, p));
   return arr;
 }
+
+// ── § 8  Backend ──────────────────────────────────────────────────────────────
+
+// Backend constants (mirror DM_Backend enum)
+const DM_BACKEND_CPU             = 0;
+const DM_BACKEND_VULKAN_COMPUTE  = 1;
+const DM_BACKEND_VULKAN_COOP_MAT = 2;
+const DM_BACKEND_TENSORFLOW      = 3;
+const DM_BACKEND_CUDA            = 4;
+const DM_BACKEND_ROCM            = 5;
+const DM_BACKEND_AUTO            = 255;
+
+/**
+ * Detect available backends and select the best one (idempotent).
+ * Respects DM_BACKEND env var: cpu | vulkan | tensorflow | auto
+ */
+function backendInit()  { lib.dm_backend_init(); }
+
+/** @returns {number} currently active DM_Backend constant */
+function backendGet()   { return lib.dm_backend_get(); }
+
+/**
+ * Override the active backend.
+ * @param {number} b — DM_BACKEND_* constant; pass DM_BACKEND_AUTO to re-detect
+ */
+function backendSet(b)  { lib.dm_backend_set(b); }
+
+/**
+ * Return a capability snapshot.
+ * @returns {{ active, tf_available, vulkan_available, coop_mat_available,
+ *             cuda_available, rocm_available }}
+ */
+function backendQuery() {
+  const q = lib.dm_backend_query();
+  return {
+    active:             q.active,
+    tf_available:       q.tf_available,
+    vulkan_available:   q.vulkan_available,
+    coop_mat_available: q.coop_mat_available,
+    cuda_available:     q.cuda_available,
+    rocm_available:     q.rocm_available,
+  };
+}
+
+/**
+ * Human-readable name for a backend constant.
+ * @param {number} b — DM_BACKEND_* constant
+ * @returns {string} e.g. "tensorflow", "vulkan", "cpu"
+ */
+function backendName(b) { return lib.dm_backend_name(b); }
 
 // ── § 1  Core ─────────────────────────────────────────────────────────────────
 
@@ -566,6 +633,10 @@ module.exports = {
   DM_OK, DM_LIB_PATH: LIB_PATH,
   BENCH_LOAD, BENCH_ALGO, BENCH_WRITE, BENCH_TOTAL,
 
+  // § 8  Backend constants
+  DM_BACKEND_CPU, DM_BACKEND_VULKAN_COMPUTE, DM_BACKEND_VULKAN_COOP_MAT,
+  DM_BACKEND_TENSORFLOW, DM_BACKEND_CUDA, DM_BACKEND_ROCM, DM_BACKEND_AUTO,
+
   // § 1
   version, versionNumber, init, strerror,
 
@@ -584,9 +655,10 @@ module.exports = {
   // § 6
   LM,
 
-  // § 8  Engine
+  // § 8  Engine + Backend
   Tensor,
   op,
+  backendInit, backendGet, backendSet, backendQuery, backendName,
 
   // § 9
   benchReset, benchStart, benchStop, benchRecord, getBenchReport, benchPrint,

@@ -223,6 +223,12 @@ extern int dm_flat_load_mmap(const char *path,
                               DM_FlatDataset *out,
                               DM_ConnectorStats *stats);
 
+/* §8a Backend dispatch — internal symbols match public names exactly;
+ * dm_backend_init/get/set/query/name are exported from dm_backend.c
+ * directly under their public names so no shim wrappers are needed here.
+ * We declare them extern so dm_init() can call dm_backend_init(). */
+extern void dm_backend_init(void);
+
 /* §18 Experiment renamed functions */
 extern double dm_timer_now_seconds(void);
 extern double get_peak_ram_mb(void);
@@ -292,8 +298,9 @@ DM_API uint32_t dm_version_number(void) {
 }
 
 DM_API DM_Status dm_init(void) {
-    /* Algorithms self-register via __attribute__((constructor)).
-       Reserve for future global setup (e.g. GPU warm-up). */
+    /* Algorithms self-register via __attribute__((constructor)). */
+    /* Initialise backend dispatch (detects TFE / Vulkan / CPU). */
+    dm_backend_init();
     return DM_OK;
 }
 

@@ -500,6 +500,43 @@ DM_API DM_Status dm_image_patchify_raw(const float *in_nhwc,
                                        int         *out_patches);
 
 /* ─────────────────────────────────────────────────────────────────────────
+ * § 8a  Backend selection
+ *
+ * dm_engine automatically picks the best available backend at startup.
+ * Override with the DM_BACKEND env var or dm_backend_set().
+ *
+ *   DM_BACKEND=cpu         force CPU-only
+ *   DM_BACKEND=vulkan      force Vulkan portable
+ *   DM_BACKEND=tensorflow  force TFE (default when available)
+ *   DM_BACKEND=auto        auto-detect (default)
+ * ───────────────────────────────────────────────────────────────────────── */
+
+typedef enum {
+    DM_BACKEND_CPU             = 0,   /* pure-C, always available             */
+    DM_BACKEND_VULKAN_COMPUTE  = 1,   /* Vulkan portable compute              */
+    DM_BACKEND_VULKAN_COOP_MAT = 2,   /* Vulkan cooperative matrix (optional) */
+    DM_BACKEND_TENSORFLOW      = 3,   /* TFE — XLA/cuDNN/oneDNN               */
+    DM_BACKEND_CUDA            = 4,   /* CUDA/Tensor Core (future)            */
+    DM_BACKEND_ROCM            = 5,   /* ROCm/HIP (future)                    */
+    DM_BACKEND_AUTO            = 255  /* runtime picks best available         */
+} DM_Backend;
+
+typedef struct {
+    DM_Backend active;
+    int        tf_available;
+    int        vulkan_available;
+    int        coop_mat_available;
+    int        cuda_available;
+    int        rocm_available;
+} DM_BackendInfo;
+
+DM_API void           dm_backend_init  (void);
+DM_API DM_Backend     dm_backend_get   (void);
+DM_API void           dm_backend_set   (DM_Backend b);
+DM_API DM_BackendInfo dm_backend_query (void);
+DM_API const char    *dm_backend_name  (DM_Backend b);
+
+/* ─────────────────────────────────────────────────────────────────────────
  * § 8  Engine — dm_engine core (TFE backend, NCHW float32)
  *
  * dm_engine is the compute core of dm.  Every op dispatches through the

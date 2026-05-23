@@ -17,6 +17,35 @@ package dm
 #include "dm.h"
 #include <stdlib.h>
 #include <string.h>
+
+// Backend shims — static inline so gopls resolves them from this preamble
+// without needing to chase the #cgo CFLAGS include path.
+typedef struct {
+    int active;
+    int tf_available;
+    int vulkan_available;
+    int coop_mat_available;
+    int cuda_available;
+    int rocm_available;
+} DmCgoBackendInfo;
+
+static inline void dm_cgo_backend_init(void) { dm_backend_init(); }
+static inline int  dm_cgo_backend_get(void)  { return (int)dm_backend_get(); }
+static inline void dm_cgo_backend_set(int b) { dm_backend_set((DM_Backend)b); }
+static inline DmCgoBackendInfo dm_cgo_backend_query(void) {
+    DM_BackendInfo q = dm_backend_query();
+    DmCgoBackendInfo r;
+    r.active             = (int)q.active;
+    r.tf_available       = q.tf_available;
+    r.vulkan_available   = q.vulkan_available;
+    r.coop_mat_available = q.coop_mat_available;
+    r.cuda_available     = q.cuda_available;
+    r.rocm_available     = q.rocm_available;
+    return r;
+}
+static inline const char *dm_cgo_backend_name(int b) {
+    return dm_backend_name((DM_Backend)b);
+}
 */
 import "C"
 import (
@@ -53,6 +82,57 @@ func Init() error { return statusErr(C.dm_init(), "dm.Init") }
 func Strerror(code int) string {
 	return C.GoString(C.dm_strerror(C.DM_Status(code)))
 }
+
+// ── § 8a  Backend selection ───────────────────────────────────────────────────
+
+// DM_Backend tier constants mirror the C enum.
+const (
+	BackendCPU            = 0   // pure-C, always available
+	BackendVulkanCompute  = 1   // Vulkan portable compute
+	BackendVulkanCoopMat  = 2   // Vulkan cooperative matrix (optional)
+	BackendTensorFlow     = 3   // TFE — XLA/cuDNN/oneDNN
+	BackendCUDA           = 4   // CUDA (future)
+	BackendROCm           = 5   // ROCm (future)
+	BackendAuto           = 255 // runtime auto-detect
+)
+
+// BackendInfo mirrors DM_BackendInfo.
+type BackendInfo struct {
+	Active           int
+	TFAvailable      bool
+	VulkanAvailable  bool
+	CoopMatAvailable bool
+	CUDAAvailable    bool
+	ROCmAvailable    bool
+}
+
+// BackendInit detects available backends and selects the best one.
+// Respects the DM_BACKEND environment variable (cpu|vulkan|tensorflow|auto).
+// Idempotent.
+func BackendInit() { C.dm_cgo_backend_init() }
+
+// BackendGet returns the currently active backend constant.
+func BackendGet() int { return int(C.dm_cgo_backend_get()) }
+
+// BackendSet overrides the active backend.
+// Pass BackendAuto to re-run auto-detection.
+func BackendSet(b int) { C.dm_cgo_backend_set(C.int(b)) }
+
+// BackendQuery returns a full capability snapshot.
+func BackendQuery() BackendInfo {
+	qi := C.dm_cgo_backend_query()
+	return BackendInfo{
+		Active:           int(qi.active),
+		TFAvailable:      qi.tf_available != 0,
+		VulkanAvailable:  qi.vulkan_available != 0,
+		CoopMatAvailable: qi.coop_mat_available != 0,
+		CUDAAvailable:    qi.cuda_available != 0,
+		ROCmAvailable:    qi.rocm_available != 0,
+	}
+}
+
+// BackendName returns a human-readable name for a backend constant.
+func BackendName(b int) string { return C.GoString(C.dm_cgo_backend_name(C.int(b))) }
 
 // ── § 2  Dataset ──────────────────────────────────────────────────────────────
 
