@@ -40,7 +40,14 @@ def test_native_bpe_paper_toy_example(tmp: Path):
         str(vocab),
         "--stats",
     ])
-    stats = json.loads(learned.stderr)
+    # Extract JSON substring from stderr to handle potential logger lines
+    stderr_str = learned.stderr
+    start_idx = stderr_str.find('{')
+    end_idx = stderr_str.rfind('}')
+    if start_idx != -1 and end_idx != -1:
+        stats = json.loads(stderr_str[start_idx:end_idx+1])
+    else:
+        stats = json.loads(stderr_str)
     assert stats["word_types"] == 4
     assert stats["word_tokens"] == 16
     assert stats["merges"] == 10

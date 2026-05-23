@@ -182,6 +182,12 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 ### Self-Contained Data Generators
 74. **LAGA** - Self-contained Layout-Aware Generative Architecture for knowledge-preserving synthetic transaction, utility, sequence, text, and tabular data generation using embedded encoding, support/co-occurrence/transition layouts, miner-style evaluation, privacy rejection, and closed-loop repair.
 
+### Vision Models (Deep Learning)
+75. **ResNet-18** — Pure-C99 implementation of He et al.'s Deep Residual Network (ResNet) using BasicBlocks (two 3×3 convs + identity/projection shortcut), BatchNorm, ReLU, MaxPool, GlobalAvgPool, and a linear classifier head. Exposed via `libdm.so` FFI and a Python numpy binding.
+76. **MobileNetV4-Tiny** — Lightweight depthwise-separable CNN for edge inference, adapted from Howard et al.'s MobileNet family. Full forward-pass implemented in C99 with NHWC layout.
+77. **TinyViT** — Compact Vision Transformer backbone with patch embedding, multi-head self-attention, and MLP blocks implemented in C99, suited for resource-constrained classification.
+78. **ViT (Vision Transformer)** — Full C99 implementation of Dosovitskiy et al.'s ViT (ICLR 2021). Supports five variants: Tiny (D=192, L=5), Small (D=384, L=6), Base (D=768, L=12), Large (D=1024, L=24), Huge (D=1280, L=32). Architecture: patch embedding → [CLS] + 1D position embeddings → L×(LN→MHSA→residual, LN→MLP-GELU→residual) → LN → linear head. Exposed via `libdm.so` FFI (`dm_op_vit_forward`) and CLI (`./bin/dm.exe vit bench --variant small`).
+
 ---
 
 ## 🚀 Getting Started
@@ -201,7 +207,7 @@ gcc -Iinclude -Iinclude/core -Wall -Wextra -O2 -pthread src/main.c src/core/*.c 
 ```bash
 ./bin/dm.exe <algorithm> <dataset_path> <format> <min_support> [min_io] [ins_threshold] [prn_threshold] [decay_base] [decay_life]
 ```
-* **`<algorithm>` / direct subcommand**: `ais`, `apriori`, `eclat`, `fpgrowth`, `tree_projection`, `aclose`, `close`, `closet`, `closetplus`, `fpclose`, `charm`, `dci_closed`, `lcm`, `lcmver2`, `nafcp`, `fcfia`, `max_miner`, `genmax`, `fpmax`, `mafia`, `hep`, `fhoi`, `dfhoi`, `tkhoim`, `hoimto`, `mfhoi`, `fhoi_miner`, `weak_mfhoi_miner`, `strong_mfhoi_miner`, `mhoui`, `houi_miner`, `weak_mhoui_miner`, `strong_mhoui_miner`, `direct_mhoui_miner`, `regular_mine`, `negfin`, `prepost`, `prepostplus`, `dic`, `ltm`, `sam`, `carpenter`, `dbv_miner`, `defme`, `talky_g`, `pascal`, `zart`, `apriori_rare`, `apriori_inverse`, `cori`, `rp_tree`, `estdec`, `clostream`, `cfi_stream`, `uapriori`, `msapriori`, `ffiminer`, `ubmffp`, `dfigrowth`, `sum`, `mlhui_miner`, `fchm`, `vhuqi`, `fhuqi_miner`, `tkq`, `thue`, `mheinu`, `dphim`, `closed_fhuim_kinana`, `uspan`, `hupspm`, `hup_miner`, `hiep`, `maximal_munch`, `bpe`, `bpe_dropout`, `unigram`, `sentencepiece`, `tokenizer_lab`, `gpe`, `parity_bpe`, `fast_wordpiece`.
+* **`<algorithm>` / direct subcommand**: `ais`, `apriori`, `eclat`, `fpgrowth`, `tree_projection`, `aclose`, `close`, `closet`, `closetplus`, `fpclose`, `charm`, `dci_closed`, `lcm`, `lcmver2`, `nafcp`, `fcfia`, `max_miner`, `genmax`, `fpmax`, `mafia`, `hep`, `fhoi`, `dfhoi`, `tkhoim`, `hoimto`, `mfhoi`, `fhoi_miner`, `weak_mfhoi_miner`, `strong_mfhoi_miner`, `mhoui`, `houi_miner`, `weak_mhoui_miner`, `strong_mhoui_miner`, `direct_mhoui_miner`, `regular_mine`, `negfin`, `prepost`, `prepostplus`, `dic`, `ltm`, `sam`, `carpenter`, `dbv_miner`, `defme`, `talky_g`, `pascal`, `zart`, `apriori_rare`, `apriori_inverse`, `cori`, `rp_tree`, `estdec`, `clostream`, `cfi_stream`, `uapriori`, `msapriori`, `ffiminer`, `ubmffp`, `dfigrowth`, `sum`, `mlhui_miner`, `fchm`, `vhuqi`, `fhuqi_miner`, `tkq`, `thue`, `mheinu`, `dphim`, `closed_fhuim_kinana`, `uspan`, `hupspm`, `hup_miner`, `hiep`, `maximal_munch`, `bpe`, `bpe_dropout`, `unigram`, `sentencepiece`, `tokenizer_lab`, `gpe`, `parity_bpe`, `fast_wordpiece`, `resnet18`, `mobilenet_tiny`, `vit`.
 * **`vhuqi`** uses `<min_support>` as the absolute minimum utility threshold and accepts optional `[qrc]`, defaulting to `3`.
 * **`fhuqi_miner`** requires quantity format `4`: `./bin/dm.exe fhuqi_miner <quantity_dataset> 4 <theta> <qrc> <all|min|max> <profit_file>`.
 * **`tkq`** requires quantity format `4`: `./bin/dm.exe tkq <quantity_dataset> 4 <k> <qrc> <all|min|max> <profit_file>`.
@@ -500,6 +506,14 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 **[124]** T. Reps, "Maximal-munch tokenization in linear time," *ACM Transactions on Programming Languages and Systems*, vol. 20, no. 2, pp. 259-273, 1998. https://doi.org/10.1145/276393.276394 *(Reps Maximal-Munch Scanner)*
 
 **[125]** C. Xu, B. Zhou, T. Gan, Q. Zheng, and L. Li, "Vocabulary Learning via Optimal Transport for Neural Machine Translation," in *Proc. 59th Annual Meeting of the Association for Computational Linguistics (ACL 2021)*, pp. 7361–7373, 2021. https://aclanthology.org/2021.acl-long.571/ *(VOLT)*
+
+**[126]** K. He, X. Zhang, S. Ren, and J. Sun, "Deep Residual Learning for Image Recognition," in *Proc. IEEE Conference on Computer Vision and Pattern Recognition (CVPR)*, 2016, pp. 770–778. https://doi.org/10.1109/CVPR.2016.90 *(ResNet-18)*
+
+**[127]** A. G. Howard, M. Zhu, B. Chen, D. Kalenichenko, W. Wang, T. Weyand, M. Andreetto, and H. Adam, "MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications," arXiv:1704.04861, 2017. https://arxiv.org/abs/1704.04861 *(MobileNetV4-Tiny)*
+
+**[128]** K. Wu, J. Zhang, H. Peng, M. Liu, B. Xiao, J. Fu, and L. Yuan, "TinyViT: Fast Pretraining Distillation for Small Vision Transformers," in *Proc. European Conference on Computer Vision (ECCV)*, 2022, pp. 68–85. https://doi.org/10.1007/978-3-031-20083-0_5 *(TinyViT)*
+
+**[129]** A. Dosovitskiy, L. Beyer, A. Kolesnikov, D. Weissenborn, X. Zhai, T. Unterthiner, M. Dehghani, M. Minderer, G. Heigold, S. Gelly, J. Uszkoreit, and N. Houlsby, "An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale," in *Proc. International Conference on Learning Representations (ICLR)*, 2021. https://arxiv.org/abs/2010.11929 *(ViT)*
 
 ---
 

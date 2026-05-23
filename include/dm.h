@@ -312,6 +312,10 @@ DM_API DM_Status  dm_tinyvit_load(const char *weight_path,
                                    int               *img_size_out,
                                    float            **weights_out);
 
+/** Free weights allocated by dm_tinyvit_load. */
+DM_API void       dm_tinyvit_free_weights(float *weights);
+
+
 /**
  * Fast Pretraining Distillation — save sparse teacher logits (Section 3.1).
  * @param out_path      Output .tspl file path
@@ -349,6 +353,50 @@ DM_API DM_Status  dm_tinyvit_distill_loss(const float    *student_logits,
                                            float          *loss_out);
 
 /* ─────────────────────────────────────────────────────────────────────────
+ * § 5c  MobileNet Tiny
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * MobileNetV4-Tiny forward pass.
+ * If head_w is NULL, head weights will be randomly initialized using the seed.
+ * @param img_nchw      float[3 × img_size × img_size] NCHW layout image values (0.0-1.0)
+ * @param img_size      Width/height of input image (usually 64 or 224)
+ * @param classes       Number of classification classes
+ * @param seed          PRNG seed for weight/activation randomness
+ * @param head_w        Optional head weight tensor: float[classes × feature_dim] (NULL to use seed)
+ * @param head_b        Optional head bias tensor: float[classes] (NULL to use zero bias)
+ * @param logits_out    Output logits: float[classes] (softmax activation will be applied)
+ */
+DM_API DM_Status dm_mobilenet_tiny_forward_raw(const float *img_nchw,
+                                               int          img_size,
+                                               int          classes,
+                                               unsigned int seed,
+                                               const float *head_w,
+                                               const float *head_b,
+                                               float       *logits_out);
+
+/** Load classification head weights. */
+DM_API DM_Status dm_mobilenet_tiny_head_load(const char    *path,
+                                             int           *classes_out,
+                                             int           *feature_dim_out,
+                                             int           *image_size_out,
+                                             unsigned int  *seed_out,
+                                             float        **w_out,
+                                             float        **b_out);
+
+/** Save classification head weights. */
+DM_API DM_Status dm_mobilenet_tiny_head_save(const char  *path,
+                                             int          classes,
+                                             int          feature_dim,
+                                             int          image_size,
+                                             unsigned int seed,
+                                             const float *w,
+                                             const float *b);
+
+/** Free weights allocated by dm_mobilenet_tiny_head_load. */
+DM_API void      dm_mobilenet_tiny_head_free(float *w, float *b);
+
+/* ─────────────────────────────────────────────────────────────────────────
  * § 6  Language Model
  *       • "transformer"       — Transformer encoder-decoder (Vaswani et al.
  *                               NeurIPS 2017 / arXiv:1706.03762)
@@ -378,6 +426,46 @@ DM_API DM_Status  dm_lm_generate(DM_LM        lm,
                                   int          buf_size);
 DM_API DM_Status  dm_lm_load    (DM_LM lm, const char *checkpoint_dir);
 DM_API void       dm_lm_free    (DM_LM lm);
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * § 6b  BERT
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/** Get the total number of float weights for the BERT config. */
+DM_API size_t    dm_bert_weight_count_raw(int variant, int vocab_size, int max_seq_len);
+
+/** Load weights from a binary checkpoint file. */
+DM_API DM_Status dm_bert_load_raw(const char *path,
+                                  int        *variant_out,
+                                  int        *vocab_size_out,
+                                  int        *max_seq_len_out,
+                                  float     **weights_out);
+
+/** Free weights allocated by dm_bert_load_raw. */
+DM_API void      dm_bert_free_weights(float *weights);
+
+/** Full BERT forward pass returning final layer states & CLS pooling. */
+DM_API DM_Status dm_bert_forward_raw(int          variant,
+                                     int          vocab_size,
+                                     int          max_seq_len,
+                                     const float *weights,
+                                     const int   *token_ids,
+                                     const int   *segment_ids,
+                                     int          seq,
+                                     float       *hidden_out,
+                                     float       *cls_out);
+
+/** BERT forward pass with attention mask. */
+DM_API DM_Status dm_bert_forward_masked_raw(int          variant,
+                                            int          vocab_size,
+                                            int          max_seq_len,
+                                            const float *weights,
+                                            const int   *token_ids,
+                                            const int   *segment_ids,
+                                            const int   *attention_mask,
+                                            int          seq,
+                                            float       *hidden_out,
+                                            float       *cls_out);
 
 /* ─────────────────────────────────────────────────────────────────────────
  * § 7  Image utilities
@@ -441,6 +529,17 @@ DM_API DM_Status dm_op_linear        (const DM_Tensor *in, DM_Tensor *out,
 DM_API DM_Status dm_op_global_avg_pool(const DM_Tensor *in, DM_Tensor *out);
 DM_API void      dm_op_relu6         (DM_Tensor *t);
 DM_API void      dm_op_softmax       (DM_Tensor *t);
+DM_API void      dm_op_relu          (DM_Tensor *t);
+DM_API DM_Status dm_op_tensor_add    (DM_Tensor *out, const DM_Tensor *in);
+DM_API DM_Status dm_op_max_pool2d_same(const DM_Tensor *in, DM_Tensor *out, int kernel, int stride);
+DM_API DM_Status dm_op_batch_norm    (DM_Tensor *t, const float *gamma, const float *beta, const float *mean, const float *var, float eps);
+DM_API DM_Status dm_op_resnet18_forward(const DM_Tensor *input, DM_Tensor *logits, int classes, unsigned int seed);
+DM_API DM_Status dm_op_resnet_basic_block(const DM_Tensor *in, DM_Tensor *out, int out_c, int stride, unsigned int seed);
+/* variant: 0=tiny 1=small 2=base 3=large 4=huge */
+DM_API DM_Status dm_op_vit_forward(const DM_Tensor *input, DM_Tensor *logits,
+                                    int variant, int num_classes, unsigned int seed);
+DM_API size_t    dm_op_vit_param_count(int variant, int img_size, int patch_size,
+                                        int num_classes);
 
 /* ─────────────────────────────────────────────────────────────────────────
  * § 9  Benchmark

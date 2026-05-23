@@ -1151,7 +1151,7 @@ class WindowMHSA(L.Layer):\n\
         self.proj = L.Dense(d,   use_bias=True)\n\
         # Relative position bias table: [heads, (2W-1)^2]\n\
         nb = (2*W-1)**2\n\
-        self.rel_bias = self.add_weight(name+'_rel_bias',\n\
+        self.rel_bias = self.add_weight(name=name+'_rel_bias',\n\
                             shape=(heads, nb), initializer='zeros')\n\
         # Build relative position index\n\
         coords = tf.stack(tf.meshgrid(tf.range(W),tf.range(W),indexing='ij'),axis=-1)\n\
@@ -1331,7 +1331,10 @@ for epoch in range(epochs):\n\
 # Since the C forward pass uses its own weight layout, we use the TF\n\
 # SavedModel for actual trained inference via TF_LoadSessionFromSavedModel.\n\
 saved_dir = out_path.replace('.bin','_saved')\n\
-model.save(saved_dir)\n\
+if hasattr(model, 'export'):\n\
+    model.export(saved_dir)\n\
+else:\n\
+    model.save(saved_dir)\n\
 print(f'SavedModel written to {saved_dir}')\n\
 print(f'For C inference, load weights from {saved_dir} via TF C API.')\n\
 print('Done.')\n\
@@ -1373,7 +1376,7 @@ static int run_tf_train(int argc, char **argv)
     /* Build command */
     char cmd[2048];
     snprintf(cmd, sizeof(cmd),
-             "python3 %s %s %s %s %d %d %d %g %d %s %d",
+             "python3 %s %s %s %s %d %d %d %g %d \"%s\" %d",
              script_path, manifest, out, variant_s,
              num_classes, epochs, batch, lr, img_size,
              labels ? labels : "", topK);

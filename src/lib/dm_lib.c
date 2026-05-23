@@ -25,6 +25,16 @@
 #include "dm.h"
 #include "models/lm/bert.h"
 
+typedef struct DM_Spec DM_Spec;
+typedef struct DM_Ledger DM_Ledger;
+
+DM_Spec* dm_spec_new(void);
+void dm_spec_free(DM_Spec *spec);
+DM_Ledger* dm_ledger_new(void);
+void dm_ledger_free(DM_Ledger *ledger);
+int dm_spec_parse(const char *path, DM_Spec *spec, DM_Ledger *ledger);
+int dm_medm_repair_and_feedback(DM_Spec *spec, DM_Ledger *ledger, const char *output_base_path, const char *real_dataset_path, unsigned int seed);
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -465,7 +475,263 @@ typedef struct {
     char type[32];
     char model_dir[512];
     int  trained;
+    char **vocab;
+    int  vocab_size;
 } _TokHandle;
+
+static int is_space_char(char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+static void free_vocab(_TokHandle *h) {
+    if (h->vocab) {
+        for (int i = 0; i < h->vocab_size; i++) {
+            free(h->vocab[i]);
+        }
+        free(h->vocab);
+        h->vocab = NULL;
+    }
+    h->vocab_size = 0;
+}
+
+static char *dm_xstrndup(const char *s, size_t n) {
+    char *p = malloc(n + 1);
+    if (p) {
+        memcpy(p, s, n);
+        p[n] = '\0';
+    }
+    return p;
+}
+
+static void load_vocab_for_handle(_TokHandle *h) {
+    free_vocab(h);
+
+    if (strcmp(h->type, "sentencepiece") == 0) {
+        FILE *f = fopen(h->model_dir, "r");
+        if (!f) return;
+        fseek(f, 0, SEEK_END);
+        long size = ftell(f);
+        rewind(f);
+        char *buf = malloc(size + 1);
+        if (!buf) { fclose(f); return; }
+        size_t read_bytes = fread(buf, 1, size, f);
+        buf[read_bytes] = '\0';
+        fclose(f);
+
+        char *p = strstr(buf, "\"vocab\"");
+        if (p) {
+            p = strchr(p, '[');
+            if (p) {
+                p++;
+                int cap = 1024;
+                h->vocab = malloc(cap * sizeof(char *));
+                h->vocab_size = 0;
+                while (p && *p) {
+                    char *end = strchr(p, ']');
+                    char *q = strchr(p, '"');
+                    if (!q || (end && end < q)) break;
+                    q++;
+                    char *e = strchr(q, '"');
+                    if (!e) break;
+                    
+                    int len = e - q;
+                    char *s = malloc(len + 1);
+                    if (s) {
+                        memcpy(s, q, len);
+                        s[len] = '\0';
+                    }
+
+                    if (h->vocab_size >= cap) {
+                        cap *= 2;
+                        h->vocab = realloc(h->vocab, cap * sizeof(char *));
+                    }
+                    if (s) {
+                        h->vocab[h->vocab_size++] = s;
+                    }
+                    p = e + 1;
+                }
+            }
+        }
+        free(buf);
+    } else if (strcmp(h->type, "bpe") == 0) {
+        int cap = 256 + 1024;
+        h->vocab = malloc(cap * sizeof(char *));
+        for (int i = 0; i < 256; i++) {
+            h->vocab[i] = malloc(2);
+            h->vocab[i][0] = (char)i;
+            h->vocab[i][1] = '\0';
+        }
+        h->vocab_size = 256;
+
+        FILE *f = fopen(h->model_dir, "r");
+        if (f) {
+            char line[1024];
+            while (fgets(line, sizeof(line), f)) {
+                size_t ln = strlen(line);
+                while (ln && (line[ln - 1] == '\n' || line[ln - 1] == '\r')) line[--ln] = '\0';
+                char *s = line;
+                while (*s && is_space_char(*s)) s++;
+                if (!*s || *s == '#') continue;
+                
+                char *left = strtok(s, " \t");
+                char *right = strtok(NULL, " \t");
+                if (left && right) {
+                    int len1 = strlen(left);
+                    int len2 = strlen(right);
+                    char *new_tok = malloc(len1 + len2 + 1);
+                    if (new_tok) {
+                        strcpy(new_tok, left);
+                        strcat(new_tok, right);
+                    }
+
+                    if (h->vocab_size >= cap) {
+                        cap *= 2;
+                        h->vocab = realloc(h->vocab, cap * sizeof(char *));
+                    }
+                    if (new_tok) {
+                        h->vocab[h->vocab_size++] = new_tok;
+                    }
+                }
+            }
+            fclose(f);
+        }
+    } else if (strcmp(h->type, "unigram") == 0) {
+        FILE *f = fopen(h->model_dir, "r");
+        if (f) {
+            char line[4096];
+            int cap = 1024;
+            h->vocab = malloc(cap * sizeof(char *));
+            h->vocab_size = 0;
+            while (fgets(line, sizeof(line), f)) {
+                size_t ln = strlen(line);
+                while (ln && (line[ln - 1] == '\n' || line[ln - 1] == '\r')) line[--ln] = '\0';
+                if (!line[0] || line[0] == '#') continue;
+                
+                char *tab = strrchr(line, '\t');
+                if (tab) {
+                    *tab = '\0';
+                    char *new_piece = strdup(line);
+                    if (h->vocab_size >= cap) {
+                        cap *= 2;
+                        h->vocab = realloc(h->vocab, cap * sizeof(char *));
+                    }
+                    if (new_piece) {
+                        h->vocab[h->vocab_size++] = new_piece;
+                    }
+                }
+            }
+            fclose(f);
+        }
+    } else if (strcmp(h->type, "gpe") == 0 || strcmp(h->type, "parity_bpe") == 0) {
+        int cap = 256 + 1024;
+        h->vocab = malloc(cap * sizeof(char *));
+        for (int i = 0; i < 256; i++) {
+            h->vocab[i] = malloc(2);
+            h->vocab[i][0] = (char)i;
+            h->vocab[i][1] = '\0';
+        }
+        h->vocab_size = 256;
+
+        FILE *f = fopen(h->model_dir, "r");
+        if (f) {
+            fseek(f, 0, SEEK_END);
+            long size = ftell(f);
+            rewind(f);
+            char *buf = malloc(size + 1);
+            if (buf) {
+                size_t read_bytes = fread(buf, 1, size, f);
+                buf[read_bytes] = '\0';
+                
+                char *p = strstr(buf, "\"merges\"");
+                if (p) {
+                    p = strchr(p, '[');
+                    if (p) {
+                        p++;
+                        while (p && *p) {
+                            char *end = strstr(p, "],\n");
+                            char *pair = strchr(p, '[');
+                            if (!pair || (end && end < pair)) break;
+                            
+                            char *q = strchr(pair, '"');
+                            if (!q) break;
+                            q++;
+                            char *e = strchr(q, '"');
+                            if (!e) break;
+                            int len1 = e - q;
+                            char *left = malloc(len1 + 1);
+                            if (left) {
+                                memcpy(left, q, len1);
+                                left[len1] = '\0';
+                            }
+                            
+                            q = strchr(e + 1, '"');
+                            if (!q) { free(left); break; }
+                            q++;
+                            e = strchr(q, '"');
+                            if (!e) { free(left); break; }
+                            int len2 = e - q;
+                            char *right = malloc(len2 + 1);
+                            if (right) {
+                                memcpy(right, q, len2);
+                                right[len2] = '\0';
+                            }
+                            
+                            char *new_tok = NULL;
+                            if (left && right) {
+                                new_tok = malloc(len1 + len2 + 1);
+                                if (new_tok) {
+                                    strcpy(new_tok, left);
+                                    strcat(new_tok, right);
+                                }
+                            }
+                            free(left);
+                            free(right);
+                            
+                            if (h->vocab_size >= cap) {
+                                cap *= 2;
+                                h->vocab = realloc(h->vocab, cap * sizeof(char *));
+                            }
+                            if (new_tok) {
+                                h->vocab[h->vocab_size++] = new_tok;
+                            }
+                            p = e + 1;
+                        }
+                    }
+                }
+                free(buf);
+            }
+            fclose(f);
+        }
+    }
+}
+
+static int find_vocab_id(_TokHandle *h, const char *piece) {
+    if (strcmp(h->type, "bpe") == 0 || strcmp(h->type, "unigram") == 0) {
+        int len = strlen(piece);
+        if (len >= 2 && strcmp(piece + len - 2, "@@") == 0) {
+            char clean[256];
+            strncpy(clean, piece, len - 2);
+            clean[len - 2] = '\0';
+            for (int i = 0; i < h->vocab_size; i++) {
+                if (strcmp(h->vocab[i], clean) == 0) return i;
+            }
+        } else {
+            char with_eow[256];
+            snprintf(with_eow, sizeof(with_eow), "%s</w>", piece);
+            for (int i = 0; i < h->vocab_size; i++) {
+                if (strcmp(h->vocab[i], with_eow) == 0) return i;
+            }
+            for (int i = 0; i < h->vocab_size; i++) {
+                if (strcmp(h->vocab[i], piece) == 0) return i;
+            }
+        }
+    } else {
+        for (int i = 0; i < h->vocab_size; i++) {
+            if (strcmp(h->vocab[i], piece) == 0) return i;
+        }
+    }
+    return -1;
+}
 
 DM_API DM_Tokenizer dm_tokenizer_create(const char *type) {
     if (!type) return NULL;
@@ -506,17 +772,52 @@ DM_API DM_Status dm_tokenizer_train(DM_Tokenizer tok,
     _TokHandle *h = (_TokHandle *)tok;
     char vs[32];
     snprintf(vs, sizeof(vs), "%d", vocab_size);
-    char *argv[] = {
-        (char *)h->type, "train",
-        "-i", (char *)corpus_path,
-        "-o", (char *)output_path,
-        "--vocab-size", vs,
-        NULL
-    };
-    int rc = call_tokenizer_cli(h->type, 8, argv);
+
+    int rc = 0;
+    if (strcmp(h->type, "bpe") == 0) {
+        char *argv[] = {
+            "bpe", "learn-bpe",
+            "-i", (char *)corpus_path,
+            "-m", vs,
+            "-o", (char *)output_path,
+            NULL
+        };
+        rc = call_tokenizer_cli(h->type, 8, argv);
+    } else if (strcmp(h->type, "sentencepiece") == 0) {
+        char *argv[] = {
+            "sentencepiece", "train",
+            "--input", (char *)corpus_path,
+            "--vocab-size", vs,
+            "-o", (char *)output_path,
+            NULL
+        };
+        rc = call_tokenizer_cli(h->type, 8, argv);
+    } else if (strcmp(h->type, "parity_bpe") == 0) {
+        char *argv[] = {
+            "parity_bpe", "train",
+            "--input-labeled", (char *)corpus_path,
+            "--merges", vs,
+            "-o", (char *)output_path,
+            NULL
+        };
+        rc = call_tokenizer_cli(h->type, 8, argv);
+    } else if (strcmp(h->type, "unigram") == 0 || strcmp(h->type, "gpe") == 0) {
+        char *argv[] = {
+            (char *)h->type, "train",
+            "-i", (char *)corpus_path,
+            "-o", (char *)output_path,
+            "--vocab-size", vs,
+            NULL
+        };
+        rc = call_tokenizer_cli(h->type, 8, argv);
+    } else {
+        return DM_ERR_GENERIC;
+    }
+
     if (rc == 0) {
         strncpy(h->model_dir, output_path, sizeof(h->model_dir) - 1);
         h->trained = 1;
+        load_vocab_for_handle(h);
     }
     return rc == 0 ? DM_OK : DM_ERR_GENERIC;
 }
@@ -526,6 +827,7 @@ DM_API DM_Status dm_tokenizer_load(DM_Tokenizer tok, const char *model_path) {
     _TokHandle *h = (_TokHandle *)tok;
     strncpy(h->model_dir, model_path, sizeof(h->model_dir) - 1);
     h->trained = 1;
+    load_vocab_for_handle(h);
     return DM_OK;
 }
 
@@ -546,14 +848,49 @@ DM_API DM_Status dm_tokenizer_encode(DM_Tokenizer  tok,
     if (!f) return DM_ERR_IO;
     fputs(text, f); fputc('\n', f); fclose(f);
 
-    char *argv[] = {
-        (char *)h->type, "encode",
-        "-m", h->model_dir,
-        "-i", tmp_in,
-        "-o", tmp_out,
-        NULL
-    };
-    int rc = call_tokenizer_cli(h->type, 8, argv);
+    int rc = 0;
+    if (strcmp(h->type, "sentencepiece") == 0) {
+        char *argv[] = {
+            "sentencepiece", "encode",
+            "--model", h->model_dir,
+            "--input", tmp_in,
+            "--output", tmp_out,
+            "--output-format", "id",
+            NULL
+        };
+        rc = call_tokenizer_cli(h->type, 10, argv);
+    } else if (strcmp(h->type, "bpe") == 0) {
+        char *argv[] = {
+            "bpe", "apply-bpe",
+            "-c", h->model_dir,
+            "-i", tmp_in,
+            "-o", tmp_out,
+            NULL
+        };
+        rc = call_tokenizer_cli(h->type, 8, argv);
+    } else if (strcmp(h->type, "parity_bpe") == 0) {
+        char *argv[] = {
+            "parity_bpe", "encode",
+            "-m", h->model_dir,
+            "-i", tmp_in,
+            "-o", tmp_out,
+            NULL
+        };
+        rc = call_tokenizer_cli(h->type, 8, argv);
+    } else if (strcmp(h->type, "unigram") == 0 || strcmp(h->type, "gpe") == 0) {
+        char *argv[] = {
+            (char *)h->type, "encode",
+            "-m", h->model_dir,
+            "-i", tmp_in,
+            "-o", tmp_out,
+            NULL
+        };
+        rc = call_tokenizer_cli(h->type, 8, argv);
+    } else {
+        remove(tmp_in);
+        return DM_ERR_GENERIC;
+    }
+
     remove(tmp_in);
     if (rc != 0) { remove(tmp_out); return DM_ERR_GENERIC; }
 
@@ -561,11 +898,27 @@ DM_API DM_Status dm_tokenizer_encode(DM_Tokenizer  tok,
     if (!f) { remove(tmp_out); return DM_ERR_IO; }
 
     int capacity = *in_out_len, count = 0;
-    unsigned int val;
-    while (fscanf(f, "%u", &val) == 1) {
-        if (count < capacity) out_ids[count] = (uint32_t)val;
-        count++;
+
+    if (strcmp(h->type, "sentencepiece") == 0) {
+        unsigned int val;
+        while (fscanf(f, "%u", &val) == 1) {
+            if (count < capacity) out_ids[count] = (uint32_t)val;
+            count++;
+        }
+    } else {
+        if (!h->vocab) load_vocab_for_handle(h);
+        if (!h->vocab) { fclose(f); remove(tmp_out); return DM_ERR_GENERIC; }
+
+        char piece[512];
+        while (fscanf(f, "%511s", piece) == 1) {
+            int id = find_vocab_id(h, piece);
+            if (id != -1) {
+                if (count < capacity) out_ids[count] = (uint32_t)id;
+                count++;
+            }
+        }
     }
+
     fclose(f); remove(tmp_out);
     if (count > capacity) { *in_out_len = count; return DM_ERR_MEMORY; }
     *in_out_len = count;
@@ -578,65 +931,122 @@ DM_API DM_Status dm_tokenizer_decode(DM_Tokenizer   tok,
                                       char           *out_buf,
                                       int             buf_size)
 {
-    if (!tok || !ids || !out_buf || n_ids <= 0) return DM_ERR_INVALID_PARAM;
+    if (!tok || !ids || !out_buf || n_ids <= 0 || buf_size <= 0) return DM_ERR_INVALID_PARAM;
     _TokHandle *h = (_TokHandle *)tok;
     if (!h->trained) return DM_ERR_INVALID_PARAM;
 
-    char tmp_in[256], tmp_out[256];
-    snprintf(tmp_in,  sizeof(tmp_in),  "/tmp/dm_dec_in_%d.txt",  (int)getpid());
-    snprintf(tmp_out, sizeof(tmp_out), "/tmp/dm_dec_out_%d.txt", (int)getpid());
+    if (strcmp(h->type, "sentencepiece") == 0) {
+        char tmp_in[256], tmp_out[256];
+        snprintf(tmp_in,  sizeof(tmp_in),  "/tmp/dm_dec_in_%d.txt",  (int)getpid());
+        snprintf(tmp_out, sizeof(tmp_out), "/tmp/dm_dec_out_%d.txt", (int)getpid());
 
-    FILE *f = fopen(tmp_in, "w");
-    if (!f) return DM_ERR_IO;
-    for (int i = 0; i < n_ids; i++) fprintf(f, "%u%s", ids[i], i+1<n_ids?" ":"");
-    fputc('\n', f); fclose(f);
+        FILE *f = fopen(tmp_in, "w");
+        if (!f) return DM_ERR_IO;
+        for (int i = 0; i < n_ids; i++) fprintf(f, "%u%s", ids[i], i+1<n_ids?" ":"");
+        fputc('\n', f); fclose(f);
 
-    char *argv[] = {
-        (char *)h->type, "decode",
-        "-m", h->model_dir,
-        "-i", tmp_in,
-        "-o", tmp_out,
-        NULL
-    };
-    int rc = call_tokenizer_cli(h->type, 8, argv);
-    remove(tmp_in);
-    if (rc != 0) { remove(tmp_out); return DM_ERR_GENERIC; }
+        char *argv[] = {
+            "sentencepiece", "decode",
+            "--model", h->model_dir,
+            "--input", tmp_in,
+            "--output", tmp_out,
+            "--input-format", "id",
+            NULL
+        };
+        int rc = call_tokenizer_cli(h->type, 10, argv);
+        remove(tmp_in);
+        if (rc != 0) { remove(tmp_out); return DM_ERR_GENERIC; }
 
-    f = fopen(tmp_out, "r");
-    if (!f) { remove(tmp_out); return DM_ERR_IO; }
-    size_t n = fread(out_buf, 1, (size_t)(buf_size - 1), f);
-    out_buf[n] = '\0';
-    if (n > 0 && out_buf[n-1] == '\n') out_buf[--n] = '\0';
-    fclose(f); remove(tmp_out);
-    return DM_OK;
+        f = fopen(tmp_out, "r");
+        if (!f) { remove(tmp_out); return DM_ERR_IO; }
+        size_t n = fread(out_buf, 1, (size_t)(buf_size - 1), f);
+        out_buf[n] = '\0';
+        if (n > 0 && out_buf[n-1] == '\n') out_buf[--n] = '\0';
+        fclose(f); remove(tmp_out);
+        return DM_OK;
+    } else {
+        if (!h->vocab) load_vocab_for_handle(h);
+        if (!h->vocab) return DM_ERR_GENERIC;
+
+        out_buf[0] = '\0';
+        int current_len = 0;
+
+        for (int i = 0; i < n_ids; i++) {
+            uint32_t id = ids[i];
+            if (id >= (uint32_t)h->vocab_size) return DM_ERR_INVALID_PARAM;
+            const char *piece = h->vocab[id];
+
+            char clean[256];
+            strncpy(clean, piece, sizeof(clean) - 1);
+            clean[sizeof(clean) - 1] = '\0';
+            int len = strlen(clean);
+
+            if (strcmp(h->type, "bpe") == 0 || strcmp(h->type, "unigram") == 0) {
+                if (len >= 4 && strcmp(clean + len - 4, "</w>") == 0) {
+                    clean[len - 4] = '\0';
+                    len -= 4;
+                }
+
+                int has_suffix = 0;
+                if (len >= 2 && strcmp(clean + len - 2, "@@") == 0) {
+                    clean[len - 2] = '\0';
+                    len -= 2;
+                    has_suffix = 1;
+                }
+
+                int needed = len + (has_suffix ? 0 : 1);
+                if (current_len + needed >= buf_size) {
+                    return DM_ERR_MEMORY;
+                }
+
+                strcat(out_buf, clean);
+                current_len += len;
+                if (!has_suffix && i + 1 < n_ids) {
+                    strcat(out_buf, " ");
+                    current_len++;
+                }
+            } else {
+                if (current_len + len >= buf_size) {
+                    return DM_ERR_MEMORY;
+                }
+                strcat(out_buf, clean);
+                current_len += len;
+            }
+        }
+        return DM_OK;
+    }
 }
 
 DM_API int dm_tokenizer_vocab_size(DM_Tokenizer tok) {
     if (!tok) return 0;
     _TokHandle *h = (_TokHandle *)tok;
     if (!h->trained) return 0;
-    char tmp[256];
-    snprintf(tmp, sizeof(tmp), "/tmp/dm_vs_%d.txt", (int)getpid());
-    char *argv[] = { (char *)h->type, "vocab", "-m", h->model_dir, "-o", tmp, NULL };
-    int rc = call_tokenizer_cli(h->type, 6, argv);
-    if (rc != 0) return 0;
-    FILE *f = fopen(tmp, "r");
-    if (!f) return 0;
-    int count = 0; char line[4096];
-    while (fgets(line, sizeof(line), f)) count++;
-    fclose(f); remove(tmp);
-    return count;
+    if (!h->vocab) load_vocab_for_handle(h);
+    return h->vocab_size;
 }
 
 DM_API const char *dm_tokenizer_token_text(DM_Tokenizer tok, uint32_t id,
                                             uint32_t *out_len)
 {
-    (void)tok; (void)id;
-    if (out_len) *out_len = 0;
-    return NULL; /* not available without in-memory vocab */
+    if (!tok) return NULL;
+    _TokHandle *h = (_TokHandle *)tok;
+    if (!h->trained) return NULL;
+    if (!h->vocab) load_vocab_for_handle(h);
+    if (!h->vocab || id >= (uint32_t)h->vocab_size) {
+        if (out_len) *out_len = 0;
+        return NULL;
+    }
+    if (out_len) *out_len = (uint32_t)strlen(h->vocab[id]);
+    return h->vocab[id];
 }
 
-DM_API void dm_tokenizer_free(DM_Tokenizer tok) { free(tok); }
+DM_API void dm_tokenizer_free(DM_Tokenizer tok) {
+    if (tok) {
+        _TokHandle *h = (_TokHandle *)tok;
+        free_vocab(h);
+        free(h);
+    }
+}
 
 DM_API DM_Status dm_tokenizer_volt_run(const char *corpus_path,
                                         int min_size, int max_size,
@@ -835,6 +1245,12 @@ DM_API DM_Status dm_tinyvit_load(const char *weight_path,
     return DM_OK;
 }
 
+DM_API void dm_tinyvit_free_weights(float *weights)
+{
+    free(weights);
+}
+
+
 DM_API DM_Status dm_tinyvit_save_labels(const char *out_path,
                                          int num_images, int num_classes, int topK,
                                          const uint32_t *indices, const float *values,
@@ -1021,6 +1437,73 @@ DM_API DM_Status dm_lm_generate(DM_LM lm, const char *prompt,
 DM_API void dm_lm_free(DM_LM lm) { free(lm); }
 
 /* =========================================================================
+ * § 6b  BERT
+ * ========================================================================= */
+
+DM_API size_t dm_bert_weight_count_raw(int variant, int vocab_size, int max_seq_len)
+{
+    BertConfig cfg;
+    dm_bert_config_init(&cfg, (BertVariant)variant, vocab_size, max_seq_len);
+    return dm_bert_weight_count(&cfg);
+}
+
+DM_API DM_Status dm_bert_load_raw(const char *path,
+                                  int        *variant_out,
+                                  int        *vocab_size_out,
+                                  int        *max_seq_len_out,
+                                  float     **weights_out)
+{
+    if (!path || !weights_out) return DM_ERR_INVALID_PARAM;
+    BertConfig cfg;
+    int rc = dm_bert_load(path, &cfg, weights_out);
+    if (rc != 0) return DM_ERR_GENERIC;
+    if (variant_out)     *variant_out     = (int)cfg.variant;
+    if (vocab_size_out)  *vocab_size_out  = cfg.vocab_size;
+    if (max_seq_len_out) *max_seq_len_out = cfg.max_seq_len;
+    return DM_OK;
+}
+
+DM_API void dm_bert_free_weights(float *weights)
+{
+    free(weights);
+}
+
+DM_API DM_Status dm_bert_forward_raw(int          variant,
+                                     int          vocab_size,
+                                     int          max_seq_len,
+                                     const float *weights,
+                                     const int   *token_ids,
+                                     const int   *segment_ids,
+                                     int          seq,
+                                     float       *hidden_out,
+                                     float       *cls_out)
+{
+    if (!weights || !token_ids || !segment_ids || !hidden_out) return DM_ERR_INVALID_PARAM;
+    BertConfig cfg;
+    dm_bert_config_init(&cfg, (BertVariant)variant, vocab_size, max_seq_len);
+    int rc = dm_bert_forward(&cfg, weights, token_ids, segment_ids, seq, hidden_out, cls_out);
+    return rc == 0 ? DM_OK : DM_ERR_GENERIC;
+}
+
+DM_API DM_Status dm_bert_forward_masked_raw(int          variant,
+                                            int          vocab_size,
+                                            int          max_seq_len,
+                                            const float *weights,
+                                            const int   *token_ids,
+                                            const int   *segment_ids,
+                                            const int   *attention_mask,
+                                            int          seq,
+                                            float       *hidden_out,
+                                            float       *cls_out)
+{
+    if (!weights || !token_ids || !segment_ids || !hidden_out) return DM_ERR_INVALID_PARAM;
+    BertConfig cfg;
+    dm_bert_config_init(&cfg, (BertVariant)variant, vocab_size, max_seq_len);
+    int rc = dm_bert_forward_masked(&cfg, weights, token_ids, segment_ids, attention_mask, seq, hidden_out, cls_out);
+    return rc == 0 ? DM_OK : DM_ERR_GENERIC;
+}
+
+/* =========================================================================
  * § 7  Image utilities
  *
  * dm_image_patchify_raw: raw float-buffer version (avoids name clash with
@@ -1122,6 +1605,65 @@ DM_API DM_Status dm_op_global_avg_pool(const DM_Tensor *in, DM_Tensor *out) {
 DM_API void dm_op_relu6  (DM_Tensor *t) { dm_relu6(t);   }
 DM_API void dm_op_softmax(DM_Tensor *t) { dm_softmax(t); }
 
+DM_API void dm_op_relu(DM_Tensor *t) {
+    dm_relu(t);
+}
+
+DM_API DM_Status dm_op_tensor_add(DM_Tensor *out, const DM_Tensor *in) {
+    return dm_tensor_add(out, in) == 0 ? DM_OK : DM_ERR_GENERIC;
+}
+
+DM_API DM_Status dm_op_max_pool2d_same(const DM_Tensor *in, DM_Tensor *out, int kernel, int stride) {
+    return dm_max_pool2d_same(in, out, kernel, stride) == 0 ? DM_OK : DM_ERR_GENERIC;
+}
+
+DM_API DM_Status dm_op_batch_norm(DM_Tensor *t, const float *gamma, const float *beta, const float *mean, const float *var, float eps) {
+    return dm_batch_norm(t, gamma, beta, mean, var, eps) == 0 ? DM_OK : DM_ERR_GENERIC;
+}
+
+extern int dm_resnet18_forward(const DM_Tensor *input, DM_Tensor *logits, int classes, unsigned int seed);
+extern int dm_resnet_basic_block(const DM_Tensor *in, DM_Tensor *out, int out_c, int stride, unsigned int seed);
+
+DM_API DM_Status dm_op_resnet18_forward(const DM_Tensor *input, DM_Tensor *logits, int classes, unsigned int seed) {
+    return dm_resnet18_forward(input, logits, classes, seed) == 0 ? DM_OK : DM_ERR_GENERIC;
+}
+
+DM_API DM_Status dm_op_resnet_basic_block(const DM_Tensor *in, DM_Tensor *out, int out_c, int stride, unsigned int seed) {
+    return dm_resnet_basic_block(in, out, out_c, stride, seed) == 0 ? DM_OK : DM_ERR_GENERIC;
+}
+
+/* ViT FFI wrappers — forward-declare only the symbols we need to avoid
+ * re-including vit.h (which would conflict with the DM_Tensor already
+ * defined via dm.h at the top of this translation unit).              */
+typedef int ViTVariant_int;
+typedef struct { int variant; int img_size; int patch_size; int num_layers;
+                 int d_model; int mlp_dim; int num_heads; int num_classes; } ViTConfig_fwd;
+
+extern void dm_vit_config_init(void *cfg, ViTVariant_int v, int nc, int sz);
+extern int  dm_vit_forward(const DM_Tensor *in, DM_Tensor *out, const void *cfg,
+                            const float *w, unsigned int seed);
+extern size_t dm_vit_param_count(const void *cfg);
+
+DM_API DM_Status dm_op_vit_forward(const DM_Tensor *input, DM_Tensor *logits,
+                                    int variant, int num_classes, unsigned int seed)
+{
+    if (variant < 0 || variant > 4) return DM_ERR_GENERIC;
+    ViTConfig_fwd cfg;
+    dm_vit_config_init(&cfg, variant, num_classes, input ? input->h : 224);
+    return dm_vit_forward(input, logits, &cfg, NULL, seed) == 0
+           ? DM_OK : DM_ERR_GENERIC;
+}
+
+DM_API size_t dm_op_vit_param_count(int variant, int img_size, int patch_size,
+                                     int num_classes)
+{
+    if (variant < 0 || variant > 4) return 0;
+    ViTConfig_fwd cfg;
+    dm_vit_config_init(&cfg, variant, num_classes, img_size);
+    if (patch_size > 0) cfg.patch_size = patch_size;
+    return dm_vit_param_count(&cfg);
+}
+
 /* =========================================================================
  * § 9  Benchmark — renamed wrappers only
  *
@@ -1163,11 +1705,68 @@ DM_API DM_DataGen dm_datagen_create(const char *type) {
     return (DM_DataGen)h;
 }
 
+static void write_medm_spec_file(const char *spec_str, const char *temp_path) {
+    FILE *f = fopen(temp_path, "w");
+    if (!f) return;
+    char *copy = strdup(spec_str);
+    char *tok = strtok(copy, ",");
+    while (tok) {
+        char key[128], val[128];
+        if (sscanf(tok, "%127[^=]=%127s", key, val) == 2) {
+            if (strcmp(key, "nItems") == 0) strcpy(key, "item_count");
+            else if (strcmp(key, "nTxn") == 0) strcpy(key, "size");
+            else if (strcmp(key, "avgLen") == 0) strcpy(key, "avg_len");
+            fprintf(f, "%s=%s\n", key, val);
+        }
+        tok = strtok(NULL, ",");
+    }
+    free(copy);
+    fclose(f);
+}
+
 DM_API DM_Status dm_datagen_run(DM_DataGen gen, const char *spec,
                                   const char *output_path, unsigned seed)
 {
     if (!gen || !spec || !output_path) return DM_ERR_INVALID_PARAM;
     _DataGenHandle *h = (_DataGenHandle *)gen;
+
+    if (strcmp(h->type, "medm") == 0) {
+        char temp_spec[256];
+        temp_spec[0] = '\0';
+        const char *spec_file = spec;
+        FILE *test_f = fopen(spec, "r");
+        if (test_f) {
+            fclose(test_f);
+        } else {
+            snprintf(temp_spec, sizeof(temp_spec), "/tmp/dm_spec_%d.txt", (int)getpid());
+            write_medm_spec_file(spec, temp_spec);
+            spec_file = temp_spec;
+        }
+
+        DM_Spec *spec_ptr = dm_spec_new();
+        DM_Ledger *ledger_ptr = dm_ledger_new();
+        if (!spec_ptr || !ledger_ptr) {
+            if (spec_ptr) dm_spec_free(spec_ptr);
+            if (ledger_ptr) dm_ledger_free(ledger_ptr);
+            if (temp_spec[0]) remove(temp_spec);
+            return DM_ERR_MEMORY;
+        }
+
+        int rc = dm_spec_parse(spec_file, spec_ptr, ledger_ptr);
+        if (temp_spec[0]) remove(temp_spec);
+
+        if (rc != 0) {
+            dm_spec_free(spec_ptr);
+            dm_ledger_free(ledger_ptr);
+            return DM_ERR_IO;
+        }
+
+        int status = dm_medm_repair_and_feedback(spec_ptr, ledger_ptr, output_path, NULL, seed);
+        dm_spec_free(spec_ptr);
+        dm_ledger_free(ledger_ptr);
+        return status == 0 ? DM_OK : DM_ERR_GENERIC;
+    }
+
     char seed_s[16];
     snprintf(seed_s, sizeof(seed_s), "%u", seed);
     char *argv[] = {

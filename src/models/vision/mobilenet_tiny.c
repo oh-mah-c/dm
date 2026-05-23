@@ -1259,3 +1259,125 @@ int dm_mobilenet_tiny_cli(int argc, char **argv) {
     usage(argv[0]);
     return 2;
 }
+
+#ifndef DM_API
+#if defined(_WIN32) && defined(DM_BUILDING_LIB)
+#  define DM_API __declspec(dllexport)
+#elif defined(__GNUC__) && defined(DM_BUILDING_LIB)
+#  define DM_API __attribute__((visibility("default")))
+#else
+#  define DM_API
+#endif
+#endif
+
+typedef enum {
+    DM_OK                = 0,
+    DM_ERR_GENERIC       = -1,
+    DM_ERR_IO            = -2,
+    DM_ERR_MEMORY        = -3,
+    DM_ERR_INVALID_PARAM = -4
+} DM_Status;
+
+DM_API DM_Status dm_mobilenet_tiny_forward_raw(const float *img_nchw,
+                                               int          img_size,
+                                               int          classes,
+                                               unsigned int seed,
+                                               const float *head_w,
+                                               const float *head_b,
+                                               float       *logits_out)
+{
+    if (!img_nchw || !logits_out || img_size <= 0 || classes <= 0) return DM_ERR_INVALID_PARAM;
+
+    DM_Tensor input = {0};
+    if (dm_tensor_alloc(&input, 1, 3, img_size, img_size) != 0) return DM_ERR_MEMORY;
+    memcpy(input.data, img_nchw, 3 * img_size * img_size * sizeof(float));
+
+    DM_Tensor features = {0};
+    int rc = mobilenet_features(&input, &features, seed);
+    dm_tensor_free(&input);
+    if (rc != 0) {
+        dm_tensor_free(&features);
+        return DM_ERR_GENERIC;
+    }
+
+    DM_Tensor logits = {0};
+    if (dm_tensor_alloc(&logits, 1, classes, 1, 1) != 0) {
+        dm_tensor_free(&features);
+        return DM_ERR_MEMORY;
+    }
+
+    float *w_to_use = (float *)head_w;
+    float *w_alloc = NULL;
+    if (!w_to_use) {
+        w_alloc = make_weights((size_t)classes * features.c, seed + 700, 0.05f);
+        if (!w_alloc) {
+            dm_tensor_free(&features);
+            dm_tensor_free(&logits);
+            return DM_ERR_MEMORY;
+        }
+        w_to_use = w_alloc;
+    }
+
+    if (dm_linear(&features, &logits, w_to_use, head_b, classes) != 0) {
+        free(w_alloc);
+        dm_tensor_free(&features);
+        dm_tensor_free(&logits);
+        return DM_ERR_GENERIC;
+    }
+    dm_softmax(&logits);
+
+    memcpy(logits_out, logits.data, classes * sizeof(float));
+
+    free(w_alloc);
+    dm_tensor_free(&features);
+    dm_tensor_free(&logits);
+    return DM_OK;
+}
+
+DM_API DM_Status dm_mobilenet_tiny_head_load(const char    *path,
+                                             int           *classes_out,
+                                             int           *feature_dim_out,
+                                             int           *image_size_out,
+                                             unsigned int  *seed_out,
+                                             float        **w_out,
+                                             float        **b_out)
+{
+    if (!path || !w_out || !b_out) return DM_ERR_INVALID_PARAM;
+    TinyHead h;
+    memset(&h, 0, sizeof(h));
+    if (head_load(&h, path) != 0) return DM_ERR_GENERIC;
+    if (classes_out)     *classes_out     = h.classes;
+    if (feature_dim_out) *feature_dim_out = h.feature_dim;
+    if (image_size_out)  *image_size_out  = h.image_size;
+    if (seed_out)        *seed_out        = h.seed;
+    *w_out = h.w;
+    *b_out = h.b;
+    return DM_OK;
+}
+
+DM_API DM_Status dm_mobilenet_tiny_head_save(const char  *path,
+                                             int          classes,
+                                             int          feature_dim,
+                                             int          image_size,
+                                             unsigned int seed,
+                                             const float *w,
+                                             const float *b)
+{
+    if (!path || !w) return DM_ERR_INVALID_PARAM;
+    TinyHead h;
+    h.classes = classes;
+    h.feature_dim = feature_dim;
+    h.image_size = image_size;
+    h.seed = seed;
+    h.w = (float *)w;
+    h.b = (float *)b;
+    if (head_save(&h, path) != 0) return DM_ERR_GENERIC;
+    return DM_OK;
+}
+
+DM_API void dm_mobilenet_tiny_head_free(float *w, float *b)
+{
+    free(w);
+    free(b);
+}
+

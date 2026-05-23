@@ -149,6 +149,57 @@ _dm_vision_forward_raw = _fn("dm_vision_forward_raw",  DM_Status,
                                ctypes.POINTER(c_float), c_int, c_int, c_int,
                                ctypes.POINTER(c_float), c_int)
 
+# § 5b  TinyViT
+_dm_tinyvit_weight_count = _fn("dm_tinyvit_weight_count", c_size_t, c_int, c_int, c_int)
+_dm_tinyvit_forward      = _fn("dm_tinyvit_forward",      DM_Status,
+                               c_int, ctypes.POINTER(c_float), ctypes.POINTER(c_float),
+                               c_int, c_int, c_int, ctypes.POINTER(c_float))
+_dm_tinyvit_load         = _fn("dm_tinyvit_load",         DM_Status,
+                               c_char_p, ctypes.POINTER(c_int), ctypes.POINTER(c_int),
+                               ctypes.POINTER(c_int), ctypes.POINTER(ctypes.POINTER(c_float)))
+_dm_tinyvit_free_weights = _fn("dm_tinyvit_free_weights", None, ctypes.POINTER(c_float))
+_dm_tinyvit_save_labels  = _fn("dm_tinyvit_save_labels",  DM_Status,
+                               c_char_p, c_int, c_int, c_int,
+                               ctypes.POINTER(c_uint32), ctypes.POINTER(c_float), ctypes.POINTER(c_uint32))
+_dm_tinyvit_distill_loss = _fn("dm_tinyvit_distill_loss", DM_Status,
+                               ctypes.POINTER(c_float), ctypes.POINTER(c_uint32), ctypes.POINTER(c_float),
+                               c_int, c_int, c_float, ctypes.POINTER(c_float))
+
+
+# § 5c  MobileNet Tiny
+_dm_mobilenet_tiny_forward_raw = _fn("dm_mobilenet_tiny_forward_raw", DM_Status,
+                                     ctypes.POINTER(c_float), c_int, c_int, ctypes.c_uint32,
+                                     ctypes.POINTER(c_float), ctypes.POINTER(c_float),
+                                     ctypes.POINTER(c_float))
+_dm_mobilenet_tiny_head_load   = _fn("dm_mobilenet_tiny_head_load",   DM_Status,
+                                     c_char_p, ctypes.POINTER(c_int), ctypes.POINTER(c_int),
+                                     ctypes.POINTER(c_int), ctypes.POINTER(ctypes.c_uint32),
+                                     ctypes.POINTER(ctypes.POINTER(c_float)),
+                                     ctypes.POINTER(ctypes.POINTER(c_float)))
+_dm_mobilenet_tiny_head_save   = _fn("dm_mobilenet_tiny_head_save",   DM_Status,
+                                     c_char_p, c_int, c_int, c_int, ctypes.c_uint32,
+                                     ctypes.POINTER(c_float), ctypes.POINTER(c_float))
+_dm_mobilenet_tiny_head_free   = _fn("dm_mobilenet_tiny_head_free",   None,
+                                     ctypes.POINTER(c_float), ctypes.POINTER(c_float))
+
+
+# § 6b  BERT
+_dm_bert_weight_count_raw    = _fn("dm_bert_weight_count_raw",    c_size_t, c_int, c_int, c_int)
+_dm_bert_load_raw            = _fn("dm_bert_load_raw",            DM_Status,
+                                   c_char_p, ctypes.POINTER(c_int), ctypes.POINTER(c_int),
+                                   ctypes.POINTER(c_int), ctypes.POINTER(ctypes.POINTER(c_float)))
+_dm_bert_free_weights        = _fn("dm_bert_free_weights",        None, ctypes.POINTER(c_float))
+_dm_bert_forward_raw         = _fn("dm_bert_forward_raw",         DM_Status,
+                                   c_int, c_int, c_int, ctypes.POINTER(c_float),
+                                   ctypes.POINTER(c_int), ctypes.POINTER(c_int), c_int,
+                                   ctypes.POINTER(c_float), ctypes.POINTER(c_float))
+_dm_bert_forward_masked_raw  = _fn("dm_bert_forward_masked_raw",  DM_Status,
+                                   c_int, c_int, c_int, ctypes.POINTER(c_float),
+                                   ctypes.POINTER(c_int), ctypes.POINTER(c_int),
+                                   ctypes.POINTER(c_int), c_int,
+                                   ctypes.POINTER(c_float), ctypes.POINTER(c_float))
+
+
 # § 6  LM
 _dm_lm_create   = _fn("dm_lm_create",   DM_LM,     c_char_p)
 _dm_lm_train    = _fn("dm_lm_train",    DM_Status, DM_LM, c_char_p, c_char_p, c_int, c_int, c_float)
@@ -652,3 +703,264 @@ def experiment_write_header(csv_path: str) -> None:
 
 def experiment_generate_report(results_root: str) -> None:
     _dm_experiment_generate_report(_enc(results_root))
+
+
+# ── § 5b  TinyViT ─────────────────────────────────────────────────────────────
+
+TINYVIT_5M  = 0
+TINYVIT_11M = 1
+TINYVIT_21M = 2
+
+class TinyViT:
+    """Wraps the TinyViT C99 forward pass and utilities."""
+
+    def __init__(self, variant: int = TINYVIT_21M, classes: int = 1000, img_size: int = 224):
+        self.variant = variant
+        self.classes = classes
+        self.img_size = img_size
+        self._weights_ptr = None
+        self._weights_owner = False
+
+    def __del__(self):
+        self.free_weights()
+
+    def free_weights(self):
+        if self._weights_ptr and self._weights_owner:
+            _dm_tinyvit_free_weights(self._weights_ptr)
+            self._weights_ptr = None
+            self._weights_owner = False
+
+    @staticmethod
+    def weight_count(variant: int, classes: int, img_size: int) -> int:
+        return _dm_tinyvit_weight_count(variant, classes, img_size)
+
+    def load_weights(self, weight_path: str):
+        self.free_weights()
+        var = c_int(0)
+        cls = c_int(0)
+        sz = c_int(0)
+        ptr = ctypes.POINTER(c_float)()
+        _check(_dm_tinyvit_load(_enc(weight_path), ctypes.byref(var), ctypes.byref(cls),
+                               ctypes.byref(sz), ctypes.byref(ptr)),
+               "dm.TinyViT.load")
+        self.variant = var.value
+        self.classes = cls.value
+        self.img_size = sz.value
+        self._weights_ptr = ptr
+        self._weights_owner = True
+
+    def forward(self, input_nhwc: Sequence[float], batch: int = 1) -> List[float]:
+        if not self._weights_ptr:
+            raise RuntimeError("No weights loaded. Call load_weights() or set weights first.")
+        expected_len = batch * self.img_size * self.img_size * 3
+        if len(input_nhwc) != expected_len:
+            raise ValueError(f"Input size mismatch. Expected {expected_len} elements, got {len(input_nhwc)}")
+
+        in_arr = (c_float * len(input_nhwc))(*input_nhwc)
+        logits = (c_float * (batch * self.classes))()
+        _check(_dm_tinyvit_forward(self.variant, self._weights_ptr, in_arr, batch,
+                                  self.classes, self.img_size, logits),
+               "dm.TinyViT.forward")
+        return list(logits)
+
+    @staticmethod
+    def save_labels(out_path: str, num_images: int, num_classes: int, topK: int,
+                    indices: Sequence[int], values: Sequence[float], aug_seeds: Sequence[int]) -> None:
+        idx_arr = (c_uint32 * len(indices))(*indices)
+        val_arr = (c_float * len(values))(*values)
+        seed_arr = (c_uint32 * len(aug_seeds))(*aug_seeds)
+        _check(_dm_tinyvit_save_labels(_enc(out_path), num_images, num_classes, topK,
+                                      idx_arr, val_arr, seed_arr),
+               "dm.TinyViT.save_labels")
+
+    @staticmethod
+    def distill_loss(student_logits: Sequence[float], indices: Sequence[int],
+                     teacher_values: Sequence[float], K: int, C: int, temperature: float) -> float:
+        s_logits = (c_float * len(student_logits))(*student_logits)
+        idx_arr = (c_uint32 * len(indices))(*indices)
+        t_vals = (c_float * len(teacher_values))(*teacher_values)
+        loss = c_float(0.0)
+        _check(_dm_tinyvit_distill_loss(s_logits, idx_arr, t_vals, K, C, temperature, ctypes.byref(loss)),
+               "dm.TinyViT.distill_loss")
+        return loss.value
+
+
+# ── § 5c  MobileNet Tiny ──────────────────────────────────────────────────────
+
+class MobileNetTiny:
+    """Wraps MobileNetV4-Tiny FFI bindings for inference and head checkpoint management."""
+
+    def __init__(self, image_size: int = 224, classes: int = 1000, seed: int = 1337):
+        self.image_size = image_size
+        self.classes = classes
+        self.seed = seed
+        self._head_w = None
+        self._head_b = None
+        self._feature_dim = None
+
+    def __del__(self):
+        self.free_head()
+
+    def free_head(self):
+        if self._head_w or self._head_b:
+            _dm_mobilenet_tiny_head_free(self._head_w, self._head_b)
+            self._head_w = None
+            self._head_b = None
+            self._feature_dim = None
+
+    def load_head(self, path: str):
+        self.free_head()
+        classes = c_int(0)
+        feature_dim = c_int(0)
+        image_size = c_int(0)
+        seed = ctypes.c_uint32(0)
+        w_ptr = ctypes.POINTER(c_float)()
+        b_ptr = ctypes.POINTER(c_float)()
+
+        _check(_dm_mobilenet_tiny_head_load(
+            _enc(path),
+            ctypes.byref(classes),
+            ctypes.byref(feature_dim),
+            ctypes.byref(image_size),
+            ctypes.byref(seed),
+            ctypes.byref(w_ptr),
+            ctypes.byref(b_ptr)
+        ), "dm.MobileNetTiny.load_head")
+
+        self.classes = classes.value
+        self._feature_dim = feature_dim.value
+        self.image_size = image_size.value
+        self.seed = seed.value
+        self._head_w = w_ptr
+        self._head_b = b_ptr
+
+    def save_head(self, path: str):
+        if not self._head_w or not self._head_b or not self._feature_dim:
+            raise RuntimeError("No head weights loaded to save.")
+        _check(_dm_mobilenet_tiny_head_save(
+            _enc(path),
+            self.classes,
+            self._feature_dim,
+            self.image_size,
+            self.seed,
+            self._head_w,
+            self._head_b
+        ), "dm.MobileNetTiny.save_head")
+
+    def forward(self, input_nchw: Sequence[float]) -> List[float]:
+        expected_len = 3 * self.image_size * self.image_size
+        if len(input_nchw) != expected_len:
+            raise ValueError(f"Input size mismatch. Expected {expected_len} elements, got {len(input_nchw)}")
+
+        in_arr = (c_float * expected_len)(*input_nchw)
+        logits = (c_float * self.classes)()
+        _check(_dm_mobilenet_tiny_forward_raw(
+            in_arr,
+            self.image_size,
+            self.classes,
+            self.seed,
+            self._head_w,
+            self._head_b,
+            logits
+        ), "dm.MobileNetTiny.forward")
+        return list(logits)
+
+
+# ── § 6b  BERT ────────────────────────────────────────────────────────────────
+
+BERT_BASE = 0
+BERT_LARGE = 1
+
+class BERT:
+    """Wraps BERT FFI bindings for weights loading and sequence encoding."""
+
+    def __init__(self, variant: int = BERT_BASE, vocab_size: int = 30522, max_seq_len: int = 512):
+        self.variant = variant
+        self.vocab_size = vocab_size
+        self.max_seq_len = max_seq_len
+        self._weights_ptr = None
+        self._weights_owner = False
+
+    def __del__(self):
+        self.free_weights()
+
+    def free_weights(self):
+        if self._weights_ptr and self._weights_owner:
+            _dm_bert_free_weights(self._weights_ptr)
+            self._weights_ptr = None
+            self._weights_owner = False
+
+    @staticmethod
+    def weight_count(variant: int, vocab_size: int, max_seq_len: int) -> int:
+        return _dm_bert_weight_count_raw(variant, vocab_size, max_seq_len)
+
+    def load_weights(self, path: str):
+        self.free_weights()
+        var = c_int(0)
+        voc = c_int(0)
+        seq = c_int(0)
+        ptr = ctypes.POINTER(c_float)()
+
+        _check(_dm_bert_load_raw(
+            _enc(path),
+            ctypes.byref(var),
+            ctypes.byref(voc),
+            ctypes.byref(seq),
+            ctypes.byref(ptr)
+        ), "dm.BERT.load_weights")
+
+        self.variant = var.value
+        self.vocab_size = voc.value
+        self.max_seq_len = seq.value
+        self._weights_ptr = ptr
+        self._weights_owner = True
+
+    def forward(self, token_ids: Sequence[int], segment_ids: Sequence[int], attention_mask: Optional[Sequence[int]] = None) -> Tuple[List[float], List[float]]:
+        if not self._weights_ptr:
+            raise RuntimeError("No weights loaded. Call load_weights() first.")
+
+        seq = len(token_ids)
+        if seq <= 0 or seq > self.max_seq_len:
+            raise ValueError(f"Sequence length must be between 1 and {self.max_seq_len}, got {seq}")
+
+        if len(segment_ids) != seq:
+            raise ValueError("segment_ids length must match token_ids")
+
+        hidden_dim = 768 if self.variant == BERT_BASE else 1024
+        hidden_out = (c_float * (seq * hidden_dim))()
+        cls_out = (c_float * hidden_dim)()
+
+        tok_arr = (c_int * seq)(*token_ids)
+        seg_arr = (c_int * seq)(*segment_ids)
+
+        if attention_mask is not None:
+            if len(attention_mask) != seq:
+                raise ValueError("attention_mask length must match token_ids")
+            att_arr = (c_int * seq)(*attention_mask)
+            _check(_dm_bert_forward_masked_raw(
+                self.variant,
+                self.vocab_size,
+                self.max_seq_len,
+                self._weights_ptr,
+                tok_arr,
+                seg_arr,
+                att_arr,
+                seq,
+                hidden_out,
+                cls_out
+            ), "dm.BERT.forward")
+        else:
+            _check(_dm_bert_forward_raw(
+                self.variant,
+                self.vocab_size,
+                self.max_seq_len,
+                self._weights_ptr,
+                tok_arr,
+                seg_arr,
+                seq,
+                hidden_out,
+                cls_out
+            ), "dm.BERT.forward")
+
+        return list(hidden_out), list(cls_out)
+

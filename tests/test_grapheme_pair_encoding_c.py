@@ -50,7 +50,13 @@ def test_native_gpe_train_encode_evaluate(tmp: Path):
         str(model),
         "--stats",
     ])
-    stats = json.loads(trained.stderr)
+    stderr_str = trained.stderr
+    start_idx = stderr_str.find('{')
+    end_idx = stderr_str.rfind('}')
+    if start_idx != -1 and end_idx != -1:
+        stats = json.loads(stderr_str[start_idx:end_idx+1])
+    else:
+        stats = json.loads(stderr_str)
     assert stats["unit"] == "grapheme"
     assert stats["pretokenizer"] == "whitespace"
     assert stats["merges"] > 0

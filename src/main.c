@@ -143,6 +143,8 @@
 #include "models/language/tiny_transformer.h"
 #include "models/lm/bert.h"
 #include "models/vision/mobilenet_tiny.h"
+#include "models/vision/resnet.h"
+#include "models/vision/vit.h"
 #include "generator/textbook_generator.h"
 #include <stdio.h>
 #include <string.h>
@@ -527,6 +529,12 @@ int main(int argc, char **argv) {
     }
     if (argc >= 2 && (strcmp(argv[1], "mobilenet_tiny") == 0 || strcmp(argv[1], "mobilenetv4_tiny") == 0 || strcmp(argv[1], "dm_mobilenet_tiny") == 0)) {
         return dm_mobilenet_tiny_cli(argc, argv);
+    }
+    if (argc >= 2 && (strcmp(argv[1], "resnet18") == 0 || strcmp(argv[1], "dm_resnet18") == 0)) {
+        return dm_resnet18_cli(argc, argv);
+    }
+    if (argc >= 2 && (strcmp(argv[1], "vit") == 0 || strcmp(argv[1], "dm_vit") == 0)) {
+        return dm_vit_cli(argc, argv);
     }
     dm_register_algorithm(&bio_huif_ga_algo);
     dm_register_algorithm(&bio_huif_pso_algo);
