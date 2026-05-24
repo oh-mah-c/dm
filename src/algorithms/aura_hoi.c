@@ -42,6 +42,10 @@ typedef struct {
     uint64_t *item_bits;
     uint32_t *transaction_len;
     double *reciprocal_len;
+    uint32_t max_transaction_len;
+    double *len_bucket_sum;
+    uint32_t *len_bucket_stamp;
+    uint32_t len_bucket_epoch;
     size_t min_support;
     double min_occupancy;
     double threshold_value;
@@ -185,6 +189,51 @@ static double exact_summed_occupancy(AURACtx *ctx, const uint64_t *support, size
         }
     }
     return (double)len * sum;
+}
+
+static void support_summed_stats(AURACtx *ctx, const uint64_t *support,
+                                 double *sum_recip_out, double *ubo_out) {
+    double sum = 0.0;
+    double max_ubo = 0.0;
+
+    if (++ctx->len_bucket_epoch == 0) {
+        memset(ctx->len_bucket_stamp, 0,
+               ((size_t)ctx->max_transaction_len + 1) * sizeof(uint32_t));
+        ctx->len_bucket_epoch = 1;
+    }
+
+    for (size_t w = 0; w < ctx->words; w++) {
+        uint64_t x = support[w];
+        while (x) {
+            unsigned bit = (unsigned)__builtin_ctzll(x);
+            size_t tid = (w << 6) + bit;
+            if (tid < ctx->ntrans) {
+                uint32_t len = ctx->transaction_len[tid];
+                double recip = ctx->reciprocal_len[tid];
+                sum += recip;
+                if (len > 0) {
+                    if (ctx->len_bucket_stamp[len] != ctx->len_bucket_epoch) {
+                        ctx->len_bucket_stamp[len] = ctx->len_bucket_epoch;
+                        ctx->len_bucket_sum[len] = 0.0;
+                    }
+                    ctx->len_bucket_sum[len] += recip;
+                }
+            }
+            x &= x - 1;
+        }
+    }
+
+    double suffix_sum = 0.0;
+    for (uint32_t len = ctx->max_transaction_len; len > 0; len--) {
+        if (ctx->len_bucket_stamp[len] == ctx->len_bucket_epoch) {
+            suffix_sum += ctx->len_bucket_sum[len];
+            double ubo = (double)len * suffix_sum;
+            if (ubo > max_ubo) max_ubo = ubo;
+        }
+    }
+
+    *sum_recip_out = sum;
+    *ubo_out = max_ubo;
 }
 
 static void support_hash(const uint64_t *bits, size_t words, uint64_t *h1, uint64_t *h2) {
@@ -465,6 +514,17 @@ static void aura_search_raw(AURACtx *ctx, const uint32_t *prefix, size_t prefix_
             continue;
         }
 
+        double sum_recip = 0.0;
+        double ubo_bound = path_bound;
+        if (ctx->summed_occupancy_mode) {
+            support_summed_stats(ctx, child, &sum_recip, &ubo_bound);
+            if (ubo_bound + 1e-12 < ctx->threshold_value) {
+                ctx->pruned_envelope++;
+                arena_rewind(&ctx->arena, mark);
+                continue;
+            }
+        }
+
         uint32_t *next_prefix = (uint32_t *)malloc((prefix_len + 1) * sizeof(uint32_t));
         size_t *next_tail = (size_t *)malloc((tail_count - pos - 1) * sizeof(size_t));
         if (!next_prefix || (!next_tail && tail_count > pos + 1)) {
@@ -482,7 +542,7 @@ static void aura_search_raw(AURACtx *ctx, const uint32_t *prefix, size_t prefix_
         for (size_t j = pos + 1; j < tail_count; j++) next_tail[next_count++] = tail[j];
 
         double score = ctx->summed_occupancy_mode
-            ? exact_summed_occupancy(ctx, child, next_len)
+            ? (double)next_len * sum_recip
             : exact_average_occupancy(ctx, child, supp, next_len);
         if (score + 1e-12 >= ctx->threshold_value) {
             ctx->raw_hoi_count++;
@@ -490,7 +550,7 @@ static void aura_search_raw(AURACtx *ctx, const uint32_t *prefix, size_t prefix_
         }
 
         double local = ctx->summed_occupancy_mode
-            ? residual_sum_envelope(ctx, next_len, child, next_tail, next_count)
+            ? ubo_bound
             : residual_envelope(ctx, next_len, child, next_tail, next_count);
         double next_bound = local < path_bound ? local : path_bound;
         if (next_bound + 1e-12 >= ctx->threshold_value && next_count > 0) {
@@ -534,9 +594,17 @@ static DM_Status run(DM_Dataset *ds, void *params) {
 
     for (size_t t = 0; t < ctx.ntrans; t++) {
         ctx.transaction_len[t] = (uint32_t)ctx.trans[t].count;
+        if (ctx.transaction_len[t] > ctx.max_transaction_len) {
+            ctx.max_transaction_len = ctx.transaction_len[t];
+        }
         ctx.reciprocal_len[t] = ctx.trans[t].count ? 1.0 / (double)ctx.trans[t].count : 0.0;
         for (size_t j = 0; j < ctx.trans[t].count; j++) support_count[ctx.trans[t].items[j]]++;
     }
+    ctx.len_bucket_sum = (double *)calloc((size_t)ctx.max_transaction_len + 1, sizeof(double));
+    ctx.len_bucket_stamp = (uint32_t *)calloc((size_t)ctx.max_transaction_len + 1, sizeof(uint32_t));
+    ctx.len_bucket_epoch = 1;
+    if (!ctx.len_bucket_sum || !ctx.len_bucket_stamp) return DM_ERROR_MEMORY;
+
     for (uint32_t i = 0; i <= ctx.max_id; i++) {
         if (support_count[i] >= ctx.min_support) ctx.active_count++;
     }
@@ -571,9 +639,13 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     if (!tail) return DM_ERROR_MEMORY;
     for (size_t i = 0; i < ctx.active_count; i++) tail[i] = i;
 
-    double root_bound = ctx.summed_occupancy_mode
-        ? residual_sum_envelope(&ctx, 0, root, tail, ctx.active_count)
-        : residual_envelope(&ctx, 0, root, tail, ctx.active_count);
+    double root_bound;
+    if (ctx.summed_occupancy_mode) {
+        double root_sum = 0.0;
+        support_summed_stats(&ctx, root, &root_sum, &root_bound);
+    } else {
+        root_bound = residual_envelope(&ctx, 0, root, tail, ctx.active_count);
+    }
     printf("[AURA-HOI] transactions=%zu active_items=%zu minsup=%zu minocc=%.6f threshold=%.6f mode=%s root_residual_envelope=%.6f view=%s\n",
            ctx.ntrans, ctx.active_count, ctx.min_support, ctx.min_occupancy, ctx.threshold_value,
            ctx.summed_occupancy_mode ? "summed-compatible" : "average", root_bound,
@@ -608,6 +680,8 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     free(ctx.item_bits);
     free(ctx.transaction_len);
     free(ctx.reciprocal_len);
+    free(ctx.len_bucket_sum);
+    free(ctx.len_bucket_stamp);
     return DM_SUCCESS;
 }
 
