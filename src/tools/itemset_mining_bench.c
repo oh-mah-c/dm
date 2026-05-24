@@ -149,11 +149,11 @@ static int run_one(const BenchConfig *cfg, const char *threshold, BenchRow *row)
     char command[4096];
     if (cfg->extra_args && cfg->extra_args[0]) {
         snprintf(command, sizeof(command),
-                 "sh -c 'ulimit -v %d; exec timeout %d ./bin/dm.exe %s %s %d %s %s' 2>&1",
+                 "sh -c 'ulimit -v %d; exec timeout %d ./build/bin/dm.exe %s %s %d %s %s' 2>&1",
                  cfg->mem_mb * 1024, cfg->timeout_seconds, algo_q, dataset_q, cfg->type_id, threshold_q, cfg->extra_args);
     } else {
         snprintf(command, sizeof(command),
-                 "sh -c 'ulimit -v %d; exec timeout %d ./bin/dm.exe %s %s %d %s' 2>&1",
+                 "sh -c 'ulimit -v %d; exec timeout %d ./build/bin/dm.exe %s %s %d %s' 2>&1",
                  cfg->mem_mb * 1024, cfg->timeout_seconds, algo_q, dataset_q, cfg->type_id, threshold_q);
     }
 

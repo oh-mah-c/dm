@@ -55,8 +55,6 @@ dkms.conf
 *.dwo
 
 # Custom project ignores
-bin/
-obj/
 build/
 .venv/
 __pycache__/

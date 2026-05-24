@@ -6,8 +6,9 @@ TF_IFLAGS = -Isrc/core/dm_engine \
             -Isrc/core/dm_engine/third_party/xla/third_party/tsl
 CFLAGS = -D_POSIX_C_SOURCE=200809L -Iinclude -Iinclude/core $(VULKAN_CFLAGS) $(TF_IFLAGS) -Wall -Wextra -O2 -pthread -fPIC
 SRC_DIR = src
-OBJ_DIR = obj
-BIN_DIR = bin
+BUILD_DIR = build
+OBJ_DIR = $(BUILD_DIR)/obj
+BIN_DIR = $(BUILD_DIR)/bin
 
 GPU_SOURCES = $(SRC_DIR)/gpu/dm_gpu.c \
               $(SRC_DIR)/gpu/gpu_bpe.c \
@@ -347,7 +348,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 libdm: $(LIBDM_SO)
 
 clean:
-	rm -rf $(OBJ_DIR) $(BIN_DIR) $(LIBDM_SO) $(LIBDM_DYLIB)
+	rm -rf $(BUILD_DIR) $(LIBDM_SO) $(LIBDM_DYLIB)
 
 plots:
 	MPLCONFIGDIR=/tmp/mpl python3 scripts/plot_results.py results

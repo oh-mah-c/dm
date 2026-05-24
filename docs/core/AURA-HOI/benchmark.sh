@@ -8,7 +8,7 @@
 # ═══════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
-BIN="./bin/dm.exe"
+BIN="./build/bin/dm.exe"
 OUTDIR="docs/core/AURA-HOI"
 CSV="${OUTDIR}/benchmark_results.csv"
 ITEMSET_CSV="${OUTDIR}/itemset_counts.csv"
