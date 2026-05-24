@@ -302,9 +302,9 @@ $(TEXTBOOK_GENERATOR_TARGET): $(SRC_DIR)/tools/dm_textbook_generator.c $(SRC_DIR
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(SRC_DIR)/tools/dm_textbook_generator.c $(SRC_DIR)/generator/textbook_generator.c -o $@ $(LDFLAGS)
 
-$(MOBILENET_TINY_TARGET): $(SRC_DIR)/tools/dm_mobilenet_tiny.c $(SRC_DIR)/models/vision/mobilenet_tiny.c $(SRC_DIR)/core/dm_engine.c $(SRC_DIR)/encoding/image_patchify.c include/models/vision/mobilenet_tiny.h include/core/dm_engine.h include/encoding/image_patchify.h
+$(MOBILENET_TINY_TARGET): $(SRC_DIR)/tools/dm_mobilenet_tiny.c $(SRC_DIR)/models/vision/mobilenet_tiny.c $(SRC_DIR)/core/dm_engine.c $(SRC_DIR)/core/dm_block.c $(SRC_DIR)/core/dm_dtype.c $(SRC_DIR)/lowering/dm_lowering.c $(SRC_DIR)/lowering/dm_lower_tf.c $(SRC_DIR)/lowering/dm_lower_cpu.c $(SRC_DIR)/lowering/dm_lower_vulkan.c $(SRC_DIR)/encoding/image_patchify.c include/models/vision/mobilenet_tiny.h include/core/dm_engine.h include/encoding/image_patchify.h
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) $(TF_IFLAGS) $(SRC_DIR)/tools/dm_mobilenet_tiny.c $(SRC_DIR)/models/vision/mobilenet_tiny.c $(SRC_DIR)/core/dm_engine.c $(SRC_DIR)/encoding/image_patchify.c -o $@ $(LDFLAGS) -L.venv/lib/python3.12/site-packages/tensorflow -ltensorflow_cc -ltensorflow_framework -Wl,-rpath,.venv/lib/python3.12/site-packages/tensorflow
+	$(CC) $(CFLAGS) $(TF_IFLAGS) $(SRC_DIR)/tools/dm_mobilenet_tiny.c $(SRC_DIR)/models/vision/mobilenet_tiny.c $(SRC_DIR)/core/dm_engine.c $(SRC_DIR)/core/dm_block.c $(SRC_DIR)/core/dm_dtype.c $(SRC_DIR)/lowering/dm_lowering.c $(SRC_DIR)/lowering/dm_lower_tf.c $(SRC_DIR)/lowering/dm_lower_cpu.c $(SRC_DIR)/lowering/dm_lower_vulkan.c $(SRC_DIR)/encoding/image_patchify.c -o $@ $(LDFLAGS) -L.venv/lib/python3.12/site-packages/tensorflow -ltensorflow_cc -ltensorflow_framework -Wl,-rpath,.venv/lib/python3.12/site-packages/tensorflow
 
 shaders: $(SPV_SHADERS)
 

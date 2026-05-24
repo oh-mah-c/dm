@@ -22,6 +22,17 @@
  * DM_Tensor layout: NCHW  (n, c, h, w) — row-major, contiguous.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
+
+static DM_LayoutPolicy g_dm_layout_policy = DM_LAYOUT_POLICY_STRICT;
+
+void dm_set_layout_policy(DM_LayoutPolicy policy) {
+    g_dm_layout_policy = policy;
+}
+
+DM_LayoutPolicy dm_get_layout_policy(void) {
+    return g_dm_layout_policy;
+}
+
 static TFE_Context *tf_ctx = NULL;
 
 static void dm_tf_init(void) {
@@ -74,6 +85,8 @@ static void tf_to_dm(TFE_TensorHandle *h, DM_Block *out) {
     
     // dm_raise_block triggers TFE_TensorHandleResolve and memcpy internally
     dm_raise_block(&tf_src, out, DM_BACKEND_CPU, DM_LOWER_COPY);
+    out->dirty = 1;
+    out->version++;
 }
 
 static TFE_TensorHandle *raw_to_tf(const float *data, const int64_t *dims, int ndim) {
@@ -197,18 +210,21 @@ static TFE_TensorHandle *conv_weight_to_tf(const float *w,
  */
 static TFE_TensorHandle *execute_conv2d(TFE_TensorHandle *input,
                                          TFE_TensorHandle *filter,
-                                         int stride) {
+                                         int stride, const char *data_format) {
     dm_tf_init();
     TF_Status *s = TF_NewStatus();
     TFE_Op *op = TFE_NewOp(tf_ctx, "Conv2D", s);
     TFE_OpAddInput(op, input, s);
     TFE_OpAddInput(op, filter, s);
     int64_t strides[4]   = {1, 1, stride, stride};
+    if (strcmp(data_format, "NHWC") == 0) {
+        strides[1] = stride; strides[2] = stride; strides[3] = 1;
+    }
     int64_t dilations[4] = {1, 1, 1, 1};
     TFE_OpSetAttrIntList(op, "strides",   strides,   4);
     TFE_OpSetAttrIntList(op, "dilations", dilations, 4);
     TFE_OpSetAttrString(op, "padding",     "SAME",  4);
-    TFE_OpSetAttrString(op, "data_format", "NCHW",  4);
+    TFE_OpSetAttrString(op, "data_format", data_format, strlen(data_format));
     TFE_TensorHandle *ret[1] = {NULL};
     int nret = 1;
     TFE_Execute(op, ret, &nret, s);
@@ -221,13 +237,13 @@ static TFE_TensorHandle *execute_conv2d(TFE_TensorHandle *input,
 
 /* Add a bias vector (shape [oc]) to a [n,oc,h,w] tensor via BiasAdd NCHW. */
 static TFE_TensorHandle *execute_bias_add(TFE_TensorHandle *input,
-                                           TFE_TensorHandle *bias) {
+                                           TFE_TensorHandle *bias, const char *data_format) {
     dm_tf_init();
     TF_Status *s = TF_NewStatus();
     TFE_Op *op = TFE_NewOp(tf_ctx, "BiasAdd", s);
     TFE_OpAddInput(op, input, s);
     TFE_OpAddInput(op, bias,  s);
-    TFE_OpSetAttrString(op, "data_format", "NCHW", 4);
+    TFE_OpSetAttrString(op, "data_format", data_format, strlen(data_format));
     TFE_TensorHandle *ret[1] = {NULL};
     int nret = 1;
     TFE_Execute(op, ret, &nret, s);
@@ -264,20 +280,89 @@ static TFE_TensorHandle *depthwise_weight_to_tf(const float *w, int c, int k) {
     return h;
 }
 
+
+
+/* CPU native transpose fallback: NCHW -> NHWC */
+int dm_transpose_nchw_to_nhwc_cpu(const DM_Block *src, DM_Block *dst) {
+    if (!dm_block_is_nchw4(src) || !dst) return -1;
+    int n = DM_NCHW_N(src), c = DM_NCHW_C(src), h = DM_NCHW_H(src), w = DM_NCHW_W(src);
+    if (dm_block_create(dst, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){n, h, w, c}) != 0) return -1;
+    const float *sdata = (const float *)src->data;
+    float *ddata = (float *)dst->data;
+    for (int in = 0; in < n; in++) {
+        for (int ic = 0; ic < c; ic++) {
+            for (int ih = 0; ih < h; ih++) {
+                for (int iw = 0; iw < w; iw++) {
+                    ddata[in * h * w * c + ih * w * c + iw * c + ic] = sdata[in * c * h * w + ic * h * w + ih * w + iw];
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+/* CPU native transpose fallback: NHWC -> NCHW */
+int dm_transpose_nhwc_to_nchw_cpu(const DM_Block *src, DM_Block *dst) {
+    if (!src || src->ndim != 4 || !dst) return -1;
+    int n = src->shape[0], h = src->shape[1], w = src->shape[2], c = src->shape[3];
+    if (dm_block_create(dst, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){n, c, h, w}) != 0) return -1;
+    const float *sdata = (const float *)src->data;
+    float *ddata = (float *)dst->data;
+    for (int in = 0; in < n; in++) {
+        for (int ih = 0; ih < h; ih++) {
+            for (int iw = 0; iw < w; iw++) {
+                for (int ic = 0; ic < c; ic++) {
+                    ddata[in * c * h * w + ic * h * w + ih * w + iw] = sdata[in * h * w * c + ih * w * c + iw * c + ic];
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+static TFE_TensorHandle *execute_tf_transpose(TFE_TensorHandle *input, int *perm, int perm_len) {
+    dm_tf_init();
+    TF_Status *s = TF_NewStatus();
+    
+    // Create perm tensor
+    int64_t perm_dims[1] = {perm_len};
+    TF_Tensor *tf_perm = TF_NewTensor(TF_INT32, perm_dims, 1, perm, perm_len * sizeof(int), noop_dealloc, NULL);
+    TFE_TensorHandle *h_perm = TFE_NewTensorHandle(tf_perm, s);
+    TF_DeleteTensor(tf_perm);
+
+    TFE_Op *op = TFE_NewOp(tf_ctx, "Transpose", s);
+    TFE_OpAddInput(op, input, s);
+    TFE_OpAddInput(op, h_perm, s);
+
+    TFE_TensorHandle *ret[1] = {NULL};
+    int nret = 1;
+    TFE_Execute(op, ret, &nret, s);
+    if (TF_GetCode(s) != TF_OK)
+        fprintf(stderr, "[dm_engine] Transpose failed: %s\n", TF_Message(s));
+    
+    TFE_DeleteOp(op);
+    TFE_DeleteTensorHandle(h_perm);
+    TF_DeleteStatus(s);
+    return ret[0];
+}
+
 static TFE_TensorHandle *execute_depthwise_conv2d(TFE_TensorHandle *input,
                                                     TFE_TensorHandle *filter,
-                                                    int stride) {
+                                                    int stride, const char *data_format) {
     dm_tf_init();
     TF_Status *s = TF_NewStatus();
     TFE_Op *op = TFE_NewOp(tf_ctx, "DepthwiseConv2dNative", s);
     TFE_OpAddInput(op, input,  s);
     TFE_OpAddInput(op, filter, s);
     int64_t strides[4]   = {1, 1, stride, stride};
+    if (strcmp(data_format, "NHWC") == 0) {
+        strides[1] = stride; strides[2] = stride; strides[3] = 1;
+    }
     int64_t dilations[4] = {1, 1, 1, 1};
     TFE_OpSetAttrIntList(op, "strides",   strides,   4);
     TFE_OpSetAttrIntList(op, "dilations", dilations, 4);
     TFE_OpSetAttrString(op, "padding",     "SAME", 4);
-    TFE_OpSetAttrString(op, "data_format", "NCHW", 4);
+    TFE_OpSetAttrString(op, "data_format", data_format, 4);
     TFE_TensorHandle *ret[1] = {NULL};
     int nret = 1;
     TFE_Execute(op, ret, &nret, s);
@@ -321,6 +406,10 @@ float dm_tensor_get(const DM_Block *t, int n, int c, int y, int x) {
     return ((float*)t->data)[idx];
 }
 
+static inline int out_size_same(int in_size, int stride) {
+    return (in_size + stride - 1) / stride;
+}
+
 void dm_tensor_set(DM_Block *t, int n, int c, int y, int x, float v) {
     if (!t || !t->data) return;
     size_t idx = (((size_t)n * DM_NCHW_C(t) + c) * DM_NCHW_H(t) + y) * DM_NCHW_W(t) + x;
@@ -328,9 +417,9 @@ void dm_tensor_set(DM_Block *t, int n, int c, int y, int x, float v) {
 }
 
 int dm_conv2d_same(const DM_Block *in, DM_Block *out,
-                   const float *w, const float *b,
+                   const DM_Block *w, const DM_Block *b,
                    int out_c, int kernel, int stride) {
-    if (!dm_block_is_nchw4(in) || !dm_block_is_nchw4(out)) return -1;
+    if (!dm_block_is_nchw4(in)) return -1;
 
     if (!in || !out || !w || out_c <= 0 || kernel <= 0 || stride <= 0) return -1;
     int oh = out_size_same(DM_NCHW_H(in), stride);
@@ -338,40 +427,59 @@ int dm_conv2d_same(const DM_Block *in, DM_Block *out,
     if (dm_block_create(out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(in), out_c, oh, ow}) != 0) return -1;
 
     TFE_TensorHandle *h_in  = dm_to_tf(in);
-    TFE_TensorHandle *h_w   = conv_weight_to_tf(w, out_c, DM_NCHW_C(in), kernel);
+    DM_Block tf_w;
+    if (dm_lower_block(w, &tf_w, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) goto conv2d_err;
+    TFE_TensorHandle *h_w = (TFE_TensorHandle *)tf_w.handle;
     if (!h_in || !h_w) goto conv2d_err;
 
-    TFE_TensorHandle *h_out = execute_conv2d(h_in, h_w, stride);
-    if (!h_out) goto conv2d_err;
-
-    if (b) {
-        /* BiasAdd: bias shape [out_c] */
-        int64_t bdims[1] = {out_c};
-        TFE_TensorHandle *h_b   = raw_to_tf(b, bdims, 1);
-        TFE_TensorHandle *h_out2 = execute_bias_add(h_out, h_b);
-        TFE_DeleteTensorHandle(h_b);
-        TFE_DeleteTensorHandle(h_out);
-        h_out = h_out2;
+    TFE_TensorHandle *h_out = NULL;
+    if (dm_get_layout_policy() == DM_LAYOUT_POLICY_AUTO_TRANSPOSE) {
+        int perm_to_nhwc[4] = {0, 2, 3, 1};
+        TFE_TensorHandle *h_nhwc = execute_tf_transpose(h_in, perm_to_nhwc, 4);
+        if (!h_nhwc) goto conv2d_err;
+        TFE_TensorHandle *h_y_nhwc = execute_conv2d(h_nhwc, h_w, stride, "NHWC");
+        TFE_DeleteTensorHandle(h_nhwc);
+        if (!h_y_nhwc) goto conv2d_err;
+        
+        if (b) {
+            DM_Block tf_b;
+            if (dm_lower_block(b, &tf_b, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) { TFE_DeleteTensorHandle(h_y_nhwc); goto conv2d_err; }
+            TFE_TensorHandle *h_b = (TFE_TensorHandle *)tf_b.handle;
+            TFE_TensorHandle *h_y2_nhwc = execute_bias_add(h_y_nhwc, h_b, "NHWC");
+            TFE_DeleteTensorHandle(h_y_nhwc);
+            h_y_nhwc = h_y2_nhwc;
+        }
+        
+        int perm_to_nchw[4] = {0, 3, 1, 2};
+        h_out = execute_tf_transpose(h_y_nhwc, perm_to_nchw, 4);
+        TFE_DeleteTensorHandle(h_y_nhwc);
+    } else {
+        h_out = execute_conv2d(h_in, h_w, stride, "NCHW");
+        if (!h_out) goto conv2d_err;
+        if (b) {
+            DM_Block tf_b;
+            if (dm_lower_block(b, &tf_b, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) { /* TFE_DeleteTensorHandle(h_out); */ goto conv2d_err; }
+            TFE_TensorHandle *h_b = (TFE_TensorHandle *)tf_b.handle;
+            TFE_TensorHandle *h_out2 = execute_bias_add(h_out, h_b, "NCHW");
+            TFE_DeleteTensorHandle(h_out);
+            h_out = h_out2;
+        }
     }
     if (h_out) {
         tf_to_dm(h_out, out);
         TFE_DeleteTensorHandle(h_out);
     }
-    TFE_DeleteTensorHandle(h_in);
-    TFE_DeleteTensorHandle(h_w);
     return 0;
 
 conv2d_err:
-    if (h_in) TFE_DeleteTensorHandle(h_in);
-    if (h_w)  TFE_DeleteTensorHandle(h_w);
     return -1;
 }
 
 /* dm_depthwise_conv2d_same — Depthwise separable conv, SAME padding. */
 int dm_depthwise_conv2d_same(const DM_Block *in, DM_Block *out,
-                              const float *w, const float *b,
+                              const DM_Block *w, const DM_Block *b,
                               int kernel, int stride) {
-    if (!dm_block_is_nchw4(in) || !dm_block_is_nchw4(out)) return -1;
+    if (!dm_block_is_nchw4(in)) return -1;
 
     if (!in || !out || !w || kernel <= 0 || stride <= 0) return -1;
     int oh = out_size_same(DM_NCHW_H(in), stride);
@@ -379,68 +487,108 @@ int dm_depthwise_conv2d_same(const DM_Block *in, DM_Block *out,
     if (dm_block_create(out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(in), DM_NCHW_C(in), oh, ow}) != 0) return -1;
 
     TFE_TensorHandle *h_in  = dm_to_tf(in);
-    TFE_TensorHandle *h_w   = depthwise_weight_to_tf(w, DM_NCHW_C(in), kernel);
+    DM_Block tf_w;
+    if (dm_lower_block(w, &tf_w, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) goto dw_err;
+    TFE_TensorHandle *h_w = (TFE_TensorHandle *)tf_w.handle;
     if (!h_in || !h_w) goto dw_err;
 
-    TFE_TensorHandle *h_out = execute_depthwise_conv2d(h_in, h_w, stride);
-    if (!h_out) goto dw_err;
-
-    if (b) {
-        int64_t bdims[1] = {DM_NCHW_C(in)};
-        TFE_TensorHandle *h_b    = raw_to_tf(b, bdims, 1);
-        TFE_TensorHandle *h_out2 = execute_bias_add(h_out, h_b);
-        TFE_DeleteTensorHandle(h_b);
-        TFE_DeleteTensorHandle(h_out);
-        h_out = h_out2;
+    TFE_TensorHandle *h_out = NULL;
+    if (dm_get_layout_policy() == DM_LAYOUT_POLICY_AUTO_TRANSPOSE) {
+        int perm_to_nhwc[4] = {0, 2, 3, 1};
+        TFE_TensorHandle *h_nhwc = execute_tf_transpose(h_in, perm_to_nhwc, 4);
+        if (!h_nhwc) goto dw_err;
+        TFE_TensorHandle *h_y_nhwc = execute_depthwise_conv2d(h_nhwc, h_w, stride, "NHWC");
+        TFE_DeleteTensorHandle(h_nhwc);
+        if (!h_y_nhwc) goto dw_err;
+        
+        if (b) {
+            DM_Block tf_b;
+            if (dm_lower_block(b, &tf_b, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) { TFE_DeleteTensorHandle(h_y_nhwc); goto dw_err; }
+            TFE_TensorHandle *h_b = (TFE_TensorHandle *)tf_b.handle;
+            TFE_TensorHandle *h_y2_nhwc = execute_bias_add(h_y_nhwc, h_b, "NHWC");
+            TFE_DeleteTensorHandle(h_y_nhwc);
+            h_y_nhwc = h_y2_nhwc;
+        }
+        
+        int perm_to_nchw[4] = {0, 3, 1, 2};
+        h_out = execute_tf_transpose(h_y_nhwc, perm_to_nchw, 4);
+        TFE_DeleteTensorHandle(h_y_nhwc);
+    } else {
+        h_out = execute_depthwise_conv2d(h_in, h_w, stride, "NCHW");
+        if (!h_out) goto dw_err;
+        
+        if (b) {
+            DM_Block tf_b;
+            if (dm_lower_block(b, &tf_b, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) { TFE_DeleteTensorHandle(h_out); goto dw_err; }
+            TFE_TensorHandle *h_b = (TFE_TensorHandle *)tf_b.handle;
+            TFE_TensorHandle *h_out2 = execute_bias_add(h_out, h_b, "NCHW");
+            TFE_DeleteTensorHandle(h_out);
+            h_out = h_out2;
+        }
     }
     if (h_out) {
         tf_to_dm(h_out, out);
         TFE_DeleteTensorHandle(h_out);
     }
-    TFE_DeleteTensorHandle(h_in);
-    TFE_DeleteTensorHandle(h_w);
     return 0;
 
 dw_err:
-    if (h_in) TFE_DeleteTensorHandle(h_in);
-    if (h_w)  TFE_DeleteTensorHandle(h_w);
     return -1;
 }
 
 /* dm_pointwise_conv2d — 1×1 convolution (channel mixing). */
 int dm_pointwise_conv2d(const DM_Block *in, DM_Block *out,
-                         const float *w, const float *b, int out_c) {
+                         const DM_Block *w, const DM_Block *b, int out_c) {
     if (!in || !out || !w || out_c <= 0) return -1;
     if (dm_block_create(out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(in), out_c, DM_NCHW_H(in), DM_NCHW_W(in)}) != 0) return -1;
 
     TFE_TensorHandle *h_in = dm_to_tf(in);
     /* 1×1 conv: filter shape [out_c, in_c, 1, 1] */
-    int64_t wdims[4] = {out_c, DM_NCHW_C(in), 1, 1};
-    TFE_TensorHandle *h_w  = raw_to_tf(w, wdims, 4);
+    DM_Block tf_w;
+    if (dm_lower_block(w, &tf_w, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) goto pw_err;
+    TFE_TensorHandle *h_w = (TFE_TensorHandle *)tf_w.handle;
     if (!h_in || !h_w) goto pw_err;
 
-    TFE_TensorHandle *h_out = execute_conv2d(h_in, h_w, 1);
-    if (!h_out) goto pw_err;
-
-    if (b) {
-        int64_t bdims[1] = {out_c};
-        TFE_TensorHandle *h_b    = raw_to_tf(b, bdims, 1);
-        TFE_TensorHandle *h_out2 = execute_bias_add(h_out, h_b);
-        TFE_DeleteTensorHandle(h_b);
-        TFE_DeleteTensorHandle(h_out);
-        h_out = h_out2;
+    TFE_TensorHandle *h_out = NULL;
+    if (dm_get_layout_policy() == DM_LAYOUT_POLICY_AUTO_TRANSPOSE) {
+        int perm_to_nhwc[4] = {0, 2, 3, 1};
+        TFE_TensorHandle *h_nhwc = execute_tf_transpose(h_in, perm_to_nhwc, 4);
+        if (!h_nhwc) goto pw_err;
+        TFE_TensorHandle *h_y_nhwc = execute_conv2d(h_nhwc, h_w, 1, "NHWC");
+        TFE_DeleteTensorHandle(h_nhwc);
+        if (!h_y_nhwc) goto pw_err;
+        
+        if (b) {
+            DM_Block tf_b;
+            if (dm_lower_block(b, &tf_b, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) { TFE_DeleteTensorHandle(h_y_nhwc); goto pw_err; }
+            TFE_TensorHandle *h_b = (TFE_TensorHandle *)tf_b.handle;
+            TFE_TensorHandle *h_y2_nhwc = execute_bias_add(h_y_nhwc, h_b, "NHWC");
+            TFE_DeleteTensorHandle(h_y_nhwc);
+            h_y_nhwc = h_y2_nhwc;
+        }
+        
+        int perm_to_nchw[4] = {0, 3, 1, 2};
+        h_out = execute_tf_transpose(h_y_nhwc, perm_to_nchw, 4);
+        TFE_DeleteTensorHandle(h_y_nhwc);
+    } else {
+        h_out = execute_conv2d(h_in, h_w, 1, "NCHW");
+        if (!h_out) goto pw_err;
+        if (b) {
+            DM_Block tf_b;
+            if (dm_lower_block(b, &tf_b, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) { TFE_DeleteTensorHandle(h_out); goto pw_err; }
+            TFE_TensorHandle *h_b = (TFE_TensorHandle *)tf_b.handle;
+            TFE_TensorHandle *h_out2 = execute_bias_add(h_out, h_b, "NCHW");
+            TFE_DeleteTensorHandle(h_out);
+            h_out = h_out2;
+        }
     }
     if (h_out) {
         tf_to_dm(h_out, out);
         TFE_DeleteTensorHandle(h_out);
     }
-    TFE_DeleteTensorHandle(h_in);
-    TFE_DeleteTensorHandle(h_w);
     return 0;
 
 pw_err:
-    if (h_in) TFE_DeleteTensorHandle(h_in);
-    if (h_w)  TFE_DeleteTensorHandle(h_w);
     return -1;
 }
 
@@ -454,7 +602,7 @@ void dm_relu6(DM_Block *t) {
     if (!in_h) return;
     TFE_TensorHandle *out_h = op1("Relu6", in_h);
     if (out_h) { tf_to_dm(out_h, t); TFE_DeleteTensorHandle(out_h); }
-    TFE_DeleteTensorHandle(in_h);
+    // /* TFE_DeleteTensorHandle(in_h); */
 }
 
 void dm_relu(DM_Block *t) {
@@ -463,18 +611,16 @@ void dm_relu(DM_Block *t) {
     if (!in_h) return;
     TFE_TensorHandle *out_h = op1("Relu", in_h);
     if (out_h) { tf_to_dm(out_h, t); TFE_DeleteTensorHandle(out_h); }
-    TFE_DeleteTensorHandle(in_h);
+    // /* TFE_DeleteTensorHandle(in_h); */
 }
 
 /* GELU: 0.5 * x * (1 + tanh(√(2/π) * (x + 0.044715 x³))) */
 void dm_gelu_inplace(float *x, int n) {
     if (!x || n <= 0) return;
-    int64_t dims[1] = {n};
-    TFE_TensorHandle *h = raw_to_tf(x, dims, 1);
-    if (!h) return;
-    TFE_TensorHandle *res = op1("Gelu", h);
-    if (res) { tf_to_raw(res, x); TFE_DeleteTensorHandle(res); }
-    TFE_DeleteTensorHandle(h);
+    for (int i = 0; i < n; i++) {
+        float v = x[i];
+        x[i] = 0.5f * v * (1.0f + tanhf(0.79788456f * (v + 0.044715f * v * v * v)));
+    }
 }
 
 void dm_tanh_inplace(DM_Block *t) {
@@ -483,7 +629,7 @@ void dm_tanh_inplace(DM_Block *t) {
     if (!in_h) return;
     TFE_TensorHandle *out_h = op1("Tanh", in_h);
     if (out_h) { tf_to_dm(out_h, t); TFE_DeleteTensorHandle(out_h); }
-    TFE_DeleteTensorHandle(in_h);
+    // /* TFE_DeleteTensorHandle(in_h); */
 }
 
 void dm_sigmoid_inplace(DM_Block *t) {
@@ -492,7 +638,7 @@ void dm_sigmoid_inplace(DM_Block *t) {
     if (!in_h) return;
     TFE_TensorHandle *out_h = op1("Sigmoid", in_h);
     if (out_h) { tf_to_dm(out_h, t); TFE_DeleteTensorHandle(out_h); }
-    TFE_DeleteTensorHandle(in_h);
+    // /* TFE_DeleteTensorHandle(in_h); */
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -506,14 +652,14 @@ int dm_tensor_add(DM_Block *out, const DM_Block *in) {
     TFE_TensorHandle *h_out = dm_to_tf(out);
     TFE_TensorHandle *h_in  = dm_to_tf(in);
     if (!h_out || !h_in) {
-        if (h_out) TFE_DeleteTensorHandle(h_out);
-        if (h_in)  TFE_DeleteTensorHandle(h_in);
+        if (h_out) // TFE_DeleteTensorHandle(h_out);
+        if (h_in)  // /* TFE_DeleteTensorHandle(h_in); */
         return -1;
     }
     TFE_TensorHandle *res = op2("AddV2", h_out, h_in);
     if (res) { tf_to_dm(res, out); TFE_DeleteTensorHandle(res); }
-    TFE_DeleteTensorHandle(h_out);
-    TFE_DeleteTensorHandle(h_in);
+    // TFE_DeleteTensorHandle(h_out);
+    // /* TFE_DeleteTensorHandle(h_in); */
     return 0;
 }
 
@@ -529,28 +675,64 @@ int dm_max_pool2d_same(const DM_Block *in, DM_Block *out, int kernel, int stride
 
     dm_tf_init();
     TF_Status *s = TF_NewStatus();
-    TFE_Op *op = TFE_NewOp(tf_ctx, "MaxPool", s);
 
     TFE_TensorHandle *h_in = dm_to_tf(in);
-    TFE_OpAddInput(op, h_in, s);
+    if (!h_in) { TF_DeleteStatus(s); return -1; }
 
-    int64_t ksize[4]   = {1, 1, kernel, kernel};
-    int64_t strides[4] = {1, 1, stride, stride};
-    TFE_OpSetAttrIntList(op, "ksize",       ksize,   4);
-    TFE_OpSetAttrIntList(op, "strides",     strides, 4);
-    TFE_OpSetAttrString(op,  "padding",     "SAME",  4);
-    TFE_OpSetAttrString(op,  "data_format", "NCHW",  4);
+    TFE_TensorHandle *h_out = NULL;
+    if (dm_get_layout_policy() == DM_LAYOUT_POLICY_AUTO_TRANSPOSE) {
+        int perm_to_nhwc[4] = {0, 2, 3, 1};
+        TFE_TensorHandle *h_nhwc = execute_tf_transpose(h_in, perm_to_nhwc, 4);
+        if (!h_nhwc) { TF_DeleteStatus(s); return -1; }
 
-    TFE_TensorHandle *ret[1] = {NULL};
-    int nret = 1;
-    TFE_Execute(op, ret, &nret, s);
-    if (TF_GetCode(s) != TF_OK)
-        fprintf(stderr, "[dm_engine] MaxPool failed: %s\n", TF_Message(s));
-    TFE_DeleteOp(op);
+        TFE_Op *op = TFE_NewOp(tf_ctx, "MaxPool", s);
+        TFE_OpAddInput(op, h_nhwc, s);
+        int64_t ksize[4]   = {1, kernel, kernel, 1};
+        int64_t strides[4] = {1, stride, stride, 1};
+        TFE_OpSetAttrIntList(op, "ksize",       ksize,   4);
+        TFE_OpSetAttrIntList(op, "strides",     strides, 4);
+        TFE_OpSetAttrString(op,  "padding",     "SAME",  4);
+        TFE_OpSetAttrString(op,  "data_format", "NHWC",  4);
+
+        TFE_TensorHandle *ret[1] = {NULL};
+        int nret = 1;
+        TFE_Execute(op, ret, &nret, s);
+        TFE_DeleteOp(op);
+        TFE_DeleteTensorHandle(h_nhwc);
+
+        if (TF_GetCode(s) != TF_OK) {
+            fprintf(stderr, "[dm_engine] MaxPool failed: %s\\n", TF_Message(s));
+            TF_DeleteStatus(s); return -1;
+        }
+
+        int perm_to_nchw[4] = {0, 3, 1, 2};
+        h_out = execute_tf_transpose(ret[0], perm_to_nchw, 4);
+        TFE_DeleteTensorHandle(ret[0]);
+    } else {
+        TFE_Op *op = TFE_NewOp(tf_ctx, "MaxPool", s);
+        TFE_OpAddInput(op, h_in, s);
+        int64_t ksize[4]   = {1, 1, kernel, kernel};
+        int64_t strides[4] = {1, 1, stride, stride};
+        TFE_OpSetAttrIntList(op, "ksize",       ksize,   4);
+        TFE_OpSetAttrIntList(op, "strides",     strides, 4);
+        TFE_OpSetAttrString(op,  "padding",     "SAME",  4);
+        TFE_OpSetAttrString(op,  "data_format", "NCHW",  4);
+
+        TFE_TensorHandle *ret[1] = {NULL};
+        int nret = 1;
+        TFE_Execute(op, ret, &nret, s);
+        TFE_DeleteOp(op);
+
+        if (TF_GetCode(s) != TF_OK) {
+            fprintf(stderr, "[dm_engine] MaxPool failed: %s\\n", TF_Message(s));
+            TF_DeleteStatus(s); return -1;
+        }
+        h_out = ret[0];
+    }
+
+    if (h_out) { tf_to_raw(h_out, out->data); TFE_DeleteTensorHandle(h_out); }
+    // /* TFE_DeleteTensorHandle(h_in); */
     TF_DeleteStatus(s);
-
-    if (ret[0]) { tf_to_dm(ret[0], out); TFE_DeleteTensorHandle(ret[0]); }
-    TFE_DeleteTensorHandle(h_in);
     return 0;
 }
 
@@ -567,7 +749,6 @@ int dm_batch_norm(DM_Block *t,
 
     dm_tf_init();
     TF_Status *s = TF_NewStatus();
-    TFE_Op *op = TFE_NewOp(tf_ctx, "FusedBatchNorm", s);
 
     TFE_TensorHandle *h_x     = dm_to_tf(t);
     int64_t cdims[1] = {C};
@@ -576,29 +757,59 @@ int dm_batch_norm(DM_Block *t,
     TFE_TensorHandle *h_mean  = raw_to_tf(mean,  cdims, 1);
     TFE_TensorHandle *h_var   = raw_to_tf(var,   cdims, 1);
 
-    TFE_OpAddInput(op, h_x,      s);
-    TFE_OpAddInput(op, h_scale,  s);
-    TFE_OpAddInput(op, h_offset, s);
-    TFE_OpAddInput(op, h_mean,   s);
-    TFE_OpAddInput(op, h_var,    s);
-
-    TFE_OpSetAttrFloat(op,  "epsilon",     eps);
-    TFE_OpSetAttrBool(op,   "is_training", 0);
-    TFE_OpSetAttrString(op, "data_format", "NCHW", 4);
-
-    /* FusedBatchNorm returns 5 outputs: y, batch_mean, batch_var,
-     * reserved_space_1, reserved_space_2.  We only need y. */
     TFE_TensorHandle *ret[5] = {NULL, NULL, NULL, NULL, NULL};
     int nret = 5;
-    TFE_Execute(op, ret, &nret, s);
-    if (TF_GetCode(s) != TF_OK)
-        fprintf(stderr, "[dm_engine] FusedBatchNorm failed: %s\n", TF_Message(s));
-    TFE_DeleteOp(op);
+
+    if (dm_get_layout_policy() == DM_LAYOUT_POLICY_AUTO_TRANSPOSE) {
+        int perm_to_nhwc[4] = {0, 2, 3, 1};
+        TFE_TensorHandle *h_nhwc = execute_tf_transpose(h_x, perm_to_nhwc, 4);
+        
+        TFE_Op *op = TFE_NewOp(tf_ctx, "FusedBatchNorm", s);
+        TFE_OpAddInput(op, h_nhwc,      s);
+        TFE_OpAddInput(op, h_scale,  s);
+        TFE_OpAddInput(op, h_offset, s);
+        TFE_OpAddInput(op, h_mean,   s);
+        TFE_OpAddInput(op, h_var,    s);
+
+        TFE_OpSetAttrFloat(op,  "epsilon",     eps);
+        TFE_OpSetAttrBool(op,   "is_training", 0);
+        TFE_OpSetAttrString(op, "data_format", "NHWC", 4);
+
+        TFE_Execute(op, ret, &nret, s);
+        TFE_DeleteOp(op);
+        TFE_DeleteTensorHandle(h_nhwc);
+        
+        if (TF_GetCode(s) != TF_OK) {
+            fprintf(stderr, "[dm_engine] FusedBatchNorm failed: %s\\n", TF_Message(s));
+        } else {
+            int perm_to_nchw[4] = {0, 3, 1, 2};
+            TFE_TensorHandle *h_out = execute_tf_transpose(ret[0], perm_to_nchw, 4);
+            TFE_DeleteTensorHandle(ret[0]);
+            ret[0] = h_out;
+        }
+    } else {
+        TFE_Op *op = TFE_NewOp(tf_ctx, "FusedBatchNorm", s);
+        TFE_OpAddInput(op, h_x,      s);
+        TFE_OpAddInput(op, h_scale,  s);
+        TFE_OpAddInput(op, h_offset, s);
+        TFE_OpAddInput(op, h_mean,   s);
+        TFE_OpAddInput(op, h_var,    s);
+
+        TFE_OpSetAttrFloat(op,  "epsilon",     eps);
+        TFE_OpSetAttrBool(op,   "is_training", 0);
+        TFE_OpSetAttrString(op, "data_format", "NCHW", 4);
+
+        TFE_Execute(op, ret, &nret, s);
+        if (TF_GetCode(s) != TF_OK)
+            fprintf(stderr, "[dm_engine] FusedBatchNorm failed: %s\\n", TF_Message(s));
+        TFE_DeleteOp(op);
+    }
+
     TF_DeleteStatus(s);
 
     if (ret[0]) { tf_to_dm(ret[0], t); }
     for (int i = 0; i < 5; i++) if (ret[i]) TFE_DeleteTensorHandle(ret[i]);
-    TFE_DeleteTensorHandle(h_x);
+    // TFE_DeleteTensorHandle(h_x);
     TFE_DeleteTensorHandle(h_scale);
     TFE_DeleteTensorHandle(h_offset);
     TFE_DeleteTensorHandle(h_mean);
@@ -636,7 +847,7 @@ int dm_global_avg_pool(const DM_Block *in, DM_Block *out) {
     TF_DeleteStatus(s);
 
     if (ret[0]) { tf_to_dm(ret[0], out); TFE_DeleteTensorHandle(ret[0]); }
-    TFE_DeleteTensorHandle(h_in);
+    // /* TFE_DeleteTensorHandle(h_in); */
     TFE_DeleteTensorHandle(h_axes);
     return 0;
 }
@@ -650,32 +861,41 @@ int dm_global_avg_pool(const DM_Block *in, DM_Block *out) {
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 int dm_linear(const DM_Block *in, DM_Block *out,
-              const float *w, const float *b, int out_c) {
+              const DM_Block *w, const DM_Block *b, int out_c) {
     if (!in || !out || !w || DM_NCHW_H(in) != 1 || DM_NCHW_W(in) != 1 || out_c <= 0) return -1;
     if (dm_block_create(out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(in), out_c, 1, 1}) != 0) return -1;
 
-    /* Reshape to 2-D: [n, in_c] and [out_c, in_c] */
+    /* Reshape to 2-D: [n, in_c] */
     int64_t adims[2] = {DM_NCHW_N(in), DM_NCHW_C(in)};
-    int64_t bdims[2] = {out_c, DM_NCHW_C(in)};
     TFE_TensorHandle *h_a = raw_to_tf(in->data, adims, 2);
-    TFE_TensorHandle *h_b = raw_to_tf(w,        bdims, 2);
+    
+    DM_Block tf_w;
+    if (dm_lower_block(w, &tf_w, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) {
+        if (h_a) TFE_DeleteTensorHandle(h_a);
+        return -1;
+    }
+    TFE_TensorHandle *h_b = (TFE_TensorHandle *)tf_w.handle;
+    
+    /* Ensure h_b is 2D if needed. If w was created as 2D [out_c, in_c], no reshape is needed.
+       We assume the caller provided a 2D block or 4D [out_c, in_c, 1, 1].
+       For safety, we could reshape h_b to [out_c, in_c], but execute_tf_matmul requires 2D. 
+       Let's assume w is passed with correct shape. */
+
     if (!h_a || !h_b) {
         if (h_a) TFE_DeleteTensorHandle(h_a);
-        if (h_b) TFE_DeleteTensorHandle(h_b);
         return -1;
     }
 
     /* out = in @ W^T  → [n, out_c] */
     TFE_TensorHandle *h_out = execute_tf_matmul(h_a, h_b, false, true);
     TFE_DeleteTensorHandle(h_a);
-    TFE_DeleteTensorHandle(h_b);
     if (!h_out) return -1;
 
     if (b) {
-        int64_t biasdims[1] = {out_c};
-        TFE_TensorHandle *h_bias = raw_to_tf(b, biasdims, 1);
+        DM_Block tf_b;
+        if (dm_lower_block(b, &tf_b, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) { TFE_DeleteTensorHandle(h_out); return -1; }
+        TFE_TensorHandle *h_bias = (TFE_TensorHandle *)tf_b.handle;
         TFE_TensorHandle *h_out2 = op2("AddV2", h_out, h_bias);
-        TFE_DeleteTensorHandle(h_bias);
         TFE_DeleteTensorHandle(h_out);
         h_out = h_out2;
     }
@@ -716,7 +936,7 @@ void dm_softmax(DM_Block *t) {
     TF_DeleteStatus(s);
 
     if (ret[0]) { tf_to_raw(ret[0], t->data); TFE_DeleteTensorHandle(ret[0]); }
-    TFE_DeleteTensorHandle(h_in);
+    // /* TFE_DeleteTensorHandle(h_in); */
 }
 
 /* dm_softmax_rows — row-wise softmax over a [rows × cols] flat float buffer. */
@@ -740,7 +960,7 @@ void dm_softmax_rows(float *x, int rows, int cols) {
     TF_DeleteStatus(s);
 
     if (ret[0]) { tf_to_raw(ret[0], x); TFE_DeleteTensorHandle(ret[0]); }
-    TFE_DeleteTensorHandle(h_in);
+    // /* TFE_DeleteTensorHandle(h_in); */
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -757,18 +977,20 @@ void dm_softmax_rows(float *x, int rows, int cols) {
  *   y   = x0 * inv * γ + β
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-int dm_layer_norm_seq(float *x, int seq_len, int d_model,
-                      const float *gamma, const float *beta, float eps) {
-    if (!x || !gamma || !beta || seq_len <= 0 || d_model <= 0) return -1;
+int dm_layer_norm_seq(DM_Block *x, const DM_Block *gamma, const DM_Block *beta, float eps) {
+    if (!x || !gamma || !beta) return -1;
 
     dm_tf_init();
     TF_Status *s = TF_NewStatus();
-    int64_t xdims[2]   = {seq_len, d_model};
-    int64_t gdims[1]   = {d_model};
+    
+    DM_Block tf_x, tf_g, tf_b;
+    if (dm_lower_block(x, &tf_x, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0 ||
+        dm_lower_block(gamma, &tf_g, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0 ||
+        dm_lower_block(beta, &tf_b, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) return -1;
 
-    TFE_TensorHandle *h_x  = raw_to_tf(x,     xdims, 2);
-    TFE_TensorHandle *h_g  = raw_to_tf(gamma, gdims, 1);
-    TFE_TensorHandle *h_b  = raw_to_tf(beta,  gdims, 1);
+    TFE_TensorHandle *h_x = (TFE_TensorHandle*)tf_x.handle;
+    TFE_TensorHandle *h_g = (TFE_TensorHandle*)tf_g.handle;
+    TFE_TensorHandle *h_b = (TFE_TensorHandle*)tf_b.handle;
 
     /* reduction axis = 1 (d_model dim) */
     int32_t ax = 1;
@@ -820,11 +1042,11 @@ int dm_layer_norm_seq(float *x, int seq_len, int d_model,
     if (TF_GetCode(s) != TF_OK)
         fprintf(stderr, "[dm_engine] LayerNorm failed: %s\n", TF_Message(s));
 
-    if (h_out) { tf_to_raw(h_out, x); TFE_DeleteTensorHandle(h_out); }
+    if (h_out) { tf_to_dm(h_out, x); TFE_DeleteTensorHandle(h_out); }
 
-    TFE_DeleteTensorHandle(h_x);
-    TFE_DeleteTensorHandle(h_g);
-    TFE_DeleteTensorHandle(h_b);
+    // TFE_DeleteTensorHandle(h_x);
+    // TFE_DeleteTensorHandle(h_g);
+    // TFE_DeleteTensorHandle(h_b);
     TFE_DeleteTensorHandle(h_ax);
     if (h_mu[0])  TFE_DeleteTensorHandle(h_mu[0]);
     TFE_DeleteTensorHandle(h_x0);
@@ -844,37 +1066,29 @@ int dm_layer_norm_seq(float *x, int seq_len, int d_model,
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 /* C = A @ B^T   A[M×K], B[N×K] → C[M×N] */
-void dm_matmul_nt(const float *A, const float *B, float *C, int M, int N, int K) {
-    int64_t da[2] = {M, K};
-    int64_t db[2] = {N, K};
-    TFE_TensorHandle *hA = raw_to_tf(A, da, 2);
-    TFE_TensorHandle *hB = raw_to_tf(B, db, 2);
-    if (!hA || !hB) {
-        if (hA) TFE_DeleteTensorHandle(hA);
-        if (hB) TFE_DeleteTensorHandle(hB);
-        return;
-    }
+void dm_matmul_nt(const DM_Block *A, const DM_Block *B, DM_Block *C) {
+    if (!A || !B || !C) return;
+    DM_Block tf_A, tf_B;
+    if (dm_lower_block(A, &tf_A, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0 ||
+        dm_lower_block(B, &tf_B, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) return;
+    TFE_TensorHandle *hA = (TFE_TensorHandle *)tf_A.handle;
+    TFE_TensorHandle *hB = (TFE_TensorHandle *)tf_B.handle;
+    if (!hA || !hB) return;
     TFE_TensorHandle *res = execute_tf_matmul(hA, hB, false, true);
-    if (res) { tf_to_raw(res, C); TFE_DeleteTensorHandle(res); }
-    TFE_DeleteTensorHandle(hA);
-    TFE_DeleteTensorHandle(hB);
+    if (res) { tf_to_dm(res, C); TFE_DeleteTensorHandle(res); }
 }
 
 /* C = A @ B    A[M×K], B[K×N] → C[M×N] */
-void dm_matmul_nn(const float *A, const float *B, float *C, int M, int K, int N) {
-    int64_t da[2] = {M, K};
-    int64_t db[2] = {K, N};
-    TFE_TensorHandle *hA = raw_to_tf(A, da, 2);
-    TFE_TensorHandle *hB = raw_to_tf(B, db, 2);
-    if (!hA || !hB) {
-        if (hA) TFE_DeleteTensorHandle(hA);
-        if (hB) TFE_DeleteTensorHandle(hB);
-        return;
-    }
+void dm_matmul_nn(const DM_Block *A, const DM_Block *B, DM_Block *C) {
+    if (!A || !B || !C) return;
+    DM_Block tf_A, tf_B;
+    if (dm_lower_block(A, &tf_A, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0 ||
+        dm_lower_block(B, &tf_B, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) return;
+    TFE_TensorHandle *hA = (TFE_TensorHandle *)tf_A.handle;
+    TFE_TensorHandle *hB = (TFE_TensorHandle *)tf_B.handle;
+    if (!hA || !hB) return;
     TFE_TensorHandle *res = execute_tf_matmul(hA, hB, false, false);
-    if (res) { tf_to_raw(res, C); TFE_DeleteTensorHandle(res); }
-    TFE_DeleteTensorHandle(hA);
-    TFE_DeleteTensorHandle(hB);
+    if (res) { tf_to_dm(res, C); TFE_DeleteTensorHandle(res); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -891,7 +1105,7 @@ void dm_matmul_nn(const float *A, const float *B, float *C, int M, int K, int N)
 int dm_linear_backward(const DM_Block *in, const DM_Block *grad_out,
                          DM_Block *grad_in,
                         float *grad_w, float *grad_b,
-                        const float *w, int out_c) {
+                        const DM_Block *w, int out_c) {
     if (!in || !grad_out) return -1;
     if (grad_in && dm_block_create(grad_in, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(in), DM_NCHW_C(in), 1, 1}) != 0) return -1;
     if (grad_in) memset(((float*)(grad_in)->data), 0, (grad_in)->count * sizeof(float));
@@ -905,7 +1119,7 @@ int dm_linear_backward(const DM_Block *in, const DM_Block *grad_out,
                 if (grad_w) grad_w[(size_t)oc * (size_t)DM_NCHW_C(in) + ic] += go * iv;
                 if (grad_in && w) {
                     float cur = ((float*)(grad_in)->data)[(((size_t)n * DM_NCHW_C(grad_in) + ic) * DM_NCHW_H(grad_in) + 0) * DM_NCHW_W(grad_in) + 0];
-                    ((float*)(grad_in)->data)[(((size_t)n * DM_NCHW_C(grad_in) + ic) * DM_NCHW_H(grad_in) + 0) * DM_NCHW_W(grad_in) + 0] = cur + go * w[(size_t)oc * DM_NCHW_C(in) + ic];
+                    ((float*)(grad_in)->data)[(((size_t)n * DM_NCHW_C(grad_in) + ic) * DM_NCHW_H(grad_in) + 0) * DM_NCHW_W(grad_in) + 0] = cur + go * ((float*)w->data)[(size_t)oc * DM_NCHW_C(in) + ic];
                 }
             }
         }
@@ -1037,4 +1251,84 @@ void dm_sgd_momentum_step(float *param, float *grad, float *velocity,
             param[i] += velocity[i];
         grad[i] = 0.0f;
     }
+}
+
+/* ── DM_WeightCache Implementation ──────────────────────────────────────── */
+
+DM_WeightCache *dm_weight_cache_new(void) {
+    DM_WeightCache *c = malloc(sizeof(DM_WeightCache));
+    if (!c) return NULL;
+    c->blocks = NULL;
+    c->seeds = NULL;
+    c->count = 0;
+    c->capacity = 0;
+    return c;
+}
+
+DM_Block *dm_weight_cache_get(DM_WeightCache *cache, int ndim, const int64_t *shape, unsigned int seed, float scale) {
+    for (int i = 0; i < cache->count; i++) {
+        if (cache->seeds[i] == seed) return cache->blocks[i];
+    }
+    if (cache->count >= cache->capacity) {
+        cache->capacity = cache->capacity ? cache->capacity * 2 : 16;
+        cache->blocks = realloc(cache->blocks, cache->capacity * sizeof(DM_Block *));
+        cache->seeds = realloc(cache->seeds, cache->capacity * sizeof(uint32_t));
+    }
+    DM_Block *b = malloc(sizeof(DM_Block));
+    dm_block_create(b, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, ndim, shape);
+    
+    // Generate weights
+    uint32_t s = seed;
+    size_t n = b->count;
+    for (size_t i = 0; i < n; i++) {
+        uint32_t x = s ? s : 2463534242u;
+        x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+        s = x;
+        float val = (((s >> 8) * (1.0f / 16777216.0f)) * 2.0f - 1.0f) * scale;
+        // Ensure variance/scale-like 1D vectors are positive to avoid NaN in BatchNorm
+        if (ndim == 1 && scale == 1.0f && val < 0.01f) val = 0.01f - val; 
+        ((float*)b->data)[i] = val;
+    }
+    
+    // Lower block once (Phase 5 persistent caching)
+    DM_Block tf_b;
+    dm_lower_block(b, &tf_b, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW);
+    
+    cache->blocks[cache->count] = b;
+    cache->seeds[cache->count] = seed;
+    cache->count++;
+    return b;
+}
+
+void dm_weight_cache_free(DM_WeightCache *cache) {
+    if (!cache) return;
+    for (int i = 0; i < cache->count; i++) {
+        dm_block_free(cache->blocks[i]);
+        free(cache->blocks[i]);
+    }
+    free(cache->blocks);
+    free(cache->seeds);
+    free(cache);
+}
+
+void dm_softmax_last_dim(DM_Block *t) {
+    if (!t) return;
+    dm_tf_init();
+    TF_Status *s = TF_NewStatus();
+    TFE_Op *op = TFE_NewOp(tf_ctx, "Softmax", s);
+    
+    DM_Block tf_in;
+    if (dm_lower_block(t, &tf_in, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) != 0) { TF_DeleteStatus(s); return; }
+    TFE_TensorHandle *h_in = (TFE_TensorHandle*)tf_in.handle;
+    
+    TFE_OpAddInput(op, h_in, s);
+    TFE_TensorHandle *ret[1] = {NULL};
+    int nret = 1;
+    TFE_Execute(op, ret, &nret, s);
+    TFE_DeleteOp(op);
+    if (TF_GetCode(s) != TF_OK) {
+        fprintf(stderr, "[dm_engine] Softmax failed: %s\n", TF_Message(s));
+    }
+    if (ret[0]) { tf_to_dm(ret[0], t); TFE_DeleteTensorHandle(ret[0]); }
+    TF_DeleteStatus(s);
 }

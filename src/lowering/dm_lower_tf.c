@@ -99,6 +99,28 @@ int dm_tf_tensor_to_block(const DM_TF_Tensor *tensor, DM_Block *out, DM_BlockKin
     return 0;
 }
 
+int dm_tf_tensor_copy_to_block(const DM_TF_Tensor *tensor, DM_Block *out) {
+    if (!tensor || !out || !out->data) return -1;
+    
+    TFE_TensorHandle *h = (TFE_TensorHandle*)tensor;
+    TF_Status *s = TF_NewStatus();
+    TF_Tensor *tf_t = TFE_TensorHandleResolve(h, s);
+    
+    if (TF_GetCode(s) != TF_OK) {
+        TF_DeleteStatus(s);
+        return -1;
+    }
+    
+    size_t bytes = TF_TensorByteSize(tf_t);
+    if (out->bytes >= bytes) {
+        memcpy(out->data, TF_TensorData(tf_t), bytes);
+    }
+    
+    TF_DeleteTensor(tf_t);
+    TF_DeleteStatus(s);
+    return (out->bytes >= bytes) ? 0 : -1;
+}
+
 void dm_tf_tensor_free(void *tensor) {
     if (!tensor) return;
     TFE_TensorHandle *h = (TFE_TensorHandle*)tensor;

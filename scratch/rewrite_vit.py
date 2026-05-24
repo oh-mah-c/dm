@@ -1,4 +1,4 @@
-/*
+code = """/*
  * DM_NCHW_C(&vit) — Vision Transformer (ViT), Dosovitskiy et al., ICLR 2021
  * arXiv:2010.11929v2
  *
@@ -70,7 +70,6 @@ static int mhsa_forward(DM_WeightCache *cache, DM_Block *x, unsigned int seed, i
     for (int i=0; i<seq; i++)
         for (int j=0; j<3*D; j++)
             q_ptr[i*3*D + j] += qb_ptr[j];
-    qkv.dirty = 1; qkv.version++;
 
     DM_Block attn_out = {0};
     dm_block_create(&attn_out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 2, (int64_t[]){seq, D});
@@ -116,7 +115,6 @@ static int mhsa_forward(DM_WeightCache *cache, DM_Block *x, unsigned int seed, i
     for (int i = 0; i < seq; i++)
         for (int j = 0; j < D; j++)
             x_ptr[(size_t)i*D + j] += pb_ptr[j];
-    x->dirty = 1; x->version++;
 
     dm_block_free(&qkv);
     dm_block_free(&attn_out);
@@ -144,10 +142,8 @@ static int mlp_forward(DM_WeightCache *cache, DM_Block *x, unsigned int seed, in
     for (int i = 0; i < seq; i++)
         for (int j = 0; j < M; j++)
             h_ptr[(size_t)i*M + j] += b1_ptr[j];
-    hidden.dirty = 1; hidden.version++;
 
     dm_gelu_inplace(h_ptr, seq * M);
-    hidden.dirty = 1; hidden.version++;
 
     dm_matmul_nt(&hidden, fc2_w, x);
     float *x_ptr = (float*)x->data;
@@ -155,7 +151,6 @@ static int mlp_forward(DM_WeightCache *cache, DM_Block *x, unsigned int seed, in
     for (int i = 0; i < seq; i++)
         for (int j = 0; j < D; j++)
             x_ptr[(size_t)i*D + j] += b2_ptr[j];
-    x->dirty = 1; x->version++;
 
     dm_block_free(&hidden);
     return 0;
@@ -221,7 +216,6 @@ int dm_vit_forward(const DM_Block *input, DM_Block *logits,
     for (int i = 0; i < N; i++)
         for (int j = 0; j < D; j++)
             z_ptr[(size_t)(i+1)*D + j] = pp_ptr[(size_t)i*D + j] + pb_ptr[j];
-            z.dirty = 1; z.version++;
             
     dm_block_free(&patches);
     dm_block_free(&patches_proj);
@@ -230,7 +224,6 @@ int dm_vit_forward(const DM_Block *input, DM_Block *logits,
     for (int i = 0; i < seq; i++)
         for (int j = 0; j < D; j++)
             z_ptr[(size_t)i*D + j] += pe_ptr[(size_t)i*D + j];
-            z.dirty = 1; z.version++;
 
     for (int l = 0; l < L; l++) {
         DM_Block *ln1_g = dm_weight_cache_get(cache, 1, (int64_t[]){D}, seed + l*100 + 20, 1.0f);
@@ -242,13 +235,11 @@ int dm_vit_forward(const DM_Block *input, DM_Block *logits,
         dm_layer_norm_seq(&z, ln1_g, ln1_b, 1e-6f);
         mhsa_forward(cache, &z, seed, l, seq, D, h);
         for (size_t i = 0; i < (size_t)seq*D; i++) z_ptr[i] += ((float*)z_res.data)[i];
-        z.dirty = 1; z.version++;
 
         memcpy(z_res.data, z.data, (size_t)seq * D * sizeof(float));
         dm_layer_norm_seq(&z, ln2_g, ln2_b, 1e-6f);
         mlp_forward(cache, &z, seed, l, seq, D, M);
         for (size_t i = 0; i < (size_t)seq*D; i++) z_ptr[i] += ((float*)z_res.data)[i];
-        z.dirty = 1; z.version++;
     }
 
     DM_Block *hln_g = dm_weight_cache_get(cache, 1, (int64_t[]){D}, seed + 999, 1.0f);
@@ -260,7 +251,6 @@ int dm_vit_forward(const DM_Block *input, DM_Block *logits,
     DM_Block z_cls = {0};
     dm_block_create(&z_cls, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 2, (int64_t[]){1, D});
     memcpy(z_cls.data, z.data, D * sizeof(float));
-    z_cls.dirty = 1; z_cls.version++;
     dm_layer_norm_seq(&z_cls, hln_g, hln_b, 1e-6f);
 
     if (dm_block_create(logits, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){1, K, 1, 1}) != 0) {
@@ -293,9 +283,9 @@ int dm_vit_forward_variant(const DM_Block *input, DM_Block *logits,
 
 static void vit_usage(const char *prog) {
     fprintf(stderr,
-        "Usage:\n"
-        "  %s vit bench [--variant tiny|small|base|large|huge]\n"
-        "               [--size N] [--classes N] [--seed N]\n\n",
+        "Usage:\\n"
+        "  %s vit bench [--variant tiny|small|base|large|huge]\\n"
+        "               [--size N] [--classes N] [--seed N]\\n\\n",
         prog);
 }
 
@@ -325,14 +315,14 @@ int dm_vit_cli(int argc, char **argv)
     dm_vit_config_init(&cfg, var, classes, size);
 
     static const char *vnames[] = {"tiny","small","base","large","huge"};
-    printf("ViT-%s/%d  size=%dx%d  D=%d  L=%d  heads=%d  classes=%d  seed=%u\n",
+    printf("ViT-%s/%d  size=%dx%d  D=%d  L=%d  heads=%d  classes=%d  seed=%u\\n",
            vnames[var], cfg.patch_size, size, size,
            cfg.d_model, cfg.num_layers, cfg.num_heads, classes, seed);
-    printf("Total params: %zu\n", dm_vit_param_count(&cfg));
+    printf("Total params: %zu\\n", dm_vit_param_count(&cfg));
 
     DM_Block in = {0}, out = {0};
     if (dm_block_create(&in, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){1, 3, size, size}) != 0) {
-        fprintf(stderr, "alloc failed\n"); return 1;
+        fprintf(stderr, "alloc failed\\n"); return 1;
     }
     { size_t __n = (&in)->count; float *__d = (float*)(&in)->data; for(size_t __i=0; __i<__n; __i++) __d[__i] = 1.0f; }
 
@@ -344,22 +334,27 @@ int dm_vit_cli(int argc, char **argv)
     dm_bench_stop(DM_PHASE_TOTAL);
 
     if (rc == 0) {
-        printf("Raw logit range: [%.4f, %.4f]\n", ((float*)((float*)out.data))[0], ((float*)((float*)out.data))[classes-1]);
+        printf("Raw logit range: [%.4f, %.4f]\\n", ((float*)((float*)out.data))[0], ((float*)((float*)out.data))[classes-1]);
         dm_softmax(&out);
-        printf("Top-5 predictions:\n");
+        printf("Top-5 predictions:\\n");
         for (int r = 0; r < 5 && r < classes; r++) {
             int best = -1; float bv = -1e30f;
             for (int j = 0; j < classes; j++)
                 if (((float*)((float*)out.data))[j] > bv) { bv = ((float*)((float*)out.data))[j]; best = j; }
-            printf("  rank %d  class %4d  prob %.6f\n", r+1, best, bv);
+            printf("  rank %d  class %4d  prob %.6f\\n", r+1, best, bv);
             ((float*)((float*)out.data))[best] = -1e30f;
         }
         dm_bench_print_report("vit", "synthetic");
     } else {
-        fprintf(stderr, "Forward pass failed\n");
+        fprintf(stderr, "Forward pass failed\\n");
     }
 
     dm_block_free(&in);
     dm_block_free(&out);
     return rc == 0 ? 0 : 1;
 }
+"""
+
+with open("src/models/vision/vit.c", "w") as f:
+    f.write(code)
+

@@ -546,11 +546,8 @@ DM_API const char    *dm_backend_name  (DM_Backend b);
  * Users can build their own models by composing these primitives directly:
  *
  *   DM_Tensor x, y;
- *   dm_tensor_alloc(&x, 1, 3, 224, 224);   // NCHW batch=1, RGB 224×224
- *   dm_tensor_alloc(&y, 1, 64, 112, 112);
  *   dm_op_conv2d_same(&x, &y, weights, bias, 64, 3, 2);
  *   dm_op_relu(&y);
- *   dm_tensor_free(&x);  dm_tensor_free(&y);
  *
  * Layout conventions:
  *   Tensors           — NCHW  (n, c, h, w), row-major, contiguous float32
@@ -566,20 +563,8 @@ typedef struct {
 } DM_Tensor;
 
 /* DEPRECATION SHIM: Phase 0-3 migration */
-#define dm_tensor_alloc(...) _Pragma("GCC warning \"'dm_tensor_alloc' is deprecated. Use 'dm_block_create'\"") -1
-#define dm_tensor_free(...)  _Pragma("GCC warning \"'dm_tensor_free' is deprecated. Use 'dm_block_free'\"") 
-#define dm_tensor_fill(...)  _Pragma("GCC warning \"'dm_tensor_fill' is deprecated.\"") 
-#define dm_tensor_get(...)   0.0f
-#define dm_tensor_set(...)   
-#define dm_tensor_count(...) 0
 
 /* ── Tensor lifecycle (DEPRECATED) ──────────────────────────────────────── */
-DM_API DM_Status dm_tensor_alloc (DM_Tensor *t, int n, int c, int h, int w);
-DM_API void      dm_tensor_free  (DM_Tensor *t);
-DM_API void      dm_tensor_fill  (DM_Tensor *t, float value);
-DM_API float     dm_tensor_get   (const DM_Tensor *t, int n, int c, int y, int x);
-DM_API void      dm_tensor_set   (DM_Tensor *t, int n, int c, int y, int x, float v);
-DM_API size_t    dm_tensor_count (const DM_Tensor *t);
 
 /* ── Convolutions ──────────────────────────────────────────────────────────
  * All use SAME padding. Filter layout: OIHW for conv2d, [c][k][k] for depthwise.

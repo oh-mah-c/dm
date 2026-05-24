@@ -25,6 +25,10 @@ int dm_lower_block(const DM_Block *src, DM_Block *dst, DM_Backend target_backend
 
     switch (target_backend) {
         case DM_BACKEND_CPU:
+            if (src->backend == DM_BACKEND_TENSORFLOW) {
+                if (policy == DM_LOWER_VIEW) return -1; // CPU cannot directly view TF memory zero-copy in our current model
+                return dm_tf_tensor_copy_to_block(src->handle, dst);
+            }
             return dm_block_to_cpu(src, dst);
         case DM_BACKEND_VULKAN_COMPUTE:
         case DM_BACKEND_VULKAN_COOP_MAT:
@@ -37,7 +41,32 @@ int dm_lower_block(const DM_Block *src, DM_Block *dst, DM_Backend target_backend
                 }
 
                 DM_TF_Tensor *tf_tensor = NULL;
-                int rc = dm_block_to_tf_tensor(src, &tf_tensor);
+                
+                // Persistent Backend Handle Caching
+                DM_Block *mut_src = (DM_Block *)src;
+                if (src->backend == DM_BACKEND_CPU && src->handle != NULL) {
+                    if (src->dirty) {
+                        // Invalidate cached handle
+                        if (src->owns_handle && src->handle_destructor) {
+                            src->handle_destructor(src->handle);
+                        }
+                        mut_src->handle = NULL;
+                        mut_src->owns_handle = 0;
+                    } else {
+                        tf_tensor = (DM_TF_Tensor *)src->handle;
+                    }
+                }
+                
+                int rc = 0;
+                if (!tf_tensor) {
+                    rc = dm_block_to_tf_tensor(src, &tf_tensor);
+                    if (rc == 0 && src->backend == DM_BACKEND_CPU) {
+                        mut_src->handle = tf_tensor;
+                        mut_src->owns_handle = 1;
+                        mut_src->handle_destructor = dm_tf_tensor_free;
+                        mut_src->dirty = 0;
+                    }
+                }
                 if (rc == 0) {
                     *dst = *src;
                     dst->backend = DM_BACKEND_TENSORFLOW;
@@ -49,10 +78,12 @@ int dm_lower_block(const DM_Block *src, DM_Block *dst, DM_Backend target_backend
                     
                     if (policy == DM_LOWER_VIEW) {
                         dst->owns_data = 0;
-                        dst->owns_handle = 1; // We allocated a NEW handle to view the data, we must free the handle
+                        dst->owns_handle = 0; // The source block caches and owns the handle
                     } else if (policy == DM_LOWER_MOVE) {
                         dst->owns_data = src->owns_data;
-                        dst->owns_handle = 1;
+                        dst->owns_handle = src->owns_handle;
+                        mut_src->owns_handle = 0; // Transfer ownership
+                        mut_src->handle = NULL;
                     } else { // DM_LOWER_COPY
                         // dm_block_to_tf_tensor is currently zero-copy (wraps CPU pointer).
                         // If strict COPY is requested, we should ideally allocate new memory or a new tensor.

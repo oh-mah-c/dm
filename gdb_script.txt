@@ -1,0 +1,3 @@
+run resnet18 bench
+bt
+quit

@@ -22,7 +22,14 @@ typedef enum {
     DM_LAYOUT_DATASET
 } DM_Layout;
 
+typedef enum {
+    DM_LAYOUT_POLICY_STRICT,
+    DM_LAYOUT_POLICY_AUTO_TRANSPOSE,
+    DM_LAYOUT_POLICY_BACKEND_NATIVE
+} DM_LayoutPolicy;
+
 const char* dm_layout_name(DM_Layout layout);
+const char* dm_layout_policy_name(DM_LayoutPolicy policy);
 
 #ifdef __cplusplus
 }

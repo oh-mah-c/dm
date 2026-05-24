@@ -43,6 +43,8 @@ int dm_block_create(
         if (!block->data) return -1;
         block->owns_data = 1;
     }
+    block->dirty = 1;
+    block->version = 1;
     return 0;
 }
 
@@ -85,6 +87,8 @@ int dm_block_view(
     block->data = data;
     block->owns_data = 0;
     block->owns_handle = 0;
+    block->dirty = 1;
+    block->version = 1;
     
     return 0;
 }

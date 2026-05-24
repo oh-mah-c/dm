@@ -40,6 +40,8 @@ typedef struct {
     int owns_data;
     int owns_handle;
     void (*handle_destructor)(void *handle);
+    int dirty;
+    uint64_t version;
     int requires_grad;
 
     void *grad;

@@ -36,7 +36,7 @@ extern void dm_matmul_nt(const float *A, const float *B, float *C,
 /* From dm_gpu.c — Vulkan context factory (runtime-loads Vulkan; returns NULL
  * when no Vulkan loader or GPU is present — safe to call always). */
 extern void *dm_gpu_create(int device_index, const char *shader_dir);
-extern void  dm_gpu_free(void *ctx);
+extern void  dm_gpu_destroy(void *ctx);
 
 /* ── Module state ─────────────────────────────────────────────────────────── */
 
@@ -88,7 +88,7 @@ static int probe_vulkan(void)
      * We create a context, check it, then immediately destroy it. */
     void *ctx = dm_gpu_create(0, NULL);
     if (!ctx) return 0;
-    dm_gpu_free(ctx);
+    dm_gpu_destroy(ctx);
     return 1;
 }
 

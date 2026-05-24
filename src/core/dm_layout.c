@@ -19,3 +19,12 @@ const char* dm_layout_name(DM_Layout layout) {
         default:                       return "UNKNOWN";
     }
 }
+
+const char* dm_layout_policy_name(DM_LayoutPolicy policy) {
+    switch(policy) {
+        case DM_LAYOUT_POLICY_STRICT: return "STRICT";
+        case DM_LAYOUT_POLICY_AUTO_TRANSPOSE: return "AUTO_TRANSPOSE";
+        case DM_LAYOUT_POLICY_BACKEND_NATIVE: return "BACKEND_NATIVE";
+        default: return "UNKNOWN";
+    }
+}

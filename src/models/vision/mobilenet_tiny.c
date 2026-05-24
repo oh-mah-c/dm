@@ -14,6 +14,9 @@
 #endif
 #include "tensorflow/c/c_api.h"
 #include "tensorflow/c/tf_tstring.h"
+#include "lowering/dm_lowering.h"
+
+
 
 static void usage(const char *prog) {
     fprintf(stderr,
@@ -55,40 +58,37 @@ static float *make_weights(size_t n, unsigned int seed, float scale) {
     return w;
 }
 
-static int conv_relu(const DM_Block *in, DM_Block *out, int out_c, int kernel, int stride, unsigned int seed) {
-    float *w = make_weights((size_t)out_c * DM_NCHW_C(in) * kernel * kernel, seed, 0.08f);
+static int conv_relu(const DM_Block *in, DM_Block *out, DM_WeightCache *cache, int out_c, int kernel, int stride, unsigned int seed) {
+    DM_Block *w = dm_weight_cache_get(cache, 4, (int64_t[]){kernel, kernel, DM_NCHW_C(in), out_c}, seed, 0.08f);
     int rc;
     if (!w) return -1;
     rc = dm_conv2d_same(in, out, w, NULL, out_c, kernel, stride);
-    free(w);
     if (rc == 0) dm_relu6(out);
     return rc;
 }
 
-static int depthwise_relu(const DM_Block *in, DM_Block *out, int kernel, int stride, unsigned int seed) {
-    float *w = make_weights((size_t)DM_NCHW_C(in) * kernel * kernel, seed, 0.08f);
+static int depthwise_relu(const DM_Block *in, DM_Block *out, DM_WeightCache *cache, int kernel, int stride, unsigned int seed) {
+    DM_Block *w = dm_weight_cache_get(cache, 4, (int64_t[]){kernel, kernel, DM_NCHW_C(in), 1}, seed, 0.08f);
     int rc;
     if (!w) return -1;
     rc = dm_depthwise_conv2d_same(in, out, w, NULL, kernel, stride);
-    free(w);
     if (rc == 0) dm_relu6(out);
     return rc;
 }
 
-static int pointwise_relu(const DM_Block *in, DM_Block *out, int out_c, unsigned int seed, int activate) {
-    float *w = make_weights((size_t)out_c * DM_NCHW_C(in), seed, 0.08f);
+static int pointwise_relu(const DM_Block *in, DM_Block *out, DM_WeightCache *cache, int out_c, unsigned int seed, int activate) {
+    DM_Block *w = dm_weight_cache_get(cache, 4, (int64_t[]){1, 1, DM_NCHW_C(in), out_c}, seed, 0.08f);
     int rc;
     if (!w) return -1;
     rc = dm_pointwise_conv2d(in, out, w, NULL, out_c);
-    free(w);
     if (rc == 0 && activate) dm_relu6(out);
     return rc;
 }
 
-static int fused_ib(const DM_Block *in, DM_Block *out, int expanded_c, int out_c, int kernel, int stride, unsigned int seed) {
+static int fused_ib(const DM_Block *in, DM_Block *out, DM_WeightCache *cache, int expanded_c, int out_c, int kernel, int stride, unsigned int seed) {
     DM_Block x = {0};
-    if (conv_relu(in, &x, expanded_c, kernel, stride, seed + 1) != 0) return -1;
-    if (pointwise_relu(&x, out, out_c, seed + 2, 1) != 0) { dm_block_free(&x); return -1; }
+    if (conv_relu(in, &x, cache, expanded_c, kernel, stride, seed + 1) != 0) return -1;
+    if (pointwise_relu(&x, out, cache, out_c, seed + 2, 1) != 0) { dm_block_free(&x); return -1; }
     dm_block_free(&x);
     return 0;
 }
@@ -101,7 +101,7 @@ static int add_residual_if_same(const DM_Block *in, DM_Block *out) {
     return 1;
 }
 
-int dm_uib_block(const DM_Block *in, DM_Block *out, DM_UIBKind kind,
+int dm_uib_block(const DM_Block *in, DM_Block *out, DM_WeightCache *cache, DM_UIBKind kind,
                  int expanded_c, int out_c, int kernel1, int kernel2, int stride, unsigned int seed) {
     DM_Block a = {0}, b = {0}, c = {0};
     const DM_Block *cur = in;
@@ -110,17 +110,17 @@ int dm_uib_block(const DM_Block *in, DM_Block *out, DM_UIBKind kind,
     int use_dw2 = (kind == DM_UIB_IB || kind == DM_UIB_EXTRADW);
 
     if (use_dw1) {
-        if (depthwise_relu(cur, &a, kernel1, stride, seed + 11) != 0) goto done;
+        if (depthwise_relu(cur, &a, cache, kernel1, stride, seed + 11) != 0) goto done;
         cur = &a;
     }
-    if (pointwise_relu(cur, &b, expanded_c, seed + 12, 1) != 0) goto done;
+    if (pointwise_relu(cur, &b, cache, expanded_c, seed + 12, 1) != 0) goto done;
     cur = &b;
     if (use_dw2) {
         int dw_stride = use_dw1 ? 1 : stride;
-        if (depthwise_relu(cur, &c, kernel2, dw_stride, seed + 13) != 0) goto done;
+        if (depthwise_relu(cur, &c, cache, kernel2, dw_stride, seed + 13) != 0) goto done;
         cur = &c;
     }
-    if (pointwise_relu(cur, out, out_c, seed + 14, 0) != 0) goto done;
+    if (pointwise_relu(cur, out, cache, out_c, seed + 14, 0) != 0) goto done;
     add_residual_if_same(in, out);
     rc = 0;
 done:
@@ -128,36 +128,41 @@ done:
     return rc;
 }
 
-static int spatial_reduce(const DM_Block *in, DM_Block *out, int reduce, unsigned int seed) {
+static int spatial_reduce(const DM_Block *in, DM_Block *out, DM_WeightCache *cache, int reduce, unsigned int seed) {
     if (!reduce) {
         size_t bytes = (in)->count * sizeof(float);
         if (dm_block_create(out, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){DM_NCHW_N(in), DM_NCHW_C(in), DM_NCHW_H(in), DM_NCHW_W(in)}) != 0) return -1;
         memcpy(((float*)out->data), ((float*)in->data), bytes);
         return 0;
     }
-    return depthwise_relu(in, out, 3, 2, seed);
+    return depthwise_relu(in, out, cache, 3, 2, seed);
 }
 
-int dm_mobile_mqa_block(const DM_Block *in, DM_Block *out, int heads, int key_dim,
+int dm_mobile_mqa_block(const DM_Block *in, DM_Block *out, DM_WeightCache *cache, int heads, int key_dim,
                         int spatial_reduction, unsigned int seed) {
     DM_Block kv_in = {0};
+    DM_Block *wq_b = NULL, *wk_b = NULL, *wv_b = NULL, *wo_b = NULL;
     float *wq = NULL, *wk = NULL, *wv = NULL, *wo = NULL;
     float *q = NULL, *k = NULL, *v = NULL, *cat = NULL;
     int tokens_q, tokens_kv, y, x, t, s, h, d, c, oc;
     float scale;
     if (!in || !out || heads <= 0 || key_dim <= 0) return -1;
-    if (spatial_reduce(in, &kv_in, spatial_reduction, seed + 21) != 0) return -1;
+    if (spatial_reduce(in, &kv_in, cache, spatial_reduction, seed + 21) != 0) return -1;
     tokens_q = DM_NCHW_H(in) * DM_NCHW_W(in);
     tokens_kv = DM_NCHW_H(&kv_in) * DM_NCHW_W(&kv_in);
-    wq = make_weights((size_t)heads * key_dim * DM_NCHW_C(in), seed + 22, 0.05f);
-    wk = make_weights((size_t)key_dim * DM_NCHW_C(in), seed + 23, 0.05f);
-    wv = make_weights((size_t)key_dim * DM_NCHW_C(in), seed + 24, 0.05f);
-    wo = make_weights((size_t)DM_NCHW_C(in) * heads * key_dim, seed + 25, 0.05f);
+    wq_b = dm_weight_cache_get(cache, 2, (int64_t[]){heads * key_dim, DM_NCHW_C(in)}, seed + 22, 0.05f);
+    wq = (float *)wq_b->data;
+    wk_b = dm_weight_cache_get(cache, 2, (int64_t[]){key_dim, DM_NCHW_C(in)}, seed + 23, 0.05f);
+    wk = (float *)wk_b->data;
+    wv_b = dm_weight_cache_get(cache, 2, (int64_t[]){key_dim, DM_NCHW_C(in)}, seed + 24, 0.05f);
+    wv = (float *)wv_b->data;
+    wo_b = dm_weight_cache_get(cache, 2, (int64_t[]){DM_NCHW_C(in), heads * key_dim}, seed + 25, 0.05f);
+    wo = (float *)wo_b->data;
     q = (float *)calloc((size_t)heads * tokens_q * key_dim, sizeof(float));
     k = (float *)calloc((size_t)tokens_kv * key_dim, sizeof(float));
     v = (float *)calloc((size_t)tokens_kv * key_dim, sizeof(float));
     cat = (float *)calloc((size_t)tokens_q * heads * key_dim, sizeof(float));
-    if (!wq || !wk || !wv || !wo || !q || !k || !v || !cat) goto fail;
+    if (!wq_b || !wk_b || !wv_b || !wo_b || !q || !k || !v || !cat) goto fail;
 
     for (h = 0; h < heads; h++) for (t = 0; t < tokens_q; t++) {
         y = t / DM_NCHW_W(in); x = t % DM_NCHW_W(in);
@@ -202,22 +207,22 @@ int dm_mobile_mqa_block(const DM_Block *in, DM_Block *out, int heads, int key_di
         }
     }
     add_residual_if_same(in, out);
-    dm_block_free(&kv_in); free(wq); free(wk); free(wv); free(wo); free(q); free(k); free(v); free(cat);
+    dm_block_free(&kv_in); free(q); free(k); free(v); free(cat);
     return 0;
 fail:
-    dm_block_free(&kv_in); free(wq); free(wk); free(wv); free(wo); free(q); free(k); free(v); free(cat);
+    dm_block_free(&kv_in); free(q); free(k); free(v); free(cat);
     return -1;
 }
 
-static int mobilenet_features(const DM_Block *input, DM_Block *features, unsigned int seed) {
+static int mobilenet_features(const DM_Block *input, DM_Block *features, DM_WeightCache *cache, unsigned int seed) {
     DM_Block x1 = {0}, x2 = {0}, x3 = {0}, x4 = {0}, x5 = {0}, x6 = {0}, pool = {0};
     int rc = -1;
-    if (fused_ib(input, &x1, 16, 16, 3, 2, seed + 100) != 0) goto done;
-    if (dm_uib_block(&x1, &x2, DM_UIB_EXTRADW, 64, 24, 3, 3, 2, seed + 200) != 0) goto done;
-    if (dm_uib_block(&x2, &x3, DM_UIB_IB, 96, 24, 3, 3, 1, seed + 300) != 0) goto done;
-    if (dm_uib_block(&x3, &x4, DM_UIB_CONVNEXT, 96, 32, 5, 3, 2, seed + 400) != 0) goto done;
-    if (dm_mobile_mqa_block(&x4, &x5, 4, 8, 1, seed + 500) != 0) goto done;
-    if (pointwise_relu(&x5, &x6, 64, seed + 600, 1) != 0) goto done;
+    if (fused_ib(input, &x1, cache, 16, 16, 3, 2, seed + 100) != 0) goto done;
+    if (dm_uib_block(&x1, &x2, cache, DM_UIB_EXTRADW, 64, 24, 3, 3, 2, seed + 200) != 0) goto done;
+    if (dm_uib_block(&x2, &x3, cache, DM_UIB_IB, 96, 24, 3, 3, 1, seed + 300) != 0) goto done;
+    if (dm_uib_block(&x3, &x4, cache, DM_UIB_CONVNEXT, 96, 32, 5, 3, 2, seed + 400) != 0) goto done;
+    if (dm_mobile_mqa_block(&x4, &x5, cache, 4, 8, 1, seed + 500) != 0) goto done;
+    if (pointwise_relu(&x5, &x6, cache, 64, seed + 600, 1) != 0) goto done;
     if (dm_global_avg_pool(&x6, &pool) != 0) goto done;
     *features = pool;
     memset(&pool, 0, sizeof(pool));
@@ -246,18 +251,18 @@ done:
     return rc;
 }
 
-int dm_mobilenet_tiny_forward(const DM_Block *input, DM_Block *logits, int classes, unsigned int seed) {
+int dm_mobilenet_tiny_forward(const DM_Block *input, DM_Block *logits, DM_WeightCache *cache, int classes, unsigned int seed) {
     DM_Block features = {0};
-    float *w = NULL;
+    DM_Block *w_b = NULL;
     int rc = -1;
-    if (mobilenet_features(input, &features, seed) != 0) goto done;
-    w = make_weights((size_t)classes * DM_NCHW_C(&features), seed + 700, 0.05f);
-    if (!w) goto done;
-    if (dm_linear(&features, logits, w, NULL, classes) != 0) goto done;
+    if (mobilenet_features(input, &features, cache, seed) != 0) goto done;
+    w_b = dm_weight_cache_get(cache, 2, (int64_t[]){classes, DM_NCHW_C(&features)}, seed + 700, 0.05f);
+    if (!w_b) goto done;
+    if (dm_linear(&features, logits, w_b, NULL, classes) != 0) goto done;
     dm_softmax(logits);
     rc = 0;
 done:
-    free(w);
+    
     dm_block_free(&features);
     return rc;
 }
@@ -322,12 +327,12 @@ static int head_load(TinyHead *h, const char *path) {
     return 0;
 }
 
-static int load_resized_features(const char *path, int size, unsigned int seed, DM_Block *features) {
+static int load_resized_features(const char *path, int size, unsigned int seed, DM_Block *features, DM_WeightCache *cache) {
     DM_Block img = {0}, resized = {0};
     int rc = -1;
     if (dm_image_load_ppm_rgb_f32(path, &img) != 0) goto done;
     if (dm_image_resize_nearest(&img, &resized, size, size) != 0) goto done;
-    if (mobilenet_features(&resized, features, seed) != 0) goto done;
+    if (mobilenet_features(&resized, features, cache, seed) != 0) goto done;
     rc = 0;
 done:
     dm_block_free(&img);
@@ -394,9 +399,10 @@ static int cmd_train(int argc, char **argv) {
             float *logits;
             int c, d, pred = 0;
             if (label < 0 || label >= classes) continue;
-            if (load_resized_features(path, size, seed, &feat) != 0) continue;
+            DM_WeightCache *cache = dm_weight_cache_new(); 
+            if (load_resized_features(path, size, seed, &feat, cache) != 0) continue;
             logits = (float *)malloc(sizeof(float) * (size_t)classes);
-            if (!logits) { dm_block_free(&feat); fclose(fp); head_free(&head); return 1; }
+            if (!logits) { dm_block_free(&feat); dm_weight_cache_free(cache); fclose(fp); head_free(&head); return 1; }
             head_logits(&head, &feat, logits);
             for (c = 1; c < classes; c++) if (logits[c] > logits[pred]) pred = c;
             if (pred == label) correct++;
@@ -408,8 +414,7 @@ static int cmd_train(int argc, char **argv) {
             }
             samples++;
             free(logits);
-            dm_block_free(&feat);
-        }
+            dm_block_free(&feat); dm_weight_cache_free(cache); }
         fclose(fp);
         if (samples) {
             float rate = lr / (float)samples;
@@ -428,8 +433,7 @@ static int cmd_train(int argc, char **argv) {
     }
     if (head_save(&head, output) != 0) { head_free(&head); return 1; }
     printf("saved=%s\nclasses=%d\nfeature_dim=%d\nimage_size=%d\n", output, head.classes, head.feature_dim, head.image_size);
-    head_free(&head);
-    return 0;
+    head_free(&head); return 0;
 }
 
 static int cmd_infer(int argc, char **argv) {
@@ -456,20 +460,20 @@ static int cmd_infer(int argc, char **argv) {
         classes = head.classes;
         size = head.image_size;
         seed = head.seed;
-        if (load_resized_features(input, size, seed, &feat) != 0) { head_free(&head); return 1; }
-        if (dm_block_create(&logits, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){1, classes, 1, 1}) != 0) { dm_block_free(&feat); head_free(&head); return 1; }
+        DM_WeightCache *cache = dm_weight_cache_new(); 
+        if (load_resized_features(input, size, seed, &feat, cache) != 0) { head_free(&head); return 1; }
+        if (dm_block_create(&logits, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){1, classes, 1, 1}) != 0) { dm_block_free(&feat); dm_weight_cache_free(cache); head_free(&head); return 1; }
         raw = (float *)malloc(sizeof(float) * (size_t)classes);
-        if (!raw) { dm_block_free(&feat); head_free(&head); dm_block_free(&logits); return 1; }
+        if (!raw) { dm_block_free(&feat); dm_weight_cache_free(cache); head_free(&head); dm_weight_cache_free(cache); dm_block_free(&logits); return 1; }
         head_logits(&head, &feat, raw);
         for (c = 0; c < classes; c++) dm_tensor_set(&logits, 0, c, 0, 0, raw[c]);
         dm_softmax(&logits);
-        free(raw);
-        dm_block_free(&feat);
-        head_free(&head);
-    } else {
+    dm_weight_cache_free(cache); free(raw);
+        dm_block_free(&feat); dm_weight_cache_free(cache); head_free(&head); dm_weight_cache_free(cache); } else {
         if (dm_image_load_ppm_rgb_f32(input, &img) != 0) return 1;
         if (dm_image_resize_nearest(&img, &resized, size, size) != 0) { dm_block_free(&img); return 1; }
-        if (dm_mobilenet_tiny_forward(&resized, &logits, classes, seed) != 0) { dm_block_free(&img); dm_block_free(&resized); return 1; }
+        DM_WeightCache *cache = dm_weight_cache_new(); 
+        if (dm_mobilenet_tiny_forward(&resized, &logits, cache, classes, seed) != 0) { dm_block_free(&img); dm_block_free(&resized); return 1; }
     }
     printf("model=mobilenet_tiny_mnv4_style\n");
     printf("input=%s\nclasses=%d\nimage_size=%d\n", input, classes, size);
@@ -483,11 +487,11 @@ static int cmd_infer(int argc, char **argv) {
         printf("rank%d_class=%d prob=%.8f\n", i + 1, best, bv);
         dm_tensor_set(&logits, 0, best, 0, 0, -1.0f);
     }
-    dm_block_free(&img); dm_block_free(&resized); dm_block_free(&logits);
-    return 0;
+    dm_block_free(&img); dm_block_free(&resized); dm_block_free(&logits); return 0;
 }
 
 static int cmd_bench_block(int argc, char **argv) {
+    dm_set_layout_policy(DM_LAYOUT_POLICY_AUTO_TRANSPOSE);
     int h = 16, w = 16, c = 32, i;
     DM_Block x = {0}, y = {0}, z = {0};
     for (i = 2; i < argc; i++) {
@@ -498,13 +502,13 @@ static int cmd_bench_block(int argc, char **argv) {
     }
     if (dm_block_create(&x, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){1, c, h, w}) != 0) return 1;
     for (i = 0; i < (int)(&x)->count; i++) ((float*)((float*)x.data))[i] = (float)(i % 17) / 17.0f;
-    if (dm_uib_block(&x, &y, DM_UIB_EXTRADW, c * 4, c, 3, 3, 1, 1) != 0) { dm_block_free(&x); return 1; }
-    if (dm_mobile_mqa_block(&y, &z, 4, 8, 1, 2) != 0) { dm_block_free(&x); dm_block_free(&y); return 1; }
-    printf("uib_out=%dx%dx%d\n", DM_NCHW_C(&y), DM_NCHW_H(&y), DM_NCHW_W(&y));
-    printf("mobile_mqa_out=%dx%dx%d\n", DM_NCHW_C(&z), DM_NCHW_H(&z), DM_NCHW_W(&z));
+    DM_WeightCache *cache = dm_weight_cache_new(); 
+    if (dm_uib_block(&x, &y, cache, DM_UIB_EXTRADW, c * 4, c, 3, 3, 1, 1) != 0) { dm_block_free(&x); return 1; }
+    if (dm_mobile_mqa_block(&y, &z, cache, 4, 8, 1, 2) != 0) { dm_block_free(&x); dm_block_free(&y); return 1; }
+    printf("uib_out=%ldx%ldx%ld\n", DM_NCHW_C(&y), DM_NCHW_H(&y), DM_NCHW_W(&y));
+    printf("mobile_mqa_out=%ldx%ldx%ld\n", DM_NCHW_C(&z), DM_NCHW_H(&z), DM_NCHW_W(&z));
     printf("operators=FusedIB,UIB_FFN,UIB_IB,UIB_ConvNext,UIB_ExtraDW,Mobile_MQA(shared_KV,SRA_stride2_DW)\n");
-    dm_block_free(&x); dm_block_free(&y); dm_block_free(&z);
-    return 0;
+    dm_block_free(&x); dm_block_free(&y); dm_block_free(&z); dm_weight_cache_free(cache); return 0;
 }
 
 static int parse_metadata_key(const char *json, const char *sec, const char *key, char *out_val, size_t max_len) {
@@ -1293,7 +1297,8 @@ DM_API DM_Status dm_mobilenet_tiny_forward_raw(const float *img_nchw,
     memcpy(((float*)input.data), img_nchw, 3 * img_size * img_size * sizeof(float));
 
     DM_Block features = {0};
-    int rc = mobilenet_features(&input, &features, seed);
+    DM_WeightCache *cache = dm_weight_cache_new(); 
+    int rc = mobilenet_features(&input, &features, cache, seed);
     dm_block_free(&input);
     if (rc != 0) {
         dm_block_free(&features);
@@ -1318,15 +1323,17 @@ DM_API DM_Status dm_mobilenet_tiny_forward_raw(const float *img_nchw,
         w_to_use = w_alloc;
     }
 
-    if (dm_linear(&features, &logits, w_to_use, head_b, classes) != 0) {
+    DM_Block w_block = {0}, b_block = {0};
+    if (w_to_use) dm_block_view(&w_block, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 2, (int64_t[]){classes, DM_NCHW_C(&features)}, w_to_use);
+    if (head_b) dm_block_view(&b_block, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 1, (int64_t[]){classes}, (void*)head_b);
+    if (dm_linear(&features, &logits, w_to_use ? &w_block : NULL, head_b ? &b_block : NULL, classes) != 0) {
         free(w_alloc);
         dm_block_free(&features);
         dm_block_free(&logits);
         return DM_ERR_GENERIC;
     }
     dm_softmax(&logits);
-
-    memcpy(logits_out, ((float*)logits.data), classes * sizeof(float));
+    dm_weight_cache_free(cache); memcpy(logits_out, ((float*)logits.data), classes * sizeof(float));
 
     free(w_alloc);
     dm_block_free(&features);
@@ -1375,9 +1382,9 @@ DM_API DM_Status dm_mobilenet_tiny_head_save(const char  *path,
     return DM_OK;
 }
 
-DM_API void dm_mobilenet_tiny_head_free(float *w, float *b)
+DM_API void dm_mobilenet_tiny_head_free(DM_Block *w, DM_Block *b)
 {
-    free(w);
+    
     free(b);
 }
 

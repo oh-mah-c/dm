@@ -59,15 +59,15 @@ size_t dm_tensor_count(const DM_Block *t);
  * Weight layout for dm_depthwise:    w[c][ky][kx]            (transposed internally)
  */
 int dm_conv2d_same(const DM_Block *in, DM_Block *out,
-                   const float *w, const float *b,
+                   const DM_Block *w, const DM_Block *b,
                    int out_c, int kernel, int stride);
 
 int dm_depthwise_conv2d_same(const DM_Block *in, DM_Block *out,
-                              const float *w, const float *b,
+                              const DM_Block *w, const DM_Block *b,
                               int kernel, int stride);
 
 int dm_pointwise_conv2d(const DM_Block *in, DM_Block *out,
-                         const float *w, const float *b, int out_c);
+                         const DM_Block *w, const DM_Block *b, int out_c);
 
 /* ── Activations (TFE) ────────────────────────────────────────────────────── */
 void dm_relu6          (DM_Block *t);
@@ -90,23 +90,22 @@ int dm_batch_norm(DM_Block *t,
                   const float *mean,  const float *var, float eps);
 
 /* Layer-norm over sequence rows: x[seq_len × d_model] (TFE pipeline) */
-int dm_layer_norm_seq(float *x, int seq_len, int d_model,
-                      const float *gamma, const float *beta, float eps);
+int dm_layer_norm_seq(DM_Block *x, const DM_Block *gamma, const DM_Block *beta, float eps);
 
 /* ── Linear / Fully-connected (TFE MatMul + AddV2) ─────────────────────── */
 /* in:  [n, in_c, 1, 1]  →  out: [n, out_c, 1, 1] */
 int dm_linear(const DM_Block *in, DM_Block *out,
-              const float *w, const float *b, int out_c);
+              const DM_Block *w, const DM_Block *b, int out_c);
 
 /* ── Softmax (TFE) ───────────────────────────────────────────────────────── */
 void dm_softmax     (DM_Block *t);               /* [n,c,1,1] over channel dim */
-void dm_softmax_rows(float *x, int rows, int cols); /* raw [rows×cols] in-place  */
+void dm_softmax_last_dim(DM_Block *t);           /* Softmax over the last dimension */
 
 /* ── Matrix multiplications (TFE MatMul) ────────────────────────────────── */
 /* C = A @ B^T   A[M×K], B[N×K] → C[M×N] */
-void dm_matmul_nt(const float *A, const float *B, float *C, int M, int N, int K);
+void dm_matmul_nt(const DM_Block *A, const DM_Block *B, DM_Block *C);
 /* C = A @ B     A[M×K], B[K×N] → C[M×N] */
-void dm_matmul_nn(const float *A, const float *B, float *C, int M, int K, int N);
+void dm_matmul_nn(const DM_Block *A, const DM_Block *B, DM_Block *C);
 
 /* ── Training primitives (pure-C — no TFE needed) ───────────────────────── */
 
@@ -114,7 +113,7 @@ void dm_matmul_nn(const float *A, const float *B, float *C, int M, int K, int N)
 int  dm_linear_backward(const DM_Block *in, const DM_Block *grad_out,
                          DM_Block *grad_in,
                          float *grad_w, float *grad_b,
-                         const float *w, int out_c);
+                         const DM_Block *w, int out_c);
 void dm_tanh_backward  (const DM_Block *out, const DM_Block *grad_out,
                          DM_Block *grad_in);
 void dm_relu_backward  (const DM_Block *in,  const DM_Block *grad_out,
@@ -143,5 +142,18 @@ void dm_adam_step(float *param, float *grad, float *m, float *v,
 void dm_sgd_momentum_step(float *param, float *grad, float *velocity,
                            int n, float lr, float momentum,
                            float weight_decay, int nesterov);
+
+
+/* ── DM_WeightCache ─────────────────────────────────────────────────────── */
+typedef struct {
+    DM_Block **blocks;
+    uint32_t *seeds;
+    int count;
+    int capacity;
+} DM_WeightCache;
+
+DM_WeightCache *dm_weight_cache_new(void);
+DM_Block *dm_weight_cache_get(DM_WeightCache *cache, int ndim, const int64_t *shape, unsigned int seed, float scale);
+void dm_weight_cache_free(DM_WeightCache *cache);
 
 #endif /* DM_ENGINE_H */
