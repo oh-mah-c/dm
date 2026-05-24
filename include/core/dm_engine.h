@@ -151,9 +151,70 @@ typedef struct {
     int count;
     int capacity;
 } DM_WeightCache;
+#define DM_WEIGHT_CACHE_DEFINED 1
 
 DM_WeightCache *dm_weight_cache_new(void);
 DM_Block *dm_weight_cache_get(DM_WeightCache *cache, int ndim, const int64_t *shape, unsigned int seed, float scale);
 void dm_weight_cache_free(DM_WeightCache *cache);
+void dm_matmul_nt_backward(const DM_Block *A, const DM_Block *B, const DM_Block *grad_out, 
+                           DM_Block *grad_A, DM_Block *grad_B);
+
+void dm_matmul_nn_backward(const DM_Block *A, const DM_Block *B, const DM_Block *grad_out, 
+                           DM_Block *grad_A, DM_Block *grad_B);
+
+int dm_layer_norm_seq_backward(const DM_Block *x, const DM_Block *gamma, 
+                               const DM_Block *grad_out, float eps,
+                               DM_Block *grad_x, DM_Block *grad_gamma, DM_Block *grad_beta);
+
+void dm_gelu_backward(const DM_Block *x, const DM_Block *grad_out, DM_Block *grad_in);
+
+void dm_softmax_backward(const DM_Block *y, const DM_Block *grad_out, DM_Block *grad_in);
+
+/* ── Training Runtime Substrate ─────────────────────────────────────────── */
+
+typedef struct {
+    DM_Block weight;
+    char name[128];
+} DM_Parameter;
+
+typedef struct {
+    DM_Block grad;
+    char name[128];
+} DM_Gradient;
+
+typedef struct {
+    DM_Parameter *param;
+    DM_Gradient *grad;
+} DM_TrainableParam;
+
+typedef struct {
+    DM_Block *activations;
+    size_t count;
+    size_t capacity;
+} DM_ActivationCache;
+
+typedef struct {
+    DM_Block m;
+    DM_Block v;
+} DM_OptimizerState;
+
+typedef struct {
+    DM_TrainableParam *params;
+    DM_OptimizerState *opt_states;
+    size_t num_params;
+    float learning_rate;
+    float beta1;
+    float beta2;
+    float eps;
+    float weight_decay;
+    int step;
+} DM_TrainingContext;
+
+int dm_activation_cache_init(DM_ActivationCache *cache, size_t initial_capacity);
+void dm_activation_cache_free(DM_ActivationCache *cache);
+int dm_activation_cache_push(DM_ActivationCache *cache, const DM_Block *block);
+
+int dm_training_context_init(DM_TrainingContext *ctx, size_t num_params);
+void dm_training_context_free(DM_TrainingContext *ctx);
 
 #endif /* DM_ENGINE_H */

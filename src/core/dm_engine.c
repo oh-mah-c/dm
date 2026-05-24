@@ -1144,6 +1144,128 @@ void dm_relu_backward(const DM_Block *in, const DM_Block *grad_out,
         ((float*)grad_in->data)[i] = ((float*)in->data)[i] > 0.0f ? ((float*)grad_out->data)[i] : 0.0f;
 }
 
+void dm_matmul_nt_backward(const DM_Block *A, const DM_Block *B, const DM_Block *grad_out, 
+                           DM_Block *grad_A, DM_Block *grad_B) {
+    if (!A || !B || !grad_out) return;
+    if (grad_A) dm_matmul_nn(grad_out, B, grad_A);
+    if (grad_B) {
+        DM_Block tf_g, tf_A;
+        if (dm_lower_block(grad_out, &tf_g, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) == 0 &&
+            dm_lower_block(A, &tf_A, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) == 0) {
+            TFE_TensorHandle *hg = (TFE_TensorHandle *)tf_g.handle;
+            TFE_TensorHandle *hA = (TFE_TensorHandle *)tf_A.handle;
+            TFE_TensorHandle *res = execute_tf_matmul(hg, hA, true, false);
+            if (res) { tf_to_dm(res, grad_B); TFE_DeleteTensorHandle(res); }
+        }
+    }
+}
+
+void dm_matmul_nn_backward(const DM_Block *A, const DM_Block *B, const DM_Block *grad_out, 
+                           DM_Block *grad_A, DM_Block *grad_B) {
+    if (!A || !B || !grad_out) return;
+    if (grad_A) dm_matmul_nt(grad_out, B, grad_A);
+    if (grad_B) {
+        DM_Block tf_g, tf_A;
+        if (dm_lower_block(grad_out, &tf_g, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) == 0 &&
+            dm_lower_block(A, &tf_A, DM_BACKEND_TENSORFLOW, DM_LOWER_VIEW) == 0) {
+            TFE_TensorHandle *hg = (TFE_TensorHandle *)tf_g.handle;
+            TFE_TensorHandle *hA = (TFE_TensorHandle *)tf_A.handle;
+            TFE_TensorHandle *res = execute_tf_matmul(hA, hg, true, false);
+            if (res) { tf_to_dm(res, grad_B); TFE_DeleteTensorHandle(res); }
+        }
+    }
+}
+
+int dm_layer_norm_seq_backward(const DM_Block *x, const DM_Block *gamma, 
+                               const DM_Block *grad_out, float eps,
+                               DM_Block *grad_x, DM_Block *grad_gamma, DM_Block *grad_beta) {
+    if (!x || !gamma || !grad_out) return -1;
+    int64_t dim = gamma->shape[0];
+    int64_t rows = x->count / dim;
+    const float *xp = (const float *)x->data;
+    const float *gp = (const float *)gamma->data;
+    const float *gop = (const float *)grad_out->data;
+    
+    float *gxp = grad_x ? (float *)grad_x->data : NULL;
+    float *ggp = grad_gamma ? (float *)grad_gamma->data : NULL;
+    float *gbp = grad_beta ? (float *)grad_beta->data : NULL;
+    
+    if (ggp) memset(ggp, 0, dim * sizeof(float));
+    if (gbp) memset(gbp, 0, dim * sizeof(float));
+    
+    for (int64_t r = 0; r < rows; r++) {
+        const float *xr = xp + r * dim;
+        const float *gor = gop + r * dim;
+        float *gxr = gxp ? gxp + r * dim : NULL;
+        
+        double mean = 0.0, var = 0.0;
+        for (int64_t c = 0; c < dim; c++) mean += xr[c];
+        mean /= (double)dim;
+        for (int64_t c = 0; c < dim; c++) {
+            double d = (double)xr[c] - mean;
+            var += d * d;
+        }
+        var /= (double)dim;
+        float inv = 1.0f / sqrtf((float)var + eps);
+        
+        double sum_gor_x_gp = 0.0, sum_gor_x_gp_x_xhat = 0.0;
+        for (int64_t c = 0; c < dim; c++) {
+            float xhat = (xr[c] - (float)mean) * inv;
+            float g = gor[c] * gp[c];
+            sum_gor_x_gp += g;
+            sum_gor_x_gp_x_xhat += g * xhat;
+            
+            if (ggp) ggp[c] += gor[c] * xhat;
+            if (gbp) gbp[c] += gor[c];
+        }
+        
+        if (gxr) {
+            for (int64_t c = 0; c < dim; c++) {
+                float xhat = (xr[c] - (float)mean) * inv;
+                float grad_xhat = gor[c] * gp[c];
+                gxr[c] = inv * (grad_xhat - (float)(sum_gor_x_gp / dim) - xhat * (float)(sum_gor_x_gp_x_xhat / dim));
+            }
+        }
+    }
+    return 0;
+}
+
+void dm_gelu_backward(const DM_Block *x, const DM_Block *grad_out, DM_Block *grad_in) {
+    if (!x || !grad_out || !grad_in) return;
+    const float *xp = (const float *)x->data;
+    const float *gop = (const float *)grad_out->data;
+    float *gip = (float *)grad_in->data;
+    for (size_t i = 0; i < x->count; i++) {
+        float v = xp[i];
+        float t = tanhf(0.79788456f * (v + 0.044715f * v * v * v));
+        float cdf = 0.5f * (1.0f + t);
+        float pdf = 0.5f * 0.79788456f * (1.0f - t * t) * (1.0f + 0.134145f * v * v);
+        gip[i] = gop[i] * (cdf + v * pdf);
+    }
+}
+
+void dm_softmax_backward(const DM_Block *y, const DM_Block *grad_out, DM_Block *grad_in) {
+    if (!y || !grad_out || !grad_in) return;
+    int64_t dim = y->shape[y->ndim - 1];
+    int64_t rows = y->count / dim;
+    const float *yp = (const float *)y->data;
+    const float *gop = (const float *)grad_out->data;
+    float *gip = (float *)grad_in->data;
+    
+    for (int64_t r = 0; r < rows; r++) {
+        const float *yr = yp + r * dim;
+        const float *gor = gop + r * dim;
+        float *gir = gip + r * dim;
+        
+        double sum = 0.0;
+        for (int64_t c = 0; c < dim; c++) sum += yr[c] * gor[c];
+        
+        for (int64_t c = 0; c < dim; c++) {
+            gir[c] = yr[c] * (gor[c] - (float)sum);
+        }
+    }
+}
+
 /* ── Maxout ─────────────────────────────────────────────────────────────── */
 
 int dm_maxout(const DM_Block *in,  DM_Block *out, int k, int *argmax) {
@@ -1332,3 +1454,85 @@ void dm_softmax_last_dim(DM_Block *t) {
     if (ret[0]) { tf_to_dm(ret[0], t); TFE_DeleteTensorHandle(ret[0]); }
     TF_DeleteStatus(s);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Training Runtime Substrate Lifecycle
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+int dm_activation_cache_init(DM_ActivationCache *cache, size_t initial_capacity) {
+    if (!cache) return -1;
+    cache->count = 0;
+    cache->capacity = initial_capacity > 0 ? initial_capacity : 64;
+    cache->activations = (DM_Block *)calloc(cache->capacity, sizeof(DM_Block));
+    if (!cache->activations) return -1;
+    return 0;
+}
+
+void dm_activation_cache_free(DM_ActivationCache *cache) {
+    if (!cache || !cache->activations) return;
+    for (size_t i = 0; i < cache->count; i++) {
+        dm_block_free(&cache->activations[i]);
+    }
+    free(cache->activations);
+    cache->activations = NULL;
+    cache->count = 0;
+    cache->capacity = 0;
+}
+
+int dm_activation_cache_push(DM_ActivationCache *cache, const DM_Block *block) {
+    if (!cache || !block) return -1;
+    if (cache->count >= cache->capacity) {
+        size_t new_cap = cache->capacity * 2;
+        DM_Block *new_acts = (DM_Block *)realloc(cache->activations, new_cap * sizeof(DM_Block));
+        if (!new_acts) return -1;
+        memset(new_acts + cache->capacity, 0, (new_cap - cache->capacity) * sizeof(DM_Block));
+        cache->activations = new_acts;
+        cache->capacity = new_cap;
+    }
+    int rc = dm_block_create(&cache->activations[cache->count], block->kind, block->dtype, block->layout, block->backend, block->ndim, block->shape);
+    if (rc == 0) {
+        memcpy(cache->activations[cache->count].data, block->data, block->bytes);
+        cache->count++;
+    }
+    return rc;
+}
+
+int dm_training_context_init(DM_TrainingContext *ctx, size_t num_params) {
+    if (!ctx) return -1;
+    memset(ctx, 0, sizeof(*ctx));
+    ctx->num_params = num_params;
+    if (num_params > 0) {
+        ctx->params = (DM_TrainableParam *)calloc(num_params, sizeof(DM_TrainableParam));
+        ctx->opt_states = (DM_OptimizerState *)calloc(num_params, sizeof(DM_OptimizerState));
+        if (!ctx->params || !ctx->opt_states) {
+            free(ctx->params);
+            free(ctx->opt_states);
+            return -1;
+        }
+    }
+    ctx->learning_rate = 0.001f;
+    ctx->beta1 = 0.9f;
+    ctx->beta2 = 0.999f;
+    ctx->eps = 1e-8f;
+    ctx->weight_decay = 0.0f;
+    ctx->step = 0;
+    return 0;
+}
+
+void dm_training_context_free(DM_TrainingContext *ctx) {
+    if (!ctx) return;
+    for (size_t i = 0; i < ctx->num_params; i++) {
+        if (ctx->params) {
+            if (ctx->params[i].param) dm_block_free(&ctx->params[i].param->weight);
+            if (ctx->params[i].grad) dm_block_free(&ctx->params[i].grad->grad);
+        }
+        if (ctx->opt_states) {
+            dm_block_free(&ctx->opt_states[i].m);
+            dm_block_free(&ctx->opt_states[i].v);
+        }
+    }
+    if (ctx->params) { free(ctx->params); ctx->params = NULL; }
+    if (ctx->opt_states) { free(ctx->opt_states); ctx->opt_states = NULL; }
+    ctx->num_params = 0;
+}
+

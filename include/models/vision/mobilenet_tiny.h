@@ -3,12 +3,15 @@
 
 #include "core/dm_engine.h"
 
+#ifndef DM_WEIGHT_CACHE_DEFINED
 typedef struct {
     DM_Block **blocks;
     uint32_t *seeds;
     int count;
     int capacity;
 } DM_WeightCache;
+#define DM_WEIGHT_CACHE_DEFINED 1
+#endif
 
 typedef enum {
     DM_UIB_FFN = 0,

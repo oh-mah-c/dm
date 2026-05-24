@@ -144,7 +144,9 @@
 #include "models/lm/bert.h"
 #include "models/vision/mobilenet_tiny.h"
 #include "models/vision/resnet.h"
-#include "models/vision/vit.h"
+#include "models/vision/swin.h"
+#include "models/mlp_train.h"
+#include "models/vision/tinyvit.h"
 #include "algorithms/prefixspan.h"
 #include "algorithms/spade.h"
 #include "generator/textbook_generator.h"
@@ -539,6 +541,15 @@ int main(int argc, char **argv) {
     }
     if (argc >= 2 && (strcmp(argv[1], "vit") == 0 || strcmp(argv[1], "dm_vit") == 0)) {
         return dm_vit_cli(argc, argv);
+    }
+    if (argc >= 2 && (strcmp(argv[1], "swin") == 0 || strcmp(argv[1], "dm_swin") == 0)) {
+        return dm_swin_cli(argc, argv);
+    }
+    if (argc >= 2 && strcmp(argv[1], "mlp_train") == 0) {
+        return dm_mlp_train_cli(argc, argv);
+    }
+    if (argc >= 2 && (strcmp(argv[1], "tinyvit") == 0 || strcmp(argv[1], "dm_tinyvit") == 0)) {
+        return dm_tinyvit_cli(argc, argv);
     }
     dm_register_algorithm(&bio_huif_ga_algo);
     dm_register_algorithm(&bio_huif_pso_algo);
