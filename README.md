@@ -184,6 +184,7 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 
 ### Vision Models
 75. **ResNet** (ResNet-18 / 34 / 50 / 101 / 152) - Deep Residual Learning for image classification. Implements all five variants from Table 1 using BasicBlock (2-layer) and Bottleneck (3-layer) residual blocks with identity/projection shortcuts. Backed by LibTorch with Vulkan GPU support. Train with `./build/resnet_train --model resnet50 --epochs 90`.
+76. **VGGNet** (VGG-A / B / C / VGG-16 / VGG-19) - Very Deep Convolutional Networks. Implements all 5 configurations from Table 1 (11–19 weight layers) using stacked 3×3 conv filters, 5 max-pooling layers, and three FC layers with Dropout(0.5). Config C includes 1×1 conv layers; no LRN used. Backed by LibTorch. Train with `./build/vgg_train --model vgg16 --epochs 74`.
 
 ---
 
@@ -528,6 +529,8 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 **[125]** C. Xu, B. Zhou, T. Gan, Q. Zheng, and L. Li, "Vocabulary Learning via Optimal Transport for Neural Machine Translation," in *Proc. 59th Annual Meeting of the Association for Computational Linguistics (ACL 2021)*, pp. 7361–7373, 2021. https://aclanthology.org/2021.acl-long.571/ *(VOLT)*
 
 **[126]** K. He, X. Zhang, S. Ren, and J. Sun, "Deep Residual Learning for Image Recognition," in *Proc. IEEE Conference on Computer Vision and Pattern Recognition (CVPR)*, 2016, pp. 770–778. https://doi.org/10.1109/CVPR.2016.90 *(ResNet-18 / 34 / 50 / 101 / 152)*
+
+**[127]** K. Simonyan and A. Zisserman, "Very Deep Convolutional Networks for Large-Scale Image Recognition," in *Proc. International Conference on Learning Representations (ICLR)*, 2015. arXiv:1409.1556v6. https://arxiv.org/abs/1409.1556 *(VGGNet — VGG-A / B / C / VGG-16 / VGG-19)*
 
 ---
 
