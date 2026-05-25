@@ -1,255 +1,200 @@
-# dm — Install from Source
+# Installing dm from Scratch
 
-Two native cores: **PyTorch (LibTorch)** for ML + **Vulkan-Hpp** for GPU compute.
-Both are built with **CMake**. No Bazel required.
+This guide walks you through building **dm** on a fresh Ubuntu/Debian machine. dm uses **PyTorch (LibTorch)** as its ML core and **Vulkan-Hpp** as its GPU compute layer — both are included directly in the repo as native source code, so there are no submodules to init.
 
 ---
 
-## Requirements
+## What you will build
 
-| Tool | Version | Install |
-|------|---------|---------|
-| CMake | ≥ 3.18 | `sudo apt install cmake` |
-| Ninja | any | `sudo apt install ninja-build` |
-| Clang or GCC | 13+ | `sudo apt install clang` |
-| Python 3 + NumPy | 3.10+ | `sudo apt install python3 python3-numpy` |
-| OpenBLAS | any | `sudo apt install libopenblas-dev` |
-| Vulkan SDK | 1.3+ | `sudo apt install libvulkan-dev glslang-tools` |
-| Git | any | `sudo apt install git` |
+| Component | Where it ends up |
+|---|---|
+| LibTorch (PyTorch C++ library) | `src/core/pytorch/dist/` |
+| Vulkan-Hpp headers | `src/core/gpu/Vulkan-Hpp/dist/` |
+| dm binary | `build/dm` |
+| dm_tokenizer binary | `build/dm_tokenizer` |
 
-### Ubuntu one-liner
+---
+
+## Step 1 — Install system dependencies
 
 ```bash
-sudo apt update && sudo apt install -y \
-  cmake ninja-build clang \
-  python3 python3-dev python3-numpy \
-  libopenblas-dev \
-  libvulkan-dev glslang-tools \
-  git build-essential
+sudo apt update
+sudo apt install -y \
+    build-essential cmake ninja-build git \
+    libvulkan-dev vulkan-headers glslc \
+    libicu-dev \
+    python3 python3-dev python3-numpy \
+    libopenblas-dev
 ```
 
+> **Why each package?**
+> - `libvulkan-dev vulkan-headers` — Vulkan SDK for GPU compute
+> - `glslc` — Vulkan shader compiler (separate from `glslang-tools`, must be this one)
+> - `libicu-dev` — Unicode library used by the tokenizer
+> - `python3-numpy` — needed by PyTorch's build system even when `BUILD_PYTHON=OFF`
+> - `libopenblas-dev` — CPU BLAS backend for LibTorch
+
 ---
 
-## Clone
+## Step 2 — Clone dm
 
 ```bash
-git clone <your-remote-url> dm
+git clone https://github.com/oh-mah-c/dm.git
 cd dm
-
-# Submodules are already initialized if you followed the dev setup.
-# If not:
-git submodule update --init --recursive src/core/pytorch
-git submodule update --init --recursive src/core/gpu/Vulkan-Hpp
 ```
+
+That's it — no `git submodule` commands. PyTorch and Vulkan-Hpp source code are already part of the repo.
 
 ---
 
-## Phase 1 — Build PyTorch (LibTorch)
+## Step 3 — Build PyTorch (LibTorch)
 
-PyTorch lives at `src/core/pytorch/`. Building it with `BUILD_PYTHON=OFF`
-produces **LibTorch** — a pure C++ shared library with no Python dependency
-at runtime. This is the dm ML core.
-
-### 1.1 — Configure
+This is the longest step. It compiles PyTorch as a pure C++ library (no Python runtime) with Vulkan GPU support.
 
 ```bash
 cd src/core/pytorch
-mkdir -p build && cd build
+mkdir build && cd build
 
 cmake .. \
-  -GNinja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_SHARED_LIBS=ON \
-  -DUSE_CUDA=OFF \
-  -DUSE_ROCM=OFF \
-  -DUSE_MPS=OFF \
-  -DUSE_VULKAN=ON \
-  -DUSE_OPENMP=ON \
-  -DBUILD_PYTHON=OFF \
-  -DBUILD_CAFFE2=OFF \
-  -DBUILD_TEST=OFF \
-  -DUSE_DISTRIBUTED=OFF \
-  -DUSE_NCCL=OFF \
-  -DUSE_KINETO=OFF \
-  -DCMAKE_INSTALL_PREFIX=../../engine/dist
-```
+    -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=ON \
+    -DUSE_CUDA=OFF \
+    -DUSE_VULKAN=ON \
+    -DBUILD_PYTHON=OFF \
+    -DBUILD_TEST=OFF \
+    -DUSE_DISTRIBUTED=OFF \
+    -DUSE_NCCL=OFF \
+    -DUSE_KINETO=OFF \
+    -DGLSLC_EXECUTABLE=/usr/bin/glslc \
+    -DCMAKE_INSTALL_PREFIX=../dist
 
-> **`USE_VULKAN=ON`** — lets LibTorch tensors run Vulkan compute shaders,
-> sharing the same GPU pipeline with Vulkan-Hpp.
-
-> **`USE_OPENMP=ON`** — CPU parallelism for free. Remove if you don't have
-> `libgomp` installed.
-
-### 1.2 — Build
-
-```bash
-# Still inside src/core/pytorch/build/
-# Rule of thumb: 1 job per 3 GB of free RAM
-# 8 GB  → --parallel 2
-# 16 GB → --parallel 4
-# 32 GB → --parallel 8
-
-cmake --build . --parallel 4
-```
-
-> **First build takes 30–90 minutes** depending on CPU and RAM.
-> Subsequent incremental builds are fast.
-
-### 1.3 — Install
-
-```bash
+cmake --build . --parallel 4   # use more cores if you have them
 cmake --install .
 ```
 
-Artifacts land in `src/core/engine/dist/`:
-
-```
-src/core/engine/dist/
-  include/
-    torch/          ← torch/torch.h, ATen/, c10/
-  lib/
-    libtorch_cpu.so
-    libc10.so
-    libgomp.so.1
-  share/
-    cmake/Torch/    ← TorchConfig.cmake  (CMake find_package target)
-```
+> ⏱ This takes ~20–40 minutes depending on your machine. It compiles thousands of files.
+>
+> After `cmake --install .` you will see `src/core/pytorch/dist/lib/libtorch.so` and friends.
 
 ---
 
-## Phase 2 — Build Vulkan-Hpp
+## Step 4 — Install Vulkan-Hpp headers
 
-Vulkan-Hpp lives at `src/core/gpu/Vulkan-Hpp/`. It is **header-only** at the
-dm level — you don't need to build samples or tests. The only thing needed is
-the `Vulkan-Headers` submodule (C Vulkan headers) which was already fetched.
+Vulkan-Hpp generates its C++ headers from the Vulkan spec at build time. After building the generator, you copy the headers into the dist folder.
 
 ```bash
+# Go back to repo root first
+cd ../../../../   # from src/core/pytorch/build
+
 cd src/core/gpu/Vulkan-Hpp
-mkdir -p build && cd build
+mkdir build && cd build
 
-cmake .. \
-  -GNinja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DVULKAN_HPP_BUILD_TESTS=OFF \
-  -DVULKAN_HPP_BUILD_SAMPLES=OFF \
-  -DVULKAN_HPP_INSTALL=ON \
-  -DCMAKE_INSTALL_PREFIX=../dist
-```
+cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build .
 
-```bash
-cmake --build . --parallel 4
-cmake --install .
-```
+# Run the generator — this writes .hpp files into ../vulkan/
+./VulkanHppGenerator
 
-Headers install to `src/core/gpu/Vulkan-Hpp/dist/include/vulkan/`.
+# Create the dist include dir
+mkdir -p ../dist/include/vulkan
+mkdir -p ../dist/include/vk_video
 
-> If you only need headers (no install), skip the build entirely —
-> just point `#include` at `src/core/gpu/Vulkan-Hpp/vulkan/vulkan.hpp` directly.
+# Copy generated C++ headers
+cp ../vulkan/*.hpp ../dist/include/vulkan/
 
----
+# Copy C Vulkan headers from Vulkan-Headers subdir
+cp ../Vulkan-Headers/include/vulkan/*.h ../dist/include/vulkan/
 
-## Phase 3 — Build dm
-
-From the **dm root**:
-
-```bash
-cd /path/to/dm
-mkdir -p build && cd build
-
-cmake .. \
-  -GNinja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_PREFIX_PATH="src/core/engine/dist;src/core/gpu/Vulkan-Hpp/dist"
-
-cmake --build . --parallel 4
+# Copy vk_video headers (needed by vulkan_core.h)
+cp ../Vulkan-Headers/include/vk_video/* ../dist/include/vk_video/
 ```
 
 ---
 
-## Quick reference — full sequence
+## Step 5 — Build dm
+
+Now build dm itself. From the repo root:
 
 ```bash
-# 1. Clone + submodules
-git clone <url> dm && cd dm
-git submodule update --init --recursive src/core/pytorch
-git submodule update --init --recursive src/core/gpu/Vulkan-Hpp
+cd /path/to/dm   # make sure you are at repo root
 
-# 2. System deps
-sudo apt install -y cmake ninja-build clang python3 python3-dev \
-  python3-numpy libopenblas-dev libvulkan-dev glslang-tools build-essential
+mkdir build
+cmake -S . -B build -G Ninja
+cmake --build build --parallel 4
+```
 
-# 3. Build PyTorch → installs to src/core/engine/dist/
-cd src/core/pytorch && mkdir -p build && cd build
-cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_SHARED_LIBS=ON -DUSE_CUDA=OFF -DUSE_VULKAN=ON \
-  -DBUILD_PYTHON=OFF -DBUILD_CAFFE2=OFF -DBUILD_TEST=OFF \
-  -DUSE_DISTRIBUTED=OFF -DUSE_NCCL=OFF -DUSE_KINETO=OFF \
-  -DCMAKE_INSTALL_PREFIX=../../engine/dist
-cmake --build . --parallel 4 && cmake --install .
-cd ../../..
+If everything worked you will see:
 
-# 4. Vulkan-Hpp (header-only — just init submodule, no build needed)
-# Already done via: git submodule update --init --recursive src/core/gpu/Vulkan-Hpp
-
-# 5. Build dm
-mkdir -p build && cd build
-cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_PREFIX_PATH="src/core/engine/dist;src/core/gpu/Vulkan-Hpp"
-cmake --build . --parallel 4
+```
+[235/235] Linking CXX executable dm
 ```
 
 ---
 
-## Subsequent builds
-
-PyTorch only needs rebuilding if you change files inside `src/core/pytorch/`.
-For all dm changes just run from the dm root:
+## Step 6 — Run
 
 ```bash
-cd build && cmake --build . --parallel 4
-```
+./build/dm
+# Usage: dm <algo_id> <dataset_path> ...
 
-CMake tracks dependencies — only changed targets recompile.
+./build/dm_tokenizer
+```
 
 ---
 
 ## Troubleshooting
 
-### OOM during PyTorch build
-Reduce parallel jobs. Each job uses ~2–3 GB RAM:
+### `glslc not found` during PyTorch cmake
+Make sure you installed `glslc` (not `glslang-tools`). Then pass it explicitly:
 ```bash
-cmake --build . --parallel 2   # 6 GB needed
-cmake --build . --parallel 1   # 3 GB needed (slow but safe)
+cmake .. -DGLSLC_EXECUTABLE=/usr/bin/glslc ...
+```
+If you already ran cmake once, delete the cache first: `rm CMakeCache.txt`
+
+### `USE_VULKAN requires Vulkan installed`
+```bash
+sudo apt install libvulkan-dev vulkan-headers
 ```
 
-### `Could not find Torch` when building dm
-PyTorch install step was skipped or `--prefix` path is wrong.
-Check:
+### `unorm2_getNFKCInstance` linker error
+You are missing `libicu-dev`:
 ```bash
-ls src/core/engine/dist/share/cmake/Torch/TorchConfig.cmake
-```
-If missing, re-run `cmake --install .` from `src/core/pytorch/build/`.
-
-### `vulkan/vulkan.h: No such file or directory`
-`Vulkan-Headers` submodule is empty. Run:
-```bash
-git submodule update --init src/core/gpu/Vulkan-Hpp/Vulkan-Headers
+sudo apt install libicu-dev
 ```
 
-### `undefined reference to omp_get_thread_num`
-OpenMP not installed. Either install `libgomp`:
-```bash
-sudo apt install libgomp1
-```
-Or rebuild PyTorch with `-DUSE_OPENMP=OFF`.
+### PyTorch cmake fails with old cache
+Always run cmake from a fresh `build/` directory, or delete `CMakeCache.txt` before re-running.
 
-### `<atomic> file not found` or stdlib conflicts
-System libc++ is missing. Use libstdc++ (default on Ubuntu):
-```bash
-cmake .. -DCMAKE_CXX_FLAGS="-stdlib=libstdc++"
+### `vulkan_enums.hpp not found` during Vulkan-Hpp install
+You need to run `./VulkanHppGenerator` first (Step 4). The `.hpp` files are generated, not pre-committed.
+
+### Headers not found when building dm
+Make sure `cmake --install .` finished successfully for PyTorch (Step 3). The `dist/` folders must exist before building dm.
+
+---
+
+## Directory layout after full build
+
+```
+dm/
+├── src/core/pytorch/
+│   ├── (source — part of repo)
+│   └── dist/            ← built by you in Step 3 (gitignored)
+│       ├── lib/
+│       │   ├── libtorch.so
+│       │   ├── libtorch_cpu.so
+│       │   └── ...
+│       └── include/
+├── src/core/gpu/Vulkan-Hpp/
+│   ├── (source — part of repo)
+│   └── dist/            ← built by you in Step 4 (gitignored)
+│       └── include/
+│           ├── vulkan/
+│           └── vk_video/
+└── build/               ← dm binaries (gitignored)
+    ├── dm
+    └── dm_tokenizer
 ```
 
-### PyTorch configure step fails on `No module named numpy`
-```bash
-pip3 install numpy
-```
+The `dist/` and `build/` directories are in `.gitignore` — each developer builds them locally.
