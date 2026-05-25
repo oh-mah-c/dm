@@ -119,6 +119,17 @@ foreach(train_src ${DM_MODEL_TRAIN_SRCS})
         ${TORCH_INCLUDE_DIRS})
 endforeach()
 
+# ── Model test binaries (one per test_*.cpp under src/models/) ───────────────
+file(GLOB_RECURSE DM_MODEL_TEST_SRCS ${DM_SRC}/models/**/test_*.cpp)
+foreach(test_src ${DM_MODEL_TEST_SRCS})
+    get_filename_component(test_name ${test_src} NAME_WE)  # e.g. test_resnet
+    add_executable(${test_name} ${test_src})
+    target_link_libraries(${test_name} PRIVATE dm_core)
+    target_include_directories(${test_name} PRIVATE
+        ${DM_INCLUDE}/models
+        ${TORCH_INCLUDE_DIRS})
+endforeach()
+
 # ── Install ───────────────────────────────────────────────────────────────────
 install(TARGETS dm dm_core dm_tokenizer
     RUNTIME DESTINATION bin
