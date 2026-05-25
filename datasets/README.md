@@ -41,3 +41,30 @@ Training: SGD, lr=0.01, momentum=0.9, weight_decay=5e-4, batch=256, 74 epochs.
 *(Single-model, 10-crop testing — paper Table 3)*
 
 Training: SGD, lr=0.1, momentum=0.9, weight_decay=1e-4, batch=256, 90 epochs.
+
+### Swin Transformer (Liu et al., ICCV 2021)
+
+**Paper:** Z. Liu, Y. Lin, Y. Cao, H. Hu, Y. Wei, Z. Zhang, S. Lin, and B. Guo, "Swin Transformer: Hierarchical Vision Transformer using Shifted Windows," *ICCV 2021*. https://arxiv.org/abs/2103.14030
+
+**Standard benchmark:** ImageNet-1K (regular training, single crop top-1 accuracy).
+
+| Variant | C   | Depths       | Heads          | Params | FLOPs | Top-1 acc. |
+|---------|-----|--------------|----------------|--------|-------|------------|
+| Swin-T  | 96  | {2,2,6,2}    | {3,6,12,24}    | 29M    | 4.5G  | 81.3%      |
+| Swin-S  | 96  | {2,2,18,2}   | {3,6,12,24}    | 50M    | 8.7G  | 83.0%      |
+| Swin-B  | 128 | {2,2,18,2}   | {4,8,16,32}    | 88M    | 15.4G | 83.5%      |
+| Swin-L  | 192 | {2,2,18,2}   | {6,12,24,48}   | 197M   | 34.5G | 86.4%\*    |
+
+*(\* Swin-L with ImageNet-22K pre-training fine-tuned on ImageNet-1K — paper Table 1)*
+
+*(Single-crop 224² evaluation — paper Table 1(a))*
+
+Architecture highlights (Section 3):
+- Patch partition: 4×4 non-overlapping patches → linear embedding to dim C
+- 4 hierarchical stages; patch merging between stages doubles channels
+- Swin Transformer blocks alternate W-MSA (regular windows) and SW-MSA (shifted windows)
+- Window size M=7; relative position bias per head (Eq. 4)
+- Efficient cyclic-shift trick for batched shifted-window attention (Fig. 4)
+
+Training (Section 4.1 regular ImageNet-1K): AdamW, lr=0.001, weight_decay=0.05,
+cosine LR decay, 20-epoch linear warm-up, 300 epochs, batch=1024.
