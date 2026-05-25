@@ -183,8 +183,15 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 74. **LAGA** - Self-contained Layout-Aware Generative Architecture for knowledge-preserving synthetic transaction, utility, sequence, text, and tabular data generation using embedded encoding, support/co-occurrence/transition layouts, miner-style evaluation, privacy rejection, and closed-loop repair.
 
 ### Vision Models
-75. **ResNet** (ResNet-18 / 34 / 50 / 101 / 152) - Deep Residual Learning for image classification. Implements all five variants from Table 1 using BasicBlock (2-layer) and Bottleneck (3-layer) residual blocks with identity/projection shortcuts. Backed by LibTorch with Vulkan GPU support. Train with `./build/resnet_train --model resnet50 --epochs 90`.
-76. **VGGNet** (VGG-A / B / C / VGG-16 / VGG-19) - Very Deep Convolutional Networks. Implements all 5 configurations from Table 1 (11–19 weight layers) using stacked 3×3 conv filters, 5 max-pooling layers, and three FC layers with Dropout(0.5). Config C includes 1×1 conv layers; no LRN used. Backed by LibTorch. Train with `./build/vgg_train --model vgg16 --epochs 74`.
+75. **ResNet** (ResNet-18 / 34 / 50 / 101 / 152) — He et al., CVPR 2016 **[126]**. Deep Residual Learning for image classification. Implements all five variants from Table 1 using BasicBlock (2-layer) and Bottleneck (3-layer) residual blocks with identity/projection shortcuts. Backed by LibTorch with Vulkan GPU support. Train with `./build/resnet_train --model resnet50 --epochs 90`.
+76. **VGGNet** (VGG-A / B / C / VGG-16 / VGG-19) — Simonyan & Zisserman, ICLR 2015 **[127]**. Very Deep Convolutional Networks. Implements all 5 configurations from Table 1 (11–19 weight layers) using stacked 3×3 conv filters, 5 max-pooling layers, and three FC layers with Dropout(0.5). Config C includes 1×1 conv layers; no LRN used. Backed by LibTorch. Train with `./build/vgg_train --model vgg16 --epochs 74`.
+77. **YOLO v1** — Redmon et al., CVPR 2016 **[128]**. You Only Look Once: Unified, Real-Time Object Detection. Single-pass grid-based detector (S=7, B=2, C=20) with 24-layer backbone, Leaky ReLU activations, and multi-part SSE loss (λ_coord=5, λ_noobj=0.5) with √(w·h) trick. Includes NMS post-processing and SGD training. Train with `./build/yolo_train --S 7 --B 2 --C 20 --epochs 135`.
+78. **VAE** (Variational Autoencoder) — Kingma & Welling, ICLR 2014 **[129]**. Auto-Encoding Variational Bayes. Implements encoder (tanh MLP → μ, log σ²), reparameterisation trick (z = μ + ε·σ), and decoder (tanh MLP → sigmoid output). ELBO loss: reconstruction BCE + KL divergence D_KL(q(z|x) ‖ p(z)). Train with `./build/vae_train --latent 20 --epochs 50`.
+79. **MobileNet v1** — Howard et al., arXiv:1704.04861v1 **[130]**. MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications. Factorises standard convolutions into depthwise (groups=in_ch) + pointwise (1×1) blocks, reducing computation by ≈8–9×. Supports width multiplier α ∈ {1.0, 0.75, 0.5, 0.25} scaling from 4.2M to 0.5M parameters. RMSprop training. Train with `./build/mobilenet_train --alpha 1.0 --classes 1000 --epochs 100`.
+
+### NLP / Sequence Models
+80. **Word2Vec** (CBOW + Skip-gram) — Mikolov et al., arXiv:1301.3781v3 **[131]**. Efficient Estimation of Word Representations in Vector Space. Implements both CBOW (context → centre) and Skip-gram (centre → context) with negative sampling using unigram^(3/4) noise distribution and SGD. Supports analogy arithmetic (king − man + woman ≈ queen) and cosine-similarity nearest-neighbour retrieval. Train with `./build/word2vec_train --mode skipgram --dim 300 --window 5 --neg 5 --epochs 5`.
+81. **Whisper** (Tiny / Base / Small / Medium / Large) — Radford et al., ICML 2023 **[132]**. Robust Speech Recognition via Large-Scale Weak Supervision. Encoder-decoder Transformer for multilingual ASR: Conv1D stem (stride=2) on 80-ch log-mel spectrograms, sinusoidal PE, pre-norm Transformer encoder; learned PE + masked self-attention + cross-attention decoder with tied output projection. Multitask tokens: SOT, language tags (99 languages), TRANSCRIBE/TRANSLATE, NOSPEECH, NOTIMESTAMPS, timestamps, EOT. AdamW with linear warmup. Train with `./build/whisper_train --size base --epochs 10`.
 
 ---
 
@@ -531,6 +538,16 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 **[126]** K. He, X. Zhang, S. Ren, and J. Sun, "Deep Residual Learning for Image Recognition," in *Proc. IEEE Conference on Computer Vision and Pattern Recognition (CVPR)*, 2016, pp. 770–778. https://doi.org/10.1109/CVPR.2016.90 *(ResNet-18 / 34 / 50 / 101 / 152)*
 
 **[127]** K. Simonyan and A. Zisserman, "Very Deep Convolutional Networks for Large-Scale Image Recognition," in *Proc. International Conference on Learning Representations (ICLR)*, 2015. arXiv:1409.1556v6. https://arxiv.org/abs/1409.1556 *(VGGNet — VGG-A / B / C / VGG-16 / VGG-19)*
+
+**[128]** J. Redmon, S. Divvala, R. Girshick, and A. Farhadi, "You Only Look Once: Unified, Real-Time Object Detection," in *Proc. IEEE Conference on Computer Vision and Pattern Recognition (CVPR)*, 2016, pp. 779–788. https://doi.org/10.1109/CVPR.2016.91 *(YOLO v1)*
+
+**[129]** D. P. Kingma and M. Welling, "Auto-Encoding Variational Bayes," in *Proc. 2nd International Conference on Learning Representations (ICLR)*, 2014. arXiv:1312.6114v11. https://arxiv.org/abs/1312.6114 *(VAE)*
+
+**[130]** A. G. Howard, M. Zhu, B. Chen, D. Kalenichenko, W. Wang, T. Weyand, M. Andreetto, and H. Adam, "MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications," arXiv:1704.04861v1, 2017. https://arxiv.org/abs/1704.04861 *(MobileNet v1 — α ∈ {1.0, 0.75, 0.5, 0.25})*
+
+**[131]** T. Mikolov, K. Chen, G. Corrado, and J. Dean, "Efficient Estimation of Word Representations in Vector Space," arXiv:1301.3781v3, 2013. https://arxiv.org/abs/1301.3781 *(Word2Vec — CBOW / Skip-gram with Negative Sampling)*
+
+**[132]** A. Radford, J. W. Kim, T. Xu, G. Brockman, C. McLeavey, and I. Sutskever, "Robust Speech Recognition via Large-Scale Weak Supervision," in *Proc. 40th International Conference on Machine Learning (ICML)*, 2023, pp. 28492–28518. https://proceedings.mlr.press/v202/radford23a *(Whisper — Tiny / Base / Small / Medium / Large)*
 
 ---
 
