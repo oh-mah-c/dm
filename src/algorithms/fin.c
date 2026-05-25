@@ -164,6 +164,43 @@ static int cmp_freq_desc(const void *a, const void *b) {
     return (ia < ib) ? -1 : 1;
 }
 
+static void collect_nodes(PPCNode *node, Nodeset *ns) {
+    if (!node) return;
+    if (node->item != 0xFFFFFFFF) {
+        uint32_t item = node->item;
+        ns[item].node_count++;
+    }
+    PPCNode *child = node->children;
+    while (child) {
+        collect_nodes(child, ns);
+        child = child->sibling;
+    }
+}
+
+static void fill_nodes(PPCNode *node, Nodeset *ns) {
+    if (!node) return;
+    if (node->item != 0xFFFFFFFF) {
+        uint32_t item = node->item;
+        NodeInfo *ni = &ns[item].nodes[ns[item].node_count++];
+        ni->pre = node->pre;
+        ni->post = node->post;
+        ni->count = node->count;
+        ns[item].support += node->count;
+        ns[item].item = item;
+    }
+    PPCNode *child = node->children;
+    while (child) {
+        fill_nodes(child, ns);
+        child = child->sibling;
+    }
+}
+
+static int cmp_node_info(const void *a, const void *b) {
+    uint32_t pa = ((const NodeInfo *)a)->pre;
+    uint32_t pb = ((const NodeInfo *)b)->pre;
+    return (pa < pb) ? -1 : 1;
+}
+
 static DM_Status run(DM_Dataset *ds, void *params) {
     DM_FIN_Params *f_params = (DM_FIN_Params *)params;
     double min_sup_param = f_params ? f_params->min_support : 0.01;
@@ -245,18 +282,6 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     // We need to traverse the whole tree or use a header table. 
     // Let's use a queue or recursion to collect.
     
-    void collect_nodes(PPCNode *node, Nodeset *ns) {
-        if (!node) return;
-        if (node->item != 0xFFFFFFFF) {
-            uint32_t item = node->item;
-            ns[item].node_count++;
-        }
-        PPCNode *child = node->children;
-        while (child) {
-            collect_nodes(child, ns);
-            child = child->sibling;
-        }
-    }
     collect_nodes(root, item_nodesets);
     for (uint32_t i = 0; i <= ds->max_id; i++) {
         if (item_nodesets[i].node_count > 0) {
@@ -264,31 +289,9 @@ static DM_Status run(DM_Dataset *ds, void *params) {
             item_nodesets[i].node_count = 0; // reset to use as index
         }
     }
-    void fill_nodes(PPCNode *node, Nodeset *ns) {
-        if (!node) return;
-        if (node->item != 0xFFFFFFFF) {
-            uint32_t item = node->item;
-            NodeInfo *ni = &ns[item].nodes[ns[item].node_count++];
-            ni->pre = node->pre;
-            ni->post = node->post;
-            ni->count = node->count;
-            ns[item].support += node->count;
-            ns[item].item = item;
-        }
-        PPCNode *child = node->children;
-        while (child) {
-            fill_nodes(child, ns);
-            child = child->sibling;
-        }
-    }
     fill_nodes(root, item_nodesets);
 
     // Nodesets must be sorted by pre-order for the intersection logic to work efficiently.
-    int cmp_node_info(const void *a, const void *b) {
-        uint32_t pa = ((NodeInfo *)a)->pre;
-        uint32_t pb = ((NodeInfo *)b)->pre;
-        return (pa < pb) ? -1 : 1;
-    }
     for (uint32_t i = 0; i <= ds->max_id; i++) {
         if (item_nodesets[i].node_count > 0) {
             qsort(item_nodesets[i].nodes, item_nodesets[i].node_count, sizeof(NodeInfo), cmp_node_info);

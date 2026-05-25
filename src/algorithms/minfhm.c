@@ -103,7 +103,8 @@ static void free_ul(MinFHM_UtilityList *ul) {
 static void minfhm_search(MinFHM_UtilityList *P, MinFHM_UtilityList **extensions, size_t ext_count, uint32_t *prefix, size_t prefix_len, double min_util) {
     for (size_t i = 0; i < ext_count; i++) {
         MinFHM_UtilityList *Px = extensions[i];
-        uint32_t current_prefix[prefix_len + 1];
+        uint32_t *current_prefix = (uint32_t *)malloc(sizeof(uint32_t) * (prefix_len + 1));
+        if (!current_prefix) continue;
         memcpy(current_prefix, prefix, sizeof(uint32_t) * prefix_len);
         current_prefix[prefix_len] = Px->item;
 
@@ -121,6 +122,7 @@ static void minfhm_search(MinFHM_UtilityList *P, MinFHM_UtilityList **extensions
             if (minimal) {
                 add_to_store(current_prefix, prefix_len + 1);
                 // According to Property 5, we do NOT explore extensions of a MinHUI.
+                free(current_prefix);
                 continue; 
             }
         }
@@ -149,6 +151,7 @@ static void minfhm_search(MinFHM_UtilityList *P, MinFHM_UtilityList **extensions
             for (size_t k = 0; k < next_ext_count; k++) free_ul(next_extensions[k]);
             free(next_extensions);
         }
+        free(current_prefix);
     }
 }
 
@@ -201,8 +204,9 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     // EUCS
     eucs = calloc(promising_count, sizeof(double*));
     for (size_t i = 0; i < ds->count; i++) {
-        uint32_t p_items[src[i].count];
+        uint32_t *p_items = (uint32_t *)malloc(sizeof(uint32_t) * src[i].count);
         size_t p_cnt = 0;
+        if (!p_items) continue;
         for (size_t j = 0; j < src[i].count; j++) if (rank[src[i].items[j].id] != 0xFFFFFFFF) p_items[p_cnt++] = src[i].items[j].id;
         for (size_t j = 0; j < p_cnt; j++) {
             uint32_t rj = rank[p_items[j]];
@@ -214,6 +218,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
                 eucs[rk][rj] += src[i].total_utility;
             }
         }
+        free(p_items);
     }
 
     initial_lists = malloc(sizeof(MinFHM_UtilityList*) * promising_count);
@@ -224,9 +229,14 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     }
 
     for (size_t i = 0; i < ds->count; i++) {
-        uint32_t t_items[src[i].count];
-        double t_utils[src[i].count];
+        uint32_t *t_items = (uint32_t *)malloc(sizeof(uint32_t) * src[i].count);
+        double *t_utils = (double *)malloc(sizeof(double) * src[i].count);
         size_t t_count = 0;
+        if (!t_items || !t_utils) {
+            free(t_items);
+            free(t_utils);
+            continue;
+        }
         for (size_t j = 0; j < src[i].count; j++) {
             if (rank[src[i].items[j].id] != 0xFFFFFFFF) {
                 t_items[t_count] = src[i].items[j].id;
@@ -256,6 +266,8 @@ static DM_Status run(DM_Dataset *ds, void *params) {
             el->count++;
             remaining += t_utils[j];
         }
+        free(t_items);
+        free(t_utils);
     }
 
     minfhm_search(NULL, initial_lists, promising_count, NULL, 0, min_util);

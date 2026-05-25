@@ -1,0 +1,23 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "gpu",
+    srcs = [
+        "dm_gpu.c",
+        "gpu_bpe.c",
+        "gpu_sinkhorn.c",
+        "gpu_unigram_em.c",
+    ],
+    hdrs = [
+        "dm_gpu_internal.h",
+    ],
+    data = glob(["shaders/*.glsl"]),
+    deps = [
+        "//include:headers",
+        "//src/core/gpu/vulkan_hpp:vulkan_headers",
+    ],
+    linkopts = select({
+        "//:windows": [],
+        "//conditions:default": ["-ldl"],
+    }),
+)

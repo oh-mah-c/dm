@@ -9,6 +9,11 @@
 #include <direct.h>
 #include <windows.h>
 
+#ifndef _SSIZE_T_DEFINED
+typedef intptr_t ssize_t;
+#define _SSIZE_T_DEFINED
+#endif
+
 static inline int dm_mkdir(const char *path, int mode) {
     (void)mode;
     return _mkdir(path);

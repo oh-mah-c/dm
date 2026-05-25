@@ -70,6 +70,20 @@ typedef struct {
     uint32_t support;
 } FI_Node;
 
+static void collect_f1_ns_recursive(BMC_Node *n, Nodeset *ns_array, uint32_t *rm) {
+    if (!n) return;
+    if (n->item != 0xFFFFFFFF) {
+        uint32_t r = rm[n->item];
+        ns_array[r].infos[ns_array[r].len++] = (N_info){n->bitmap_code, n->count};
+        ns_array[r].support += n->count;
+    }
+    BMC_Node *c = n->children;
+    while (c) {
+        collect_f1_ns_recursive(c, ns_array, rm);
+        c = c->sibling;
+    }
+}
+
 /* --- Memory Management --- */
 
 typedef struct MemBlock {
@@ -324,16 +338,6 @@ static DM_Status run(DM_Dataset *ds, void *params) {
         f1_ns[i].support = 0;
     }
 
-    void collect_f1_ns_recursive(BMC_Node *n, Nodeset *ns_array, uint32_t *rm) {
-        if (!n) return;
-        if (n->item != 0xFFFFFFFF) {
-            uint32_t r = rm[n->item];
-            ns_array[r].infos[ns_array[r].len++] = (N_info){n->bitmap_code, n->count};
-            ns_array[r].support += n->count;
-        }
-        BMC_Node *c = n->children;
-        while (c) { collect_f1_ns_recursive(c, ns_array, rm); c = c->sibling; }
-    }
     collect_f1_ns_recursive(root, f1_ns, ctx.rank_map);
 
     FI_Node *f1_nodes = malloc(ctx.nf * sizeof(FI_Node));

@@ -1,0 +1,187 @@
+package(default_visibility = ["//visibility:public"])
+
+MATH_LINKOPTS = select({
+    "//:windows": [],
+    "//conditions:default": ["-lm"],
+})
+
+cc_library(
+    name = "faro",
+    srcs = [
+        "faro_tokenizer.c",
+        "tokenizer_variants.c",
+    ],
+    deps = ["//include:headers"],
+)
+
+cc_library(
+    name = "all_tokenizers",
+    srcs = [
+        "bpe_dropout.c",
+        "bpe_subword.c",
+        "faro_tokenizer.c",
+        "fast_wordpiece.c",
+        "grapheme_pair_encoding.c",
+        "maximal_munch.c",
+        "parity_bpe.c",
+        "sentencepiece_lite.c",
+        "tokenizer_lab.c",
+        "tokenizer_variants.c",
+        "unigram_subword.c",
+        "volt.c",
+    ],
+    defines = select({
+        "//:windows": ["DM_NO_ICU"],
+        "//conditions:default": [],
+    }),
+    deps = ["//include:headers"],
+    linkopts = select({
+        "//:windows": [],
+        "//conditions:default": ["-licuuc"],
+    }),
+)
+
+cc_binary(
+    name = "tokenizer_miner",
+    srcs = ["main.c"],
+    deps = [":faro"],
+)
+
+cc_binary(
+    name = "hust_tokenize",
+    srcs = ["hust_tokenize.c"],
+    deps = ["//include:headers"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_library(
+    name = "bpe_subword",
+    srcs = ["bpe_subword.c"],
+    deps = ["//include:headers"],
+)
+
+cc_library(
+    name = "bpe_subword_gpu",
+    srcs = ["bpe_subword.c"],
+    defines = ["DM_GPU"],
+    deps = [
+        "//include:headers",
+        "//src/core/gpu:gpu",
+    ],
+)
+
+cc_library(
+    name = "bpe_dropout",
+    srcs = ["bpe_dropout.c"],
+    deps = ["//include:headers"],
+)
+
+cc_library(
+    name = "unigram_subword",
+    srcs = ["unigram_subword.c"],
+    deps = ["//include:headers"],
+)
+
+cc_library(
+    name = "unigram_subword_gpu",
+    srcs = ["unigram_subword.c"],
+    defines = ["DM_GPU"],
+    deps = [
+        "//include:headers",
+        "//src/core/gpu:gpu",
+    ],
+)
+
+cc_library(
+    name = "sentencepiece_lite",
+    srcs = ["sentencepiece_lite.c"],
+    defines = select({
+        "//:windows": ["DM_NO_ICU"],
+        "//conditions:default": [],
+    }),
+    deps = ["//include:headers"],
+    linkopts = select({
+        "//:windows": [],
+        "//conditions:default": ["-licuuc"],
+    }),
+)
+
+cc_library(
+    name = "sentencepiece_lite_gpu",
+    srcs = ["sentencepiece_lite.c"],
+    defines = select({
+        "//:windows": [
+            "DM_GPU",
+            "DM_NO_ICU",
+        ],
+        "//conditions:default": ["DM_GPU"],
+    }),
+    deps = [
+        "//include:headers",
+        "//src/core/gpu:gpu",
+    ],
+    linkopts = select({
+        "//:windows": [],
+        "//conditions:default": ["-licuuc"],
+    }),
+)
+
+cc_library(
+    name = "tokenizer_lab",
+    srcs = ["tokenizer_lab.c"],
+    deps = ["//include:headers"],
+)
+
+cc_library(
+    name = "tokenizer_lab_gpu",
+    srcs = ["tokenizer_lab.c"],
+    defines = ["DM_GPU"],
+    deps = [
+        "//include:headers",
+        "//src/core/gpu:gpu",
+    ],
+)
+
+cc_library(
+    name = "grapheme_pair_encoding",
+    srcs = ["grapheme_pair_encoding.c"],
+    deps = ["//include:headers"],
+)
+
+cc_library(
+    name = "grapheme_pair_encoding_gpu",
+    srcs = ["grapheme_pair_encoding.c"],
+    defines = ["DM_GPU"],
+    deps = [
+        "//include:headers",
+        "//src/core/gpu:gpu",
+    ],
+)
+
+cc_library(
+    name = "parity_bpe",
+    srcs = ["parity_bpe.c"],
+    deps = ["//include:headers"],
+)
+
+cc_library(
+    name = "fast_wordpiece",
+    srcs = ["fast_wordpiece.c"],
+    deps = ["//include:headers"],
+)
+
+cc_library(
+    name = "volt",
+    srcs = ["volt.c"],
+    deps = ["//include:headers"],
+)
+
+cc_library(
+    name = "volt_gpu",
+    srcs = ["volt.c"],
+    defines = ["DM_GPU"],
+    deps = [
+        "//include:headers",
+        "//src/core/gpu:gpu",
+    ],
+)

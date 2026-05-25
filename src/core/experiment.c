@@ -1,6 +1,5 @@
 #include "core/experiment.h"
 #include "core/dm_portability.h"
-#include <libgen.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>

@@ -7,6 +7,27 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef _WIN32
+#include <intrin.h>
+#include <windows.h>
+#ifndef CLOCK_MONOTONIC
+#define CLOCK_MONOTONIC 1
+static int clock_gettime(int unused, struct timespec *ts) {
+    static LARGE_INTEGER freq;
+    static int initialized = 0;
+    LARGE_INTEGER counter;
+    (void)unused;
+    if (!initialized) {
+        QueryPerformanceFrequency(&freq);
+        initialized = 1;
+    }
+    QueryPerformanceCounter(&counter);
+    ts->tv_sec = (time_t)(counter.QuadPart / freq.QuadPart);
+    ts->tv_nsec = (long)(((counter.QuadPart % freq.QuadPart) * 1000000000LL) / freq.QuadPart);
+    return 0;
+}
+#endif
+#endif
 
 #define MHOUI_WORD_BITS 64
 #define MHOUI_EPS 1e-12
@@ -89,7 +110,13 @@ static void bitset_and(uint64_t *out, const uint64_t *a, const uint64_t *b, int 
 
 static int bitset_popcount(const uint64_t *bits, int words) {
     int total = 0;
-    for (int i = 0; i < words; i++) total += __builtin_popcountll(bits[i]);
+    for (int i = 0; i < words; i++) {
+#ifdef _MSC_VER
+        total += (int)__popcnt64(bits[i]);
+#else
+        total += __builtin_popcountll(bits[i]);
+#endif
+    }
     return total;
 }
 

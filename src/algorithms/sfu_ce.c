@@ -135,12 +135,15 @@ static DM_Status run(DM_Dataset *ds, void *params) {
         for (int i = 0; i < sample_size; i++) {
             memset(samples[i], 0, sizeof(uint32_t) * n_items);
             if (i < mutation_count && iter > 0) {
-                uint32_t pool[n_items]; size_t pool_size = 0;
+                uint32_t *pool = (uint32_t *)malloc(sizeof(uint32_t) * n_items);
+                size_t pool_size = 0;
+                if (!pool) continue;
                 for (size_t j = 0; j < n_items; j++) if (pv[j] > 0.5) pool[pool_size++] = (uint32_t)j;
                 if (pool_size > 0) {
                     int num = (rand() % (int)pool_size) + 1;
                     for (int k = 0; k < num; k++) samples[i][pool[rand() % pool_size]] = 1;
                 }
+                free(pool);
             } else {
                 for (size_t j = 0; j < n_items; j++) {
                     if ((double)rand() / RAND_MAX < pv[j]) samples[i][j] = 1;
@@ -153,10 +156,12 @@ static DM_Status run(DM_Dataset *ds, void *params) {
             }
         }
         
-        double sorted_utils[sample_size];
+        double *sorted_utils = (double *)malloc(sizeof(double) * sample_size);
+        if (!sorted_utils) continue;
         memcpy(sorted_utils, sample_utils, sizeof(double) * sample_size);
         qsort(sorted_utils, sample_size, sizeof(double), cmp_samples);
         double gamma = sorted_utils[(int)(rho * (sample_size - 1))];
+        free(sorted_utils);
         
         double denom = 0;
         for (int i = 0; i < sample_size; i++) if (sample_utils[i] >= gamma && sample_utils[i] > 0) denom += 1.0;

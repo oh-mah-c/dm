@@ -105,10 +105,13 @@ static void hupspm_recursive(H_ProjectedDatabase *pdb, DM_Sequence_Utility *ds_p
             
             if (actual_u >= min_util) found_count++;
             
-            uint32_t next_prefix[prefix_len + 1];
-            memcpy(next_prefix, prefix, sizeof(uint32_t) * prefix_len);
-            next_prefix[prefix_len] = item;
-            hupspm_recursive(next_pdb, ds_payload, ds_count, next_prefix, prefix_len + 1, max_id);
+            uint32_t *next_prefix = malloc(sizeof(uint32_t) * (prefix_len + 1));
+            if (next_prefix) {
+                memcpy(next_prefix, prefix, sizeof(uint32_t) * prefix_len);
+                next_prefix[prefix_len] = item;
+                hupspm_recursive(next_pdb, ds_payload, ds_count, next_prefix, prefix_len + 1, max_id);
+                free(next_prefix);
+            }
         }
         free_projected(next_pdb);
     }
@@ -164,10 +167,13 @@ static void hupspm_recursive(H_ProjectedDatabase *pdb, DM_Sequence_Utility *ds_p
             
             if (actual_u >= min_util) found_count++;
             
-            uint32_t next_prefix[prefix_len + 1];
-            memcpy(next_prefix, prefix, sizeof(uint32_t) * prefix_len);
-            next_prefix[prefix_len] = item;
-            hupspm_recursive(next_pdb, ds_payload, ds_count, next_prefix, prefix_len + 1, max_id);
+            uint32_t *next_prefix = malloc(sizeof(uint32_t) * (prefix_len + 1));
+            if (next_prefix) {
+                memcpy(next_prefix, prefix, sizeof(uint32_t) * prefix_len);
+                next_prefix[prefix_len] = item;
+                hupspm_recursive(next_pdb, ds_payload, ds_count, next_prefix, prefix_len + 1, max_id);
+                free(next_prefix);
+            }
         }
         free_projected(next_pdb);
     }

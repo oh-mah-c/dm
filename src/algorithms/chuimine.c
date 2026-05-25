@@ -310,9 +310,14 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     }
 
     for (size_t i = 0; i < ds->count; i++) {
-        uint32_t t_items[src[i].count];
-        double t_utils[src[i].count];
+        uint32_t *t_items = (uint32_t *)malloc(sizeof(uint32_t) * src[i].count);
+        double *t_utils = (double *)malloc(sizeof(double) * src[i].count);
         size_t t_count = 0;
+        if (!t_items || !t_utils) {
+            free(t_items);
+            free(t_utils);
+            continue;
+        }
         for (size_t j = 0; j < src[i].count; j++) {
             if (rank[src[i].items[j].id] != 0xFFFFFFFF) {
                 t_items[t_count] = src[i].items[j].id;
@@ -349,6 +354,8 @@ static DM_Status run(DM_Dataset *ds, void *params) {
             el->tidset[el->tid_count++] = (uint32_t)i;
             current_sum += t_utils[j];
         }
+        free(t_items);
+        free(t_utils);
     }
 
     chui_count = 0;

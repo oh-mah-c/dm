@@ -8,6 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
 
 typedef struct {
     uint64_t *pool;
@@ -112,18 +115,36 @@ static inline void bit_set(uint64_t *bits, size_t idx) {
     bits[idx >> 6] |= 1ull << (idx & 63u);
 }
 
+static inline size_t cloe_popcount64(uint64_t x) {
+#ifdef _MSC_VER
+    return (size_t)__popcnt64(x);
+#else
+    return (size_t)__builtin_popcountll(x);
+#endif
+}
+
+static inline unsigned cloe_ctz64(uint64_t x) {
+#ifdef _MSC_VER
+    unsigned long idx;
+    _BitScanForward64(&idx, x);
+    return (unsigned)idx;
+#else
+    return (unsigned)__builtin_ctzll(x);
+#endif
+}
+
 static size_t bitset_and_count(uint64_t *out, const uint64_t *a, const uint64_t *b, size_t words) {
     size_t count = 0;
     for (size_t w = 0; w < words; w++) {
         out[w] = a[w] & b[w];
-        count += (size_t)__builtin_popcountll(out[w]);
+        count += cloe_popcount64(out[w]);
     }
     return count;
 }
 
 static size_t bitset_count(const uint64_t *bits, size_t words) {
     size_t count = 0;
-    for (size_t w = 0; w < words; w++) count += (size_t)__builtin_popcountll(bits[w]);
+    for (size_t w = 0; w < words; w++) count += cloe_popcount64(bits[w]);
     return count;
 }
 
@@ -141,7 +162,7 @@ static double exact_average_occupancy(CLOECtx *ctx, const uint64_t *support, siz
     for (size_t w = 0; w < ctx->words; w++) {
         uint64_t x = support[w];
         while (x) {
-            unsigned bit = (unsigned)__builtin_ctzll(x);
+            unsigned bit = cloe_ctz64(x);
             size_t tid = (w << 6) + bit;
             if (tid < ctx->ntrans) sum += ctx->reciprocal_len[tid];
             x &= x - 1;
@@ -172,7 +193,7 @@ static double occupancy_envelope_local(CLOECtx *ctx, size_t prefix_len, const ui
         for (size_t w = 0; w < ctx->words; w++) {
             uint64_t x = support[w] & ib[w];
             while (x) {
-                unsigned bit = (unsigned)__builtin_ctzll(x);
+                unsigned bit = cloe_ctz64(x);
                 size_t tid = (w << 6) + bit;
                 if (tid < ctx->ntrans) {
                     if (rem[tid] < UINT16_MAX) rem[tid]++;
@@ -194,7 +215,7 @@ static double occupancy_envelope_local(CLOECtx *ctx, size_t prefix_len, const ui
         for (size_t w = 0; w < ctx->words; w++) {
             uint64_t x = support[w];
             while (x) {
-                unsigned bit = (unsigned)__builtin_ctzll(x);
+                unsigned bit = cloe_ctz64(x);
                 size_t tid = (w << 6) + bit;
                 if (tid < ctx->ntrans && rem[tid] >= b) vals[nvals++] = ctx->reciprocal_len[tid];
                 x &= x - 1;

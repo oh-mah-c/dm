@@ -8,7 +8,7 @@
 #include <string.h>
 
 #ifdef DM_GPU
-#include "gpu/dm_gpu.h"
+#include "core/gpu/dm_gpu.h"
 #endif
 
 #define UNI_SEP "@@"

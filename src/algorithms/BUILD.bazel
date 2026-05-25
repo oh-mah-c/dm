@@ -1,0 +1,141 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "all_algorithms",
+    srcs = glob(["*.c"]),
+    deps = [
+        "//include:headers",
+        "//src/core:all_core",
+    ],
+)
+
+cc_library(
+    name = "laga_generator",
+    srcs = ["laga.c"],
+    deps = [
+        "//include:headers",
+        "//src/core:arena",
+    ],
+)
+
+cc_library(
+    name = "mfhoi_common",
+    srcs = ["mfhoi_common.c"],
+    deps = [
+        "//include:headers",
+        "//src/core:mfhoi_common_core",
+    ],
+)
+
+cc_library(
+    name = "mhoui",
+    srcs = ["mhoui.c"],
+    deps = [
+        "//include:headers",
+        "//src/core:dataset",
+    ],
+)
+
+cc_library(
+    name = "vifp",
+    srcs = ["vifp.c"],
+    deps = [
+        "//include:headers",
+        "//src/core:dataset",
+    ],
+)
+
+cc_library(
+    name = "hupp",
+    srcs = ["hupp.c"],
+    deps = [
+        "//include:headers",
+        "//src/core:benchmark",
+    ],
+)
+
+cc_library(
+    name = "chuo_miner",
+    srcs = ["chuo_miner.c"],
+    deps = [
+        "//include:headers",
+        "//src/core:dataset",
+    ],
+)
+
+cc_library(
+    name = "pso_classifier",
+    srcs = ["pso_classifier.c"],
+    deps = [
+        "//include:headers",
+        "//src/core:benchmark",
+    ],
+)
+
+cc_library(
+    name = "tku_miner",
+    srcs = [
+        "laga.c",
+        "tku_miner.c",
+    ],
+    deps = [
+        "//include:headers",
+        "//src/core:arena",
+        "//src/core:dataset",
+        "//src/tokenizer:faro",
+    ],
+)
+
+cc_library(
+    name = "kclotree_miner",
+    srcs = ["kclotree_miner.c"],
+    deps = [
+        "//include:headers",
+        "//src/core:benchmark",
+    ],
+)
+
+cc_library(
+    name = "tipn_houi",
+    srcs = ["tipn_houi.c"],
+    deps = [
+        "//include:headers",
+        "//src/core:benchmark",
+    ],
+)
+
+cc_library(
+    name = "htk_miner",
+    srcs = ["htk_miner.c"],
+    deps = [
+        "//include:headers",
+        "//src/core:benchmark",
+    ],
+)
+
+cc_library(
+    name = "topkphm",
+    srcs = ["topkphm.c"],
+    deps = [
+        "//include:headers",
+        "//src/core:benchmark",
+    ],
+)
+
+cc_library(
+    name = "tku_pso",
+    srcs = ["tku_pso.c"],
+    deps = [
+        "//include:headers",
+        "//src/core:dataset",
+    ],
+)
+
+cc_library(
+    name = "tmku",
+    srcs = ["tmku.c"],
+    deps = [
+        "//include:headers",
+        "//src/core:dataset",
+    ],
+)

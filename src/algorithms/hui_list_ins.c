@@ -175,8 +175,13 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     HLI_EUCS eucs = { malloc(sizeof(HLI_EUCS_Entry) * 1024), 0, 1024 };
 
     for (size_t i = 0; i < total_count; i++) {
-        uint32_t t_items[data[i].count];
-        double t_utils[data[i].count];
+        uint32_t *t_items = malloc(sizeof(uint32_t) * data[i].count);
+        double *t_utils = malloc(sizeof(double) * data[i].count);
+        if (!t_items || !t_utils) {
+            free(t_items);
+            free(t_utils);
+            continue;
+        }
         size_t t_count = 0;
         for (size_t j = 0; j < data[i].count; j++) {
             if (rank[data[i].items[j].id] != 0xFFFFFFFF) {
@@ -234,6 +239,8 @@ static DM_Status run(DM_Dataset *ds, void *params) {
             }
             remaining_utility += t_utils[j];
         }
+        free(t_items);
+        free(t_utils);
     }
 
     // 4. Mining on Merged Lists

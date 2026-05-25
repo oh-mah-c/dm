@@ -4,11 +4,36 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef _WIN32
+#include <windows.h>
+#include <psapi.h>
+#else
 #include <sys/mman.h>
+#include <sys/resource.h>
+#endif
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/resource.h>
+
+#ifdef _WIN32
+#ifndef CLOCK_MONOTONIC
+#define CLOCK_MONOTONIC 1
+static int clock_gettime(int unused, struct timespec *ts) {
+    static LARGE_INTEGER freq;
+    static int initialized = 0;
+    LARGE_INTEGER counter;
+    (void)unused;
+    if (!initialized) {
+        QueryPerformanceFrequency(&freq);
+        initialized = 1;
+    }
+    QueryPerformanceCounter(&counter);
+    ts->tv_sec = (time_t)(counter.QuadPart / freq.QuadPart);
+    ts->tv_nsec = (long)(((counter.QuadPart % freq.QuadPart) * 1000000000LL) / freq.QuadPart);
+    return 0;
+}
+#endif
+#endif
 
 typedef struct {
     FILE *out_file;
@@ -26,11 +51,55 @@ static void spmf_emit_callback(const uint32_t *tokens, size_t count, void *user_
 }
 
 static long get_peak_rss_kb(void) {
+#ifdef _WIN32
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS *)&pmc, sizeof(pmc))) {
+        return (long)(pmc.PeakWorkingSetSize / 1024);
+    }
+    return 0;
+#else
     struct rusage usage;
     if (getrusage(RUSAGE_SELF, &usage) == 0) {
         return usage.ru_maxrss;
     }
     return 0;
+#endif
+}
+
+static unsigned char *read_input_file(const char *path, size_t *size_out) {
+    FILE *f = fopen(path, "rb");
+    long size;
+    unsigned char *data;
+    if (!f) {
+        perror("Failed to open input file");
+        return NULL;
+    }
+    if (fseek(f, 0, SEEK_END) != 0) {
+        perror("Failed to seek input file");
+        fclose(f);
+        return NULL;
+    }
+    size = ftell(f);
+    if (size <= 0) {
+        fprintf(stderr, "Empty input file\n");
+        fclose(f);
+        return NULL;
+    }
+    rewind(f);
+    data = (unsigned char *)malloc((size_t)size);
+    if (!data) {
+        fclose(f);
+        return NULL;
+    }
+    if (fread(data, 1, (size_t)size, f) != (size_t)size) {
+        perror("Failed to read input file");
+        free(data);
+        fclose(f);
+        return NULL;
+    }
+    fclose(f);
+    *size_out = (size_t)size;
+    return data;
 }
 
 int output_json = 0;
@@ -100,39 +169,19 @@ int main(int argc, char **argv) {
         return 1;
     }
     
-    int fd = open(input_path, O_RDONLY);
-    if (fd < 0) {
-        perror("Failed to open input file");
+    size_t file_size = 0;
+    unsigned char *mapped_data = read_input_file(input_path, &file_size);
+    if (!mapped_data) {
         tok->free(tok);
         return 1;
     }
-    
-    struct stat st;
-    if (fstat(fd, &st) < 0) {
-        perror("Failed to get file stats");
-        close(fd);
-        tok->free(tok);
-        return 1;
-    }
-    
-    size_t file_size = st.st_size;
-    unsigned char *mapped_data = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (mapped_data == MAP_FAILED) {
-        perror("mmap failed");
-        close(fd);
-        tok->free(tok);
-        return 1;
-    }
-    
-    madvise(mapped_data, file_size, MADV_SEQUENTIAL);
     
     FILE *out = stdout;
     if (output_path) {
         out = fopen(output_path, "w");
         if (!out) {
             perror("Failed to open output file");
-            munmap(mapped_data, file_size);
-            close(fd);
+            free(mapped_data);
             tok->free(tok);
             return 1;
         }
@@ -161,8 +210,7 @@ int main(int argc, char **argv) {
     }
     
     tok->free(tok);
-    munmap(mapped_data, file_size);
-    close(fd);
+    free(mapped_data);
     
     return 0;
 }

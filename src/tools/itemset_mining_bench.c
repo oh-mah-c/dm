@@ -4,9 +4,20 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#include <windows.h>
+#define mkdir(path, mode) _mkdir(path)
+#define pclose _pclose
+#define popen _popen
+#define sleep(seconds) Sleep((seconds) * 1000)
+#define WEXITSTATUS(status) (status)
+#define WIFEXITED(status) (1)
+#else
 #include <sys/wait.h>
-#include <time.h>
 #include <unistd.h>
+#endif
+#include <time.h>
 
 #if defined(__GLIBC__)
 #include <malloc.h>
@@ -276,7 +287,11 @@ int main(int argc, char **argv) {
     printf("Writing benchmark txt: %s\n", cfg.out_path);
 
     char *saveptr = NULL;
+#ifdef _WIN32
+    char *tok = strtok_s(thresholds_buf, " \t\r\n", &saveptr);
+#else
     char *tok = strtok_r(thresholds_buf, " \t\r\n", &saveptr);
+#endif
     int count = 0;
     while (tok) {
         BenchRow row;
@@ -287,7 +302,11 @@ int main(int argc, char **argv) {
         fflush(out);
         count++;
         if (cfg.pause_seconds > 0) sleep((unsigned int)cfg.pause_seconds);
+#ifdef _WIN32
+        tok = strtok_s(NULL, " \t\r\n", &saveptr);
+#else
         tok = strtok_r(NULL, " \t\r\n", &saveptr);
+#endif
     }
 
     fclose(out);

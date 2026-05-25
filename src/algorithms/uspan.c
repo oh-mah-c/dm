@@ -87,7 +87,11 @@ static void uspan_recursive(ProjectedDatabase *pdb, DM_Sequence_Utility *ds_payl
         }
         
         if (swu >= min_util) {
-            uint32_t next_prefix[prefix_len + 1];
+            uint32_t *next_prefix = (uint32_t *)malloc(sizeof(uint32_t) * (prefix_len + 1));
+            if (!next_prefix) {
+                free_projected(next_pdb);
+                continue;
+            }
             memcpy(next_prefix, prefix, sizeof(uint32_t) * prefix_len);
             next_prefix[prefix_len] = item;
             
@@ -132,6 +136,7 @@ static void uspan_recursive(ProjectedDatabase *pdb, DM_Sequence_Utility *ds_payl
                 
                 uspan_recursive(next_pdb, ds_payload, ds_count, next_prefix, prefix_len + 1, true, max_id);
             }
+            free(next_prefix);
         }
         free_projected(next_pdb);
     }
@@ -167,7 +172,11 @@ static void uspan_recursive(ProjectedDatabase *pdb, DM_Sequence_Utility *ds_payl
         }
         
         if (swu >= min_util) {
-            uint32_t next_prefix[prefix_len + 1];
+            uint32_t *next_prefix = (uint32_t *)malloc(sizeof(uint32_t) * (prefix_len + 1));
+            if (!next_prefix) {
+                free_projected(next_pdb);
+                continue;
+            }
             memcpy(next_prefix, prefix, sizeof(uint32_t) * prefix_len);
             next_prefix[prefix_len] = item;
             
@@ -211,6 +220,7 @@ static void uspan_recursive(ProjectedDatabase *pdb, DM_Sequence_Utility *ds_payl
                 
                 uspan_recursive(next_pdb, ds_payload, ds_count, next_prefix, prefix_len + 1, false, max_id);
             }
+            free(next_prefix);
         }
         free_projected(next_pdb);
     }

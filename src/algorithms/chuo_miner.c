@@ -5,6 +5,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _MSC_VER
+#include <intrin.h>
+#define dm_popcount64(x) ((uint32_t)__popcnt64((unsigned __int64)(x)))
+#else
+#define dm_popcount64(x) ((uint32_t)__builtin_popcountll(x))
+#endif
 #include <time.h>
 
 typedef struct {
@@ -97,7 +104,7 @@ static void bitset_set(uint64_t *b, uint32_t tid) {
 
 static uint32_t bitset_intersection_count(const uint64_t *a, const uint64_t *b, size_t words) {
     uint32_t c = 0;
-    for (size_t i = 0; i < words; i++) c += (uint32_t)__builtin_popcountll(a[i] & b[i]);
+    for (size_t i = 0; i < words; i++) c += dm_popcount64(a[i] & b[i]);
     return c;
 }
 

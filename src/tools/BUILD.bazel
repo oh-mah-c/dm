@@ -1,0 +1,243 @@
+package(default_visibility = ["//visibility:public"])
+
+MATH_LINKOPTS = select({
+    "//:windows": [],
+    "//conditions:default": ["-lm"],
+})
+
+
+cc_binary(
+    name = "mfhoi_miner",
+    srcs = ["mfhoi_miner.c"],
+    deps = ["//src/algorithms:mfhoi_common"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "mhoui_miner",
+    srcs = ["mhoui_miner.c"],
+    deps = ["//src/algorithms:mhoui"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "vifp_miner",
+    srcs = ["vifp_miner.c"],
+    deps = ["//src/algorithms:vifp"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "hupp_miner",
+    srcs = ["hupp_miner.c"],
+    deps = ["//src/algorithms:hupp"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "chuo_miner",
+    srcs = ["chuo_miner.c"],
+    deps = ["//src/algorithms:chuo_miner"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "pso_classifier",
+    srcs = ["pso_classifier.c"],
+    deps = ["//src/algorithms:pso_classifier"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "tku_miner",
+    srcs = ["tku_miner.c"],
+    deps = ["//src/algorithms:tku_miner"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "kclotree_miner",
+    srcs = ["kclotree_miner.c"],
+    deps = ["//src/algorithms:kclotree_miner"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "tipn_houi_miner",
+    srcs = ["tipn_houi_miner.c"],
+    deps = ["//src/algorithms:tipn_houi"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "htk_miner",
+    srcs = ["htk_miner.c"],
+    deps = ["//src/algorithms:htk_miner"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "topkphm_miner",
+    srcs = ["topkphm_miner.c"],
+    deps = ["//src/algorithms:topkphm"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "tku_pso_miner",
+    srcs = ["tku_pso_miner.c"],
+    deps = ["//src/algorithms:tku_pso"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "tmku_miner",
+    srcs = ["tmku_miner.c"],
+    deps = ["//src/algorithms:tmku"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "itemset_mining_bench",
+    srcs = ["itemset_mining_bench.c"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "dm_connect",
+    srcs = ["dm_connect.c"],
+    deps = [
+        "//src/core:flat_runtime",
+        "//src/tokenizer:faro",
+    ],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "dm_run",
+    srcs = ["dm_run.c"],
+    deps = [
+        "//src/algorithms:all_algorithms",
+        "//src/core:all_core",
+        "//src/tokenizer:all_tokenizers",
+    ],
+    linkopts = select({
+        "//:windows": [],
+        "//conditions:default": [
+            "-lm",
+            "-pthread",
+            "-licuuc",
+        ],
+    }),
+)
+
+cc_binary(
+    name = "dm_bpe",
+    srcs = ["dm_bpe.c"],
+    deps = ["//src/tokenizer:bpe_subword"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "dm_bpe_gpu",
+    srcs = ["dm_bpe.c"],
+    deps = ["//src/tokenizer:bpe_subword_gpu"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "dm_bpe_dropout",
+    srcs = ["dm_bpe_dropout.c"],
+    deps = ["//src/tokenizer:bpe_dropout"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "dm_unigram",
+    srcs = ["dm_unigram.c"],
+    deps = ["//src/tokenizer:unigram_subword"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "dm_unigram_gpu",
+    srcs = ["dm_unigram.c"],
+    deps = ["//src/tokenizer:unigram_subword_gpu"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "dm_sentencepiece",
+    srcs = ["dm_sentencepiece.c"],
+    deps = ["//src/tokenizer:sentencepiece_lite"],
+    linkopts = MATH_LINKOPTS + select({
+        "//:windows": [],
+        "//conditions:default": ["-licuuc"],
+    }),
+)
+
+cc_binary(
+    name = "dm_sentencepiece_gpu",
+    srcs = ["dm_sentencepiece.c"],
+    deps = ["//src/tokenizer:sentencepiece_lite_gpu"],
+    linkopts = MATH_LINKOPTS + select({
+        "//:windows": [],
+        "//conditions:default": ["-licuuc"],
+    }),
+)
+
+cc_binary(
+    name = "dm_tokenizer_lab",
+    srcs = ["dm_tokenizer_lab.c"],
+    deps = ["//src/tokenizer:tokenizer_lab"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "dm_tokenizer_lab_gpu",
+    srcs = ["dm_tokenizer_lab.c"],
+    deps = ["//src/tokenizer:tokenizer_lab_gpu"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "dm_gpe",
+    srcs = ["dm_gpe.c"],
+    deps = ["//src/tokenizer:grapheme_pair_encoding"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "dm_gpe_gpu",
+    srcs = ["dm_gpe.c"],
+    deps = ["//src/tokenizer:grapheme_pair_encoding_gpu"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "dm_parity_bpe",
+    srcs = ["dm_parity_bpe.c"],
+    deps = ["//src/tokenizer:parity_bpe"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "dm_fast_wordpiece",
+    srcs = ["dm_fast_wordpiece.c"],
+    deps = ["//src/tokenizer:fast_wordpiece"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "dm_volt",
+    srcs = ["dm_volt.c"],
+    deps = ["//src/tokenizer:volt"],
+    linkopts = MATH_LINKOPTS,
+)
+
+cc_binary(
+    name = "dm_volt_gpu",
+    srcs = ["dm_volt.c"],
+    deps = ["//src/tokenizer:volt_gpu"],
+    linkopts = MATH_LINKOPTS,
+)

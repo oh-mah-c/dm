@@ -204,7 +204,8 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     // EUCS
     eucs = calloc(promising_count, sizeof(double*));
     for (size_t i = 0; i < ds->count; i++) {
-        uint32_t p_items[src[i].count];
+        uint32_t *p_items = malloc(sizeof(uint32_t) * src[i].count);
+        if (!p_items) continue;
         size_t p_cnt = 0;
         for (size_t j = 0; j < src[i].count; j++) if (rank[src[i].items[j].id] != 0xFFFFFFFF) p_items[p_cnt++] = src[i].items[j].id;
         for (size_t j = 0; j < p_cnt; j++) {
@@ -217,6 +218,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
                 eucs[rk][rj] += src[i].total_utility;
             }
         }
+        free(p_items);
     }
 
     initial_lists = malloc(sizeof(FHIM_UtilityList*) * promising_count);
@@ -227,8 +229,13 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     }
 
     for (size_t i = 0; i < ds->count; i++) {
-        uint32_t t_items[src[i].count];
-        double t_utils[src[i].count];
+        uint32_t *t_items = malloc(sizeof(uint32_t) * src[i].count);
+        double *t_utils = malloc(sizeof(double) * src[i].count);
+        if (!t_items || !t_utils) {
+            free(t_items);
+            free(t_utils);
+            continue;
+        }
         size_t t_count = 0;
         for (size_t j = 0; j < src[i].count; j++) {
             if (rank[src[i].items[j].id] != 0xFFFFFFFF) {
@@ -258,6 +265,8 @@ static DM_Status run(DM_Dataset *ds, void *params) {
             el->count++;
             remaining += t_utils[j];
         }
+        free(t_items);
+        free(t_utils);
     }
 
     hui_count = 0;

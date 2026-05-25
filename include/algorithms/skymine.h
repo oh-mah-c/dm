@@ -4,7 +4,7 @@
 #include "core/dm_algorithm.h"
 
 typedef struct {
-    // No thresholds required for Skyline mining
+    int unused;
 } DM_SKYMINE_Params;
 
 #endif

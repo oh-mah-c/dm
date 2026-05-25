@@ -63,6 +63,16 @@ static int cmp_trans(const void *a, const void *b) {
     return 0;
 }
 
+static uint32_t *g_s_counts = NULL;
+
+static int cmp_freq(const void *a, const void *b) {
+    uint32_t ia = *(const uint32_t*)a;
+    uint32_t ib = *(const uint32_t*)b;
+    if (g_s_counts[ia] < g_s_counts[ib]) return -1;
+    if (g_s_counts[ia] > g_s_counts[ib]) return 1;
+    return (ia < ib) ? -1 : 1;
+}
+
 /* --- Database Reduction --- */
 
 static void reduce_db(Database *db, int32_t tail, uint32_t min_sup, uint32_t *out_in_all_len) {
@@ -189,13 +199,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     uint32_t f_idx = 0;
     for (uint32_t i = 0; i <= ds->max_id; i++) if (raw_counts[i] >= min_sup) freq_items[f_idx++] = i;
 
-    static uint32_t *g_s_counts; g_s_counts = raw_counts;
-    int cmp_freq(const void *a, const void *b) {
-        uint32_t ia = *(uint32_t*)a, ib = *(uint32_t*)b;
-        if (g_s_counts[ia] < g_s_counts[ib]) return -1;
-        if (g_s_counts[ia] > g_s_counts[ib]) return 1;
-        return (ia < ib) ? -1 : 1;
-    }
+    g_s_counts = raw_counts;
     qsort(freq_items, freq_cnt, sizeof(uint32_t), cmp_freq);
 
     uint32_t *rank_map = malloc((ds->max_id + 1) * sizeof(uint32_t));

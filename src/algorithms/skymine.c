@@ -119,7 +119,8 @@ static void skymine_recursive(UPNode *root, HeaderEntry *headers, size_t header_
         }
         
         if (utility_lb > u_min[freq]) {
-            uint32_t new_prefix[prefix_len + 1];
+            uint32_t *new_prefix = (uint32_t *)malloc(sizeof(uint32_t) * (prefix_len + 1));
+            if (!new_prefix) continue;
             memcpy(new_prefix, prefix, sizeof(uint32_t) * prefix_len);
             new_prefix[prefix_len] = item;
             add_candidate(new_prefix, prefix_len + 1, utility_lb, freq);
@@ -136,20 +137,28 @@ static void skymine_recursive(UPNode *root, HeaderEntry *headers, size_t header_
             }
             
             for (UPNode *n = headers[i].hlink; n; n = n->hlink) {
-                uint32_t path_items[prefix_len + 128]; 
-                double path_utils[prefix_len + 128];
+                size_t path_cap = prefix_len + 128;
+                uint32_t *path_items = (uint32_t *)malloc(sizeof(uint32_t) * path_cap);
+                double *path_utils = (double *)malloc(sizeof(double) * path_cap);
                 size_t path_len = 0;
+                if (!path_items || !path_utils) {
+                    free(path_items);
+                    free(path_utils);
+                    continue;
+                }
                 for (UPNode *p = n->parent; p && p->item != 0; p = p->parent) {
                     path_items[path_len] = p->item;
                     path_utils[path_len] = p->nu / p->count;
                     path_len++;
-                    if (path_len >= prefix_len + 128) break;
+                    if (path_len >= path_cap) break;
                 }
                 for (size_t j = 0; j < path_len / 2; j++) {
                     uint32_t ti = path_items[j]; path_items[j] = path_items[path_len - 1 - j]; path_items[path_len - 1 - j] = ti;
                     double tu = path_utils[j]; path_utils[j] = path_utils[path_len - 1 - j]; path_utils[path_len - 1 - j] = tu;
                 }
                 insert_transaction(cond_root, path_items, path_utils, path_len, cond_headers, cond_rank, n->count);
+                free(path_items);
+                free(path_utils);
             }
             
             if (cond_root->firstChild) {
@@ -158,6 +167,7 @@ static void skymine_recursive(UPNode *root, HeaderEntry *headers, size_t header_
             
             free_tree(cond_root);
             free(cond_headers); free(cond_rank);
+            free(new_prefix);
         }
     }
 }
@@ -205,9 +215,14 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     UPNode *root = create_node(0, NULL);
     for (size_t i = 0; i < ds->count; i++) {
         // Sort transaction by rank
-        uint32_t t_items[src[i].count];
-        double t_utils[src[i].count];
+        uint32_t *t_items = (uint32_t *)malloc(sizeof(uint32_t) * src[i].count);
+        double *t_utils = (double *)malloc(sizeof(double) * src[i].count);
         size_t t_cnt = 0;
+        if (!t_items || !t_utils) {
+            free(t_items);
+            free(t_utils);
+            continue;
+        }
         for (size_t j = 0; j < src[i].count; j++) {
             if (rank[src[i].items[j].id] != 0xFFFFFFFF) {
                 t_items[t_cnt] = src[i].items[j].id;
@@ -224,6 +239,8 @@ static DM_Status run(DM_Dataset *ds, void *params) {
             }
         }
         insert_transaction(root, t_items, t_utils, t_cnt, headers, rank, 1);
+        free(t_items);
+        free(t_utils);
     }
     
     ds_max_id = ds->max_id;

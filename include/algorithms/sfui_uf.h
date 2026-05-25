@@ -4,7 +4,7 @@
 #include "core/dm_algorithm.h"
 
 typedef struct {
-    // No thresholds
+    int unused;
 } DM_SFUI_UF_Params;
 
 #endif

@@ -10,6 +10,12 @@
 #include <sys/stat.h>
 #include <time.h>
 
+#ifdef _WIN32
+#include <direct.h>
+#define strtok_r(str, delim, saveptr) strtok_s((str), (delim), (saveptr))
+#define mkdir(path, mode) _mkdir(path)
+#endif
+
 typedef enum {
     LAGA_TRANSACTION,
     LAGA_SEQUENCE,

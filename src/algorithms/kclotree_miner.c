@@ -2,13 +2,23 @@
 #include "core/dm_portability.h"
 
 #include <ctype.h>
-#include <dirent.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+#ifdef _WIN32
+#include <windows.h>
+#ifndef S_ISREG
+#define S_ISREG(mode) (((mode) & _S_IFMT) == _S_IFREG)
+#endif
+#ifndef S_ISDIR
+#define S_ISDIR(mode) (((mode) & _S_IFMT) == _S_IFDIR)
+#endif
+#else
+#include <dirent.h>
+#endif
 
 typedef struct {
     uint32_t *items;
@@ -242,7 +252,7 @@ static int ends_with(const char *s, const char *suffix) {
 
 static char *join_path(const char *a, const char *b) {
     size_t n = strlen(a), m = strlen(b);
-    int slash = n && a[n - 1] == '/';
+    int slash = n && (a[n - 1] == '/' || a[n - 1] == '\\');
     char *r = (char *)malloc(n + m + (slash ? 1 : 2));
     if (!r) return NULL;
     sprintf(r, "%s%s%s", a, slash ? "" : "/", b);
@@ -254,6 +264,27 @@ static int load_path(const char *path, SeqDB *db) {
     if (stat(path, &st) != 0) return -1;
     if (S_ISREG(st.st_mode)) return parse_file(path, db);
     if (!S_ISDIR(st.st_mode)) return -1;
+#ifdef _WIN32
+    char *pattern = join_path(path, "*.txt");
+    if (!pattern) return -1;
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    free(pattern);
+    if (h == INVALID_HANDLE_VALUE) return -1;
+    int ok = 0;
+    do {
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+        char *p = join_path(path, fd.cFileName);
+        if (!p) {
+            FindClose(h);
+            return -1;
+        }
+        if (parse_file(p, db) == 0) ok = 1;
+        free(p);
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+    return ok ? 0 : -1;
+#else
     DIR *dir = opendir(path);
     if (!dir) return -1;
     struct dirent *ent;
@@ -271,6 +302,7 @@ static int load_path(const char *path, SeqDB *db) {
     }
     closedir(dir);
     return ok ? 0 : -1;
+#endif
 }
 
 static int pattern_contains(const Pattern *super, const Pattern *sub) {

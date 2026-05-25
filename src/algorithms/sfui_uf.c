@@ -124,7 +124,8 @@ static void p_miner(SFUI_UtilityList *P, SFUI_UtilityList **extensions, size_t e
         // Since we are searching SFUIs, u(Y) < u(X) means Y is dominated by X.
         if (P && Px->sum_iutil < P->sum_iutil) continue;
         
-        uint32_t current_prefix[prefix_len + 1];
+        uint32_t *current_prefix = (uint32_t *)malloc(sizeof(uint32_t) * (prefix_len + 1));
+        if (!current_prefix) continue;
         memcpy(current_prefix, prefix, sizeof(uint32_t) * prefix_len);
         current_prefix[prefix_len] = Px->item;
 
@@ -154,6 +155,7 @@ static void p_miner(SFUI_UtilityList *P, SFUI_UtilityList **extensions, size_t e
         
         for (size_t k = 0; k < next_ext_count; k++) free_ul(next_extensions[k]);
         free(next_extensions);
+        free(current_prefix);
     }
 }
 
@@ -220,9 +222,14 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     }
     
     for (size_t i = 0; i < ds->count; i++) {
-        uint32_t t_items[src[i].count];
-        double t_utils[src[i].count];
+        uint32_t *t_items = (uint32_t *)malloc(sizeof(uint32_t) * src[i].count);
+        double *t_utils = (double *)malloc(sizeof(double) * src[i].count);
         size_t t_cnt = 0;
+        if (!t_items || !t_utils) {
+            free(t_items);
+            free(t_utils);
+            continue;
+        }
         for (size_t j = 0; j < src[i].count; j++) {
             if (rank[src[i].items[j].id] != 0xFFFFFFFF) {
                 t_items[t_cnt] = src[i].items[j].id;
@@ -251,6 +258,8 @@ static DM_Status run(DM_Dataset *ds, void *params) {
             el->count++;
             remaining += t_utils[j];
         }
+        free(t_items);
+        free(t_utils);
     }
     
     psfui_count = 0;

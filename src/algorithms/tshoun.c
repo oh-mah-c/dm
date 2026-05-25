@@ -198,9 +198,14 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     for (size_t i = 0; i < ds->count; i++) {
         int h = tid_period[i];
         
-        uint32_t t_items[data[i].count];
-        double t_utils[data[i].count];
+        uint32_t *t_items = (uint32_t *)malloc(sizeof(uint32_t) * data[i].count);
+        double *t_utils = (double *)malloc(sizeof(double) * data[i].count);
         size_t t_count = 0;
+        if (!t_items || !t_utils) {
+            free(t_items);
+            free(t_utils);
+            continue;
+        }
         for (size_t j = 0; j < data[i].count; j++) {
             t_items[t_count] = data[i].items[j].id;
             t_utils[t_count] = data[i].items[j].utility;
@@ -217,6 +222,8 @@ static DM_Status run(DM_Dataset *ds, void *params) {
         }
 
         generate_itemsets(t_items, t_utils, t_count, h, num_periods, &hpuu2, min_util, pttu);
+        free(t_items);
+        free(t_utils);
     }
 
     // Scan 3: Filter HOUN
@@ -238,9 +245,17 @@ static DM_Status run(DM_Dataset *ds, void *params) {
         TSHOUN_Node *node = hash_table[i];
         while (node) {
             // Determine op(X) = Intersection of op(i) for all i in X
-            bool op_x[num_periods];
+            bool *op_x = (bool *)malloc(sizeof(bool) * num_periods);
             double total_pttu_opx = 0;
             double actual_utility = 0;
+            if (!op_x) {
+                TSHOUN_Node *tmp = node;
+                node = node->next;
+                free(tmp->items);
+                free(tmp->pu_per_period);
+                free(tmp);
+                continue;
+            }
             
             for (int h = 0; h < num_periods; h++) {
                 op_x[h] = true;
@@ -257,6 +272,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
                 hui_count++;
                 items_sum += node->item_count;
             }
+            free(op_x);
 
             TSHOUN_Node *tmp = node;
             node = node->next;

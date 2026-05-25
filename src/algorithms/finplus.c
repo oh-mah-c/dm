@@ -253,6 +253,25 @@ static int cmp_support_desc(const void *a, const void *b) {
     return (ia < ib) ? -1 : 1;
 }
 
+static void collect_ns(PPC_Node *n, Nodeset *ns_array, uint32_t *rm) {
+    if (!n) return;
+    if (n->item != ROOT_ITEM) {
+        uint32_t r = rm[n->item];
+        ns_array[r].codes[ns_array[r].len++] = (PP_Code){n->pre, n->post, n->count};
+    }
+    PPC_Node *c = n->children;
+    while (c) {
+        collect_ns(c, ns_array, rm);
+        c = c->sibling;
+    }
+}
+
+static int cmp_pp(const void *a, const void *b) {
+    const PP_Code *pa = (const PP_Code *)a;
+    const PP_Code *pb = (const PP_Code *)b;
+    return (pa->pre < pb->pre) ? -1 : (pa->pre > pb->pre);
+}
+
 static DM_Status run(DM_Dataset *ds, void *params) {
     DM_FINPLUS_Params *p = (DM_FINPLUS_Params*)params;
     double ms_val = p ? p->min_support : 0.01;
@@ -331,21 +350,9 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     }
     
     // Scan tree (pre-order visit already done by traverse, but we need to collect)
-    void collect_ns(PPC_Node *n, Nodeset *ns_array, uint32_t *rm) {
-        if (!n) return;
-        if (n->item != ROOT_ITEM) {
-            uint32_t r = rm[n->item];
-            ns_array[r].codes[ns_array[r].len++] = (PP_Code){n->pre, n->post, n->count};
-        }
-        PPC_Node *c = n->children;
-        while (c) { collect_ns(c, ns_array, rm); c = c->sibling; }
-    }
     collect_ns(root, item_nodesets, rank_map);
 
     // Sort Nodeset codes by pre-order (Definition 4)
-    int cmp_pp(const void *a, const void *b) {
-        return (int)(((PP_Code*)a)->pre - ((PP_Code*)b)->pre);
-    }
     for (uint32_t i = 0; i < freq_cnt; i++)
         qsort(item_nodesets[i].codes, item_nodesets[i].len, sizeof(PP_Code), cmp_pp);
 

@@ -185,9 +185,26 @@ static int cmp_support_asc(const void *a, const void *b) {
     return (ia < ib) ? -1 : 1;
 }
 
+static int cmp_support_desc(const void *a, const void *b) {
+    uint32_t ia = *(uint32_t*)a, ib = *(uint32_t*)b;
+    if (g_counts[ia] > g_counts[ib]) return -1;
+    if (g_counts[ia] < g_counts[ib]) return 1;
+    return (ia < ib) ? -1 : 1;
+}
+
 static uint32_t *g_rank_map = NULL;
 static int cmp_rank_asc(const void *a, const void *b) {
     return (int)g_rank_map[*(uint32_t*)a] - (int)g_rank_map[*(uint32_t*)b];
+}
+
+static void collect_nlist_asc(PPC_Node *n, N_List *nl_array, uint32_t *rm) {
+    if (!n) return;
+    if (n->item != ROOT_ITEM) {
+        uint32_t r = rm[n->item];
+        nl_array[r].codes[nl_array[r].len++] = (PP_Code){n->pre, n->post, n->count};
+    }
+    PPC_Node *c = n->first_child;
+    while (c) { collect_nlist_asc(c, nl_array, rm); c = c->next_sibling; }
 }
 
 static void dfs_assign_codes(PPC_Node *n, uint32_t *pre, uint32_t *post) {
@@ -223,12 +240,6 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     for (uint32_t i = 0; i <= ds->max_id; i++) if (counts[i] >= min_sup) L1_desc[d_idx++] = i;
     
     g_counts = counts;
-    int cmp_support_desc(const void *a, const void *b) {
-        uint32_t ia = *(uint32_t*)a, ib = *(uint32_t*)b;
-        if (g_counts[ia] > g_counts[ib]) return -1;
-        if (g_counts[ia] < g_counts[ib]) return 1;
-        return (ia < ib) ? -1 : 1;
-    }
     qsort(L1_desc, freq_cnt, sizeof(uint32_t), cmp_support_desc);
 
     uint32_t *rank_map_desc = malloc((ds->max_id + 1) * sizeof(uint32_t));
@@ -280,15 +291,6 @@ static DM_Status run(DM_Dataset *ds, void *params) {
         f1_nl[i].len = 0;
     }
 
-    void collect_nlist_asc(PPC_Node *n, N_List *nl_array, uint32_t *rm) {
-        if (!n) return;
-        if (n->item != ROOT_ITEM) {
-            uint32_t r = rm[n->item];
-            nl_array[r].codes[nl_array[r].len++] = (PP_Code){n->pre, n->post, n->count};
-        }
-        PPC_Node *c = n->first_child;
-        while (c) { collect_nlist_asc(c, nl_array, rm); c = c->next_sibling; }
-    }
     collect_nlist_asc(root, f1_nl, rank_map_asc);
 
     Context ctx = { .min_sup = min_sup, .total_frequent = 0, .total_footprint = 0, .rank_map = rank_map_asc, .L1_items = L1_asc, .nf = freq_cnt };

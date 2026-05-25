@@ -5,16 +5,78 @@
 #include <math.h>
 #include <float.h>
 #include <time.h>
+#ifdef _WIN32
+#include <windows.h>
+#include <psapi.h>
+#include <io.h>
+#else
 #include <sys/mman.h>
+#include <sys/resource.h>
+#endif
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/resource.h>
 #include <ctype.h>
 
 #include "../../include/tokenizer/tokenizer.h"
 
 #define HUST_NO_RANK UINT32_MAX
+
+#ifdef _WIN32
+#ifndef CLOCK_MONOTONIC
+#define CLOCK_MONOTONIC 1
+static int clock_gettime(int unused, struct timespec *ts) {
+    static LARGE_INTEGER freq;
+    static int initialized = 0;
+    LARGE_INTEGER counter;
+    (void)unused;
+    if (!initialized) {
+        QueryPerformanceFrequency(&freq);
+        initialized = 1;
+    }
+    QueryPerformanceCounter(&counter);
+    ts->tv_sec = (time_t)(counter.QuadPart / freq.QuadPart);
+    ts->tv_nsec = (long)(((counter.QuadPart % freq.QuadPart) * 1000000000LL) / freq.QuadPart);
+    return 0;
+}
+#endif
+#endif
+
+static unsigned char *read_input_file(const char *path, size_t *size_out) {
+    FILE *f = fopen(path, "rb");
+    long size;
+    unsigned char *data;
+    if (!f) {
+        perror("Failed to open input file");
+        return NULL;
+    }
+    if (fseek(f, 0, SEEK_END) != 0) {
+        perror("Failed to seek input file");
+        fclose(f);
+        return NULL;
+    }
+    size = ftell(f);
+    if (size <= 0) {
+        fprintf(stderr, "Empty input file\n");
+        fclose(f);
+        return NULL;
+    }
+    rewind(f);
+    data = (unsigned char *)malloc((size_t)size);
+    if (!data) {
+        fclose(f);
+        return NULL;
+    }
+    if (fread(data, 1, (size_t)size, f) != (size_t)size) {
+        perror("Failed to read input file");
+        free(data);
+        fclose(f);
+        return NULL;
+    }
+    fclose(f);
+    *size_out = (size_t)size;
+    return data;
+}
 
 typedef struct {
     char *name;
@@ -848,11 +910,19 @@ static void context_free(HUSTContext *ctx) {
 }
 
 static long get_peak_rss_kb(void) {
+#ifdef _WIN32
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS *)&pmc, sizeof(pmc))) {
+        return (long)(pmc.PeakWorkingSetSize / 1024);
+    }
+    return 0;
+#else
     struct rusage usage;
     if (getrusage(RUSAGE_SELF, &usage) == 0) {
         return usage.ru_maxrss;
     }
     return 0;
+#endif
 }
 
 int main(int argc, char **argv) {
@@ -915,28 +985,9 @@ int main(int argc, char **argv) {
     struct timespec start_time, end_time;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
     
-    // mmap input file
-    int fd = open(input_path, O_RDONLY);
-    if (fd < 0) {
-        perror("Failed to open input file");
-        return 1;
-    }
-    struct stat st;
-    if (fstat(fd, &st) < 0) {
-        perror("Failed to get file stats");
-        close(fd);
-        return 1;
-    }
-    size_t file_size = st.st_size;
-    if (file_size == 0) {
-        fprintf(stderr, "Empty input file\n");
-        close(fd);
-        return 1;
-    }
-    unsigned char *mapped_data = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (mapped_data == MAP_FAILED) {
-        perror("mmap failed");
-        close(fd);
+    size_t file_size = 0;
+    unsigned char *mapped_data = read_input_file(input_path, &file_size);
+    if (!mapped_data) {
         return 1;
     }
     
@@ -950,23 +1001,20 @@ int main(int argc, char **argv) {
     if (char_level) {
         if (tokenize_char_direct(&db, mapped_data, file_size, &token_stream, &stream_len) != 0) {
             fprintf(stderr, "Failed character tokenization\n");
-            munmap(mapped_data, file_size);
-            close(fd);
+            free(mapped_data);
             db_free(&db);
             return 1;
         }
     } else {
         if (tokenize_text_direct(&db, mapped_data, file_size, &token_stream, &stream_len) != 0) {
             fprintf(stderr, "Failed word tokenization\n");
-            munmap(mapped_data, file_size);
-            close(fd);
+            free(mapped_data);
             db_free(&db);
             return 1;
         }
     }
     
-    munmap(mapped_data, file_size);
-    close(fd);
+    free(mapped_data);
     
     HUSTContext ctx;
     memset(&ctx, 0, sizeof(ctx));

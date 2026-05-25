@@ -40,6 +40,26 @@ typedef struct {
     uint32_t *bit_to_item;
 } LTM_Context;
 
+typedef struct {
+    uint32_t id;
+    uint32_t count;
+} ItemCount;
+
+static uint32_t *g_ltm_item_to_bit = NULL;
+
+static int cmp_item_desc_local(const void *a, const void *b) {
+    const ItemCount *ia = (const ItemCount *)a;
+    const ItemCount *ib = (const ItemCount *)b;
+    if (ib->count != ia->count) return (int)ib->count - (int)ia->count;
+    return (int)ia->id - (int)ib->id;
+}
+
+static int cmp_transaction_bits_desc(const void *a, const void *b) {
+    uint32_t b1 = g_ltm_item_to_bit[*(const uint32_t *)a];
+    uint32_t b2 = g_ltm_item_to_bit[*(const uint32_t *)b];
+    return (int)b2 - (int)b1;
+}
+
 static uint32_t get_node(LTM_Context *ctx, uint32_t parent_idx, uint32_t item_name) {
     uint32_t curr = ctx->nodes[parent_idx].child;
     while (curr != 0) {
@@ -147,7 +167,6 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     }
 
     // Sort frequent items by support DESC
-    typedef struct { uint32_t id; uint32_t count; } ItemCount;
     ItemCount *f_items = malloc(num_frequent * sizeof(ItemCount));
     uint32_t f_idx = 0;
     for (uint32_t i = 0; i <= ds->max_id; i++) {
@@ -156,9 +175,6 @@ static DM_Status run(DM_Dataset *ds, void *params) {
             f_items[f_idx].count = counts[i];
             f_idx++;
         }
-    }
-    int cmp_item_desc_local(const void *a, const void *b) {
-        return (int)((ItemCount*)b)->count - (int)((ItemCount*)a)->count;
     }
     qsort(f_items, num_frequent, sizeof(ItemCount), cmp_item_desc_local);
 
@@ -194,12 +210,8 @@ static DM_Status run(DM_Dataset *ds, void *params) {
             }
         }
         // Sort items in transaction by support DESC (highest bit first)
-        int cmp_t(const void *a, const void *b) {
-            uint32_t b1 = ctx.item_to_bit[*(uint32_t*)a];
-            uint32_t b2 = ctx.item_to_bit[*(uint32_t*)b];
-            return (int)b2 - (int)b1;
-        }
-        qsort(t_items, t_len, sizeof(uint32_t), cmp_t);
+        g_ltm_item_to_bit = ctx.item_to_bit;
+        qsort(t_items, t_len, sizeof(uint32_t), cmp_transaction_bits_desc);
 
         uint32_t curr = 0;
         for (uint32_t j = 0; j < t_len; j++) {

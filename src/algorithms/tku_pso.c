@@ -6,6 +6,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
 
 typedef struct {
     uint32_t id;
@@ -102,7 +105,13 @@ static void bit_flip(uint64_t *bits, size_t i) {
 
 static size_t bit_count_words(const uint64_t *bits, size_t words) {
     size_t out = 0;
-    for (size_t i = 0; i < words; i++) out += (size_t)__builtin_popcountll(bits[i]);
+    for (size_t i = 0; i < words; i++) {
+#ifdef _MSC_VER
+        out += (size_t)__popcnt64(bits[i]);
+#else
+        out += (size_t)__builtin_popcountll(bits[i]);
+#endif
+    }
     return out;
 }
 

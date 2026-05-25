@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
 
 #define WORD_BITS ((int)(sizeof(unsigned long) * 8))
 
@@ -112,7 +115,13 @@ static void bit_set(unsigned long *bits, int pos) {
 
 static int bit_count(const unsigned long *bits, int words) {
     int total = 0;
-    for (int i = 0; i < words; i++) total += __builtin_popcountl(bits[i]);
+    for (int i = 0; i < words; i++) {
+#ifdef _MSC_VER
+        total += (int)__popcnt64(bits[i]);
+#else
+        total += __builtin_popcountl(bits[i]);
+#endif
+    }
     return total;
 }
 

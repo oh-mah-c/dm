@@ -77,3 +77,8 @@ test_corpus.txt
 x64/
 Debug/
 Release/
+
+# Bazel local outputs and caches
+.bazelisk/
+.bazel_tmp/
+bazel-*

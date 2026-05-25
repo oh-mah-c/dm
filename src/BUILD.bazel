@@ -1,0 +1,20 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_binary(
+    name = "dm",
+    srcs = ["main.c"],
+    deps = [
+        "//include:headers",
+        "//src/algorithms:all_algorithms",
+        "//src/core:all_core",
+        "//src/tokenizer:all_tokenizers",
+    ],
+    linkopts = select({
+        "//:windows": [],
+        "//conditions:default": [
+            "-lm",
+            "-pthread",
+            "-licuuc",
+        ],
+    }),
+)

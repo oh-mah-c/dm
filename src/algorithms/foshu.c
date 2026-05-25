@@ -122,10 +122,13 @@ static void search(FOSHU_UtilityList *p, FOSHU_UtilityList **extensions, size_t 
 
         // 1. Calculate to(Px) and ru(Px)
         double to_px = 0;
-        double sum_ip_h[num_periods];
-        double sum_r_h[num_periods];
-        memset(sum_ip_h, 0, sizeof(sum_ip_h));
-        memset(sum_r_h, 0, sizeof(sum_r_h));
+        double *sum_ip_h = (double *)calloc((size_t)num_periods, sizeof(double));
+        double *sum_r_h = (double *)calloc((size_t)num_periods, sizeof(double));
+        if (!sum_ip_h || !sum_r_h) {
+            free(sum_ip_h);
+            free(sum_r_h);
+            continue;
+        }
 
         for (int h = 0; h < num_periods; h++) {
             if (px->period_end[h] > px->period_start[h]) {
@@ -191,6 +194,8 @@ static void search(FOSHU_UtilityList *p, FOSHU_UtilityList **extensions, size_t 
             for (size_t k = 0; k < ext_px_count; k++) free_utility_list(ext_px[k]);
             free(ext_px);
         }
+        free(sum_ip_h);
+        free(sum_r_h);
     }
 }
 
@@ -296,9 +301,14 @@ static DM_Status run_foshu(DM_Dataset *ds, void *params) {
         }
 
         // Filter and sort items in transaction
-        uint32_t t_items[data[i].count];
-        double t_utils[data[i].count];
+        uint32_t *t_items = (uint32_t *)malloc(sizeof(uint32_t) * data[i].count);
+        double *t_utils = (double *)malloc(sizeof(double) * data[i].count);
         size_t t_count = 0;
+        if (!t_items || !t_utils) {
+            free(t_items);
+            free(t_utils);
+            continue;
+        }
         for (size_t j = 0; j < data[i].count; j++) {
             if (rank[data[i].items[j].id] != 0xFFFFFFFF) {
                 t_items[t_count] = data[i].items[j].id;
@@ -353,6 +363,8 @@ static DM_Status run_foshu(DM_Dataset *ds, void *params) {
 
             if (t_utils[j] > 0) remaining_positive_utility += t_utils[j];
         }
+        free(t_items);
+        free(t_utils);
     }
     free(ul_caps);
     free(tid_period);

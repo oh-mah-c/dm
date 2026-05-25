@@ -7,7 +7,7 @@
 #include <string.h>
 
 #ifdef DM_GPU
-#include "gpu/dm_gpu.h"
+#include "core/gpu/dm_gpu.h"
 
 /* Simple intern table mapping symbol strings to uint32 IDs for the GPU path. */
 typedef struct { char **names; uint32_t count, cap; } GpeIntern;

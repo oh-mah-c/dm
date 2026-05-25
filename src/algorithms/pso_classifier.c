@@ -2,7 +2,11 @@
 #include "core/dm_benchmark.h"
 
 #include <ctype.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <dirent.h>
+#endif
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -113,6 +117,45 @@ static char *label_from_name(const char *name) {
 }
 
 static int collect_class_files(const char *folder, ClassFile **out, size_t *out_n) {
+#ifdef _WIN32
+    char pattern[1024];
+    WIN32_FIND_DATAA data;
+    HANDLE dir;
+    ClassFile *files = NULL;
+    size_t n = 0, cap = 0;
+    snprintf(pattern, sizeof(pattern), "%s\\*", folder);
+    dir = FindFirstFileA(pattern, &data);
+    if (dir == INVALID_HANDLE_VALUE) return -1;
+    do {
+        if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+        if (!ends_with(data.cFileName, "translated.txt")) continue;
+        if (n == cap) {
+            size_t nc = cap ? cap * 2 : 8;
+            ClassFile *nf = (ClassFile *)realloc(files, nc * sizeof(*files));
+            if (!nf) {
+                FindClose(dir);
+                free_class_files(files, n);
+                return -1;
+            }
+            files = nf;
+            cap = nc;
+        }
+        files[n].path = make_path(folder, data.cFileName);
+        files[n].label = label_from_name(data.cFileName);
+        files[n].lines = 0;
+        if (!files[n].path || !files[n].label) {
+            FindClose(dir);
+            free_class_files(files, n + 1);
+            return -1;
+        }
+        n++;
+    } while (FindNextFileA(dir, &data));
+    FindClose(dir);
+    qsort(files, n, sizeof(*files), cmp_class_file);
+    *out = files;
+    *out_n = n;
+    return n > 1 ? 0 : -1;
+#else
     DIR *dir = opendir(folder);
     if (!dir) return -1;
     ClassFile *files = NULL;
@@ -146,6 +189,7 @@ static int collect_class_files(const char *folder, ClassFile **out, size_t *out_
     *out = files;
     *out_n = n;
     return n > 1 ? 0 : -1;
+#endif
 }
 
 static int parse_line_items(char *line, unsigned char *seen, size_t seen_n, uint32_t *max_item) {
