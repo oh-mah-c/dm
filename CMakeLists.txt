@@ -45,6 +45,10 @@ list(FILTER DM_TOK_SRCS EXCLUDE REGEX ".*/main\\.c$")
 # Algorithms
 file(GLOB DM_ALG_SRCS  ${DM_SRC}/algorithms/*.c)
 
+# Models — C++ files only (train.cpp are standalone binaries, excluded here)
+file(GLOB_RECURSE DM_MODEL_SRCS ${DM_SRC}/models/**/*.cpp)
+list(FILTER DM_MODEL_SRCS EXCLUDE REGEX ".*/train\\.cpp$")
+
 # Tools — each is its own binary, collect them separately
 file(GLOB DM_TOOL_SRCS ${DM_SRC}/tools/*.c)
 
@@ -54,6 +58,7 @@ add_library(dm_core STATIC
     ${DM_GPU_SRCS}
     ${DM_TOK_SRCS}
     ${DM_ALG_SRCS}
+    ${DM_MODEL_SRCS}
 )
 
 target_include_directories(dm_core PUBLIC
@@ -61,6 +66,7 @@ target_include_directories(dm_core PUBLIC
     ${DM_INCLUDE}/core
     ${DM_INCLUDE}/algorithms
     ${DM_INCLUDE}/tokenizer
+    ${DM_INCLUDE}/models
     ${DM_SRC}
     ${VULKANHPP_INCLUDE}
     ${Vulkan_INCLUDE_DIRS}
@@ -97,6 +103,20 @@ foreach(tool_src ${DM_TOOL_SRCS})
     get_filename_component(tool_name ${tool_src} NAME_WE)
     add_executable(${tool_name} ${tool_src})
     target_link_libraries(${tool_name} PRIVATE dm_core)
+endforeach()
+
+# ── Model training binaries (one per train.cpp under src/models/) ─────────────
+file(GLOB_RECURSE DM_MODEL_TRAIN_SRCS ${DM_SRC}/models/**/train.cpp)
+foreach(train_src ${DM_MODEL_TRAIN_SRCS})
+    # derive name from parent dir, e.g. src/models/vision/resnet/train.cpp → resnet_train
+    get_filename_component(train_dir ${train_src} DIRECTORY)
+    get_filename_component(model_name ${train_dir} NAME)
+    set(train_target "${model_name}_train")
+    add_executable(${train_target} ${train_src})
+    target_link_libraries(${train_target} PRIVATE dm_core)
+    target_include_directories(${train_target} PRIVATE
+        ${DM_INCLUDE}/models
+        ${TORCH_INCLUDE_DIRS})
 endforeach()
 
 # ── Install ───────────────────────────────────────────────────────────────────
