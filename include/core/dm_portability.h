@@ -1,6 +1,15 @@
 #ifndef DM_PORTABILITY_H
 #define DM_PORTABILITY_H
 
+/* Ensure POSIX/GNU extensions are available (sysconf, _SC_NPROCESSORS_ONLN,
+   getline, rand_r, etc.) on glibc-based systems. */
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>

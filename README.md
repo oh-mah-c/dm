@@ -3,8 +3,8 @@
   <p><strong>A Highly Optimized, Blazing-Fast Open-Source Data Mining Framework built purely in C</strong></p>
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-  [![Language: C](https://img.shields.io/badge/Language-C99-orange.svg)](https://en.wikipedia.org/wiki/C99)
-  [![Build: GCC](https://img.shields.io/badge/Build-GCC-success.svg)](#)
+  [![Language: C](https://img.shields.io/badge/Language-C99%2FC%2B%2B17-orange.svg)](https://en.wikipedia.org/wiki/C99)
+  [![Build: CMake](https://img.shields.io/badge/Build-CMake-success.svg)](#)
 </div>
 
 ---
@@ -182,20 +182,46 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 ### Self-Contained Data Generators
 74. **LAGA** - Self-contained Layout-Aware Generative Architecture for knowledge-preserving synthetic transaction, utility, sequence, text, and tabular data generation using embedded encoding, support/co-occurrence/transition layouts, miner-style evaluation, privacy rejection, and closed-loop repair.
 
+### Vision Models
+75. **ResNet** (ResNet-18 / 34 / 50 / 101 / 152) - Deep Residual Learning for image classification. Implements all five variants from Table 1 using BasicBlock (2-layer) and Bottleneck (3-layer) residual blocks with identity/projection shortcuts. Backed by LibTorch with Vulkan GPU support. Train with `./build/resnet_train --model resnet50 --epochs 90`.
+
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- GCC Compiler (MinGW on Windows, or standard GCC on Linux/macOS)
-- Make (optional, but recommended)
+- CMake ≥ 3.18, Ninja
+- GCC / Clang with C99 + C++17 support
+- Vulkan SDK (`libvulkan-dev vulkan-headers glslc`)
+- ICU (`libicu-dev`), OpenBLAS (`libopenblas-dev`)
+- Python 3 + NumPy (required by LibTorch build system only)
 
-### Compilation
-Build the executable from the source:
+> **Full step-by-step install:** see [docs/HOWTO/INSTALL.md](docs/HOWTO/INSTALL.md)
+
+### Build
 ```bash
-gcc -Iinclude -Iinclude/core -Wall -Wextra -O2 -pthread src/main.c src/core/*.c src/tokenizer/faro_tokenizer.c src/tokenizer/tokenizer_variants.c src/tokenizer/maximal_munch.c src/tokenizer/bpe_subword.c src/tokenizer/bpe_dropout.c src/tokenizer/fast_wordpiece.c src/tokenizer/grapheme_pair_encoding.c src/tokenizer/parity_bpe.c src/tokenizer/sentencepiece_lite.c src/tokenizer/tokenizer_lab.c src/tokenizer/unigram_subword.c src/algorithms/*.c -o bin/dm.exe -lm -licuuc -lpsapi
+# 1. Build LibTorch (first time only, ~30 min)
+cd src/core/pytorch && mkdir build && cd build
+cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release \
+         -DBUILD_SHARED_LIBS=ON -DUSE_CUDA=OFF -DUSE_VULKAN=ON \
+         -DBUILD_PYTHON=OFF -DBUILD_TEST=OFF \
+         -DGLSLC_EXECUTABLE=/usr/bin/glslc \
+         -DCMAKE_INSTALL_PREFIX=../dist
+cmake --build . --parallel 4 && cmake --install .
+cd ../../../../
+
+# 2. Build dm
+mkdir build
+cmake -S . -B build -GNinja
+cmake --build build --parallel 4
 ```
-*(On Linux, remove `-lpsapi`; keep `-lm` for math functions.)*
+
+### Run
+```bash
+./build/dm <algorithm> <dataset_path> <format> <min_support>
+./build/dm_tokenizer          # tokenizer binary
+./build/resnet_train --help   # ResNet training binary
+```
 
 ### Usage
 ```bash
@@ -500,6 +526,8 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 **[124]** T. Reps, "Maximal-munch tokenization in linear time," *ACM Transactions on Programming Languages and Systems*, vol. 20, no. 2, pp. 259-273, 1998. https://doi.org/10.1145/276393.276394 *(Reps Maximal-Munch Scanner)*
 
 **[125]** C. Xu, B. Zhou, T. Gan, Q. Zheng, and L. Li, "Vocabulary Learning via Optimal Transport for Neural Machine Translation," in *Proc. 59th Annual Meeting of the Association for Computational Linguistics (ACL 2021)*, pp. 7361–7373, 2021. https://aclanthology.org/2021.acl-long.571/ *(VOLT)*
+
+**[126]** K. He, X. Zhang, S. Ren, and J. Sun, "Deep Residual Learning for Image Recognition," in *Proc. IEEE Conference on Computer Vision and Pattern Recognition (CVPR)*, 2016, pp. 770–778. https://doi.org/10.1109/CVPR.2016.90 *(ResNet-18 / 34 / 50 / 101 / 152)*
 
 ---
 

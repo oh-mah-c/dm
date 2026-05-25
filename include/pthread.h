@@ -1,6 +1,11 @@
-/* Minimal pthread stub for MSVC/Windows — maps to Windows synchronization primitives */
-#ifndef DM_PTHREAD_STUB_H
-#define DM_PTHREAD_STUB_H
+/* Portability shim for pthread.h
+ *
+ * On Windows (MSVC/MinGW without pthreads-win32), provide a minimal
+ * implementation backed by Windows synchronization primitives.
+ * On POSIX systems, fall through to the real system <pthread.h>.
+ */
+#ifndef DM_PTHREAD_SHIM_H
+#define DM_PTHREAD_SHIM_H
 
 #ifdef _WIN32
 #include <windows.h>
@@ -37,7 +42,8 @@ static inline int pthread_create(pthread_t *t, const pthread_attr_t *a, void *(*
 static inline int pthread_join(pthread_t t, void **ret) { (void)ret; WaitForSingleObject(t, INFINITE); CloseHandle(t); return 0; }
 
 #else
-#error "This stub is for Windows only"
+/* On Linux/macOS use the real pthreads library. */
+#include_next <pthread.h>
 #endif /* _WIN32 */
 
-#endif /* DM_PTHREAD_STUB_H */
+#endif /* DM_PTHREAD_SHIM_H */

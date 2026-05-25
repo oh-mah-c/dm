@@ -1,0 +1,253 @@
+# =============================================================================
+#  dm — Unified CI Build
+#
+#  Two jobs:
+#    1. build-engine  — Builds TensorFlow C++ from source (src/core/engine/).
+#                       Only runs when engine source changes.
+#                       Uploads libtensorflow_cc.so.2 + libtensorflow_framework.so.2
+#                       as GitHub Release artifacts tagged "build-latest".
+#
+#    2. build-dm      — Builds all dm targets (bazel build //:build_all).
+#                       Always runs. Downloads pre-built engine .so from the
+#                       latest release if engine wasn't just rebuilt.
+#                       Uploads all dm binaries to the same release.
+#
+#  After a successful run:
+#    git pull && ./install.sh   →  downloads pre-built artifacts, skips TF rebuild
+# =============================================================================
+
+name: dm — Full Build
+
+on:
+  push:
+    branches: [main, bazel_refractor]
+  pull_request:
+    branches: [main]
+
+env:
+  BAZEL_VERSION: "7.7.0"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # JOB 1 — Build TensorFlow engine from source
+  # Only triggered when src/core/engine/** changes.
+  # ---------------------------------------------------------------------------
+  build-engine:
+    name: "Phase 1 — Build TensorFlow Engine"
+    runs-on: ubuntu-22.04
+
+    outputs:
+      engine-rebuilt: ${{ steps.check.outputs.changed }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2          # need parent commit for diff
+
+      - name: Check if engine source changed
+        id: check
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -q '^src/core/engine/'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install system deps
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang-18 lld-18 python3 python3-dev \
+            python3-numpy libssl-dev zlib1g-dev git curl
+
+      - name: Install Bazelisk
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          curl -fsSL https://github.com/bazelbuild/bazelisk/releases/download/v1.20.0/bazelisk-linux-amd64 \
+            -o /usr/local/bin/bazel
+          chmod +x /usr/local/bin/bazel
+          bazel version
+
+      # Bazel disk cache — keyed on engine source tree hash
+      - name: Restore Bazel engine cache
+        if: steps.check.outputs.changed == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/bazel-engine
+          key: bazel-engine-${{ hashFiles('src/core/engine/tensorflow/**', 'src/core/engine/third_party/**') }}
+          restore-keys: |
+            bazel-engine-
+
+      - name: Configure TensorFlow
+        if: steps.check.outputs.changed == 'true'
+        working-directory: src/core/engine
+        run: |
+          PYTHON_BIN=$(which python3)
+          PYTHON_LIB=$(python3 -c "import sysconfig; print(sysconfig.get_path('purelib'))")
+          env \
+            PYTHON_BIN_PATH="$PYTHON_BIN" \
+            PYTHON_LIB_PATH="$PYTHON_LIB" \
+            TF_NEED_ROCM=0 \
+            TF_NEED_CUDA=0 \
+            CC_OPT_FLAGS="-Wno-sign-compare" \
+            TF_SET_ANDROID_WORKSPACE=0 \
+            python3 configure.py --workspace "$PWD" < /dev/null || true
+
+      - name: Build TensorFlow C++ shared libraries
+        if: steps.check.outputs.changed == 'true'
+        working-directory: src/core/engine
+        run: |
+          bazel build \
+            --config=opt \
+            --jobs=4 \
+            --disk_cache="$HOME/.cache/bazel-engine" \
+            --show_progress_rate_limit=30 \
+            --curses=no \
+            --color=yes \
+            //tensorflow:tensorflow_cc
+
+      - name: Stage engine artifacts → dist/
+        if: steps.check.outputs.changed == 'true'
+        working-directory: src/core/engine
+        run: |
+          mkdir -p dist/lib
+          BAZEL_BIN="bazel-bin/tensorflow"
+          for so in \
+            "$BAZEL_BIN/libtensorflow_cc.so.2.21.0" \
+            "$BAZEL_BIN/libtensorflow_cc.so.2" \
+            "$BAZEL_BIN/libtensorflow_cc.so" \
+            "$BAZEL_BIN/libtensorflow_framework.so.2" \
+            "$BAZEL_BIN/libtensorflow_framework.so"; do
+            [ -f "$so" ] || [ -L "$so" ] && cp -P "$so" dist/lib/ && echo "staged: $(basename $so)"
+          done
+          ls -lh dist/lib/
+
+      - name: Upload engine artifacts to GitHub Release
+        if: steps.check.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create or update the rolling "build-latest" release
+          gh release view build-latest --repo "$GITHUB_REPOSITORY" 2>/dev/null \
+            || gh release create build-latest \
+                --repo "$GITHUB_REPOSITORY" \
+                --title "dm — Latest Build" \
+                --notes "Auto-built by CI. Download with: ./install.sh" \
+                --prerelease
+
+          # Upload .so files (overwrite if exists)
+          for f in src/core/engine/dist/lib/*.so*; do
+            [ -f "$f" ] || [ -L "$f" ] || continue
+            # Resolve symlinks so we upload actual files
+            REAL=$(readlink -f "$f")
+            NAME=$(basename "$f")
+            gh release upload build-latest "$REAL#$NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          done
+          echo "Engine .so files uploaded to release build-latest"
+
+  # ---------------------------------------------------------------------------
+  # JOB 2 — Build all dm targets
+  # Always runs. Downloads engine .so from release if engine wasn't just rebuilt.
+  # ---------------------------------------------------------------------------
+  build-dm:
+    name: "Phase 3 — Build All dm Targets"
+    runs-on: ubuntu-22.04
+    needs: build-engine
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang-18 lld-18 python3 libvulkan-dev \
+            glslang-tools libssl-dev zlib1g-dev git curl
+
+      - name: Install Bazelisk
+        run: |
+          curl -fsSL https://github.com/bazelbuild/bazelisk/releases/download/v1.20.0/bazelisk-linux-amd64 \
+            -o /usr/local/bin/bazel
+          chmod +x /usr/local/bin/bazel
+          bazel version
+
+      # Bazel disk cache — keyed on dm source (not engine)
+      - name: Restore Bazel dm cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/bazel-dm
+          key: bazel-dm-${{ hashFiles('src/**', 'include/**', 'BUILD.bazel', 'MODULE.bazel') }}
+          restore-keys: |
+            bazel-dm-
+
+      - name: Download engine .so from GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p src/core/engine/dist/lib
+
+          # If engine was just rebuilt in this run, the .so were already staged
+          # by build-engine job — but we're in a fresh runner, so always download.
+          echo "Downloading engine artifacts from release build-latest..."
+          gh release download build-latest \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "libtensorflow_*.so*" \
+            --dir src/core/engine/dist/lib \
+            --clobber || {
+              echo "WARNING: No engine release found yet. TF dep will be missing."
+              echo "Run a push that changes src/core/engine/ to trigger a full engine build first."
+            }
+
+          echo "Engine dist/lib contents:"
+          ls -lh src/core/engine/dist/lib/ 2>/dev/null || echo "(empty)"
+
+      - name: Build all dm targets
+        run: |
+          bazel build \
+            --config=ci \
+            //:build_all
+
+      - name: Collect dm binaries
+        run: |
+          mkdir -p ci-artifacts
+          # Main binary
+          [ -f bazel-bin/src/dm ] && cp bazel-bin/src/dm ci-artifacts/
+          # Core shared library
+          find bazel-bin/src/core -name "*.so" -exec cp {} ci-artifacts/ \; 2>/dev/null || true
+          # Tool binaries
+          find bazel-bin/src/tools -maxdepth 1 -type f -executable \
+            -exec cp {} ci-artifacts/ \; 2>/dev/null || true
+          echo "Collected artifacts:"
+          ls -lh ci-artifacts/
+
+      - name: Upload dm binaries to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view build-latest --repo "$GITHUB_REPOSITORY" 2>/dev/null \
+            || gh release create build-latest \
+                --repo "$GITHUB_REPOSITORY" \
+                --title "dm — Latest Build" \
+                --notes "Auto-built by CI. Download with: ./install.sh" \
+                --prerelease
+
+          for f in ci-artifacts/*; do
+            [ -f "$f" ] && gh release upload build-latest "$f" \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          done
+          echo "dm binaries uploaded to release build-latest"
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            ~/.cache/bazel-dm/
+          retention-days: 3

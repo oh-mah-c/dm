@@ -1,2 +1,0 @@
-build --copt=-Iinclude
-build --copt=-Iinclude/core

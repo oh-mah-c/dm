@@ -1,0 +1,906 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=0.88in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage[section]{placeins}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{adjustbox}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!55!black,
+  citecolor=blue!55!black,
+  urlcolor=blue!55!black,
+  pdfauthor={Minh Quan Van Ha},
+  pdftitle={AURA-HOI: Auditable Unified Representative Mining for High-Occupancy Itemsets}
+}
+
+\newtheorem{definition}{Definition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+
+\newcommand{\supp}{\operatorname{supp}}
+\newcommand{\aocc}{\operatorname{aocc}}
+\newcommand{\socc}{\operatorname{socc}}
+\newcommand{\cl}{\operatorname{cl}}
+\newcommand{\Env}{\operatorname{Env}}
+\newcommand{\EnvR}{\operatorname{Env}_{R}}
+\newcommand{\Hraw}{\mathcal{H}_{\mathrm{raw}}}
+\newcommand{\Hclosed}{\mathcal{H}_{\mathrm{closed}}}
+\newcommand{\AURA}{\textsc{AURA-HOI}}
+\newcommand{\HEP}{\textsc{HEP}}
+\newcommand{\DFHOI}{\textsc{DFHOI}}
+
+\title{\AURA: Auditable Unified Representative Mining for High-Occupancy Itemsets}
+\author{Minh Quan Van Ha\\Independent Researcher}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+High-occupancy itemset mining (HOIM) extends frequent itemset mining by requiring an itemset to occupy a sufficiently large fraction of the transactions in which it appears. This density-oriented objective is useful when support alone is not discriminative, but it also destroys the direct anti-monotonicity that makes classical frequent itemset mining efficient. Existing high-occupancy itemset miners further complicate evaluation because their outputs are not always the same object: some enumerate threshold-complete raw itemsets, while others report adaptive, maximal, top-$k$, or closed representative patterns. This paper presents \AURA, an auditable high-occupancy itemset mining algorithm designed to separate scoring semantics from output views. \AURA supports a raw fullset mode for direct comparison with \HEP{} and \DFHOI{} under a shared support--occupancy threshold, and a support-class representative mode for compact closed-output analysis. The method combines vertical bitset evidence, residual occupancy-envelope pruning, and a support-equivalence ledger. Experiments implemented in C and executed on a laptop-scale environment evaluate \AURA, \HEP, and \DFHOI{} on five transactional datasets: \texttt{mushrooms}, \texttt{chess}, \texttt{retail}, \texttt{T10I4D100K}, and \texttt{kosarak}. Across all 35 dataset--threshold configurations, the three algorithms emit identical raw itemset counts under matched semantics. \AURA{} is faster than \HEP{} on 25 of 35 configurations and faster than \DFHOI{} on 15 of 35 configurations; it also uses lower peak memory than \HEP{} on 28 of 35 configurations and lower peak memory than \DFHOI{} on 27 of 35 configurations. The results show that the proposed audit-oriented design preserves raw-output equivalence while providing competitive runtime and stable memory behavior across dense, sparse, synthetic, and large clickstream workloads.
+\end{abstract}
+
+\noindent\textbf{Keywords:} high-occupancy itemset mining; frequent itemset mining; closed itemsets; vertical bitsets; support equivalence; output normalization; occupancy pruning; reproducible pattern mining.
+
+\section{Introduction}
+
+Pattern mining studies the discovery of meaningful combinations of items from transactional data. In classical association-rule mining, the computational bottleneck is frequent itemset mining: rules are generated after identifying itemsets whose support exceeds a user-defined threshold \cite{agrawal1993mining,agrawal1994fast}. The tractability of frequent itemset mining is closely tied to the anti-monotonicity of support. If an itemset is infrequent, every superset of that itemset is also infrequent. This property enables level-wise pruning in Apriori \cite{agrawal1994fast}, conditional database compression in FP-growth \cite{han2000mining}, and efficient transaction-id intersections in vertical approaches such as Eclat \cite{zaki1997new,zaki2000scalable}.
+
+Support, however, measures only how often an itemset appears. It does not measure how much of each supporting transaction the itemset explains. In long transactions, a small itemset may occur frequently while still covering only a small fraction of each transaction. High-occupancy itemset mining (HOIM) was introduced to address this limitation by using an occupancy score based on the ratio $|X|/|t|$ for itemset $X$ inside supporting transaction $t$ \cite{deng2020mining}. Deng's original work proposed the \HEP{} algorithm and upper-bound occupancy pruning for mining high-occupancy itemsets \cite{deng2020mining}. Nguyen et al. later proposed \DFHOI{} and related algorithms based on equivalence classes and early pruning \cite{nguyen2023efficient}.
+
+HOIM is more difficult to prune than support-only mining because occupancy is not anti-monotone under extension. Adding an item increases the numerator $|X|$, but it may shrink the support set. Therefore, an extension can increase or decrease occupancy relative to its prefix. This creates a need for safe upper bounds over descendants of a search prefix. It also creates a second evaluation problem: different HOI algorithms may emit different output views. A raw threshold-complete miner outputs every itemset satisfying the threshold predicate. A top-$k$ miner outputs only the highest-ranked patterns. A maximal miner removes non-maximal patterns. A closed miner emits one support-equivalence representative per class. These outputs can all be useful, but they cannot be compared by raw count without normalization.
+
+This paper proposes \AURA{} (Auditable Unified Representative Algorithm for HOI), an HOI-only algorithm designed around one principle: every reported pattern must be traceable to a precise threshold predicate and to the support evidence that justifies it. \AURA{} provides two main output views. The first is a raw fullset view, used for direct equality comparison with \HEP{} and \DFHOI. The second is a support-class representative view, where closed representatives are stored with support-bitset certificates. In the experiments, \AURA{} is evaluated in raw summed-occupancy compatibility mode so that all compared algorithms solve the same task.
+
+The contributions are as follows.
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Unified semantics.} The paper formalizes raw high-occupancy output, summed-occupancy compatibility, support closure, and support-class certificates in a single framework.
+  \item \textbf{Auditable algorithm design.} \AURA{} uses vertical bitsets and support-class ledgers to make support evidence explicit and verifiable.
+  \item \textbf{Safe residual pruning.} A transaction-length-aware residual occupancy envelope upper-bounds the best possible descendant occupancy and enables no-false-negative pruning.
+  \item \textbf{Running example.} A complete five-transaction database is used throughout the paper to illustrate support, average occupancy, summed compatibility, closure, vertical bitsets, pruning, and the raw search behavior of \AURA.
+  \item \textbf{Fair empirical protocol.} Experiments require matched raw-output semantics before interpreting runtime and memory comparisons.
+  \item \textbf{Laptop-scale reproducibility.} The reported results are produced by a C implementation on a commodity HP ProBook laptop with an Intel Core i7-8550U processor and 16GB RAM.
+\end{enumerate}
+
+\section{Related Works}
+
+\subsection{Frequent itemset mining}
+
+Association-rule mining was introduced by Agrawal, Imieli\'nski, and Swami as the discovery of implications between itemsets in large databases \cite{agrawal1993mining}. Apriori then established the canonical level-wise algorithm for association-rule mining by exploiting downward closure of support \cite{agrawal1994fast}. Subsequent methods improved the traversal and representation of transactional evidence. FP-growth avoids explicit candidate generation by compressing transactions into an FP-tree and recursively mining conditional pattern bases \cite{han2000mining}. Eclat uses vertical transaction-id lists and computes support through intersections \cite{zaki1997new,zaki2000scalable}. These works form the algorithmic background of \AURA{} because \AURA{} also relies on vertical transaction evidence, but it uses that evidence for occupancy-aware auditing rather than support-only frequency.
+
+\subsection{Closed itemsets and support-equivalence classes}
+
+Frequent itemset mining can produce very large outputs. Closed itemset mining reduces redundancy by grouping all itemsets that share the same support set. Pasquier et al. introduced frequent closed itemsets as a concise representation for association rules \cite{pasquier1999discovering}. CHARM further developed efficient closed itemset mining with vertical tidset operations and closure properties \cite{zaki2002charm}. The key idea is that support-equivalent itemsets can be represented by a closed itemset without losing support information. \AURA{} transfers this idea into HOI mining, but does not confuse closed representatives with raw outputs. Instead, raw and closed outputs are treated as separate views over the same support evidence.
+
+\subsection{High-occupancy itemset mining}
+
+Deng introduced high-occupancy itemset mining to discover itemsets that occupy a sufficiently large proportion of the transactions in which they occur \cite{deng2020mining}. The original \HEP{} algorithm uses occupancy lists and upper-bound pruning to cope with the non-anti-monotonicity of occupancy. Nguyen et al. proposed an efficient method based on equivalence classes and early pruning, including the \DFHOI{} algorithm, to improve the efficiency of HOI mining \cite{nguyen2023efficient}. Kim et al. investigated high-occupancy pattern mining in incremental databases, emphasizing that memory behavior matters in dynamic settings \cite{kim2022mining}. These works show that HOI mining is not merely a direct variant of frequent itemset mining; it requires its own scoring, pruning, and evaluation discipline.
+
+\subsection{Output semantics and fair comparison}
+
+A frequent source of ambiguity in pattern-mining evaluation is output mismatch. A threshold-complete miner, a closed miner, a maximal miner, and a top-$k$ miner may all be correct under their own definitions while returning different counts. Therefore, a runtime advantage is scientifically meaningful only when the compared algorithms emit the same output view under the same threshold predicate. \AURA{} is motivated by this problem. It keeps the raw fullset view for direct comparison with \HEP{} and \DFHOI, while preserving a closed support-class view for compact analysis.
+
+\section{Proposed Approach}
+
+\subsection{Problem formulation}
+
+Let $I=\{1,\ldots,m\}$ be an item universe and let $D=\{t_1,\ldots,t_n\}$ be a multiset of transactions, where $t_q\subseteq I$ and $|t_q|>0$. For itemset $X\subseteq I$, define the supporting transaction set and support count as
+\begin{equation}
+T(X)=\{q:X\subseteq t_q\},\qquad \supp(X)=|T(X)|.
+\end{equation}
+The exact average occupancy of $X$ is
+\begin{equation}
+\aocc(X)=
+\begin{cases}
+\displaystyle\frac{|X|}{\supp(X)}\sum_{q\in T(X)}\frac{1}{|t_q|}, & \supp(X)>0,\\[1.1ex]
+0, & \supp(X)=0.
+\end{cases}
+\end{equation}
+Given minimum support $\sigma_{\min}$ and minimum average occupancy $\alpha\in(0,1]$, the raw average-HOI set is
+\begin{equation}
+\Hraw(D,\sigma_{\min},\alpha)=\{X\subseteq I:\supp(X)\ge \sigma_{\min}\ \wedge\ \aocc(X)\ge\alpha\}.
+\end{equation}
+
+The public baseline behavior evaluated in this paper uses a shared threshold $\alpha$ as both a support threshold and a summed-occupancy threshold. Define the summed occupancy score as
+\begin{equation}
+\socc(X)=|X|\sum_{q\in T(X)}\frac{1}{|t_q|}.
+\end{equation}
+Under summed-occupancy compatibility, the benchmark predicate is
+\begin{equation}
+\supp(X)\ge\lceil \alpha |D|\rceil\qquad\text{and}\qquad \socc(X)\ge\alpha |D|.
+\label{eq:compat}
+\end{equation}
+All main experiments use Eq.~\eqref{eq:compat}. This ensures that \AURA, \HEP, and \DFHOI{} are compared as raw fullset miners under the same repository-level semantics.
+
+\subsection{Running example}
+\label{subsec:running-example}
+
+To make the definitions and algorithmic steps concrete, this paper uses one small transaction database as a running example. Let the item universe be
+\[
+I_{\mathrm{ex}}=\{A,B,C,D,E\},
+\]
+and let the transaction database be
+\[
+D_{\mathrm{ex}}=\{t_1,t_2,t_3,t_4,t_5\}.
+\]
+The transactions are shown in Table~\ref{tab:running-example-db}.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Running example transaction database.}
+\label{tab:running-example-db}
+\begin{tabular}{clc}
+\toprule
+Transaction & Items & Length \\
+\midrule
+$t_1$ & $\{A,B,C,D\}$ & 4 \\
+$t_2$ & $\{A,B,C\}$ & 3 \\
+$t_3$ & $\{A,B,D\}$ & 3 \\
+$t_4$ & $\{A,C,D,E\}$ & 4 \\
+$t_5$ & $\{B,C,D,E\}$ & 4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This example is intentionally small but contains the main structural cases required by HOI mining. Some itemsets have high support but only moderate occupancy; some itemsets have lower support but cover a larger fraction of their supporting transactions; and some itemsets provide clear examples of support bitsets, closure, and branch pruning.
+
+Consider the itemset $X=\{A,B\}$. It appears in $t_1,t_2,t_3$, hence
+\[
+T(\{A,B\})=\{1,2,3\},\qquad \supp(\{A,B\})=3.
+\]
+Its exact average occupancy is
+\[
+\aocc(\{A,B\})
+=
+\frac{|\{A,B\}|}{3}
+\left(
+\frac{1}{|t_1|}+
+\frac{1}{|t_2|}+
+\frac{1}{|t_3|}
+\right)
+=
+\frac{2}{3}
+\left(
+\frac{1}{4}+\frac{1}{3}+\frac{1}{3}
+\right)
+=
+0.6111.
+\]
+The summed occupancy score used by the repository-level compatibility mode is
+\[
+\socc(\{A,B\})
+=
+2
+\left(
+\frac{1}{4}+\frac{1}{3}+\frac{1}{3}
+\right)
+=
+1.8333.
+\]
+
+If the shared threshold is $\alpha_{\mathrm{ex}}=0.35$, then the compatibility predicate uses
+\[
+\sigma_{\min}=\lceil \alpha_{\mathrm{ex}} |D_{\mathrm{ex}}|\rceil
+=\lceil 0.35\times 5\rceil=2
+\]
+and
+\[
+\xi=\alpha_{\mathrm{ex}} |D_{\mathrm{ex}}|=0.35\times 5=1.75.
+\]
+Therefore, $\{A,B\}$ satisfies the support condition because $3\ge 2$, and it also satisfies the summed-occupancy condition because $1.8333\ge 1.75$. It is therefore a raw summed-compatible HOI in this running example. The same itemset also satisfies average occupancy at threshold $0.35$ because $0.6111\ge 0.35$.
+
+The example also illustrates why average occupancy and summed-occupancy compatibility must be distinguished. If $\alpha_{\mathrm{ex}}$ were increased to $0.40$, then $\xi=2.0$. The same itemset $\{A,B\}$ would still have average occupancy $0.6111$, but it would fail the summed-compatible threshold because $1.8333<2.0$. Thus, the average predicate and repository compatibility predicate are related but not identical.
+
+\subsection{Output views and certificates}
+
+The support closure of itemset $X$ is
+\begin{equation}
+\cl(X)=\bigcap_{q\in T(X)}t_q.
+\end{equation}
+An itemset $C$ is support-closed if $\cl(C)=C$. All itemsets with the same support bitset belong to a support-equivalence class. \AURA{} stores a certificate for each closed representative:
+\begin{equation}
+\operatorname{cert}(C)=\left(T(C), C, \mathcal{G}(C)\right),
+\end{equation}
+where $T(C)$ is the support bitset, $C$ is the representative, and $\mathcal{G}(C)$ denotes the generator paths or traversal intervals that reached the same support class. In implementation, a support class is first indexed by a hash and then verified by byte-level bitset equality. This avoids relying on hash equality alone.
+
+\AURA{} separates three views:
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Raw view}: emit every itemset satisfying the selected threshold predicate.
+  \item \textbf{Closed view}: emit one support-closed representative per support-equivalence class.
+  \item \textbf{Top-$k$ view}: maintain an optional bounded heap over the same scoring evidence.
+\end{enumerate}
+The present experiments use the raw view only, because \HEP{} and \DFHOI{} are evaluated as raw fullset baselines.
+
+\paragraph{Running example: raw and closed views.}
+Using $D_{\mathrm{ex}}$, consider the itemset $X=\{A,C\}$. Its support set is
+\[
+T(\{A,C\})=\{1,2,4\}.
+\]
+The support closure is
+\[
+\cl(\{A,C\})=t_1\cap t_2\cap t_4
+=
+\{A,B,C,D\}\cap\{A,B,C\}\cap\{A,C,D,E\}
+=
+\{A,C\}.
+\]
+Thus $\{A,C\}$ is already support-closed.
+
+Now consider $X=\{A,B,C\}$. It appears in $t_1$ and $t_2$, so
+\[
+T(\{A,B,C\})=\{1,2\}.
+\]
+Its closure is
+\[
+\cl(\{A,B,C\})=t_1\cap t_2
+=
+\{A,B,C,D\}\cap\{A,B,C\}
+=
+\{A,B,C\}.
+\]
+Therefore, it is also closed in this example. In raw mode, \AURA{} would emit an itemset whenever the selected threshold predicate is satisfied. In closed mode, \AURA{} stores one support-class representative in the ledger, together with its support bitset. If a second generator reaches the same support bitset, the ledger detects the duplicate class by hash lookup followed by byte-level bitset verification.
+
+For $\alpha_{\mathrm{ex}}=0.35$, the itemset $\{A,B\}$ is accepted in raw summed-compatible mode as shown above. The itemset $\{A,B,C\}$ has
+\[
+\supp(\{A,B,C\})=2,
+\]
+and
+\[
+\socc(\{A,B,C\})
+=
+3\left(\frac{1}{4}+\frac{1}{3}\right)
+=
+1.75.
+\]
+Since $1.75\ge\xi=1.75$, $\{A,B,C\}$ is also accepted under the compatibility predicate. Thus, the running example gives at least two concrete raw accepted patterns under the shared threshold.
+
+\subsection{Vertical bitset evidence}
+
+For each item $i\in I$, \AURA{} builds a vertical bitset $B_i$ over transaction identifiers. For a prefix $P$, the support bitset is
+\begin{equation}
+B_P=\bigcap_{i\in P}B_i.
+\end{equation}
+The population count of $B_P$ gives $\supp(P)$. Exact occupancy is computed using a reciprocal transaction-length array $r_q=1/|t_q|$. This representation makes support evidence explicit: support counting, equality testing, closure checking, and audit certificates are all derived from the same bitset object.
+
+\paragraph{Running example: vertical bitsets.}
+For $D_{\mathrm{ex}}$, define bit positions in the order $(t_1,t_2,t_3,t_4,t_5)$. The vertical bitsets are
+\[
+B_A=11110,\quad
+B_B=11101,\quad
+B_C=11011,\quad
+B_D=10111,\quad
+B_E=00011.
+\]
+Here, a $1$ means that the item appears in the corresponding transaction. For example,
+\[
+B_A=11110
+\]
+means that $A$ appears in $t_1,t_2,t_3,t_4$ but not in $t_5$.
+
+For the prefix $P=\{A,B\}$, \AURA{} computes the support bitset by intersection:
+\[
+B_{\{A,B\}}=B_A\cap B_B=11110\cap 11101=11100.
+\]
+Thus
+\[
+T(\{A,B\})=\{1,2,3\},\qquad \supp(\{A,B\})=3,
+\]
+which matches the direct transaction-level calculation. This is the same evidence used for support pruning, occupancy computation, closure checking, and ledger certification.
+
+For $P=\{A,B,C\}$,
+\[
+B_{\{A,B,C\}}
+=
+B_A\cap B_B\cap B_C
+=
+11110\cap 11101\cap 11011
+=
+11000.
+\]
+Thus $T(\{A,B,C\})=\{1,2\}$ and $\supp(\{A,B,C\})=2$.
+
+\subsection{Occupancy envelope}
+
+Let $P$ be a prefix, let $S=T(P)$ be its support set, let $p=|P|$, and let $R$ be the remaining extension tail. For a descendant $Y=P\cup Z$ with $Z\subseteq R$, the support set satisfies $T(Y)\subseteq S$. Let $r^{\downarrow}_{S,\ell}$ be the $\ell$th largest reciprocal transaction length among transactions in $S$. A safe average-occupancy envelope is
+\begin{equation}
+\Env(P,R)=\max_{1\le u\le |S|}\max_{0\le b\le |R|}\frac{p+b}{u}\sum_{\ell=1}^{u}r^{\downarrow}_{S,\ell}.
+\end{equation}
+The bound is clipped at $1$ in average mode.
+
+\begin{lemma}[Envelope safety]
+For every descendant $Y=P\cup Z$ with $Z\subseteq R$, $\aocc(Y)\le\Env(P,R)$.
+\end{lemma}
+\begin{proof}
+Let $u=\supp(Y)$ and $b=|Z|$. Because $T(Y)\subseteq S$, the sum of reciprocal transaction lengths over $T(Y)$ is no larger than the sum of the $u$ largest reciprocal lengths in $S$. Also, $|Y|=p+b$ for some $0\le b\le |R|$. Substituting these relaxations into the average-occupancy definition yields a term inside the maximization defining $\Env(P,R)$. Therefore $\aocc(Y)\le\Env(P,R)$.
+\end{proof}
+
+\paragraph{Running example: envelope intuition.}
+Let the current prefix be $P=\{A\}$ and the remaining tail be
+\[
+R=\{B,C,D,E\}.
+\]
+The support set of $P$ is
+\[
+T(\{A\})=\{1,2,3,4\},
+\]
+because $A$ appears in the first four transactions. The reciprocal transaction lengths over this support are
+\[
+\left\{\frac{1}{4},\frac{1}{3},\frac{1}{3},\frac{1}{4}\right\}.
+\]
+Sorted in descending order, this becomes
+\[
+r_S^\downarrow=\left\{\frac{1}{3},\frac{1}{3},\frac{1}{4},\frac{1}{4}\right\}.
+\]
+The envelope asks: among all possible descendants of $\{A\}$, what is the largest average occupancy that could still be achieved if the best supporting transactions and the largest feasible extension length were chosen? This value is an upper bound, not necessarily the score of a real itemset. Therefore, if the envelope is already below the threshold, every descendant can be safely pruned.
+
+For example, if a descendant keeps $u=2$ supporting transactions and extends $P$ by $b=2$ items, the relaxed occupancy term is
+\[
+\frac{1+2}{2}
+\left(
+\frac{1}{3}+\frac{1}{3}
+\right)
+=
+1.0.
+\]
+After clipping in average mode, this candidate upper bound is $1.0$. Since this is only an upper bound, it may be loose, which motivates the residual envelope.
+
+\subsection{Residual occupancy-envelope pruning}
+
+The previous envelope can be loose because it assumes tail items can co-occur in every supporting transaction. \AURA{} refines it with residual co-occurrence capacity. For each $q\in S$, define
+\begin{equation}
+c_R(q)=|t_q\cap R|.
+\end{equation}
+A descendant can add at most $c_R(q)$ tail items while remaining inside $t_q$. The residual envelope is
+\begin{equation}
+\EnvR(P,R)=\max_{1\le u\le |S|}\frac{1}{u}\sum_{\ell=1}^{u}\frac{p+c_R(q_\ell)}{|t_{q_\ell}|},
+\end{equation}
+where $q_1,\ldots,q_u$ are selected as the transactions with the largest residual occupancy contributions.
+
+\begin{theorem}[No false-negative pruning]
+If \AURA{} prunes a node $P$ only when $\supp(P)<\sigma_{\min}$ or $\min\{\Env(P,R),\EnvR(P,R)\}<\alpha$, then no valid high-occupancy descendant of $P$ is removed.
+\end{theorem}
+\begin{proof}
+The support condition is safe by support anti-monotonicity: every descendant of $P$ has support at most $\supp(P)$. The first occupancy condition is safe by the envelope lemma. For the residual envelope, a descendant can include no more than $p+c_R(q)$ items inside transaction $q\in T(P)$, so its per-transaction occupancy contribution is bounded by $(p+c_R(q))/|t_q|$. Maximizing over the best possible $u$ supporting transactions yields $\EnvR(P,R)$. Hence every descendant has occupancy at most $\min\{\Env(P,R),\EnvR(P,R)\}$. If this value is below $\alpha$, no descendant can satisfy the threshold.
+\end{proof}
+
+\paragraph{Running example: residual capacity.}
+Again let $P=\{A\}$ and $R=\{B,C,D,E\}$. For each transaction supporting $P$, the residual capacity $c_R(q)$ counts how many tail items still occur in that transaction:
+\[
+\begin{array}{c|c|c}
+q & t_q & c_R(q) \\
+\hline
+1 & \{A,B,C,D\} & 3 \\
+2 & \{A,B,C\} & 2 \\
+3 & \{A,B,D\} & 2 \\
+4 & \{A,C,D,E\} & 3 \\
+\end{array}
+\]
+Thus the residual per-transaction upper contributions are
+\[
+\frac{1+3}{4}=1.0,\quad
+\frac{1+2}{3}=1.0,\quad
+\frac{1+2}{3}=1.0,\quad
+\frac{1+3}{4}=1.0.
+\]
+For this prefix, the residual envelope remains high because every supporting transaction still contains several tail items. Therefore, \AURA{} should not prune the branch rooted at $\{A\}$ too early.
+
+Now consider a deeper prefix $P=\{A,B,C\}$. Its support is
+\[
+T(\{A,B,C\})=\{1,2\}.
+\]
+If the tail after this prefix is $R=\{D,E\}$, then
+\[
+c_R(1)=1,\qquad c_R(2)=0,
+\]
+because $t_1$ contains $D$ but $t_2$ contains neither $D$ nor $E$. The residual upper contributions are
+\[
+\frac{3+1}{4}=1.0,\qquad
+\frac{3+0}{3}=1.0.
+\]
+This branch may still be promising in average mode. However, for prefixes whose supporting transactions have little remaining tail capacity, $\EnvR$ becomes much smaller and can safely prune the subtree. This is the purpose of residual occupancy-envelope pruning: it rules out descendants that cannot reach the threshold even under the best possible extension.
+
+\subsection{Summed-compatible upper bound in raw mode}
+
+In the C implementation, raw summed-compatible mode uses a specialized path. Instead of computing closure and ledger entries for every accepted itemset, the raw path enumerates fullset itemsets and records raw counts. For a support bitset $B_P$, the implementation computes the reciprocal sum
+\[
+\sum_{q\in T(P)}\frac{1}{|t_q|}
+\]
+and uses it to evaluate
+\[
+\socc(P)=|P|\sum_{q\in T(P)}\frac{1}{|t_q|}.
+\]
+The implementation also computes a summed upper bound over the current support by grouping transactions by length. This corresponds to the purpose of \texttt{support\_summed\_stats} in the C implementation: the same support bitset provides both the exact reciprocal sum and an upper-bound value used for pruning.
+
+\paragraph{Running example: summed raw path.}
+For $P=\{A,B\}$, the support bitset is $11100$, so the reciprocal sum is
+\[
+\frac{1}{4}+\frac{1}{3}+\frac{1}{3}=0.9167.
+\]
+The summed score is
+\[
+\socc(\{A,B\})=2\times 0.9167=1.8333.
+\]
+Since $\xi=1.75$ when $\alpha_{\mathrm{ex}}=0.35$, \AURA{} accepts this itemset in raw summed-compatible mode. In the implementation, raw mode increments the raw HOI count and raw output-size statistics, rather than inserting the itemset into the closed ledger.
+
+\subsection{Algorithm}
+
+Algorithm~\ref{alg:aura} gives the high-level search procedure. In raw mode, the closure jump is disabled and the algorithm emits the full raw set. In closed mode, the algorithm computes support closure and inserts a representative into the support-class ledger.
+
+\begin{algorithm}[t]
+\caption{\AURA{} search with raw and closed output views}
+\label{alg:aura}
+\begin{algorithmic}[1]
+\Require Transaction database $D$, threshold $\alpha$, output view $v\in\{\mathrm{raw},\mathrm{closed}\}$
+\Ensure Raw HOIs or support-closed representative ledger
+\State Build vertical bitsets $B_i$ and reciprocal transaction lengths $r_q=1/|t_q|$
+\State Set $\sigma_{\min}\gets\lceil \alpha |D|\rceil$ in summed-compatibility mode
+\State Initialize ledger $L$ and optional top-$k$ heap $Q_k$
+\Procedure{Search}{$P,B_P,R$}
+  \If{$\operatorname{popcnt}(B_P)<\sigma_{\min}$}
+    \State \Return
+  \EndIf
+  \If{$\min\{\Env(P,R),\EnvR(P,R)\}<\alpha$ in average mode}
+    \State \Return
+  \EndIf
+  \If{$v=\mathrm{closed}$}
+    \State $C\gets\cl(P)$ using support-subset tests over vertical bitsets
+  \Else
+    \State $C\gets P$
+  \EndIf
+  \State Compute selected occupancy score of $C$ from $B_P$ and $r_q$
+  \If{$C$ satisfies the selected threshold predicate}
+    \If{$v=\mathrm{raw}$}
+      \State Emit $C$
+    \Else
+      \State Insert $(C,B_P,\aocc(C),\supp(C))$ into ledger $L$ if the support class is new
+    \EndIf
+  \EndIf
+  \State $R'\gets\{i\in R:i>\max(C),\ i\notin C\}$
+  \ForAll{$i\in R'$ in canonical order}
+    \State $B'\gets B_P\cap B_i$
+    \State \Call{Search}{$C\cup\{i\},B',\{j\in R':j>i\}$}
+  \EndFor
+\EndProcedure
+\State \Call{Search}{$\emptyset,\{1,\ldots,n\},I$}
+\State \Return emitted raw itemsets or ledger $L$
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Running example: raw search trace.}
+Assume summed-occupancy compatibility with $\alpha_{\mathrm{ex}}=0.35$ on $D_{\mathrm{ex}}$. Then
+\[
+\sigma_{\min}=2,\qquad \xi=1.75.
+\]
+Suppose the search starts from the empty prefix and considers item $A$. The singleton support is
+\[
+B_A=11110,\qquad \supp(\{A\})=4.
+\]
+The summed occupancy is
+\[
+\socc(\{A\})=
+1\left(
+\frac{1}{4}+\frac{1}{3}+\frac{1}{3}+\frac{1}{4}
+\right)
+=
+1.1667.
+\]
+Although $\{A\}$ passes support, it does not pass summed occupancy because $1.1667<1.75$. However, it cannot be discarded solely for failing occupancy, because descendants may have larger itemset length and thus larger summed occupancy.
+
+The search then considers $\{A,B\}$:
+\[
+B_{\{A,B\}}=11100,\qquad \supp(\{A,B\})=3,
+\]
+and
+\[
+\socc(\{A,B\})=
+2\left(
+\frac{1}{4}+\frac{1}{3}+\frac{1}{3}
+\right)
+=
+1.8333.
+\]
+Since $1.8333\ge 1.75$, \AURA{} emits $\{A,B\}$ in raw summed-compatible mode.
+
+Next consider $\{A,B,C\}$:
+\[
+B_{\{A,B,C\}}=11000,\qquad \supp(\{A,B,C\})=2.
+\]
+Its summed occupancy is
+\[
+\socc(\{A,B,C\})=
+3\left(
+\frac{1}{4}+\frac{1}{3}
+\right)
+=
+1.75.
+\]
+Since $1.75\ge1.75$, \AURA{} also emits $\{A,B,C\}$.
+
+Now consider $\{A,B,D\}$:
+\[
+B_{\{A,B,D\}}=10100,\qquad \supp(\{A,B,D\})=2,
+\]
+and
+\[
+\socc(\{A,B,D\})=
+3\left(
+\frac{1}{4}+\frac{1}{3}
+\right)
+=
+1.75.
+\]
+This itemset is also accepted. These steps demonstrate the behavior of the raw fast path: it repeatedly intersects support bitsets, applies support pruning, computes summed occupancy from reciprocal transaction lengths, and emits accepted raw itemsets without inserting them into the closed ledger.
+
+\paragraph{Running example: closed search trace.}
+If the same branch is evaluated in closed mode, \AURA{} additionally computes support closure. For example, after reaching $\{A,B\}$ with support set $\{1,2,3\}$, the closure is
+\[
+\cl(\{A,B\})=t_1\cap t_2\cap t_3
+=
+\{A,B,C,D\}\cap\{A,B,C\}\cap\{A,B,D\}
+=
+\{A,B\}.
+\]
+Thus $\{A,B\}$ is its own closed representative. The ledger stores the support bitset $11100$, the representative $\{A,B\}$, the support count $3$, and the occupancy score. If another generator reached the same support bitset, the ledger would identify it as a duplicate support class.
+
+\subsection{Complexity}
+
+Let $w=\lceil n/64\rceil$ be the number of machine words per bitset and let $N_{\mathrm{vis}}$ be the number of visited search nodes after pruning. Each vertical intersection costs $O(w)$ word operations. A direct closure test costs $O(|R|w)$. Occupancy computation costs $O(w+\supp(X))$ when scanning set bits. Therefore, the running time is
+\begin{equation}
+T_{\mathrm{AURA}}=O\left(N_{\mathrm{vis}}w+\sum_{C\in L}(w+\supp(C))+T_{\mathrm{env}}\right),
+\end{equation}
+where $T_{\mathrm{env}}$ is the cost of computing occupancy envelopes. The main memory cost is
+\begin{equation}
+M_{\mathrm{AURA}}=O(mw)+O(d_{\max}w)+O(n)+O(|L|),
+\end{equation}
+where $mw$ stores item bitsets, $d_{\max}w$ stores recursion temporaries, $O(n)$ stores transaction-length evidence, and $O(|L|)$ stores support-class certificates.
+
+\paragraph{Running example: cost interpretation.}
+For $D_{\mathrm{ex}}$, there are only $n=5$ transactions, so each support bitset fits into one 64-bit machine word:
+\[
+w=\left\lceil \frac{5}{64}\right\rceil=1.
+\]
+Therefore, each bitset intersection such as
+\[
+B_{\{A,B\}}=B_A\cap B_B
+\]
+costs one machine-word operation in the idealized model. On real benchmark datasets such as \texttt{kosarak}, $n$ is much larger and $w$ grows accordingly. This explains why vertical bitset methods are very efficient on dense datasets but can pay more memory and scanning cost on large sparse datasets. The running example shows the same operations in miniature: support is always derived from bitset intersections, while occupancy is derived from scanning the set bits and summing reciprocal transaction lengths.
+
+\section{Experiment Results}
+
+\subsection{Experimental environment}
+
+The implementation is written in C and compiled as part of the \texttt{dm} executable. All experiments were executed on a laptop-scale machine: HP ProBook 450 G5, Intel Core i7-8550U processor, and 16GB RAM. The compared algorithms are \texttt{hep}, \texttt{dfhoi}, and \texttt{aura\_hoi}. All algorithms are executed on the same dataset files and the same threshold grid. \AURA{} is run in \texttt{sum raw} mode to match the raw summed-occupancy behavior of \HEP{} and \DFHOI{}.
+
+\subsection{Datasets and thresholds}
+
+Table~\ref{tab:datasets} gives the benchmark matrix. The shared threshold $\alpha$ controls both support and summed occupancy according to Eq.~\eqref{eq:compat}. Therefore, for a dataset of size $n$, each threshold corresponds to $\sigma_{\min}=\lceil\alpha n\rceil$.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Datasets and threshold grids used in the final benchmark.}
+\label{tab:datasets}
+\begin{adjustbox}{width=\linewidth}
+\begin{tabular}{p{0.16\linewidth}r p{0.23\linewidth}p{0.30\linewidth}p{0.12\linewidth}}
+\toprule
+Dataset & Transactions & Profile & Shared thresholds $\alpha$ & MinSup range \\
+\midrule
+\texttt{mushrooms} & 8,416 & dense categorical benchmark & 0.05; 0.075; 0.1; 0.125; 0.15; 0.2; 0.3; 0.4 & 421--3367 \\
+\texttt{chess} & 3,196 & dense benchmark & 0.5; 0.55; 0.6; 0.65; 0.7; 0.75; 0.8; 0.85 & 1598--2717 \\
+\texttt{retail} & 88,162 & sparse retail transactions & 0.005; 0.01; 0.02; 0.03; 0.05; 0.075; 0.1 & 441--8817 \\
+\texttt{T10I4D100K} & 100,000 & synthetic sparse transactions & 0.005; 0.01; 0.02; 0.03; 0.05; 0.075; 0.1 & 500--10000 \\
+\texttt{kosarak} & 990,002 & large sparse clickstream & 0.001; 0.002; 0.005; 0.01; 0.02 & 991--19801 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{Correctness protocol}
+
+For each dataset and threshold, all algorithms must emit the same raw itemset count before runtime and memory comparisons are interpreted. Let $R_A$ and $R_B$ be normalized outputs from algorithms $A$ and $B$. The count difference and Jaccard similarity are
+\begin{equation}
+\operatorname{CountDiff}(A,B)=\left||R_A|-|R_B|\right|,
+\qquad
+\operatorname{Jaccard}(A,B)=\frac{|R_A\cap R_B|}{|R_A\cup R_B|}.
+\end{equation}
+The current final benchmark records itemset counts for every dataset--threshold configuration. Table~\ref{tab:counts} shows that the three algorithms match on all reported configurations.
+
+\begin{longtable}{p{0.18\linewidth}rrrrrr}
+\caption{Raw-output equivalence under the shared support/occupancy threshold.}\label{tab:counts}\\
+\toprule
+Dataset & $\alpha$ & $\sigma_{\min}$ & \HEP{} & \DFHOI{} & \AURA{} & Match \\
+\midrule
+\endfirsthead
+\toprule
+Dataset & $\alpha$ & $\sigma_{\min}$ & \HEP{} & \DFHOI{} & \AURA{} & Match \\
+\midrule
+\endhead
+\texttt{T10I4D100K} & 0.005 & 500 & 10 & 10 & 10 & yes \\
+\texttt{T10I4D100K} & 0.01 & 1000 & 0 & 0 & 0 & yes \\
+\texttt{T10I4D100K} & 0.02 & 2000 & 0 & 0 & 0 & yes \\
+\texttt{T10I4D100K} & 0.03 & 3000 & 0 & 0 & 0 & yes \\
+\texttt{T10I4D100K} & 0.05 & 5000 & 0 & 0 & 0 & yes \\
+\texttt{T10I4D100K} & 0.075 & 7500 & 0 & 0 & 0 & yes \\
+\texttt{T10I4D100K} & 0.1 & 10000 & 0 & 0 & 0 & yes \\
+\texttt{chess} & 0.5 & 1598 & 0 & 0 & 0 & yes \\
+\texttt{chess} & 0.55 & 1758 & 0 & 0 & 0 & yes \\
+\texttt{chess} & 0.6 & 1918 & 0 & 0 & 0 & yes \\
+\texttt{chess} & 0.65 & 2078 & 0 & 0 & 0 & yes \\
+\texttt{chess} & 0.7 & 2238 & 0 & 0 & 0 & yes \\
+\texttt{chess} & 0.75 & 2397 & 0 & 0 & 0 & yes \\
+\texttt{chess} & 0.8 & 2557 & 0 & 0 & 0 & yes \\
+\texttt{chess} & 0.85 & 2717 & 0 & 0 & 0 & yes \\
+\texttt{kosarak} & 0.001 & 991 & 726 & 726 & 726 & yes \\
+\texttt{kosarak} & 0.002 & 1981 & 265 & 265 & 265 & yes \\
+\texttt{kosarak} & 0.005 & 4951 & 86 & 86 & 86 & yes \\
+\texttt{kosarak} & 0.01 & 9901 & 31 & 31 & 31 & yes \\
+\texttt{kosarak} & 0.02 & 19801 & 14 & 14 & 14 & yes \\
+\texttt{mushrooms} & 0.05 & 421 & 93266 & 93266 & 93266 & yes \\
+\texttt{mushrooms} & 0.075 & 632 & 16613 & 16613 & 16613 & yes \\
+\texttt{mushrooms} & 0.1 & 842 & 955 & 955 & 955 & yes \\
+\texttt{mushrooms} & 0.125 & 1052 & 12 & 12 & 12 & yes \\
+\texttt{mushrooms} & 0.15 & 1263 & 2 & 2 & 2 & yes \\
+\texttt{mushrooms} & 0.2 & 1684 & 0 & 0 & 0 & yes \\
+\texttt{mushrooms} & 0.3 & 2525 & 0 & 0 & 0 & yes \\
+\texttt{mushrooms} & 0.4 & 3367 & 0 & 0 & 0 & yes \\
+\texttt{retail} & 0.005 & 441 & 37 & 37 & 37 & yes \\
+\texttt{retail} & 0.01 & 882 & 15 & 15 & 15 & yes \\
+\texttt{retail} & 0.02 & 1764 & 9 & 9 & 9 & yes \\
+\texttt{retail} & 0.03 & 2645 & 3 & 3 & 3 & yes \\
+\texttt{retail} & 0.05 & 4409 & 3 & 3 & 3 & yes \\
+\texttt{retail} & 0.075 & 6613 & 2 & 2 & 2 & yes \\
+\texttt{retail} & 0.1 & 8817 & 0 & 0 & 0 & yes \\
+\bottomrule
+\end{longtable}
+
+\subsection{Performance overview}
+
+Table~\ref{tab:aggregate} summarizes the runtime and memory comparison. A speed ratio above $1$ in the HEP/AURA or DFHOI/AURA columns means that \AURA{} is faster on the median threshold of that dataset. The results show that \AURA{} is consistently faster than \HEP{} on \texttt{chess}, \texttt{retail}, and \texttt{T10I4D100K}; competitive on high-threshold \texttt{kosarak}; and slower on the lowest-threshold, high-output \texttt{mushrooms} and \texttt{kosarak} settings. This behavior is expected for an audit-oriented vertical-bitset implementation: low thresholds increase output volume and expose overheads, whereas moderate and high thresholds allow the pruning and raw fast path to dominate.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Aggregate runtime and memory summary. Ratios are median speed ratios over the dataset's threshold grid.}
+\label{tab:aggregate}
+\begin{adjustbox}{width=\linewidth}
+\begin{tabular}{p{0.15\linewidth}rrrrrrr}
+\toprule
+Dataset & $N_\alpha$ & AURA $<$ HEP time & AURA $<$ DFHOI time & HEP/AURA & DFHOI/AURA & AURA $<$ HEP RAM & AURA $<$ DFHOI RAM \\
+\midrule
+\texttt{mushrooms} & 8 & 2/8 & 0/8 & 0.86$\times$ & 0.47$\times$ & 8/8 & 8/8 \\
+\texttt{chess} & 8 & 8/8 & 0/8 & 1.57$\times$ & 0.93$\times$ & 8/8 & 8/8 \\
+\texttt{retail} & 7 & 6/7 & 6/7 & 1.24$\times$ & 1.23$\times$ & 6/7 & 5/7 \\
+\texttt{T10I4D100K} & 7 & 7/7 & 7/7 & 1.31$\times$ & 1.26$\times$ & 4/7 & 4/7 \\
+\texttt{kosarak} & 5 & 2/5 & 2/5 & 0.55$\times$ & 0.55$\times$ & 2/5 & 2/5 \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+Table~\ref{tab:selected-performance} reports representative raw measurements from the CSV file. The full result file is part of the reproducibility artifact.
+
+\begin{longtable}{p{0.18\linewidth}rrr rr}
+\caption{Representative runtime and memory measurements from the final benchmark.}\label{tab:selected-performance}\\
+\toprule
+Dataset & $\alpha$ & Algorithm & Time (s) & Peak RAM (MB) & Itemsets \\
+\midrule
+\endfirsthead
+\toprule
+Dataset & $\alpha$ & Algorithm & Time (s) & Peak RAM (MB) & Itemsets \\
+\midrule
+\endhead
+\texttt{mushrooms} & 0.05 & HEP & 13.196 & 3823.48 & 93266 \\
+\texttt{mushrooms} & 0.05 & DFHOI & 6.227 & 303.45 & 93266 \\
+\texttt{mushrooms} & 0.05 & AURA-HOI & 21.926 & 302.08 & 93266 \\
+\texttt{mushrooms} & 0.15 & HEP & 0.728 & 525.5 & 2 \\
+\texttt{mushrooms} & 0.15 & DFHOI & 0.423 & 303.02 & 2 \\
+\texttt{mushrooms} & 0.15 & AURA-HOI & 0.834 & 302.06 & 2 \\
+\texttt{mushrooms} & 0.4 & HEP & 0.019 & 306.09 & 0 \\
+\texttt{mushrooms} & 0.4 & DFHOI & 0.015 & 301.94 & 0 \\
+\texttt{mushrooms} & 0.4 & AURA-HOI & 0.016 & 301.73 & 0 \\
+\texttt{chess} & 0.5 & HEP & 13.099 & 3915.96 & 0 \\
+\texttt{chess} & 0.5 & DFHOI & 8.081 & 302.87 & 0 \\
+\texttt{chess} & 0.5 & AURA-HOI & 8.233 & 301.39 & 0 \\
+\texttt{chess} & 0.7 & HEP & 0.587 & 508.42 & 0 \\
+\texttt{chess} & 0.7 & DFHOI & 0.406 & 302.16 & 0 \\
+\texttt{chess} & 0.7 & AURA-HOI & 0.406 & 301.55 & 0 \\
+\texttt{chess} & 0.85 & HEP & 0.044 & 317.66 & 0 \\
+\texttt{chess} & 0.85 & DFHOI & 0.027 & 301.82 & 0 \\
+\texttt{chess} & 0.85 & AURA-HOI & 0.028 & 301.56 & 0 \\
+\texttt{retail} & 0.005 & HEP & 0.106 & 310.02 & 37 \\
+\texttt{retail} & 0.005 & DFHOI & 0.101 & 310.09 & 37 \\
+\texttt{retail} & 0.005 & AURA-HOI & 0.16 & 311.14 & 37 \\
+\texttt{retail} & 0.03 & HEP & 0.067 & 309.62 & 3 \\
+\texttt{retail} & 0.03 & DFHOI & 0.066 & 309.62 & 3 \\
+\texttt{retail} & 0.03 & AURA-HOI & 0.053 & 308.93 & 3 \\
+\texttt{retail} & 0.1 & HEP & 0.065 & 309.3 & 0 \\
+\texttt{retail} & 0.1 & DFHOI & 0.072 & 309.41 & 0 \\
+\texttt{retail} & 0.1 & AURA-HOI & 0.053 & 308.89 & 0 \\
+\texttt{T10I4D100K} & 0.005 & HEP & 1.625 & 312.92 & 10 \\
+\texttt{T10I4D100K} & 0.005 & DFHOI & 1.573 & 312.92 & 10 \\
+\texttt{T10I4D100K} & 0.005 & AURA-HOI & 0.733 & 316.31 & 10 \\
+\texttt{T10I4D100K} & 0.03 & HEP & 0.075 & 310.24 & 0 \\
+\texttt{T10I4D100K} & 0.03 & DFHOI & 0.073 & 310.29 & 0 \\
+\texttt{T10I4D100K} & 0.03 & AURA-HOI & 0.061 & 309.93 & 0 \\
+\texttt{T10I4D100K} & 0.1 & HEP & 0.065 & 309.75 & 0 \\
+\texttt{T10I4D100K} & 0.1 & DFHOI & 0.066 & 309.63 & 0 \\
+\texttt{T10I4D100K} & 0.1 & AURA-HOI & 0.053 & 309.51 & 0 \\
+\texttt{kosarak} & 0.001 & HEP & 9.561 & 459.96 & 726 \\
+\texttt{kosarak} & 0.001 & DFHOI & 9.581 & 423.77 & 726 \\
+\texttt{kosarak} & 0.001 & AURA-HOI & 277.798 & 546.12 & 726 \\
+\texttt{kosarak} & 0.005 & HEP & 0.952 & 411.36 & 86 \\
+\texttt{kosarak} & 0.005 & DFHOI & 0.956 & 410.46 & 86 \\
+\texttt{kosarak} & 0.005 & AURA-HOI & 1.737 & 415.36 & 86 \\
+\texttt{kosarak} & 0.02 & HEP & 0.627 & 406.4 & 14 \\
+\texttt{kosarak} & 0.02 & DFHOI & 0.628 & 406.51 & 14 \\
+\texttt{kosarak} & 0.02 & AURA-HOI & 0.486 & 399.89 & 14 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Dataset-level charts}
+
+Figures~\ref{fig:mushrooms}--\ref{fig:kosarak} show the final line charts. Each chart reports runtime and peak resident memory across thresholds for one dataset. The x-axis is the shared support/occupancy threshold $\alpha$, not a standalone occupancy-only threshold.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{./mushrooms_comparison.png}
+\caption{Runtime and peak RAM on \texttt{mushrooms}. The low-threshold region produces very large raw outputs; all algorithms emit identical counts, but \AURA{} pays additional audit and bitset overhead at the lowest thresholds.}
+\label{fig:mushrooms}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{./chess_comparison.png}
+\caption{Runtime and peak RAM on \texttt{chess}. \AURA{} is faster than \HEP{} across the threshold grid while using stable memory. \DFHOI{} remains slightly faster in runtime, but with similar memory to \AURA.}
+\label{fig:chess}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{./retail_comparison.png}
+\caption{Runtime and peak RAM on \texttt{retail}. The sparse workload has very small output under the shared threshold. \AURA{} becomes fastest after the lowest threshold and uses slightly lower resident memory than the baselines.}
+\label{fig:retail}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{./T10I4D100K_comparison.png}
+\caption{Runtime and peak RAM on \texttt{T10I4D100K}. \AURA{} is faster than both baselines at every tested threshold, and the memory curves converge once the threshold removes almost all output.}
+\label{fig:t10}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{./kosarak_comparison.png}
+\caption{Runtime and peak RAM on \texttt{kosarak}. The lowest threshold is the most difficult setting for \AURA{}, while moderate and high thresholds show competitive or better runtime and memory. This dataset highlights the importance of reporting threshold sensitivity rather than a single aggregate score.}
+\label{fig:kosarak}
+\end{figure}
+
+\subsection{Interpretation}
+
+The most important result is not that one algorithm dominates every setting. Rather, the benchmark shows that all runtime and memory comparisons are made under matched raw-output semantics. This matters because the itemset counts match for every one of the 35 dataset--threshold configurations. On dense \texttt{chess}, \AURA{} is consistently faster than \HEP{} and uses far less memory than \HEP{} at low thresholds. On \texttt{retail} and \texttt{T10I4D100K}, \AURA{} is fastest for most or all thresholds, although the absolute runtimes are small. On \texttt{mushrooms} and \texttt{kosarak}, \AURA{} is slower at the lowest thresholds, where the output is larger and the overhead of the audit-oriented bitset design is most visible.
+
+These results support a conservative claim: \AURA{} is an exact raw-HOI miner with auditable support evidence and competitive performance. It is not presented as universally faster than \DFHOI{} on every dataset. Instead, its contribution is the combination of raw-output compatibility, support-class auditability, and stable memory behavior.
+
+\section{Discussion}
+
+\subsection{Why shared-threshold compatibility matters}
+
+The final experiments use a shared support/occupancy threshold because the baseline implementations treat the command-line threshold as both a support threshold and a summed-occupancy threshold. If \AURA{} used an independently chosen support threshold, then the compared algorithms might solve different mining tasks. Eq.~\eqref{eq:compat} prevents this problem by forcing all algorithms to use the same raw predicate.
+
+\subsection{What the running example shows}
+
+The running example clarifies four design decisions. First, support and occupancy are different signals. In $D_{\mathrm{ex}}$, $\{A,B\}$ has support $3$ and average occupancy $0.6111$, while its summed-compatible score is $1.8333$. Second, the same itemset may pass or fail depending on whether the average predicate or summed-compatible predicate is used. This is why the paper explicitly separates mathematical HOI semantics from repository compatibility. Third, raw and closed outputs are different views. A raw miner asks whether each itemset satisfies the threshold, whereas a closed-view miner stores representatives of support-equivalence classes. Fourth, \AURA{} uses one support-evidence object for multiple purposes: the same bitset intersection gives support, enables closure tests, supports ledger equality, and provides the transaction identifiers needed for exact occupancy computation. This is why the algorithm is described as auditable rather than only as a faster enumerator.
+
+\subsection{Runtime trade-offs}
+
+The charts show that \AURA{} is not uniformly faster at the lowest thresholds. This is a useful result rather than a failure. Low thresholds create large raw outputs and expose the cost of maintaining audit-ready support evidence. In contrast, moderate and high thresholds often allow \AURA{} to benefit from pruning, raw-mode traversal, and stable memory behavior. A future hybrid version could switch between sparse list-based projection and dense bitset traversal according to dataset density.
+
+\subsection{Memory behavior}
+
+\HEP{} shows large memory spikes on dense datasets, especially \texttt{mushrooms} and \texttt{chess}. \AURA{} has much flatter memory behavior because its main representation is vertical bitset evidence plus recursion temporaries. On sparse datasets, peak resident memory is close across all algorithms, suggesting that dataset loading and runtime environment overhead dominate the algorithm-specific memory difference.
+
+\subsection{Threats to validity}
+
+There are several threats to validity. First, the results are measured on a laptop CPU rather than a controlled server. This is acceptable for reproducibility but should not be interpreted as definitive hardware-independent performance. Second, the experiments use one implementation repository; implementation differences may affect absolute runtime. Third, itemset-count equality is necessary but weaker than full normalized itemset equality. A final archival artifact should include a checker that canonicalizes itemsets and verifies Jaccard similarity, not only counts. Fourth, disk footprint is not reported in the final CSV used for this paper, so the current final version focuses on runtime, peak RAM, and itemset counts rather than disk size.
+
+\subsection{Limitations}
+
+\AURA{} is currently an HOI-only miner. It does not handle utility, profit, sequence, temporal, or shelf-time information. Its closed-ledger view is designed for compact analysis but should not replace raw output when the user needs every threshold-satisfying itemset. The final benchmark also excludes \texttt{pumsb} because it exceeded the available 16GB memory budget under attempted laptop-scale configurations. This exclusion is reported explicitly to avoid presenting an incomplete or unstable benchmark as final.
+
+\subsection{Reproducibility}
+
+The reproducibility package should include the C source code, dataset paths, benchmark script, raw CSV files, itemset-count CSV, generated figures, and the exact \LaTeX{} source. Each result row should record dataset, algorithm, shared threshold $\alpha$, computed $\sigma_{\min}$, runtime, peak resident memory, and itemset count. Pattern contents should be emitted only when correctness checking is explicitly requested; normal benchmark runs should output statistics by default.
+
+\section{Conclusion}
+
+This paper presented \AURA, an auditable high-occupancy itemset mining algorithm that separates score semantics from output views. The method combines vertical bitset evidence, residual occupancy-envelope pruning, and support-class certificates. A five-transaction running example demonstrates how support, average occupancy, summed compatibility, closure, bitset evidence, and raw search operate from the same data. The final benchmark compares \AURA{} against \HEP{} and \DFHOI{} under a shared support/occupancy threshold on five datasets. Across all 35 reported configurations, the algorithms emit identical raw itemset counts, establishing matched output semantics before performance interpretation. \AURA{} is faster than \HEP{} on most configurations, competitive with \DFHOI{} overall, and generally exhibits stable peak memory behavior. The main value of \AURA{} is therefore not a universal speed claim, but a scientifically auditable HOI mining framework in which raw, closed, and representative outputs can be traced back to common support evidence.
+
+\bibliographystyle{plain}
+\begin{thebibliography}{99}
+
+\bibitem{agrawal1993mining}
+Rakesh Agrawal, Tomasz Imieli\'nski, and Arun Swami.
+\newblock Mining association rules between sets of items in large databases.
+\newblock In \emph{Proceedings of the 1993 ACM SIGMOD International Conference on Management of Data}, pages 207--216, 1993.
+\newblock doi:10.1145/170035.170072.
+
+\bibitem{agrawal1994fast}
+Rakesh Agrawal and Ramakrishnan Srikant.
+\newblock Fast algorithms for mining association rules in large databases.
+\newblock In \emph{Proceedings of the 20th International Conference on Very Large Data Bases}, pages 487--499, 1994.
+
+\bibitem{deng2020mining}
+Zhi-Hong Deng.
+\newblock Mining high occupancy itemsets.
+\newblock \emph{Future Generation Computer Systems}, 102:222--229, 2020.
+\newblock doi:10.1016/j.future.2019.07.039.
+
+\bibitem{han2000mining}
+Jiawei Han, Jian Pei, and Yiwen Yin.
+\newblock Mining frequent patterns without candidate generation.
+\newblock In \emph{Proceedings of the 2000 ACM SIGMOD International Conference on Management of Data}, pages 1--12, 2000.
+\newblock doi:10.1145/335191.335372.
+
+\bibitem{kim2022mining}
+Hyoju Kim, Taehyung Ryu, Changhoon Lee, Hyunmin Kim, Truong Truong, Philippe Fournier-Viger, Witold Pedrycz, and Unil Yun.
+\newblock Mining high occupancy patterns to analyze incremental data in intelligent systems.
+\newblock \emph{ISA Transactions}, 131:460--475, 2022.
+
+\bibitem{luna2019review}
+Jos\'e Mar\'ia Luna, Ramesh Uday Kiran, Philippe Fournier-Viger, and Sebasti\'an Ventura.
+\newblock Frequent itemset mining: A 25 years review.
+\newblock \emph{Wiley Interdisciplinary Reviews: Data Mining and Knowledge Discovery}, 9(6):e1329, 2019.
+\newblock doi:10.1002/widm.1329.
+
+\bibitem{nguyen2023efficient}
+Loan T. T. Nguyen, Thang Mai, Giao-Huy Pham, Unil Yun, and Bay Vo.
+\newblock An efficient method for mining high occupancy itemsets based on equivalence class and early pruning.
+\newblock \emph{Knowledge-Based Systems}, 267:110441, 2023.
+\newblock doi:10.1016/j.knosys.2023.110441.
+
+\bibitem{pasquier1999discovering}
+Nicolas Pasquier, Yves Bastide, Rafik Taouil, and Lotfi Lakhal.
+\newblock Discovering frequent closed itemsets for association rules.
+\newblock In \emph{Proceedings of the 7th International Conference on Database Theory}, pages 398--416, 1999.
+\newblock doi:10.1007/3-540-49257-7\_25.
+
+\bibitem{zaki1997new}
+Mohammed J. Zaki, Srinivasan Parthasarathy, Mitsunori Ogihara, and Wei Li.
+\newblock New algorithms for fast discovery of association rules.
+\newblock In \emph{Proceedings of the Third International Conference on Knowledge Discovery and Data Mining}, pages 283--286, 1997.
+
+\bibitem{zaki2000scalable}
+Mohammed J. Zaki.
+\newblock Scalable algorithms for association mining.
+\newblock \emph{IEEE Transactions on Knowledge and Data Engineering}, 12(3):372--390, 2000.
+\newblock doi:10.1109/69.846291.
+
+\bibitem{zaki2002charm}
+Mohammed J. Zaki and Ching-Jiu Hsiao.
+\newblock CHARM: An efficient algorithm for closed itemset mining.
+\newblock In \emph{Proceedings of the Second SIAM International Conference on Data Mining Workshop on High Performance Data Mining}, 2002.
+
+\end{thebibliography}
+
+\end{document}
