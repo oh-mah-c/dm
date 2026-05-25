@@ -1,0 +1,267 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+#include "common.cuh"
+#ifdef USE_ROCM
+#include "fbgemm_gpu/utils/rocm/sparse_group_utils.h"
+#endif
+
+using Tensor = at::Tensor;
+
+namespace fbgemm_gpu {
+
+#ifdef USE_ROCM
+// The wave size is forced to be 32 on ROCm devices in favor
+// of granularity losses reduction.
+constexpr int EMULATED_WARP_SIZE = 32;
+#else
+constexpr int EMULATED_WARP_SIZE = kWarpSize;
+#endif
+
+// TODO: Update UNROLL_FACTOR
+constexpr int GROUP_INDEX_SELECT_UNROLL_FACTOR = 1;
+constexpr int GROUP_INDEX_SELECT_COLS_PER_WARP =
+    GROUP_INDEX_SELECT_UNROLL_FACTOR * EMULATED_WARP_SIZE;
+
+// GROUP_INDEX_SELECT_COLS_PER_WARP must be power of two
+constexpr int GROUP_INDEX_SELECT_LOG_COLS_PER_WARP =
+    log2_calc<GROUP_INDEX_SELECT_COLS_PER_WARP>::value;
+
+int get_group_index_select_cols_per_warp() {
+  return GROUP_INDEX_SELECT_COLS_PER_WARP;
+}
+
+int get_group_index_select_unroll_factor() {
+  return GROUP_INDEX_SELECT_UNROLL_FACTOR;
+}
+
+template <
+    typename index_t,
+    typename scalar_t,
+    bool USE_INDEX_SELECT,
+    bool USE_VAR_COLS,
+    int UNROLL_FACTOR,
+    int COLS_PER_WARP,
+    int LOG_COLS_PER_WARP>
+__global__
+__launch_bounds__(kMaxThreads) void group_index_select_or_add_2d_kernel(
+    const int64_t* input_ptrs,
+    const int64_t* output_ptrs,
+    const int64_t* indices_ptrs,
+    const int64_t* warp_offsets_group,
+    const int32_t* num_cols_group,
+    const int64_t num_work_rows, // number of rows to work on per member
+    const int64_t group_size) {
+  const auto total_num_warps = warp_offsets_group[group_size];
+  int32_t num_cols = 0;
+  int32_t warps_per_row = 0;
+
+  if constexpr (!USE_VAR_COLS) {
+    num_cols = num_cols_group[0];
+    warps_per_row = (num_cols + COLS_PER_WARP - 1) >> LOG_COLS_PER_WARP;
+  }
+
+#ifdef USE_ROCM
+  int cached_member_id = -1;
+  int64_t cached_upper_bound = -1;
+#endif
+
+  for (int64_t warp_id = threadIdx.y * gridDim.x + blockIdx.x;
+       warp_id < total_num_warps;
+       warp_id += gridDim.x * blockDim.y) {
+    int32_t member_id = 0;
+    int32_t member_warp_id = 0;
+    if constexpr (USE_VAR_COLS) {
+#ifdef USE_ROCM
+      if (warp_id >= cached_upper_bound) {
+        rocm::warp_upper_bound<int64_t, EMULATED_WARP_SIZE>(
+            &member_id,
+            &cached_upper_bound,
+            warp_offsets_group + 1,
+            warp_id,
+            group_size);
+        cached_member_id = member_id;
+      } else {
+        member_id = cached_member_id;
+      }
+#else
+      __shared__ int member_ids[kMaxThreads / EMULATED_WARP_SIZE];
+      if (threadIdx.x == 0) {
+        binary_search_range(
+            &member_ids[threadIdx.y],
+            warp_offsets_group + 1,
+            warp_id,
+            group_size);
+      }
+      syncwarp();
+      member_id = member_ids[threadIdx.y];
+#endif
+      num_cols = num_cols_group[member_id];
+      warps_per_row = (num_cols + COLS_PER_WARP - 1) >> LOG_COLS_PER_WARP;
+      member_warp_id = warp_id - warp_offsets_group[member_id];
+    } else {
+      // All columns are the same
+      member_id = warp_id / (warps_per_row * num_work_rows);
+      member_warp_id = warp_id - (member_id * warps_per_row * num_work_rows);
+#ifdef USE_ROCM
+      if (num_cols < COLS_PER_WARP && num_cols >= UNROLL_FACTOR) {
+        // Need to ensure that [member_id] and [member_warp_id] are calculated
+        // correctly for the small embedding dimension path below
+        const auto rows_per_warp = COLS_PER_WARP / num_cols;
+        const auto warps_per_member =
+            DIV_ROUND_UP(num_work_rows, rows_per_warp);
+        member_id = warp_id / warps_per_member;
+        member_warp_id = warp_id % warps_per_member;
+      }
+#endif // USE_ROCM
+    }
+
+#ifdef USE_ROCM
+    if (num_cols < COLS_PER_WARP && num_cols >= UNROLL_FACTOR) {
+      // Optimized path for small embedding dimensions
+      // Each warp processes 'rows_per_warp' rows
+      const auto rows_per_warp = COLS_PER_WARP / num_cols;
+      const int64_t start_row = member_warp_id * rows_per_warp;
+
+      // Since we are processing multiple rows within the warp, we need to
+      // map each lane to a specific row, in addition to the column
+      const auto local_row = (threadIdx.x * UNROLL_FACTOR) /
+          num_cols; // the row ID within the set of rows handled by this warp
+      const auto col_offset = (threadIdx.x * UNROLL_FACTOR) % num_cols;
+      const int64_t current_row = start_row +
+          local_row; // the actual row within the table processed by this lane
+
+      // local_row may be out of bounds for the last few lanes in the warp if
+      // [COLS_PER_WARP % num_cols != 0] and we also need to confirm that we are
+      // within num_work_rows
+      if (local_row < rows_per_warp && current_row < num_work_rows) {
+        scalar_t* input =
+            reinterpret_cast<scalar_t*>(input_ptrs[member_id]) + col_offset;
+        scalar_t* output =
+            reinterpret_cast<scalar_t*>(output_ptrs[member_id]) + col_offset;
+
+        index_t* indices = reinterpret_cast<index_t*>(indices_ptrs[member_id]);
+        const index_t idx = indices[current_row];
+#pragma unroll
+        for (int i = 0; i < UNROLL_FACTOR && col_offset + i < num_cols; i++) {
+          // Compile time conditional
+          if constexpr (USE_INDEX_SELECT) {
+            output[current_row * num_cols + i] =
+                LDG(&input[idx * num_cols + i]);
+          } else {
+            gpuAtomicAddNoReturn(
+                &output[idx * num_cols + i], input[current_row * num_cols + i]);
+          }
+        }
+      }
+    } else {
+      // Large embedding dimensions use >= 1 warp per row
+      // which is the default codepath for non-ROCm as well
+#endif // USE_ROCM
+      const auto row = member_warp_id / warps_per_row;
+      const auto col_offset =
+          ((member_warp_id % warps_per_row) << LOG_COLS_PER_WARP) +
+          (threadIdx.x * UNROLL_FACTOR);
+      scalar_t* input =
+          reinterpret_cast<scalar_t*>(input_ptrs[member_id]) + col_offset;
+      scalar_t* output =
+          reinterpret_cast<scalar_t*>(output_ptrs[member_id]) + col_offset;
+
+      index_t* indices = reinterpret_cast<index_t*>(indices_ptrs[member_id]);
+      const index_t idx = indices[row];
+#pragma unroll
+      for (int i = 0; i < UNROLL_FACTOR && col_offset + i < num_cols; i++) {
+        // Compile time conditional
+        if constexpr (USE_INDEX_SELECT) {
+          output[row * num_cols + i] = LDG(&input[idx * num_cols + i]);
+        } else {
+          gpuAtomicAddNoReturn(
+              &output[idx * num_cols + i], input[row * num_cols + i]);
+        }
+      }
+#ifdef USE_ROCM
+    }
+#endif // USE_ROCM
+  }
+}
+
+DLL_PUBLIC void group_index_select_or_add_cuda(
+    const int64_t* input_ptrs,
+    const int64_t* output_ptrs,
+    const int64_t* indices_ptrs,
+    const int64_t* warp_offsets_group,
+    const int32_t* num_cols_group,
+    const c10::ScalarType& input_scalar_type,
+    const c10::ScalarType& indices_scalar_type,
+    const c10::DeviceIndex& device,
+    const int num_work_rows,
+    const int64_t total_num_warps,
+    const int group_size,
+    const bool use_index_select,
+    const bool use_var_cols) {
+  if (group_size == 0) {
+    return;
+  }
+
+  at::cuda::OptionalCUDAGuard device_guard(device);
+
+  // Partition work based on num_work_rows
+  uint32_t num_warps_per_threadblock = kMaxThreads / EMULATED_WARP_SIZE;
+  uint32_t max_grid_size =
+      at::cuda::getCurrentDeviceProperties()->multiProcessorCount * 8;
+  uint32_t grid_size = std::min(
+      cuda_calc_xblock_count(total_num_warps, num_warps_per_threadblock),
+      max_grid_size);
+  dim3 block_size(EMULATED_WARP_SIZE, num_warps_per_threadblock, 1);
+
+#define INVOKE_GROUP_INDEX_SELECT_OR_ADD(USE_INDEX_SELECT, USE_VAR_COLS) \
+  FBGEMM_LAUNCH_KERNEL(                                                  \
+      (group_index_select_or_add_2d_kernel<                              \
+          index_t,                                                       \
+          scalar_t,                                                      \
+          USE_INDEX_SELECT,                                              \
+          USE_VAR_COLS,                                                  \
+          GROUP_INDEX_SELECT_UNROLL_FACTOR,                              \
+          GROUP_INDEX_SELECT_COLS_PER_WARP,                              \
+          GROUP_INDEX_SELECT_LOG_COLS_PER_WARP>),                        \
+      grid_size,                                                         \
+      block_size,                                                        \
+      0,                                                                 \
+      at::cuda::getCurrentCUDAStream(),                                  \
+      input_ptrs,                                                        \
+      output_ptrs,                                                       \
+      indices_ptrs,                                                      \
+      warp_offsets_group,                                                \
+      num_cols_group,                                                    \
+      num_work_rows,                                                     \
+      group_size)
+
+  AT_DISPATCH_INDEX_TYPES(
+      indices_scalar_type, "group_index_select_2d_wrapper_1", [&] {
+        FBGEMM_DISPATCH_FLOATING_TYPES(
+            input_scalar_type, "group_index_select_2d_wrapper_2", [&] {
+              if (use_index_select) {
+                if (use_var_cols) {
+                  INVOKE_GROUP_INDEX_SELECT_OR_ADD(true, true);
+                } else {
+                  INVOKE_GROUP_INDEX_SELECT_OR_ADD(true, false);
+                }
+              } else {
+                if (use_var_cols) {
+                  INVOKE_GROUP_INDEX_SELECT_OR_ADD(false, true);
+                } else {
+                  INVOKE_GROUP_INDEX_SELECT_OR_ADD(false, false);
+                }
+              }
+            });
+      });
+
+#undef INVOKE_GROUP_INDEX_SELECT_OR_ADD
+}
+
+} // namespace fbgemm_gpu

@@ -82,3 +82,10 @@ Release/
 .bazelisk/
 .bazel_tmp/
 bazel-*
+
+# Build outputs — do not commit
+build/
+src/core/pytorch/build/
+src/core/engine/dist/
+src/core/gpu/Vulkan-Hpp/build/
+src/core/gpu/Vulkan-Hpp/dist/

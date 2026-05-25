@@ -1,0 +1,59 @@
+# Copied from TensorFlow's `https://github.com/tensorflow/tensorflow/blob/master/third_party/clog/clog.BUILD
+# Licenced under Apache-2.0 License
+
+# Description:
+#   C-style (a-la printf) logging library
+
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+licenses(["notice"])
+
+exports_files(["LICENSE"])
+
+cc_library(
+    name = "clog",
+    srcs = [
+        "src/clog.c",
+    ],
+    hdrs = [
+        "include/clog.h",
+    ],
+    copts = select({
+        ":windows": [],
+        "//conditions:default": ["-Wno-unused-result"],
+    }),
+    defines = select({
+        # When linkstatic=False, we need default visibility
+        ":macos_x86_64": ["CLOG_VISIBILITY="],
+        "//conditions:default": [],
+    }),
+    linkopts = select({
+        ":android": ["-llog"],
+        "//conditions:default": [],
+    }),
+    linkstatic = select({
+        # https://github.com/bazelbuild/bazel/issues/11552
+        ":macos_x86_64": False,
+        "//conditions:default": True,
+    }),
+    strip_include_prefix = "include",
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "android",
+    constraint_values = ["@platforms//os:android"],
+)
+
+config_setting(
+    name = "windows",
+    constraint_values = ["@platforms//os:windows"],
+)
+
+config_setting(
+    name = "macos_x86_64",
+    constraint_values = [
+        "@platforms//os:osx",
+        "@platforms//cpu:x86_64",
+    ],
+)
