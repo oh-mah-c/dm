@@ -12,7 +12,7 @@ set(DM_ROOT     ${CMAKE_SOURCE_DIR})
 set(DM_INCLUDE  ${DM_ROOT}/include)
 set(DM_SRC      ${DM_ROOT}/src)
 
-set(LIBTORCH_DIR  ${DM_ROOT}/src/core/engine/dist)
+set(LIBTORCH_DIR  ${DM_ROOT}/src/core/pytorch/dist)
 set(VULKANHPP_DIR ${DM_ROOT}/src/core/gpu/Vulkan-Hpp)
 
 # ── LibTorch ──────────────────────────────────────────────────────────────────
