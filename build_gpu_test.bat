@@ -4,7 +4,7 @@ cd /d "e:\Folder_Code\dm"
 echo Compiling dm_bpe with GPU support...
 cl.exe /DDM_GPU /nologo /W3 /O2 /D_CRT_SECURE_NO_WARNINGS ^
   /I include ^
-  /I src\core\gpu\vulkan_hpp\Vulkan-Headers\include ^
+  /I src\core\gpu\Vulkan-Hpp\Vulkan-Headers\include ^
   src\tools\dm_bpe.c ^
   src\tokenizer\bpe_subword.c ^
   src\core\gpu\dm_gpu.c ^
