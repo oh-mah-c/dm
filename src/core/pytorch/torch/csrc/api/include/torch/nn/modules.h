@@ -38,3 +38,4 @@
 // dm extensions
 #include <torch/nn/modules/quanv_nd.h>
 #include <torch/nn/modules/residual_attention.h>
+#include <torch/nn/modules/ohmcdualgateblock.h>
