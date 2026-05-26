@@ -115,6 +115,7 @@ from .normalization import (
     LocalResponseNorm,
     RMSNorm,
 )
+from .pinn import PINN, PINNMixin, pinn_collocation, pinn_grad
 from .padding import (
     CircularPad1d,
     CircularPad2d,
@@ -278,6 +279,8 @@ __all__ = [
     "MultiheadAttention",
     "NLLLoss",
     "NLLLoss2d",
+    "PINN",
+    "PINNMixin",
     "PReLU",
     "PairwiseDistance",
     "ParameterDict",
@@ -330,6 +333,8 @@ __all__ = [
     "ZeroPad1d",
     "ZeroPad2d",
     "ZeroPad3d",
+    "pinn_collocation",
+    "pinn_grad",
 ]
 
 # Please keep this list sorted
