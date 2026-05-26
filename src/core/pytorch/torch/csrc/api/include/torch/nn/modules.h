@@ -34,3 +34,6 @@
 #include <torch/nn/modules/transformercoder.h>
 #include <torch/nn/modules/transformerlayer.h>
 #include <torch/nn/modules/upsampling.h>
+
+// dm extensions
+#include <torch/nn/modules/quanv_nd.h>
