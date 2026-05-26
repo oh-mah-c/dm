@@ -39,8 +39,9 @@ file(GLOB DM_GPU_SRCS  ${DM_SRC}/core/gpu/*.c)
 
 # Tokenizer
 file(GLOB DM_TOK_SRCS  ${DM_SRC}/tokenizer/*.c)
-# tokenizer/main.c is a standalone binary — exclude from library
+# Standalone binaries with their own main() — exclude from library
 list(FILTER DM_TOK_SRCS EXCLUDE REGEX ".*/main\\.c$")
+list(FILTER DM_TOK_SRCS EXCLUDE REGEX ".*/hust_tokenize\\.c$")
 
 # Algorithms
 file(GLOB DM_ALG_SRCS  ${DM_SRC}/algorithms/*.c)
@@ -97,6 +98,18 @@ target_link_libraries(dm PRIVATE dm_core)
 # ── dm_tokenizer binary ───────────────────────────────────────────────────────
 add_executable(dm_tokenizer ${DM_SRC}/tokenizer/main.c)
 target_link_libraries(dm_tokenizer PRIVATE dm_core)
+
+# ── hust_tokenize binary ──────────────────────────────────────────────────────
+add_executable(hust_tokenize ${DM_SRC}/tokenizer/hust_tokenize.c)
+target_include_directories(hust_tokenize PRIVATE ${DM_INCLUDE}/tokenizer)
+target_link_libraries(hust_tokenize PRIVATE m)
+
+# ── llama3_train_hust binary ──────────────────────────────────────────────────
+add_executable(llama3_train_hust ${DM_SRC}/models/nlp/llama3/train_hust.cpp)
+target_link_libraries(llama3_train_hust PRIVATE dm_core)
+target_include_directories(llama3_train_hust PRIVATE
+    ${DM_INCLUDE}/models
+    ${TORCH_INCLUDE_DIRS})
 
 # ── Tool binaries (one per .c in src/tools/) ─────────────────────────────────
 foreach(tool_src ${DM_TOOL_SRCS})
