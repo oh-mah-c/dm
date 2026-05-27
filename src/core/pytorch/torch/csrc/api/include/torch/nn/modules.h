@@ -41,3 +41,4 @@
 #include <torch/nn/modules/ohmcdualgateblock.h>
 
 #include <torch/nn/modules/criss_cross_attention.h>
+#include <torch/nn/modules/kan_linear.h>
