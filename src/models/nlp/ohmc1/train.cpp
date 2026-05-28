@@ -34,6 +34,7 @@ static void usage(const char* prog) {
         "  --warmup <int>                      warmup steps (default: 100)\n"
         "  --maxiter<int>                      total gradient steps (default: 2000)\n"
         "  --save   <path>                     checkpoint path (default: ohmc1_best.pt)\n"
+        "  --dataset<path>                     dataset text file for training (char-level)\n"
         "  --cuda                              use CUDA if available\n",
         prog);
 }
@@ -44,6 +45,7 @@ int main(int argc, char** argv) {
     int64_t batch_size    = 4;
     int64_t seqlen_override = 0;
     std::string save_path = "ohmc1_best.pt";
+    std::string dataset_path = "";
     bool use_cuda         = false;
 
     OhmC1TrainConfig train_cfg;
@@ -64,6 +66,7 @@ int main(int argc, char** argv) {
         else if (arg == "--warmup"  && i + 1 < argc) train_cfg.warmup_iters = std::atoi(argv[++i]);
         else if (arg == "--maxiter" && i + 1 < argc) train_cfg.max_iters    = std::atoi(argv[++i]);
         else if (arg == "--save"    && i + 1 < argc) save_path          = argv[++i];
+        else if (arg == "--dataset" && i + 1 < argc) dataset_path       = argv[++i];
         else if (arg == "--cuda")                    use_cuda           = true;
         else { std::fprintf(stderr, "Unknown arg: %s\n", argv[i]); usage(argv[0]); return 1; }
     }
@@ -91,6 +94,29 @@ int main(int argc, char** argv) {
         }
     }
     train_cfg.device = device;
+
+    // Load dataset if provided
+    std::vector<int64_t> data_tokens;
+    if (!dataset_path.empty()) {
+        std::FILE* fp = std::fopen(dataset_path.c_str(), "rb");
+        if (!fp) {
+            std::fprintf(stderr, "Failed to open dataset: %s\n", dataset_path.c_str());
+            return 1;
+        }
+        std::fseek(fp, 0, SEEK_END);
+        long file_size = std::ftell(fp);
+        std::fseek(fp, 0, SEEK_SET);
+        std::vector<uint8_t> buffer(file_size);
+        std::fread(buffer.data(), 1, file_size, fp);
+        std::fclose(fp);
+        
+        data_tokens.reserve(file_size);
+        for (uint8_t c : buffer) {
+            data_tokens.push_back(static_cast<int64_t>(c));
+        }
+        std::printf("Loaded dataset from %s, size: %zu tokens (char-level)\n", dataset_path.c_str(), data_tokens.size());
+        model_cfg.vocab_size = 256; // strictly use 256 for char-level models
+    }
 
     // Print config
     std::printf("OhmC1 — sandwich-norm + QKNorm decoder LLM\n");
@@ -130,9 +156,27 @@ int main(int argc, char** argv) {
             train_cfg.max_iters / std::max(epochs, (int64_t)1));
 
         for (int64_t step = 0; step < steps_per_epoch; ++step) {
-            auto tokens = torch::randint(0, model_cfg.vocab_size,
-                {batch_size, model_cfg.seq_len + 1},
-                torch::TensorOptions().dtype(torch::kLong).device(device));
+            torch::Tensor tokens;
+            if (!data_tokens.empty()) {
+                int64_t max_idx = data_tokens.size() - model_cfg.seq_len - 1;
+                if (max_idx <= 0) {
+                    std::fprintf(stderr, "Dataset too small for seq_len %lld\n", (long long)model_cfg.seq_len);
+                    return 1;
+                }
+                auto tokens_t = torch::empty({batch_size, model_cfg.seq_len + 1}, torch::kLong);
+                int64_t* tokens_ptr = tokens_t.data_ptr<int64_t>();
+                for (int64_t b = 0; b < batch_size; ++b) {
+                    int64_t start_idx = std::rand() % max_idx;
+                    for (int64_t t = 0; t < model_cfg.seq_len + 1; ++t) {
+                        tokens_ptr[b * (model_cfg.seq_len + 1) + t] = data_tokens[start_idx + t];
+                    }
+                }
+                tokens = tokens_t.to(device);
+            } else {
+                tokens = torch::randint(0, model_cfg.vocab_size,
+                    {batch_size, model_cfg.seq_len + 1},
+                    torch::TensorOptions().dtype(torch::kLong).device(device));
+            }
 
             float loss = ohmc1_train_step(model, optimizer, tokens, train_cfg, global_step);
             ++global_step;

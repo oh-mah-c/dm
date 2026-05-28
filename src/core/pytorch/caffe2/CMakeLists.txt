@@ -683,6 +683,9 @@ if(NOT NO_API AND NOT BUILD_LITE_INTERPRETER)
     ${TORCH_SRC_DIR}/csrc/api/src/nn/modules/upsampling.cpp
     ${TORCH_SRC_DIR}/csrc/api/src/nn/modules/quanv_nd.cpp
     ${TORCH_SRC_DIR}/csrc/api/src/nn/modules/transformer.cpp
+    ${TORCH_SRC_DIR}/csrc/api/src/nn/modules/ohm_ring_kv.cpp
+    ${TORCH_SRC_DIR}/csrc/api/src/nn/modules/ohm_hard_router.cpp
+    ${TORCH_SRC_DIR}/csrc/api/src/nn/modules/ohm_block_drop.cpp
     ${TORCH_SRC_DIR}/csrc/api/src/nn/modules/container/functional.cpp
     ${TORCH_SRC_DIR}/csrc/api/src/nn/options/activation.cpp
     ${TORCH_SRC_DIR}/csrc/api/src/nn/options/adaptive.cpp
@@ -706,6 +709,7 @@ if(NOT NO_API AND NOT BUILD_LITE_INTERPRETER)
     ${TORCH_SRC_DIR}/csrc/api/src/optim/rmsprop.cpp
     ${TORCH_SRC_DIR}/csrc/api/src/optim/serialize.cpp
     ${TORCH_SRC_DIR}/csrc/api/src/optim/sgd.cpp
+    ${TORCH_SRC_DIR}/csrc/api/src/optim/ohm_optimizer.cpp
     ${TORCH_SRC_DIR}/csrc/api/src/optim/schedulers/lr_scheduler.cpp
     ${TORCH_SRC_DIR}/csrc/api/src/optim/schedulers/step_lr.cpp
     ${TORCH_SRC_DIR}/csrc/api/src/optim/schedulers/reduce_on_plateau_scheduler.cpp

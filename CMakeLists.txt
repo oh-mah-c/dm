@@ -132,6 +132,19 @@ foreach(train_src ${DM_MODEL_TRAIN_SRCS})
         ${TORCH_INCLUDE_DIRS})
 endforeach()
 
+# ── Model inference binaries (one per infer.cpp under src/models/) ─────────────
+file(GLOB_RECURSE DM_MODEL_INFER_SRCS ${DM_SRC}/models/**/infer.cpp)
+foreach(infer_src ${DM_MODEL_INFER_SRCS})
+    get_filename_component(infer_dir ${infer_src} DIRECTORY)
+    get_filename_component(model_name ${infer_dir} NAME)
+    set(infer_target "${model_name}_infer")
+    add_executable(${infer_target} ${infer_src})
+    target_link_libraries(${infer_target} PRIVATE dm_core)
+    target_include_directories(${infer_target} PRIVATE
+        ${DM_INCLUDE}/models
+        ${TORCH_INCLUDE_DIRS})
+endforeach()
+
 # ── Model test binaries (one per test_*.cpp under src/models/) ───────────────
 file(GLOB_RECURSE DM_MODEL_TEST_SRCS ${DM_SRC}/models/**/test_*.cpp)
 foreach(test_src ${DM_MODEL_TEST_SRCS})
@@ -140,6 +153,17 @@ foreach(test_src ${DM_MODEL_TEST_SRCS})
     target_link_libraries(${test_name} PRIVATE dm_core)
     target_include_directories(${test_name} PRIVATE
         ${DM_INCLUDE}/models
+        ${TORCH_INCLUDE_DIRS})
+endforeach()
+
+# ── General test binaries (e.g. C/C++ files under tests/) ────────────────────
+file(GLOB DM_GEN_TEST_SRCS ${DM_ROOT}/tests/*.c ${DM_ROOT}/tests/*.cpp)
+foreach(test_src ${DM_GEN_TEST_SRCS})
+    get_filename_component(test_name ${test_src} NAME_WE)
+    add_executable(${test_name} ${test_src})
+    target_link_libraries(${test_name} PRIVATE dm_core)
+    target_include_directories(${test_name} PRIVATE
+        ${DM_INCLUDE}
         ${TORCH_INCLUDE_DIRS})
 endforeach()
 
