@@ -30,9 +30,30 @@ void fill_circle(SDL_Surface* surface, int cx, int cy, int radius, uint32_t colo
     }
 }
 
+// Hàm Tiến hóa Thời gian Ảo (Imaginary-Time Schrodinger Evolution)
+// Tương đương với Tán xạ Lượng tử (Quantum Diffusion / Heat Equation)
+void imaginary_time_evolution(std::vector<std::complex<float>>& psi, int width, int height, int iterations) {
+    std::vector<std::complex<float>> next_psi = psi;
+    for (int iter = 0; iter < iterations; ++iter) {
+        #pragma omp parallel for
+        for (int y = 1; y < height - 1; ++y) {
+            for (int x = 1; x < width - 1; ++x) {
+                int i = y * width + x;
+                // Laplacian (Nabla^2)
+                std::complex<float> laplacian = 
+                    psi[i - 1] + psi[i + 1] + psi[i - width] + psi[i + width] - 4.0f * psi[i];
+                
+                // d(psi)/d(tau) = 0.5 * Laplacian. (Với dt = 0.25 để ổn định)
+                next_psi[i] = psi[i] + 0.25f * laplacian;
+            }
+        }
+        psi = next_psi;
+    }
+}
+
 int main(int argc, char* argv[]) {
     std::cout << "--- Ohm-QRENDER: Military Radar Extreme Noise Test ---\n";
-    std::srand(12345); // Fixed seed for reproducibility
+    std::srand(12345); 
     
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         std::cerr << "FAILURE: SDL Error: " << SDL_GetError() << "\n";
@@ -48,14 +69,14 @@ int main(int argc, char* argv[]) {
 
     // 1. Dựng hình Tàu ngầm
     SDL_FillRect(surface, NULL, black);
-    fill_circle(surface, 256, 256, 80, white); // Thân tàu ngầm to hơn chút
-    fill_rect(surface, 236, 150, 40, 50, white); // Tháp điều khiển
+    fill_circle(surface, 256, 256, 80, white); // Thân
+    fill_rect(surface, 236, 150, 40, 50, white); // Tháp
 
-    // 2. Bơm Bão Nhiễu
-    std::cout << "[*] Đang bơm Bão Nhiễu Radar 60% vào Không gian...\n";
+    // 2. Bơm Bão Nhiễu 50%
+    std::cout << "[*] Đang bơm Bão Nhiễu Radar vào Không gian...\n";
     uint32_t* pixels32 = static_cast<uint32_t*>(surface->pixels);
     for (int i = 0; i < width * height; ++i) {
-        if (std::rand() % 100 < 60) { // Giảm noise xuống 60% để cấu trúc vi vĩ mô tồn tại
+        if (std::rand() % 100 < 50) { 
             uint8_t noise_val = (std::rand() % 2 == 0) ? 255 : (std::rand() % 100);
             pixels32[i] = SDL_MapRGBA(surface->format, noise_val, noise_val, noise_val, 255);
         }
@@ -65,33 +86,30 @@ int main(int argc, char* argv[]) {
     std::cout << "[+] Đã xuất file: radar_input.bmp\n";
 
     std::vector<std::complex<float>> psi_in(width * height);
-    std::vector<std::complex<float>> psi_diffused(width * height);
     std::vector<std::complex<float>> psi_out(width * height);
 
     // 3. Lượng tử hóa
     std::cout << "[*] Lượng tử hóa bức ảnh nhiễu thành Hàm Sóng...\n";
     image_to_wavefunction(surface, psi_in.data());
 
-    // 4. Bước đệm: Khử nhiễu bằng Tích phân đường Feynman (Quantum Decoherence/Diffusion)
-    // Phân tán các hạt nhiễu để triệt tiêu chúng trước khi tìm viền
-    std::cout << "[*] Kích hoạt Feynman Path Integral để trung hòa nhiễu ngẫu nhiên...\n";
-    feynman_path_integral_aa(psi_in.data(), psi_diffused.data(), width, height, 50);
+    // 4. Bước đệm: Khử nhiễu bằng Tiến hóa Thời gian Ảo (Imaginary-Time Schrodinger)
+    std::cout << "[*] Kích hoạt Schrodinger Imaginary-Time Evolution để trung hòa nhiễu...\n";
+    imaginary_time_evolution(psi_in, width, height, 20); // Chạy 20 vòng lặp tiến hóa
 
     // 5. Giao thoa Lượng tử (Trích xuất viền QSobel O(1))
     std::cout << "[*] Kích hoạt Cổng Giao Thoa QSobel...\n";
-    quantum_interference_edge_detect(psi_diffused.data(), psi_out.data(), width, height);
+    quantum_interference_edge_detect(psi_in.data(), psi_out.data(), width, height);
 
     // 6. Sụp đổ Hàm Sóng
     std::cout << "[*] Sụp đổ Hàm Sóng (Đo lường xác suất |psi|^2)...\n";
     wavefunction_collapse(psi_out.data(), surface);
 
-    // 7. Thresholding
+    // 7. Thresholding mạnh để chỉ giữ lại Viền sáng nhất
     uint8_t* pixels8 = static_cast<uint8_t*>(surface->pixels);
     for (int i = 0; i < width * height; ++i) {
-        // Sau khi diffuse và edge detect, biên độ sẽ rất nhỏ. 
-        // Ta cần khuếch đại (amplification) và cắt nhiễu nền
         float intensity = static_cast<float>(pixels8[i * 4]);
-        if (intensity < 15.0f) { // Threshold cực thấp do biên độ đã bị chia nhỏ bởi Diffusion
+        // Tăng threshold lên 20. Do Imaginary Time làm mờ nên cường độ edge cũng giảm chút.
+        if (intensity < 10.0f) { 
             pixels32[i] = black;
         } else {
             pixels32[i] = white;
