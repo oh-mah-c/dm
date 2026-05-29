@@ -87,5 +87,69 @@ namespace algorithm {
         }
     }
 
+    // Một hàm tạo số ngẫu nhiên Xorshift32 siêu tốc
+    static inline uint32_t xorshift32(uint32_t* state) {
+        uint32_t x = *state;
+        x ^= x << 13;
+        x ^= x >> 17;
+        x ^= x << 5;
+        *state = x;
+        return x;
+    }
+
+    void feynman_path_integral_aa(
+        const std::complex<float>* psi_in, std::complex<float>* aa_out, 
+        int width, int height, int num_paths
+    ) {
+        // Tích phân đường Feynman:
+        // Ánh sáng từ mỗi pixel có cơ hội "nhảy" sang các pixel lân cận.
+        // Hạt di chuyển ngẫu nhiên. Mỗi bước nhảy tiêu tốn Tác dụng (Action S).
+        // Tổng biên độ xác suất = sum(e^(i * S))
+        
+        #pragma omp parallel for
+        for (int y = 0; y < height; ++y) {
+            uint32_t seed = 123456789 + y * 987654321; // RNG state
+            for (int x = 0; x < width; ++x) {
+                int i = y * width + x;
+                std::complex<float> sum_amplitude(0.0f, 0.0f);
+
+                // Nếu pixel hiện tại hoàn toàn tối, bỏ qua (để tăng tốc)
+                // Nhưng trong lý thuyết lượng tử, mọi điểm đều có thể nhận photon.
+                // Để tối ưu, ta bắn photon từ chính nó và tích lũy.
+
+                for (int p = 0; p < num_paths; ++p) {
+                    int cx = x;
+                    int cy = y;
+                    float action = 0.0f;
+                    
+                    // Thực hiện một vài bước nhảy (Random Walk)
+                    int max_steps = 3; 
+                    for (int step = 0; step < max_steps; ++step) {
+                        uint32_t rand_val = xorshift32(&seed);
+                        int dir = rand_val % 4; // 0: L, 1: R, 2: U, 3: D
+                        if (dir == 0 && cx > 0) cx--;
+                        else if (dir == 1 && cx < width - 1) cx++;
+                        else if (dir == 2 && cy > 0) cy--;
+                        else if (dir == 3 && cy < height - 1) cy++;
+
+                        // Tác dụng tăng lên theo số bước
+                        action += 1.0f; // S = integral(L dt)
+                    }
+
+                    // Tới điểm đích, lấy biên độ gốc tại đó
+                    std::complex<float> origin_amp = psi_in[cy * width + cx];
+                    
+                    // e^{i S / hbar}, giả sử hbar = 1
+                    std::complex<float> phase_factor(std::cos(action), std::sin(action));
+                    
+                    sum_amplitude += origin_amp * phase_factor;
+                }
+
+                // Trung bình hóa (Normalization)
+                aa_out[i] = sum_amplitude / static_cast<float>(num_paths);
+            }
+        }
+    }
+
 } // namespace algorithm
 } // namespace dm

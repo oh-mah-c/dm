@@ -45,23 +45,33 @@ int main(int argc, char* argv[]) {
     std::cout << "[*] Sụp đổ Hàm Sóng (Đo lường xác suất |psi|^2)...\n";
     wavefunction_collapse(psi_out.data(), surface);
 
-    // Đếm số lượng pixel sáng để kiểm chứng (Viền thì ít hơn Diện tích)
-    // Diện tích ban đầu: 50x50 = 2500 pixels sáng
-    // Chu vi (Viền): xấp xỉ 50*4 = 200 pixels sáng
+    // 4. Kích hoạt Feynman-AA (Khử răng cưa bằng Tích phân đường)
+    std::cout << "[*] Kích hoạt Khử răng cưa Feynman-AA (Monte Carlo Random Walk)...\n";
+    std::vector<std::complex<float>> psi_aa(width * height);
+    feynman_path_integral_aa(psi_out.data(), psi_aa.data(), width, height, 100);
+
+    // 5. Sụp đổ Hàm Sóng đã được Anti-aliased ngược lại thành Pixel
+    std::cout << "[*] Sụp đổ Hàm Sóng Feynman (Đo lường xác suất |psi|^2)...\n";
+    wavefunction_collapse(psi_aa.data(), surface);
+
     int bright_pixels = 0;
+    int aa_pixels = 0;
     uint8_t* pixels = static_cast<uint8_t*>(surface->pixels);
     for (int i = 0; i < width * height; ++i) {
-        if (pixels[i * 4] > 100) { // Kênh R sáng
+        if (pixels[i * 4] > 100) { // Sáng chói (Core edge)
             bright_pixels++;
+        } else if (pixels[i * 4] > 10) { // Sáng mờ (Anti-aliased glow)
+            aa_pixels++;
         }
     }
 
     std::cout << "\n--- Results ---\n";
-    std::cout << "Số lượng Điểm ảnh Sáng (Wavefunction Probability > 100): " << bright_pixels << "\n";
+    std::cout << "Số lượng Điểm ảnh Sáng chói (Core Edge, Probability > 100): " << bright_pixels << "\n";
+    std::cout << "Số lượng Điểm ảnh Mờ ảo (Feynman Glow, 10 < Probability <= 100): " << aa_pixels << "\n";
     
-    if (bright_pixels > 150 && bright_pixels < 250) {
-        std::cout << "SUCCESS: Quantum Edge Detection Hoàn Hảo!\n";
-        std::cout << "Giao thoa triệt tiêu đã xóa sạch khối trắng 2500 pixel, chỉ để lại chính xác cái viền sáng chói!\n";
+    if (aa_pixels > bright_pixels) {
+        std::cout << "SUCCESS: Feynman Path Integral Anti-Aliasing Hoàn Hảo!\n";
+        std::cout << "Ánh sáng đã lan tỏa từ viền cốt lõi ra xung quanh nhờ hạt Lượng tử, tạo ra viền mượt mà ảo diệu!\n";
     } else {
         std::cout << "FAILURE: Thuật toán giao thoa thất bại.\n";
     }

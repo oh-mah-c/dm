@@ -19,5 +19,13 @@ namespace algorithm {
         int width, int height
     );
 
+    // Khử răng cưa bằng Tích phân đường Feynman
+    // psi_in: Hàm sóng gốc (có viền răng cưa)
+    // aa_out: Hàm sóng sau khi khử răng cưa (mờ ảo, lan tỏa hạt)
+    void feynman_path_integral_aa(
+        const std::complex<float>* psi_in, std::complex<float>* aa_out, 
+        int width, int height, int num_paths
+    );
+
 } // namespace algorithm
 } // namespace dm
