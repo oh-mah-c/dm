@@ -44,11 +44,14 @@ list(FILTER DM_TOK_SRCS EXCLUDE REGEX ".*/main\\.c$")
 list(FILTER DM_TOK_SRCS EXCLUDE REGEX ".*/hust_tokenize\\.c$")
 
 # Algorithms
-file(GLOB DM_ALG_SRCS  ${DM_SRC}/algorithms/*.c)
+file(GLOB DM_ALG_SRCS  ${DM_SRC}/algorithms/*.c ${DM_SRC}/algorithms/*.cpp)
 
 # Models — C++ files only (train.cpp are standalone binaries, excluded here)
 file(GLOB_RECURSE DM_MODEL_SRCS ${DM_SRC}/models/**/*.cpp)
 list(FILTER DM_MODEL_SRCS EXCLUDE REGEX ".*/train\\.cpp$")
+list(FILTER DM_MODEL_SRCS EXCLUDE REGEX ".*/infer\\.cpp$")
+list(FILTER DM_MODEL_SRCS EXCLUDE REGEX ".*/test_.*\\.cpp$")
+list(FILTER DM_MODEL_SRCS EXCLUDE REGEX ".*/kan\\.cpp$")
 
 # Tools — each is its own binary, collect them separately
 file(GLOB DM_TOOL_SRCS ${DM_SRC}/tools/*.c)
@@ -68,6 +71,7 @@ target_include_directories(dm_core PUBLIC
     ${DM_INCLUDE}/algorithms
     ${DM_INCLUDE}/tokenizer
     ${DM_INCLUDE}/models
+    ${DM_INCLUDE}/modules
     ${DM_SRC}
     ${VULKANHPP_INCLUDE}
     ${Vulkan_INCLUDE_DIRS}
