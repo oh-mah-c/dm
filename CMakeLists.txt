@@ -14,6 +14,13 @@ set(DM_SRC      ${DM_ROOT}/src)
 
 set(LIBTORCH_DIR  ${DM_ROOT}/src/core/pytorch/dist)
 set(VULKANHPP_DIR ${DM_ROOT}/src/core/gpu/Vulkan-Hpp)
+set(SDL2_DIR ${DM_ROOT}/src/core/SDL2)
+
+# ── SDL2 (Native Core) ────────────────────────────────────────────────────────
+set(SDL_SHARED OFF CACHE BOOL "Build a shared version of the library" FORCE)
+set(SDL_STATIC ON CACHE BOOL "Build a static version of the library" FORCE)
+set(SDL_TEST OFF CACHE BOOL "Build the test directory" FORCE)
+add_subdirectory(${SDL2_DIR})
 
 # ── LibTorch ──────────────────────────────────────────────────────────────────
 list(APPEND CMAKE_PREFIX_PATH ${LIBTORCH_DIR})
@@ -74,11 +81,13 @@ target_include_directories(dm_core PUBLIC
     ${DM_SRC}
     ${VULKANHPP_INCLUDE}
     ${Vulkan_INCLUDE_DIRS}
+    ${SDL2_DIR}/include
     # LibTorch headers (C++ — used by any .cpp that links dm_core)
     ${TORCH_INCLUDE_DIRS}
 )
 
 target_link_libraries(dm_core PUBLIC
+    SDL2::SDL2-static
     Vulkan::Vulkan
     ${TORCH_LIBRARIES}
     m       # math
