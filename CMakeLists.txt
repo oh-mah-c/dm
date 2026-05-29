@@ -51,7 +51,6 @@ file(GLOB_RECURSE DM_MODEL_SRCS ${DM_SRC}/models/**/*.cpp)
 list(FILTER DM_MODEL_SRCS EXCLUDE REGEX ".*/train\\.cpp$")
 list(FILTER DM_MODEL_SRCS EXCLUDE REGEX ".*/infer\\.cpp$")
 list(FILTER DM_MODEL_SRCS EXCLUDE REGEX ".*/test_.*\\.cpp$")
-list(FILTER DM_MODEL_SRCS EXCLUDE REGEX ".*/kan\\.cpp$")
 
 # Tools — each is its own binary, collect them separately
 file(GLOB DM_TOOL_SRCS ${DM_SRC}/tools/*.c)

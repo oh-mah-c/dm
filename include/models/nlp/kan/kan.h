@@ -20,7 +20,7 @@
 //   l_total = l_pred + λ · Σ_l (μ1·|Φ_l|_1 + μ2·S(Φ_l))
 //
 // The reusable primitive dm::prim::KANLinear lives in:
-//   <torch/nn/modules/kan_linear.h>
+//   "models/nlp/primitives/kan_linear.h"
 //
 // Architecture notation [n_0, n_1, ..., n_L]:
 //   n_0 = input dim, n_L = output dim, L = number of layers.

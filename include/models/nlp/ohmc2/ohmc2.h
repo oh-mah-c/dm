@@ -9,9 +9,9 @@
 
 #include <torch/torch.h>
 #include <torch/nn/modules/kan_linear.h>
-#include <torch/nn/modules/ohm_block_drop.h>
-#include <torch/nn/modules/ohm_hard_router.h>
-#include <torch/nn/modules/ohm_ring_kv.h>
+#include "models/nlp/primitives/ohm_block_drop.h"
+#include "models/nlp/primitives/ohm_hard_router.h"
+#include "models/nlp/primitives/ohm_ring_kv.h"
 
 #include <cstdint>
 #include <string>
