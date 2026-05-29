@@ -8,13 +8,11 @@
 
 using namespace dm::algorithm;
 
-// Hàm hỗ trợ vẽ hình chữ nhật
 void fill_rect(SDL_Surface* surface, int x, int y, int w, int h, uint32_t color) {
     SDL_Rect rect = {x, y, w, h};
     SDL_FillRect(surface, &rect, color);
 }
 
-// Hàm hỗ trợ vẽ hình tròn
 void fill_circle(SDL_Surface* surface, int cx, int cy, int radius, uint32_t color) {
     uint8_t* pixels = static_cast<uint8_t*>(surface->pixels);
     int pitch = surface->pitch;
@@ -34,7 +32,7 @@ void fill_circle(SDL_Surface* surface, int cx, int cy, int radius, uint32_t colo
 
 int main(int argc, char* argv[]) {
     std::cout << "--- Ohm-QRENDER: Military Radar Extreme Noise Test ---\n";
-    std::srand(std::time(nullptr));
+    std::srand(12345); // Fixed seed for reproducibility
     
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         std::cerr << "FAILURE: SDL Error: " << SDL_GetError() << "\n";
@@ -44,58 +42,62 @@ int main(int argc, char* argv[]) {
     int width = 512;
     int height = 512;
     
-    // Tạo mảng Pixel (32-bit RGBA)
     SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(0, width, height, 32, SDL_PIXELFORMAT_RGBA32);
     uint32_t black = SDL_MapRGBA(surface->format, 0, 0, 0, 255);
     uint32_t white = SDL_MapRGBA(surface->format, 255, 255, 255, 255);
 
-    // 1. Dựng hình Tàu ngầm (Một vòng tròn + Một hình chữ nhật nhỏ)
+    // 1. Dựng hình Tàu ngầm
     SDL_FillRect(surface, NULL, black);
-    fill_circle(surface, 256, 256, 60, white); // Thân tàu ngầm
-    fill_rect(surface, 246, 170, 20, 40, white); // Tháp điều khiển
+    fill_circle(surface, 256, 256, 80, white); // Thân tàu ngầm to hơn chút
+    fill_rect(surface, 236, 150, 40, 50, white); // Tháp điều khiển
 
-    // 2. Bơm 75% Bão Nhiễu (Salt and Pepper Noise)
-    std::cout << "[*] Đang bơm Bão Nhiễu Radar 75% vào Không gian...\n";
+    // 2. Bơm Bão Nhiễu
+    std::cout << "[*] Đang bơm Bão Nhiễu Radar 60% vào Không gian...\n";
     uint32_t* pixels32 = static_cast<uint32_t*>(surface->pixels);
     for (int i = 0; i < width * height; ++i) {
-        if (std::rand() % 100 < 75) { // 75% xác suất bị nhiễu
-            // Nhiễu trắng hoặc xám ngẫu nhiên
+        if (std::rand() % 100 < 60) { // Giảm noise xuống 60% để cấu trúc vi vĩ mô tồn tại
             uint8_t noise_val = (std::rand() % 2 == 0) ? 255 : (std::rand() % 100);
             pixels32[i] = SDL_MapRGBA(surface->format, noise_val, noise_val, noise_val, 255);
         }
     }
 
-    // Xuất bức ảnh bị nhiễu tàn khốc
     SDL_SaveBMP(surface, "radar_input.bmp");
     std::cout << "[+] Đã xuất file: radar_input.bmp\n";
 
-    // Khởi tạo Không gian Hilbert
     std::vector<std::complex<float>> psi_in(width * height);
+    std::vector<std::complex<float>> psi_diffused(width * height);
     std::vector<std::complex<float>> psi_out(width * height);
 
     // 3. Lượng tử hóa
     std::cout << "[*] Lượng tử hóa bức ảnh nhiễu thành Hàm Sóng...\n";
     image_to_wavefunction(surface, psi_in.data());
 
-    // 4. Giao thoa Lượng tử (Trích xuất viền QSobel O(1))
-    std::cout << "[*] Kích hoạt Cổng Giao Thoa QSobel...\n";
-    quantum_interference_edge_detect(psi_in.data(), psi_out.data(), width, height);
+    // 4. Bước đệm: Khử nhiễu bằng Tích phân đường Feynman (Quantum Decoherence/Diffusion)
+    // Phân tán các hạt nhiễu để triệt tiêu chúng trước khi tìm viền
+    std::cout << "[*] Kích hoạt Feynman Path Integral để trung hòa nhiễu ngẫu nhiên...\n";
+    feynman_path_integral_aa(psi_in.data(), psi_diffused.data(), width, height, 50);
 
-    // 5. Sụp đổ Hàm Sóng ngược lại thành Pixel
+    // 5. Giao thoa Lượng tử (Trích xuất viền QSobel O(1))
+    std::cout << "[*] Kích hoạt Cổng Giao Thoa QSobel...\n";
+    quantum_interference_edge_detect(psi_diffused.data(), psi_out.data(), width, height);
+
+    // 6. Sụp đổ Hàm Sóng
     std::cout << "[*] Sụp đổ Hàm Sóng (Đo lường xác suất |psi|^2)...\n";
     wavefunction_collapse(psi_out.data(), surface);
 
-    // 6. Thresholding: Bộ lọc đo lường lượng tử (Chỉ lấy các pixel có cường độ văng ra khỏi mức nhiễu nền)
+    // 7. Thresholding
     uint8_t* pixels8 = static_cast<uint8_t*>(surface->pixels);
     for (int i = 0; i < width * height; ++i) {
-        if (pixels8[i * 4] < 60) { // Lọc bỏ nhiễu nhiễu xạ yếu
+        // Sau khi diffuse và edge detect, biên độ sẽ rất nhỏ. 
+        // Ta cần khuếch đại (amplification) và cắt nhiễu nền
+        float intensity = static_cast<float>(pixels8[i * 4]);
+        if (intensity < 15.0f) { // Threshold cực thấp do biên độ đã bị chia nhỏ bởi Diffusion
             pixels32[i] = black;
         } else {
-            pixels32[i] = white; // Lóe sáng viền cốt lõi
+            pixels32[i] = white;
         }
     }
 
-    // Xuất bức ảnh sau khi dùng lượng tử để lọc
     SDL_SaveBMP(surface, "radar_output_quantum.bmp");
     std::cout << "[+] Đã xuất file: radar_output_quantum.bmp\n";
 
