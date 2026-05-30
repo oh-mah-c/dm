@@ -634,6 +634,8 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 
 **[160]** H. Yesiltepe, J. Hu, T. H. S. Meral, A. K. Akan, K. Oktay, H. Eldardiry, and P. Yanardag, "VideoMLA: Low-Rank Latent KV Cache for Minute-Scale Autoregressive Video Diffusion," arXiv:2605.30351v1, 2026. https://arxiv.org/abs/2605.30351 *(Ohm-VideoMLA — Multi-Head Latent Attention; 92.7% VRAM reduction; decoupled 3D-RoPE; down-projection/up-projection)*
 
+**[161]** D. Faccio, A. Velten, and G. Wetzstein, "Non-Line-of-Sight Imaging," arXiv:2005.08026v1, 2020. https://arxiv.org/abs/2005.08026 *(Ohm-Q NLOS — Quantum Seeing Around Corners; Time-Reversal backward wave propagation; Constructive phase interference)*
+
 ---
 
 ## Strong MFHOI-Miner Experiments
