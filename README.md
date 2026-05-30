@@ -636,6 +636,8 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 
 **[161]** D. Faccio, A. Velten, and G. Wetzstein, "Non-Line-of-Sight Imaging," arXiv:2005.08026v1, 2020. https://arxiv.org/abs/2005.08026 *(Ohm-Q NLOS — Quantum Seeing Around Corners; Time-Reversal backward wave propagation; Constructive phase interference)*
 
+**[162]** H. Lee, J. Lee, and K. Jun, "High-Fidelity ROI CT Reconstruction with Limited Quantum Resources via Hybrid Classical-Quantum Refinement," arXiv:2605.29472v1, 2026. https://arxiv.org/abs/2605.29472 *(Ohm-Q Hybrid — Quantum ROI Refinement; Classical Coarse Pass; Residual QUBO formulation)*
+
 ---
 
 ## Strong MFHOI-Miner Experiments
