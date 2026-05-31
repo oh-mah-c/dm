@@ -15,6 +15,7 @@ set(DM_SRC      ${DM_ROOT}/src)
 set(LIBTORCH_DIR  ${DM_ROOT}/src/core/pytorch/dist)
 set(VULKANHPP_DIR ${DM_ROOT}/src/core/gpu/Vulkan-Hpp)
 set(SDL2_DIR ${DM_ROOT}/src/core/SDL2)
+set(MUJOCO_DIR ${DM_ROOT}/src/core/physics/mujoco)
 
 # ── SDL2 (Native Core) ────────────────────────────────────────────────────────
 set(SDL_SHARED OFF CACHE BOOL "Build a shared version of the library" FORCE)
@@ -36,6 +37,12 @@ message(STATUS "Vulkan: ${Vulkan_LIBRARIES}")
 # Vulkan-Hpp/vulkan/ (source) — both work; use installed path.
 set(VULKANHPP_INCLUDE ${VULKANHPP_DIR}/dist/include)
 
+# ── MuJoCo (Physics Engine) ───────────────────────────────────────────────────
+set(MUJOCO_BUILD_EXAMPLES OFF CACHE BOOL "Disable MuJoCo examples" FORCE)
+set(MUJOCO_BUILD_SIMULATE OFF CACHE BOOL "Disable MuJoCo simulate binary" FORCE)
+set(MUJOCO_BUILD_TESTS OFF CACHE BOOL "Disable MuJoCo tests" FORCE)
+add_subdirectory(${MUJOCO_DIR} EXCLUDE_FROM_ALL)
+
 # ── Collect sources ───────────────────────────────────────────────────────────
 
 # Core C files (dm_arena, dm_dataset, etc.)
@@ -55,6 +62,8 @@ file(GLOB DM_ALG_SRCS  ${DM_SRC}/algorithms/*.c ${DM_SRC}/algorithms/*.cpp)
 
 # Models — C++ files only (train.cpp are standalone binaries, excluded here)
 file(GLOB_RECURSE DM_MODEL_SRCS ${DM_SRC}/models/**/*.cpp)
+set(DM_PYTORCH_CUSTOM_SRCS ${DM_SRC}/core/pytorch/torch/csrc/api/src/nn/modules/ohm_qpa.cpp)
+list(APPEND DM_MODEL_SRCS ${DM_PYTORCH_CUSTOM_SRCS})
 list(FILTER DM_MODEL_SRCS EXCLUDE REGEX ".*/train\\.cpp$")
 list(FILTER DM_MODEL_SRCS EXCLUDE REGEX ".*/infer\\.cpp$")
 list(FILTER DM_MODEL_SRCS EXCLUDE REGEX ".*/test_.*\\.cpp$")
@@ -89,6 +98,7 @@ target_include_directories(dm_core PUBLIC
 target_link_libraries(dm_core PUBLIC
     SDL2::SDL2-static
     Vulkan::Vulkan
+    mujoco::mujoco
     ${TORCH_LIBRARIES}
     m       # math
     dl      # dlopen (Vulkan loader)
@@ -101,6 +111,10 @@ target_link_libraries(dm_core PUBLIC
 target_compile_definitions(dm_core PUBLIC
     DM_VULKAN_ENABLED=1
     DM_TORCH_ENABLED=1
+)
+
+target_compile_options(dm_core PUBLIC
+    -mavx2 -mbmi -mbmi2 -mpopcnt
 )
 
 # ── dm main binary ────────────────────────────────────────────────────────────

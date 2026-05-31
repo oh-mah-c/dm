@@ -1,0 +1,221 @@
+//   Copyright Naoki Shibata and contributors 2010 - 2021.
+// Distributed under the Boost Software License, Version 1.0.
+//    (See accompanying file LICENSE.txt or copy at
+//          http://www.boost.org/LICENSE_1_0.txt)
+
+#include <stdint.h>
+#include <assert.h>
+#include <signal.h>
+#include <setjmp.h>
+
+#include "misc.h"
+
+#define SLEEF_IMPORT_IS_EXPORT
+#include "sleef.h"
+
+static int cpuSupportsAVX2() {
+  static int ret = -1;
+  if (ret == -1) {
+    int32_t reg[4];
+    Sleef_x86CpuID(reg, 7, 0);
+    ret = (reg[1] & (1 << 5)) != 0;
+  }
+  return ret;
+}
+
+static int cpuSupportsFMA() {
+  static int ret = -1;
+  if (ret == -1) {
+    int32_t reg[4];
+    Sleef_x86CpuID(reg, 1, 0);
+    ret = (reg[2] & (1 << 12)) != 0;
+  }
+  return ret;
+}
+
+static int cpuSupportsFMA4() {
+  static int ret = -1;
+  if (ret == -1) {
+    int32_t reg[4];
+    Sleef_x86CpuID(reg, 0x80000001, 0);
+    ret = (reg[2] & (1 << 16)) != 0;
+  }
+  return ret;
+}
+
+#ifdef ENABLE_FMA4
+#define SUBST_IF_EXT1(funcfma4) if (cpuSupportsFMA4()) p = funcfma4;
+#else
+#define SUBST_IF_EXT1(funcfma4)
+#endif
+
+#ifdef ENABLE_AVX2
+#define SUBST_IF_EXT2(funcavx2) if (cpuSupportsAVX2() && cpuSupportsFMA()) p = funcavx2;
+#else
+#define SUBST_IF_EXT2(funcavx2)
+#endif
+
+#ifdef ENABLE_ALIAS
+#define VECALIAS_vf_vf(fptype, funcNameS, funcName, veclen)		\
+  EXPORT CONST VECTOR_CC fptype _ZGVcN ## veclen ## v_ ## funcNameS(fptype) __attribute__((alias(stringify(funcName)))); \
+  EXPORT CONST VECTOR_CC fptype _ZGVdN ## veclen ## v_ ## funcNameS(fptype) __attribute__((alias(stringify(funcName))));
+#define VECALIAS_vf_vf_vf(fptype, funcNameS, funcName, veclen)		\
+  EXPORT CONST VECTOR_CC fptype _ZGVcN ## veclen ## vv_ ## funcNameS(fptype, fptype) __attribute__((alias(stringify(funcName)))); \
+  EXPORT CONST VECTOR_CC fptype _ZGVdN ## veclen ## vv_ ## funcNameS(fptype, fptype) __attribute__((alias(stringify(funcName))));
+#define VECALIAS_vf_vf_vf_vf(fptype, funcNameS, funcName, veclen)	\
+  EXPORT CONST VECTOR_CC fptype _ZGVcN ## veclen ## vvv_ ## funcNameS(fptype, fptype, fptype) __attribute__((alias(stringify(funcName)))); \
+  EXPORT CONST VECTOR_CC fptype _ZGVdN ## veclen ## vvv_ ## funcNameS(fptype, fptype, fptype) __attribute__((alias(stringify(funcName))));
+#endif
+
+#include "dispatcher.h"
+
+//
+
+DISPATCH_vf_vf(__m256d, 4, Sleef_sin_u35, Sleef_sind1_u35, Sleef_sind4_u35, pnt_sind4_u35, disp_sind4_u35, Sleef_sind4_u35avx, Sleef_sind4_u35fma4, Sleef_sind4_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_sinf_u35, Sleef_sinf1_u35, Sleef_sinf8_u35, pnt_sinf8_u35, disp_sinf8_u35, Sleef_sinf8_u35avx, Sleef_sinf8_u35fma4, Sleef_sinf8_u35avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_cos_u35, Sleef_cosd1_u35, Sleef_cosd4_u35, pnt_cosd4_u35, disp_cosd4_u35, Sleef_cosd4_u35avx, Sleef_cosd4_u35fma4, Sleef_cosd4_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_cosf_u35, Sleef_cosf1_u35, Sleef_cosf8_u35, pnt_cosf8_u35, disp_cosf8_u35, Sleef_cosf8_u35avx, Sleef_cosf8_u35fma4, Sleef_cosf8_u35avx2)
+DISPATCH_vf2_vf(__m256d, Sleef___m256d_2, 4, Sleef_sincos_u35, Sleef_sincosd1_u35, Sleef_sincosd4_u35, pnt_sincosd4_u35, disp_sincosd4_u35, Sleef_sincosd4_u35avx, Sleef_sincosd4_u35fma4, Sleef_sincosd4_u35avx2)
+DISPATCH_vf2_vf(__m256, Sleef___m256_2, 8, Sleef_sincosf_u35, Sleef_sincosf1_u35, Sleef_sincosf8_u35, pnt_sincosf8_u35, disp_sincosf8_u35, Sleef_sincosf8_u35avx, Sleef_sincosf8_u35fma4, Sleef_sincosf8_u35avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_tan_u35, Sleef_tand1_u35, Sleef_tand4_u35, pnt_tand4_u35, disp_tand4_u35, Sleef_tand4_u35avx, Sleef_tand4_u35fma4, Sleef_tand4_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_tanf_u35, Sleef_tanf1_u35, Sleef_tanf8_u35, pnt_tanf8_u35, disp_tanf8_u35, Sleef_tanf8_u35avx, Sleef_tanf8_u35fma4, Sleef_tanf8_u35avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_asin_u35, Sleef_asind1_u35, Sleef_asind4_u35, pnt_asind4_u35, disp_asind4_u35, Sleef_asind4_u35avx, Sleef_asind4_u35fma4, Sleef_asind4_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_asinf_u35, Sleef_asinf1_u35, Sleef_asinf8_u35, pnt_asinf8_u35, disp_asinf8_u35, Sleef_asinf8_u35avx, Sleef_asinf8_u35fma4, Sleef_asinf8_u35avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_acos_u35, Sleef_acosd1_u35, Sleef_acosd4_u35, pnt_acosd4_u35, disp_acosd4_u35, Sleef_acosd4_u35avx, Sleef_acosd4_u35fma4, Sleef_acosd4_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_acosf_u35, Sleef_acosf1_u35, Sleef_acosf8_u35, pnt_acosf8_u35, disp_acosf8_u35, Sleef_acosf8_u35avx, Sleef_acosf8_u35fma4, Sleef_acosf8_u35avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_atan_u35, Sleef_atand1_u35, Sleef_atand4_u35, pnt_atand4_u35, disp_atand4_u35, Sleef_atand4_u35avx, Sleef_atand4_u35fma4, Sleef_atand4_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_atanf_u35, Sleef_atanf1_u35, Sleef_atanf8_u35, pnt_atanf8_u35, disp_atanf8_u35, Sleef_atanf8_u35avx, Sleef_atanf8_u35fma4, Sleef_atanf8_u35avx2)
+DISPATCH_vf_vf_vf(__m256d, 4, Sleef_atan2_u35, Sleef_atan2d1_u35, Sleef_atan2d4_u35, pnt_atan2d4_u35, disp_atan2d4_u35, Sleef_atan2d4_u35avx, Sleef_atan2d4_u35fma4, Sleef_atan2d4_u35avx2)
+DISPATCH_vf_vf_vf(__m256, 8, Sleef_atan2f_u35, Sleef_atan2f1_u35, Sleef_atan2f8_u35, pnt_atan2f8_u35, disp_atan2f8_u35, Sleef_atan2f8_u35avx, Sleef_atan2f8_u35fma4, Sleef_atan2f8_u35avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_log_u35, Sleef_logd1_u35, Sleef_logd4_u35, pnt_logd4_u35, disp_logd4_u35, Sleef_logd4_u35avx, Sleef_logd4_u35fma4, Sleef_logd4_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_logf_u35, Sleef_logf1_u35, Sleef_logf8_u35, pnt_logf8_u35, disp_logf8_u35, Sleef_logf8_u35avx, Sleef_logf8_u35fma4, Sleef_logf8_u35avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_cbrt_u35, Sleef_cbrtd1_u35, Sleef_cbrtd4_u35, pnt_cbrtd4_u35, disp_cbrtd4_u35, Sleef_cbrtd4_u35avx, Sleef_cbrtd4_u35fma4, Sleef_cbrtd4_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_cbrtf_u35, Sleef_cbrtf1_u35, Sleef_cbrtf8_u35, pnt_cbrtf8_u35, disp_cbrtf8_u35, Sleef_cbrtf8_u35avx, Sleef_cbrtf8_u35fma4, Sleef_cbrtf8_u35avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_sin_u10, Sleef_sind1_u10, Sleef_sind4_u10, pnt_sind4_u10, disp_sind4_u10, Sleef_sind4_u10avx, Sleef_sind4_u10fma4, Sleef_sind4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_sinf_u10, Sleef_sinf1_u10, Sleef_sinf8_u10, pnt_sinf8_u10, disp_sinf8_u10, Sleef_sinf8_u10avx, Sleef_sinf8_u10fma4, Sleef_sinf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_cos_u10, Sleef_cosd1_u10, Sleef_cosd4_u10, pnt_cosd4_u10, disp_cosd4_u10, Sleef_cosd4_u10avx, Sleef_cosd4_u10fma4, Sleef_cosd4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_cosf_u10, Sleef_cosf1_u10, Sleef_cosf8_u10, pnt_cosf8_u10, disp_cosf8_u10, Sleef_cosf8_u10avx, Sleef_cosf8_u10fma4, Sleef_cosf8_u10avx2)
+DISPATCH_vf2_vf(__m256d, Sleef___m256d_2, 4, Sleef_sincos_u10, Sleef_sincosd1_u10, Sleef_sincosd4_u10, pnt_sincosd4_u10, disp_sincosd4_u10, Sleef_sincosd4_u10avx, Sleef_sincosd4_u10fma4, Sleef_sincosd4_u10avx2)
+DISPATCH_vf2_vf(__m256, Sleef___m256_2, 8, Sleef_sincosf_u10, Sleef_sincosf1_u10, Sleef_sincosf8_u10, pnt_sincosf8_u10, disp_sincosf8_u10, Sleef_sincosf8_u10avx, Sleef_sincosf8_u10fma4, Sleef_sincosf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_tan_u10, Sleef_tand1_u10, Sleef_tand4_u10, pnt_tand4_u10, disp_tand4_u10, Sleef_tand4_u10avx, Sleef_tand4_u10fma4, Sleef_tand4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_tanf_u10, Sleef_tanf1_u10, Sleef_tanf8_u10, pnt_tanf8_u10, disp_tanf8_u10, Sleef_tanf8_u10avx, Sleef_tanf8_u10fma4, Sleef_tanf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_asin_u10, Sleef_asind1_u10, Sleef_asind4_u10, pnt_asind4_u10, disp_asind4_u10, Sleef_asind4_u10avx, Sleef_asind4_u10fma4, Sleef_asind4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_asinf_u10, Sleef_asinf1_u10, Sleef_asinf8_u10, pnt_asinf8_u10, disp_asinf8_u10, Sleef_asinf8_u10avx, Sleef_asinf8_u10fma4, Sleef_asinf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_acos_u10, Sleef_acosd1_u10, Sleef_acosd4_u10, pnt_acosd4_u10, disp_acosd4_u10, Sleef_acosd4_u10avx, Sleef_acosd4_u10fma4, Sleef_acosd4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_acosf_u10, Sleef_acosf1_u10, Sleef_acosf8_u10, pnt_acosf8_u10, disp_acosf8_u10, Sleef_acosf8_u10avx, Sleef_acosf8_u10fma4, Sleef_acosf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_atan_u10, Sleef_atand1_u10, Sleef_atand4_u10, pnt_atand4_u10, disp_atand4_u10, Sleef_atand4_u10avx, Sleef_atand4_u10fma4, Sleef_atand4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_atanf_u10, Sleef_atanf1_u10, Sleef_atanf8_u10, pnt_atanf8_u10, disp_atanf8_u10, Sleef_atanf8_u10avx, Sleef_atanf8_u10fma4, Sleef_atanf8_u10avx2)
+DISPATCH_vf_vf_vf(__m256d, 4, Sleef_atan2_u10, Sleef_atan2d1_u10, Sleef_atan2d4_u10, pnt_atan2d4_u10, disp_atan2d4_u10, Sleef_atan2d4_u10avx, Sleef_atan2d4_u10fma4, Sleef_atan2d4_u10avx2)
+DISPATCH_vf_vf_vf(__m256, 8, Sleef_atan2f_u10, Sleef_atan2f1_u10, Sleef_atan2f8_u10, pnt_atan2f8_u10, disp_atan2f8_u10, Sleef_atan2f8_u10avx, Sleef_atan2f8_u10fma4, Sleef_atan2f8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_log_u10, Sleef_logd1_u10, Sleef_logd4_u10, pnt_logd4_u10, disp_logd4_u10, Sleef_logd4_u10avx, Sleef_logd4_u10fma4, Sleef_logd4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_logf_u10, Sleef_logf1_u10, Sleef_logf8_u10, pnt_logf8_u10, disp_logf8_u10, Sleef_logf8_u10avx, Sleef_logf8_u10fma4, Sleef_logf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_cbrt_u10, Sleef_cbrtd1_u10, Sleef_cbrtd4_u10, pnt_cbrtd4_u10, disp_cbrtd4_u10, Sleef_cbrtd4_u10avx, Sleef_cbrtd4_u10fma4, Sleef_cbrtd4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_cbrtf_u10, Sleef_cbrtf1_u10, Sleef_cbrtf8_u10, pnt_cbrtf8_u10, disp_cbrtf8_u10, Sleef_cbrtf8_u10avx, Sleef_cbrtf8_u10fma4, Sleef_cbrtf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_exp_u10, Sleef_expd1_u10, Sleef_expd4_u10, pnt_expd4_u10, disp_expd4_u10, Sleef_expd4_u10avx, Sleef_expd4_u10fma4, Sleef_expd4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_expf_u10, Sleef_expf1_u10, Sleef_expf8_u10, pnt_expf8_u10, disp_expf8_u10, Sleef_expf8_u10avx, Sleef_expf8_u10fma4, Sleef_expf8_u10avx2)
+DISPATCH_vf_vf_vf(__m256d, 4, Sleef_pow_u10, Sleef_powd1_u10, Sleef_powd4_u10, pnt_powd4_u10, disp_powd4_u10, Sleef_powd4_u10avx, Sleef_powd4_u10fma4, Sleef_powd4_u10avx2)
+DISPATCH_vf_vf_vf(__m256, 8, Sleef_powf_u10, Sleef_powf1_u10, Sleef_powf8_u10, pnt_powf8_u10, disp_powf8_u10, Sleef_powf8_u10avx, Sleef_powf8_u10fma4, Sleef_powf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_sinh_u10, Sleef_sinhd1_u10, Sleef_sinhd4_u10, pnt_sinhd4_u10, disp_sinhd4_u10, Sleef_sinhd4_u10avx, Sleef_sinhd4_u10fma4, Sleef_sinhd4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_sinhf_u10, Sleef_sinhf1_u10, Sleef_sinhf8_u10, pnt_sinhf8_u10, disp_sinhf8_u10, Sleef_sinhf8_u10avx, Sleef_sinhf8_u10fma4, Sleef_sinhf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_cosh_u10, Sleef_coshd1_u10, Sleef_coshd4_u10, pnt_coshd4_u10, disp_coshd4_u10, Sleef_coshd4_u10avx, Sleef_coshd4_u10fma4, Sleef_coshd4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_coshf_u10, Sleef_coshf1_u10, Sleef_coshf8_u10, pnt_coshf8_u10, disp_coshf8_u10, Sleef_coshf8_u10avx, Sleef_coshf8_u10fma4, Sleef_coshf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_tanh_u10, Sleef_tanhd1_u10, Sleef_tanhd4_u10, pnt_tanhd4_u10, disp_tanhd4_u10, Sleef_tanhd4_u10avx, Sleef_tanhd4_u10fma4, Sleef_tanhd4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_tanhf_u10, Sleef_tanhf1_u10, Sleef_tanhf8_u10, pnt_tanhf8_u10, disp_tanhf8_u10, Sleef_tanhf8_u10avx, Sleef_tanhf8_u10fma4, Sleef_tanhf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_sinh_u35, Sleef_sinhd1_u35, Sleef_sinhd4_u35, pnt_sinhd4_u35, disp_sinhd4_u35, Sleef_sinhd4_u35avx, Sleef_sinhd4_u35fma4, Sleef_sinhd4_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_sinhf_u35, Sleef_sinhf1_u35, Sleef_sinhf8_u35, pnt_sinhf8_u35, disp_sinhf8_u35, Sleef_sinhf8_u35avx, Sleef_sinhf8_u35fma4, Sleef_sinhf8_u35avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_cosh_u35, Sleef_coshd1_u35, Sleef_coshd4_u35, pnt_coshd4_u35, disp_coshd4_u35, Sleef_coshd4_u35avx, Sleef_coshd4_u35fma4, Sleef_coshd4_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_coshf_u35, Sleef_coshf1_u35, Sleef_coshf8_u35, pnt_coshf8_u35, disp_coshf8_u35, Sleef_coshf8_u35avx, Sleef_coshf8_u35fma4, Sleef_coshf8_u35avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_tanh_u35, Sleef_tanhd1_u35, Sleef_tanhd4_u35, pnt_tanhd4_u35, disp_tanhd4_u35, Sleef_tanhd4_u35avx, Sleef_tanhd4_u35fma4, Sleef_tanhd4_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_tanhf_u35, Sleef_tanhf1_u35, Sleef_tanhf8_u35, pnt_tanhf8_u35, disp_tanhf8_u35, Sleef_tanhf8_u35avx, Sleef_tanhf8_u35fma4, Sleef_tanhf8_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_fastsinf_u3500, Sleef_fastsinf1_u3500, Sleef_fastsinf8_u3500, pnt_fastsinf8_u3500, disp_fastsinf8_u3500, Sleef_fastsinf8_u3500avx, Sleef_fastsinf8_u3500fma4, Sleef_fastsinf8_u3500avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_fastcosf_u3500, Sleef_fastcosf1_u3500, Sleef_fastcosf8_u3500, pnt_fastcosf8_u3500, disp_fastcosf8_u3500, Sleef_fastcosf8_u3500avx, Sleef_fastcosf8_u3500fma4, Sleef_fastcosf8_u3500avx2)
+DISPATCH_vf_vf_vf(__m256, 8, Sleef_fastpowf_u3500, Sleef_fastpowf1_u3500, Sleef_fastpowf8_u3500, pnt_fastpowf8_u3500, disp_fastpowf8_u3500, Sleef_fastpowf8_u3500avx, Sleef_fastpowf8_u3500fma4, Sleef_fastpowf8_u3500avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_asinh_u10, Sleef_asinhd1_u10, Sleef_asinhd4_u10, pnt_asinhd4_u10, disp_asinhd4_u10, Sleef_asinhd4_u10avx, Sleef_asinhd4_u10fma4, Sleef_asinhd4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_asinhf_u10, Sleef_asinhf1_u10, Sleef_asinhf8_u10, pnt_asinhf8_u10, disp_asinhf8_u10, Sleef_asinhf8_u10avx, Sleef_asinhf8_u10fma4, Sleef_asinhf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_acosh_u10, Sleef_acoshd1_u10, Sleef_acoshd4_u10, pnt_acoshd4_u10, disp_acoshd4_u10, Sleef_acoshd4_u10avx, Sleef_acoshd4_u10fma4, Sleef_acoshd4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_acoshf_u10, Sleef_acoshf1_u10, Sleef_acoshf8_u10, pnt_acoshf8_u10, disp_acoshf8_u10, Sleef_acoshf8_u10avx, Sleef_acoshf8_u10fma4, Sleef_acoshf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_atanh_u10, Sleef_atanhd1_u10, Sleef_atanhd4_u10, pnt_atanhd4_u10, disp_atanhd4_u10, Sleef_atanhd4_u10avx, Sleef_atanhd4_u10fma4, Sleef_atanhd4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_atanhf_u10, Sleef_atanhf1_u10, Sleef_atanhf8_u10, pnt_atanhf8_u10, disp_atanhf8_u10, Sleef_atanhf8_u10avx, Sleef_atanhf8_u10fma4, Sleef_atanhf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_exp2_u10, Sleef_exp2d1_u10, Sleef_exp2d4_u10, pnt_exp2d4_u10, disp_exp2d4_u10, Sleef_exp2d4_u10avx, Sleef_exp2d4_u10fma4, Sleef_exp2d4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_exp2f_u10, Sleef_exp2f1_u10, Sleef_exp2f8_u10, pnt_exp2f8_u10, disp_exp2f8_u10, Sleef_exp2f8_u10avx, Sleef_exp2f8_u10fma4, Sleef_exp2f8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_exp2_u35, Sleef_exp2d1_u35, Sleef_exp2d4_u35, pnt_exp2d4_u35, disp_exp2d4_u35, Sleef_exp2d4_u35avx, Sleef_exp2d4_u35fma4, Sleef_exp2d4_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_exp2f_u35, Sleef_exp2f1_u35, Sleef_exp2f8_u35, pnt_exp2f8_u35, disp_exp2f8_u35, Sleef_exp2f8_u35avx, Sleef_exp2f8_u35fma4, Sleef_exp2f8_u35avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_exp10_u10, Sleef_exp10d1_u10, Sleef_exp10d4_u10, pnt_exp10d4_u10, disp_exp10d4_u10, Sleef_exp10d4_u10avx, Sleef_exp10d4_u10fma4, Sleef_exp10d4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_exp10f_u10, Sleef_exp10f1_u10, Sleef_exp10f8_u10, pnt_exp10f8_u10, disp_exp10f8_u10, Sleef_exp10f8_u10avx, Sleef_exp10f8_u10fma4, Sleef_exp10f8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_exp10_u35, Sleef_exp10d1_u35, Sleef_exp10d4_u35, pnt_exp10d4_u35, disp_exp10d4_u35, Sleef_exp10d4_u35avx, Sleef_exp10d4_u35fma4, Sleef_exp10d4_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_exp10f_u35, Sleef_exp10f1_u35, Sleef_exp10f8_u35, pnt_exp10f8_u35, disp_exp10f8_u35, Sleef_exp10f8_u35avx, Sleef_exp10f8_u35fma4, Sleef_exp10f8_u35avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_expm1_u10, Sleef_expm1d1_u10, Sleef_expm1d4_u10, pnt_expm1d4_u10, disp_expm1d4_u10, Sleef_expm1d4_u10avx, Sleef_expm1d4_u10fma4, Sleef_expm1d4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_expm1f_u10, Sleef_expm1f1_u10, Sleef_expm1f8_u10, pnt_expm1f8_u10, disp_expm1f8_u10, Sleef_expm1f8_u10avx, Sleef_expm1f8_u10fma4, Sleef_expm1f8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_log10_u10, Sleef_log10d1_u10, Sleef_log10d4_u10, pnt_log10d4_u10, disp_log10d4_u10, Sleef_log10d4_u10avx, Sleef_log10d4_u10fma4, Sleef_log10d4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_log10f_u10, Sleef_log10f1_u10, Sleef_log10f8_u10, pnt_log10f8_u10, disp_log10f8_u10, Sleef_log10f8_u10avx, Sleef_log10f8_u10fma4, Sleef_log10f8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_log2_u10, Sleef_log2d1_u10, Sleef_log2d4_u10, pnt_log2d4_u10, disp_log2d4_u10, Sleef_log2d4_u10avx, Sleef_log2d4_u10fma4, Sleef_log2d4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_log2f_u10, Sleef_log2f1_u10, Sleef_log2f8_u10, pnt_log2f8_u10, disp_log2f8_u10, Sleef_log2f8_u10avx, Sleef_log2f8_u10fma4, Sleef_log2f8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_log2_u35, Sleef_log2d1_u35, Sleef_log2d4_u35, pnt_log2d4_u35, disp_log2d4_u35, Sleef_log2d4_u35avx, Sleef_log2d4_u35fma4, Sleef_log2d4_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_log2f_u35, Sleef_log2f1_u35, Sleef_log2f8_u35, pnt_log2f8_u35, disp_log2f8_u35, Sleef_log2f8_u35avx, Sleef_log2f8_u35fma4, Sleef_log2f8_u35avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_log1p_u10, Sleef_log1pd1_u10, Sleef_log1pd4_u10, pnt_log1pd4_u10, disp_log1pd4_u10, Sleef_log1pd4_u10avx, Sleef_log1pd4_u10fma4, Sleef_log1pd4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_log1pf_u10, Sleef_log1pf1_u10, Sleef_log1pf8_u10, pnt_log1pf8_u10, disp_log1pf8_u10, Sleef_log1pf8_u10avx, Sleef_log1pf8_u10fma4, Sleef_log1pf8_u10avx2)
+DISPATCH_vf2_vf(__m256d, Sleef___m256d_2, 4, Sleef_sincospi_u05, Sleef_sincospid1_u05, Sleef_sincospid4_u05, pnt_sincospid4_u05, disp_sincospid4_u05, Sleef_sincospid4_u05avx, Sleef_sincospid4_u05fma4, Sleef_sincospid4_u05avx2)
+DISPATCH_vf2_vf(__m256, Sleef___m256_2, 8, Sleef_sincospif_u05, Sleef_sincospif1_u05, Sleef_sincospif8_u05, pnt_sincospif8_u05, disp_sincospif8_u05, Sleef_sincospif8_u05avx, Sleef_sincospif8_u05fma4, Sleef_sincospif8_u05avx2)
+DISPATCH_vf2_vf(__m256d, Sleef___m256d_2, 4, Sleef_sincospi_u35, Sleef_sincospid1_u35, Sleef_sincospid4_u35, pnt_sincospid4_u35, disp_sincospid4_u35, Sleef_sincospid4_u35avx, Sleef_sincospid4_u35fma4, Sleef_sincospid4_u35avx2)
+DISPATCH_vf2_vf(__m256, Sleef___m256_2, 8, Sleef_sincospif_u35, Sleef_sincospif1_u35, Sleef_sincospif8_u35, pnt_sincospif8_u35, disp_sincospif8_u35, Sleef_sincospif8_u35avx, Sleef_sincospif8_u35fma4, Sleef_sincospif8_u35avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_sinpi_u05, Sleef_sinpid1_u05, Sleef_sinpid4_u05, pnt_sinpid4_u05, disp_sinpid4_u05, Sleef_sinpid4_u05avx, Sleef_sinpid4_u05fma4, Sleef_sinpid4_u05avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_sinpif_u05, Sleef_sinpif1_u05, Sleef_sinpif8_u05, pnt_sinpif8_u05, disp_sinpif8_u05, Sleef_sinpif8_u05avx, Sleef_sinpif8_u05fma4, Sleef_sinpif8_u05avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_cospi_u05, Sleef_cospid1_u05, Sleef_cospid4_u05, pnt_cospid4_u05, disp_cospid4_u05, Sleef_cospid4_u05avx, Sleef_cospid4_u05fma4, Sleef_cospid4_u05avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_cospif_u05, Sleef_cospif1_u05, Sleef_cospif8_u05, pnt_cospif8_u05, disp_cospif8_u05, Sleef_cospif8_u05avx, Sleef_cospif8_u05fma4, Sleef_cospif8_u05avx2)
+DISPATCH_vf_vf_vi(__m256d, __m128i, 4, Sleef_ldexp, Sleef_ldexpd1, Sleef_ldexpd4, pnt_ldexpd4, disp_ldexpd4, Sleef_ldexpd4_avx, Sleef_ldexpd4_fma4, Sleef_ldexpd4_avx2)
+DISPATCH_vi_vf(__m256d, __m128i, 8, Sleef_ilogb, Sleef_ilogbd1, Sleef_ilogbd4, pnt_ilogbd4, disp_ilogbd4, Sleef_ilogbd4_avx, Sleef_ilogbd4_fma4, Sleef_ilogbd4_avx2)
+DISPATCH_vf_vf_vf_vf(__m256d, 4, Sleef_fma, Sleef_fmad1, Sleef_fmad4, pnt_fmad4, disp_fmad4, Sleef_fmad4_avx, Sleef_fmad4_fma4, Sleef_fmad4_avx2)
+DISPATCH_vf_vf_vf_vf(__m256, 8, Sleef_fmaf, Sleef_fmaf1, Sleef_fmaf8, pnt_fmaf8, disp_fmaf8, Sleef_fmaf8_avx, Sleef_fmaf8_fma4, Sleef_fmaf8_avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_sqrt, Sleef_sqrtd1, Sleef_sqrtd4, pnt_sqrtd4, disp_sqrtd4, Sleef_sqrtd4_avx, Sleef_sqrtd4_fma4, Sleef_sqrtd4_avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_sqrtf, Sleef_sqrtf1, Sleef_sqrtf8, pnt_sqrtf8, disp_sqrtf8, Sleef_sqrtf8_avx, Sleef_sqrtf8_fma4, Sleef_sqrtf8_avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_sqrt_u05, Sleef_sqrtd1_u05, Sleef_sqrtd4_u05, pnt_sqrtd4_u05, disp_sqrtd4_u05, Sleef_sqrtd4_u05avx, Sleef_sqrtd4_u05fma4, Sleef_sqrtd4_u05avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_sqrtf_u05, Sleef_sqrtf1_u05, Sleef_sqrtf8_u05, pnt_sqrtf8_u05, disp_sqrtf8_u05, Sleef_sqrtf8_u05avx, Sleef_sqrtf8_u05fma4, Sleef_sqrtf8_u05avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_sqrt_u35, Sleef_sqrtd1_u35, Sleef_sqrtd4_u35, pnt_sqrtd4_u35, disp_sqrtd4_u35, Sleef_sqrtd4_u35avx, Sleef_sqrtd4_u35fma4, Sleef_sqrtd4_u35avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_sqrtf_u35, Sleef_sqrtf1_u35, Sleef_sqrtf8_u35, pnt_sqrtf8_u35, disp_sqrtf8_u35, Sleef_sqrtf8_u35avx, Sleef_sqrtf8_u35fma4, Sleef_sqrtf8_u35avx2)
+DISPATCH_vf_vf_vf(__m256d, 4, Sleef_hypot_u05, Sleef_hypotd1_u05, Sleef_hypotd4_u05, pnt_hypotd4_u05, disp_hypotd4_u05, Sleef_hypotd4_u05avx, Sleef_hypotd4_u05fma4, Sleef_hypotd4_u05avx2)
+DISPATCH_vf_vf_vf(__m256, 8, Sleef_hypotf_u05, Sleef_hypotf1_u05, Sleef_hypotf8_u05, pnt_hypotf8_u05, disp_hypotf8_u05, Sleef_hypotf8_u05avx, Sleef_hypotf8_u05fma4, Sleef_hypotf8_u05avx2)
+DISPATCH_vf_vf_vf(__m256d, 4, Sleef_hypot_u35, Sleef_hypotd1_u35, Sleef_hypotd4_u35, pnt_hypotd4_u35, disp_hypotd4_u35, Sleef_hypotd4_u35avx, Sleef_hypotd4_u35fma4, Sleef_hypotd4_u35avx2)
+DISPATCH_vf_vf_vf(__m256, 8, Sleef_hypotf_u35, Sleef_hypotf1_u35, Sleef_hypotf8_u35, pnt_hypotf8_u35, disp_hypotf8_u35, Sleef_hypotf8_u35avx, Sleef_hypotf8_u35fma4, Sleef_hypotf8_u35avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_fabs, Sleef_fabsd1, Sleef_fabsd4, pnt_fabsd4, disp_fabsd4, Sleef_fabsd4_avx, Sleef_fabsd4_fma4, Sleef_fabsd4_avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_fabsf, Sleef_fabsf1, Sleef_fabsf8, pnt_fabsf8, disp_fabsf8, Sleef_fabsf8_avx, Sleef_fabsf8_fma4, Sleef_fabsf8_avx2)
+DISPATCH_vf_vf_vf(__m256d, 4, Sleef_copysign, Sleef_copysignd1, Sleef_copysignd4, pnt_copysignd4, disp_copysignd4, Sleef_copysignd4_avx, Sleef_copysignd4_fma4, Sleef_copysignd4_avx2)
+DISPATCH_vf_vf_vf(__m256, 8, Sleef_copysignf, Sleef_copysignf1, Sleef_copysignf8, pnt_copysignf8, disp_copysignf8, Sleef_copysignf8_avx, Sleef_copysignf8_fma4, Sleef_copysignf8_avx2)
+DISPATCH_vf_vf_vf(__m256d, 4, Sleef_fmax, Sleef_fmaxd1, Sleef_fmaxd4, pnt_fmaxd4, disp_fmaxd4, Sleef_fmaxd4_avx, Sleef_fmaxd4_fma4, Sleef_fmaxd4_avx2)
+DISPATCH_vf_vf_vf(__m256, 8, Sleef_fmaxf, Sleef_fmaxf1, Sleef_fmaxf8, pnt_fmaxf8, disp_fmaxf8, Sleef_fmaxf8_avx, Sleef_fmaxf8_fma4, Sleef_fmaxf8_avx2)
+DISPATCH_vf_vf_vf(__m256d, 4, Sleef_fmin, Sleef_fmind1, Sleef_fmind4, pnt_fmind4, disp_fmind4, Sleef_fmind4_avx, Sleef_fmind4_fma4, Sleef_fmind4_avx2)
+DISPATCH_vf_vf_vf(__m256, 8, Sleef_fminf, Sleef_fminf1, Sleef_fminf8, pnt_fminf8, disp_fminf8, Sleef_fminf8_avx, Sleef_fminf8_fma4, Sleef_fminf8_avx2)
+DISPATCH_vf_vf_vf(__m256d, 4, Sleef_fdim, Sleef_fdimd1, Sleef_fdimd4, pnt_fdimd4, disp_fdimd4, Sleef_fdimd4_avx, Sleef_fdimd4_fma4, Sleef_fdimd4_avx2)
+DISPATCH_vf_vf_vf(__m256, 8, Sleef_fdimf, Sleef_fdimf1, Sleef_fdimf8, pnt_fdimf8, disp_fdimf8, Sleef_fdimf8_avx, Sleef_fdimf8_fma4, Sleef_fdimf8_avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_trunc, Sleef_truncd1, Sleef_truncd4, pnt_truncd4, disp_truncd4, Sleef_truncd4_avx, Sleef_truncd4_fma4, Sleef_truncd4_avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_truncf, Sleef_truncf1, Sleef_truncf8, pnt_truncf8, disp_truncf8, Sleef_truncf8_avx, Sleef_truncf8_fma4, Sleef_truncf8_avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_floor, Sleef_floord1, Sleef_floord4, pnt_floord4, disp_floord4, Sleef_floord4_avx, Sleef_floord4_fma4, Sleef_floord4_avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_floorf, Sleef_floorf1, Sleef_floorf8, pnt_floorf8, disp_floorf8, Sleef_floorf8_avx, Sleef_floorf8_fma4, Sleef_floorf8_avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_ceil, Sleef_ceild1, Sleef_ceild4, pnt_ceild4, disp_ceild4, Sleef_ceild4_avx, Sleef_ceild4_fma4, Sleef_ceild4_avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_ceilf, Sleef_ceilf1, Sleef_ceilf8, pnt_ceilf8, disp_ceilf8, Sleef_ceilf8_avx, Sleef_ceilf8_fma4, Sleef_ceilf8_avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_round, Sleef_roundd1, Sleef_roundd4, pnt_roundd4, disp_roundd4, Sleef_roundd4_avx, Sleef_roundd4_fma4, Sleef_roundd4_avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_roundf, Sleef_roundf1, Sleef_roundf8, pnt_roundf8, disp_roundf8, Sleef_roundf8_avx, Sleef_roundf8_fma4, Sleef_roundf8_avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_rint, Sleef_rintd1, Sleef_rintd4, pnt_rintd4, disp_rintd4, Sleef_rintd4_avx, Sleef_rintd4_fma4, Sleef_rintd4_avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_rintf, Sleef_rintf1, Sleef_rintf8, pnt_rintf8, disp_rintf8, Sleef_rintf8_avx, Sleef_rintf8_fma4, Sleef_rintf8_avx2)
+DISPATCH_vf_vf_vf(__m256d, 4, Sleef_nextafter, Sleef_nextafterd1, Sleef_nextafterd4, pnt_nextafterd4, disp_nextafterd4, Sleef_nextafterd4_avx, Sleef_nextafterd4_fma4, Sleef_nextafterd4_avx2)
+DISPATCH_vf_vf_vf(__m256, 8, Sleef_nextafterf, Sleef_nextafterf1, Sleef_nextafterf8, pnt_nextafterf8, disp_nextafterf8, Sleef_nextafterf8_avx, Sleef_nextafterf8_fma4, Sleef_nextafterf8_avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_frfrexp, Sleef_frfrexpd1, Sleef_frfrexpd4, pnt_frfrexpd4, disp_frfrexpd4, Sleef_frfrexpd4_avx, Sleef_frfrexpd4_fma4, Sleef_frfrexpd4_avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_frfrexpf, Sleef_frfrexpf1, Sleef_frfrexpf8, pnt_frfrexpf8, disp_frfrexpf8, Sleef_frfrexpf8_avx, Sleef_frfrexpf8_fma4, Sleef_frfrexpf8_avx2)
+DISPATCH_vi_vf(__m256d, __m128i, 8, Sleef_expfrexp, Sleef_expfrexpd1, Sleef_expfrexpd4, pnt_expfrexpd4, disp_expfrexpd4, Sleef_expfrexpd4_avx, Sleef_expfrexpd4_fma4, Sleef_expfrexpd4_avx2)
+DISPATCH_vf_vf_vf(__m256d, 4, Sleef_fmod, Sleef_fmodd1, Sleef_fmodd4, pnt_fmodd4, disp_fmodd4, Sleef_fmodd4_avx, Sleef_fmodd4_fma4, Sleef_fmodd4_avx2)
+DISPATCH_vf_vf_vf(__m256, 8, Sleef_fmodf, Sleef_fmodf1, Sleef_fmodf8, pnt_fmodf8, disp_fmodf8, Sleef_fmodf8_avx, Sleef_fmodf8_fma4, Sleef_fmodf8_avx2)
+DISPATCH_vf_vf_vf(__m256d, 4, Sleef_remainder, Sleef_remainderd1, Sleef_remainderd4, pnt_remainderd4, disp_remainderd4, Sleef_remainderd4_avx, Sleef_remainderd4_fma4, Sleef_remainderd4_avx2)
+DISPATCH_vf_vf_vf(__m256, 8, Sleef_remainderf, Sleef_remainderf1, Sleef_remainderf8, pnt_remainderf8, disp_remainderf8, Sleef_remainderf8_avx, Sleef_remainderf8_fma4, Sleef_remainderf8_avx2)
+DISPATCH_vf2_vf(__m256d, Sleef___m256d_2, 4, Sleef_modf, Sleef_modfd1, Sleef_modfd4, pnt_modfd4, disp_modfd4, Sleef_modfd4_avx, Sleef_modfd4_fma4, Sleef_modfd4_avx2)
+DISPATCH_vf2_vf(__m256, Sleef___m256_2, 8, Sleef_modff, Sleef_modff1, Sleef_modff8, pnt_modff8, disp_modff8, Sleef_modff8_avx, Sleef_modff8_fma4, Sleef_modff8_avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_lgamma_u10, Sleef_lgammad1_u10, Sleef_lgammad4_u10, pnt_lgammad4_u10, disp_lgammad4_u10, Sleef_lgammad4_u10avx, Sleef_lgammad4_u10fma4, Sleef_lgammad4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_lgammaf_u10, Sleef_lgammaf1_u10, Sleef_lgammaf8_u10, pnt_lgammaf8_u10, disp_lgammaf8_u10, Sleef_lgammaf8_u10avx, Sleef_lgammaf8_u10fma4, Sleef_lgammaf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_tgamma_u10, Sleef_tgammad1_u10, Sleef_tgammad4_u10, pnt_tgammad4_u10, disp_tgammad4_u10, Sleef_tgammad4_u10avx, Sleef_tgammad4_u10fma4, Sleef_tgammad4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_tgammaf_u10, Sleef_tgammaf1_u10, Sleef_tgammaf8_u10, pnt_tgammaf8_u10, disp_tgammaf8_u10, Sleef_tgammaf8_u10avx, Sleef_tgammaf8_u10fma4, Sleef_tgammaf8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_erf_u10, Sleef_erfd1_u10, Sleef_erfd4_u10, pnt_erfd4_u10, disp_erfd4_u10, Sleef_erfd4_u10avx, Sleef_erfd4_u10fma4, Sleef_erfd4_u10avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_erff_u10, Sleef_erff1_u10, Sleef_erff8_u10, pnt_erff8_u10, disp_erff8_u10, Sleef_erff8_u10avx, Sleef_erff8_u10fma4, Sleef_erff8_u10avx2)
+DISPATCH_vf_vf(__m256d, 4, Sleef_erfc_u15, Sleef_erfcd1_u15, Sleef_erfcd4_u15, pnt_erfcd4_u15, disp_erfcd4_u15, Sleef_erfcd4_u15avx, Sleef_erfcd4_u15fma4, Sleef_erfcd4_u15avx2)
+DISPATCH_vf_vf(__m256, 8, Sleef_erfcf_u15, Sleef_erfcf1_u15, Sleef_erfcf8_u15, pnt_erfcf8_u15, disp_erfcf8_u15, Sleef_erfcf8_u15avx, Sleef_erfcf8_u15fma4, Sleef_erfcf8_u15avx2)
+DISPATCH_i_i(8, Sleef_getIntf, Sleef_getIntf1, Sleef_getIntf8, pnt_getIntf8, disp_getIntf8, Sleef_getIntf8_avx, Sleef_getIntf8_fma4, Sleef_getIntf8_avx2)
+DISPATCH_i_i(4, Sleef_getInt, Sleef_getIntd1, Sleef_getIntd4, pnt_getIntd4, disp_getIntd4, Sleef_getIntd4_avx, Sleef_getIntd4_fma4, Sleef_getIntd4_avx2)
+DISPATCH_p_i(8, Sleef_getPtrf, Sleef_getPtrf1, Sleef_getPtrf8, pnt_getPtrf8, disp_getPtrf8, Sleef_getPtrf8_avx, Sleef_getPtrf8_fma4, Sleef_getPtrf8_avx2)
+DISPATCH_p_i(4, Sleef_getPtr, Sleef_getPtrd1, Sleef_getPtrd4, pnt_getPtrd4, disp_getPtrd4, Sleef_getPtrd4_avx, Sleef_getPtrd4_fma4, Sleef_getPtrd4_avx2)

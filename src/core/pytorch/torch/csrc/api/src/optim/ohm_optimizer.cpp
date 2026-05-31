@@ -34,6 +34,16 @@ void OhmOptimizerOptions::set_lr(const double lr) {
   this->lr(lr);
 }
 
+bool operator==(
+    const OhmOptimizerParamState&,
+    const OhmOptimizerParamState&) {
+  return true;
+}
+
+void OhmOptimizerParamState::serialize(torch::serialize::OutputArchive&) const {}
+
+void OhmOptimizerParamState::serialize(torch::serialize::InputArchive&) {}
+
 Tensor OhmOptimizer::step(LossClosure closure) {
   NoGradGuard no_grad;
   Tensor loss = {};

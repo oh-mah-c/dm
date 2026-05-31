@@ -1,5 +1,7 @@
 #define _GNU_SOURCE
 #include "../../include/tokenizer/tokenizer.h"
+#include "../../include/tokenizer/bpe_subword.h"
+#include "../../include/tokenizer/unigram_subword.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -105,6 +107,13 @@ static unsigned char *read_input_file(const char *path, size_t *size_out) {
 int output_json = 0;
 
 int main(int argc, char **argv) {
+    if (argc >= 2 && (strcmp(argv[1], "bpe") == 0 || strcmp(argv[1], "dm_bpe") == 0)) {
+        return dm_bpe_cli(argc, argv);
+    }
+    if (argc >= 2 && (strcmp(argv[1], "unigram") == 0 || strcmp(argv[1], "dm_unigram") == 0)) {
+        return dm_unigram_cli(argc, argv);
+    }
+
     char *input_path = NULL;
     char *output_path = NULL;
     char *mode_str = "doc";

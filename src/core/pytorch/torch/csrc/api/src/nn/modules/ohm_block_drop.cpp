@@ -19,7 +19,7 @@ torch::Tensor OhmBlockDropImpl::forward(const torch::Tensor& x) {
 
     int64_t L = x.size(dim_);
     if (L <= block_size_) {
-        return x.zeros_like();
+        return torch::zeros_like(x);
     }
 
     // Generate random starting index idx

@@ -7,7 +7,8 @@ OhmHardRouterImpl::OhmHardRouterImpl(int64_t input_dim, int64_t num_experts, con
     gate = register_module("gate", torch::nn::Linear(input_dim, num_experts));
     TORCH_CHECK(experts.size() == static_cast<size_t>(num_experts), "Mismatch between num_experts and experts vector size");
     for (int64_t i = 0; i < num_experts; ++i) {
-        experts_.push_back(register_module("expert_" + std::to_string(i), experts[i]));
+        experts_.push_back(experts[i]);
+        register_module("expert_" + std::to_string(i), experts_.back().ptr());
     }
 }
 

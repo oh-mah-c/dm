@@ -1,0 +1,14 @@
+# Target labels
+ six
+# Source files and their labels
+/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/CMakeFiles/six
+/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/CMakeFiles/six.rule
+/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/CMakeFiles/six-complete.rule
+/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-build.rule
+/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-configure.rule
+/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-download.rule
+/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-install.rule
+/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-mkdir.rule
+/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-patch.rule
+/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-test.rule
+/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-update.rule

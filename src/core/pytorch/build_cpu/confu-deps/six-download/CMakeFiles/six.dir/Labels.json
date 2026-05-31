@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/CMakeFiles/six"
+		},
+		{
+			"file" : "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/CMakeFiles/six.rule"
+		},
+		{
+			"file" : "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/CMakeFiles/six-complete.rule"
+		},
+		{
+			"file" : "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-build.rule"
+		},
+		{
+			"file" : "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-configure.rule"
+		},
+		{
+			"file" : "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-download.rule"
+		},
+		{
+			"file" : "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-install.rule"
+		},
+		{
+			"file" : "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-mkdir.rule"
+		},
+		{
+			"file" : "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-patch.rule"
+		},
+		{
+			"file" : "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-test.rule"
+		},
+		{
+			"file" : "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/confu-deps/six-download/six-prefix/src/six-stamp/six-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"six"
+		],
+		"name" : "six"
+	}
+}

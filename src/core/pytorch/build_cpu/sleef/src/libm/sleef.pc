@@ -1,0 +1,9 @@
+prefix=/home/autocookie/pomaieco/dm/src/core/pytorch/dist
+libdir=/home/autocookie/pomaieco/dm/src/core/pytorch/dist/lib
+includedir=/home/autocookie/pomaieco/dm/src/core/pytorch/dist/include
+
+Name: SLEEF
+Description: SIMD Library for Evaluating Elementary Functions, vectorized libm and DFT
+Version: 3.8.0
+Cflags: -I${includedir}
+Libs: -L${libdir} -lsleef

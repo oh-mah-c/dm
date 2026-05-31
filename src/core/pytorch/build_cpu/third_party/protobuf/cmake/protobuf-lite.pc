@@ -1,0 +1,11 @@
+prefix=/home/autocookie/pomaieco/dm/src/core/pytorch/dist
+exec_prefix=/home/autocookie/pomaieco/dm/src/core/pytorch/dist
+libdir=/home/autocookie/pomaieco/dm/src/core/pytorch/dist/lib
+includedir=/home/autocookie/pomaieco/dm/src/core/pytorch/dist/include
+
+Name: Protocol Buffers
+Description: Google's Data Interchange Format
+Version: 3.13.0.0
+Libs: -L${libdir} -lprotobuf-lite 
+Cflags: -I${includedir} 
+Conflicts: protobuf

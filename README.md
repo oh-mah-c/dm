@@ -638,6 +638,8 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 
 **[162]** H. Lee, J. Lee, and K. Jun, "High-Fidelity ROI CT Reconstruction with Limited Quantum Resources via Hybrid Classical-Quantum Refinement," arXiv:2605.29472v1, 2026. https://arxiv.org/abs/2605.29472 *(Ohm-Q Hybrid — Quantum ROI Refinement; Classical Coarse Pass; Residual QUBO formulation)*
 
+**[163]** W. Zhang, J. Wang, T. Ye, and C. Liao, "Quantum Parameterized Self-Attention Network," arXiv:2605.25365v1, 2026. https://arxiv.org/abs/2605.25365 *(OhmQPA — Quantum Parametric Attention; Parameterized Quantum Circuit (PQC); bounded score P(|00⟩) + P(|11⟩))*
+
 ---
 
 ## Strong MFHOI-Miner Experiments

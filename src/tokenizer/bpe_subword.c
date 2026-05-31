@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #ifdef DM_GPU
 #include "core/gpu/dm_gpu.h"
@@ -53,6 +54,8 @@ typedef struct {
     PairStat *items;
     size_t count;
     size_t cap;
+    size_t *buckets;     /* open-addressing table, stores item index + 1 */
+    size_t bucket_cap;   /* power of two */
 } PairStats;
 
 typedef struct {
@@ -101,6 +104,27 @@ static char *concat2(const char *a, const char *b) {
     memcpy(out, a, na);
     memcpy(out + na, b, nb + 1);
     return out;
+}
+
+static uint64_t hash_bytes64(const char *s, uint64_t h) {
+    const unsigned char *p = (const unsigned char *)s;
+    while (*p) {
+        h ^= (uint64_t)(*p++);
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+static uint64_t pair_hash64(const char *left, const char *right) {
+    uint64_t h = 14695981039346656037ULL;
+    h = hash_bytes64(left, h);
+    h ^= 0xffu;
+    h *= 1099511628211ULL;
+    h = hash_bytes64(right, h);
+    h ^= h >> 33;
+    h *= 0xff51afd7ed558ccdULL;
+    h ^= h >> 33;
+    return h;
 }
 
 static char *trim(char *s) {
@@ -284,17 +308,48 @@ static void pair_stats_free(PairStats *stats) {
         free(stats->items[i].right);
     }
     free(stats->items);
+    free(stats->buckets);
     stats->items = NULL;
-    stats->count = stats->cap = 0;
+    stats->buckets = NULL;
+    stats->count = stats->cap = stats->bucket_cap = 0;
+}
+
+static int pair_stats_rehash(PairStats *stats, size_t min_cap) {
+    size_t cap = 1024;
+    while (cap < min_cap) cap <<= 1;
+    size_t *buckets = (size_t *)calloc(cap, sizeof(size_t));
+    if (!buckets) return -1;
+    for (size_t i = 0; i < stats->count; i++) {
+        uint64_t h = pair_hash64(stats->items[i].left, stats->items[i].right);
+        size_t mask = cap - 1;
+        size_t pos = (size_t)h & mask;
+        while (buckets[pos] != 0) pos = (pos + 1) & mask;
+        buckets[pos] = i + 1;
+    }
+    free(stats->buckets);
+    stats->buckets = buckets;
+    stats->bucket_cap = cap;
+    return 0;
 }
 
 static int pair_stats_add(PairStats *stats, const char *left, const char *right, size_t freq) {
-    for (size_t i = 0; i < stats->count; i++) {
-        if (strcmp(stats->items[i].left, left) == 0 && strcmp(stats->items[i].right, right) == 0) {
+    if (!stats->buckets || (stats->count + 1) * 10 >= stats->bucket_cap * 7) {
+        if (pair_stats_rehash(stats, (stats->count + 1) * 4) != 0) return -1;
+    }
+
+    uint64_t h = pair_hash64(left, right);
+    size_t mask = stats->bucket_cap - 1;
+    size_t pos = (size_t)h & mask;
+    while (stats->buckets[pos] != 0) {
+        size_t i = stats->buckets[pos] - 1;
+        if (strcmp(stats->items[i].left, left) == 0 &&
+            strcmp(stats->items[i].right, right) == 0) {
             stats->items[i].freq += freq;
             return 0;
         }
+        pos = (pos + 1) & mask;
     }
+
     if (stats->count == stats->cap) {
         size_t next = stats->cap ? stats->cap * 2 : 256;
         PairStat *tmp = (PairStat *)realloc(stats->items, next * sizeof(PairStat));
@@ -302,10 +357,12 @@ static int pair_stats_add(PairStats *stats, const char *left, const char *right,
         stats->items = tmp;
         stats->cap = next;
     }
-    stats->items[stats->count].left = xstrdup(left);
-    stats->items[stats->count].right = xstrdup(right);
-    if (!stats->items[stats->count].left || !stats->items[stats->count].right) return -1;
-    stats->items[stats->count].freq = freq;
+    size_t idx = stats->count;
+    stats->items[idx].left = xstrdup(left);
+    stats->items[idx].right = xstrdup(right);
+    if (!stats->items[idx].left || !stats->items[idx].right) return -1;
+    stats->items[idx].freq = freq;
+    stats->buckets[pos] = idx + 1;
     stats->count++;
     return 0;
 }
@@ -531,11 +588,15 @@ static int collect_symbol_counts(const SymbolVocab *vocab, TokenVocab *counts) {
 static int learn_bpe(const WordVocab *words, size_t num_merges, size_t min_freq,
                       MergeTable *merges, TokenVocab *symbol_counts, void *gpu_ctx) {
     SymbolVocab vocab = {0};
+    fprintf(stderr, "[bpe] building initial symbol vocabulary from %zu word types...\n", words->count);
     if (symbol_vocab_from_words(words, &vocab) != 0) return -1;
+    fprintf(stderr, "[bpe] collecting initial symbol counts...\n");
     if (collect_symbol_counts(&vocab, symbol_counts) != 0) {
         symbol_vocab_free(&vocab);
         return -1;
     }
+    fprintf(stderr, "[bpe] start learning up to %zu merges (min_frequency=%zu, initial_symbols=%zu)\n",
+            num_merges, min_freq, symbol_counts->count);
 
 #ifdef DM_GPU
     DmGpuCtx *gpu = (DmGpuCtx *)gpu_ctx;
@@ -544,9 +605,11 @@ static int learn_bpe(const WordVocab *words, size_t num_merges, size_t min_freq,
 #endif
 
     for (size_t i = 0; i < num_merges; i++) {
+        clock_t iter_start = clock();
         char *left = NULL, *right = NULL;
         size_t freq = 0;
         int found = 0;
+        size_t pair_types = 0;
 
 #ifdef DM_GPU
         /* GPU path: dense pair-count matrix, viable when vocab fits. */
@@ -585,9 +648,15 @@ static int learn_bpe(const WordVocab *words, size_t num_merges, size_t min_freq,
                 symbol_vocab_free(&vocab);
                 return -1;
             }
+            pair_types = stats.count;
             const PairStat *best = NULL;
             int has = best_pair(&stats, min_freq, &best);
-            if (has <= 0) { pair_stats_free(&stats); break; }
+            if (has <= 0) {
+                fprintf(stderr, "[bpe] stopping at merge %zu/%zu: no pair reaches min_frequency=%zu (pair_types=%zu)\n",
+                        i, num_merges, min_freq, pair_types);
+                pair_stats_free(&stats);
+                break;
+            }
             left  = xstrdup(best->left);
             right = xstrdup(best->right);
             freq  = best->freq;
@@ -610,8 +679,17 @@ static int learn_bpe(const WordVocab *words, size_t num_merges, size_t min_freq,
             symbol_vocab_free(&vocab);
             return -1;
         }
+        if ((i + 1) == 1 || (i + 1) % 10 == 0 || (i + 1) == num_merges) {
+            double sec = (double)(clock() - iter_start) / (double)CLOCKS_PER_SEC;
+            fprintf(stderr,
+                    "[bpe] merge %zu/%zu pair='%s'+'%s' freq=%zu pair_types=%zu symbols=%zu iter=%.3fs\n",
+                    i + 1, num_merges, left, right, freq, pair_types,
+                    symbol_counts->count, sec);
+        }
         free(joined); free(left); free(right);
     }
+    fprintf(stderr, "[bpe] learned %zu merges, final_symbols=%zu\n",
+            merges->count, symbol_counts->count);
     symbol_vocab_free(&vocab);
     return 0;
 }
@@ -890,8 +968,15 @@ int dm_bpe_cli(int argc, char **argv) {
         }
         WordVocab words = {0};
         int rc = 0;
+        fprintf(stderr, "[bpe] reading corpus...\n");
         if (inputs.count == 0) rc = read_words_from_stdin(&words);
         for (size_t i = 0; rc == 0 && i < inputs.count; i++) rc = read_words_from_file(inputs.items[i], &words);
+        if (rc == 0) {
+            size_t word_tokens = 0;
+            for (size_t i = 0; i < words.count; i++) word_tokens += words.items[i].freq;
+            fprintf(stderr, "[bpe] corpus ready: word_types=%zu word_tokens=%zu\n",
+                    words.count, word_tokens);
+        }
 
         void *gpu_ctx = NULL;
 #ifdef DM_GPU
@@ -914,7 +999,9 @@ int dm_bpe_cli(int argc, char **argv) {
         MergeTable merges = {0};
         TokenVocab symbols = {0};
         if (rc == 0 && learn_bpe(&words, merges_n, min_frequency, &merges, &symbols, gpu_ctx) != 0) rc = -1;
+        if (rc == 0) fprintf(stderr, "[bpe] writing merges to %s\n", output ? output : "<stdout>");
         if (rc == 0 && write_merges_file(&merges, output) != 0) rc = -1;
+        if (rc == 0 && vocab_out) fprintf(stderr, "[bpe] writing vocab to %s\n", vocab_out);
         if (rc == 0 && vocab_out && write_token_vocab(&symbols, vocab_out) != 0) rc = -1;
         if (rc == 0 && stats) {
             size_t tokens = 0;

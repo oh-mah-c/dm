@@ -1,0 +1,23 @@
+set(
+generated_headers
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/CPUFunctions.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/CPUFunctions_inl.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/CompositeExplicitAutogradFunctions.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/CompositeExplicitAutogradFunctions_inl.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/CompositeExplicitAutogradNonFunctionalFunctions.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/CompositeExplicitAutogradNonFunctionalFunctions_inl.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/CompositeImplicitAutogradFunctions.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/CompositeImplicitAutogradFunctions_inl.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/CompositeImplicitAutogradNestedTensorFunctions.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/CompositeImplicitAutogradNestedTensorFunctions_inl.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/Functions.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/MetaFunctions.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/MetaFunctions_inl.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/MethodOperators.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/NativeFunctions.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/NativeMetaFunctions.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/Operators.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/RedispatchFunctions.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/RegistrationDeclarations.h"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/VmapGeneratedPlumbing.h"
+)

@@ -1,0 +1,9 @@
+set(
+cuda_generated_sources
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/RegisterCUDA_0.cpp"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/RegisterNestedTensorCUDA_0.cpp"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/RegisterQuantizedCUDA_0.cpp"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/RegisterSparseCUDA_0.cpp"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/RegisterSparseCsrCUDA_0.cpp"
+    "/home/autocookie/pomaieco/dm/src/core/pytorch/build_cpu/aten/src/ATen/UfuncCUDA_add.cu"
+)
