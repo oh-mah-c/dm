@@ -1,0 +1,1 @@
+/usr/bin/c++  -fvisibility-inlines-hidden -DUSE_PTHREADPOOL  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -Wold-style-cast  -Wconversion  -Werror  -Wsuggest-override  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wno-deprecated  -Wstrict-aliasing   -rdynamic  CMakeFiles/cmTC_27ef5.dir/std_regex.cpp.o -o cmTC_27ef5 

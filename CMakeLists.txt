@@ -12,9 +12,9 @@ set(DM_ROOT     ${CMAKE_SOURCE_DIR})
 set(DM_INCLUDE  ${DM_ROOT}/include)
 set(DM_SRC      ${DM_ROOT}/src)
 
-set(LIBTORCH_DIR  ${DM_ROOT}/src/core/pytorch/dist)
-set(VULKANHPP_DIR ${DM_ROOT}/src/core/gpu/Vulkan-Hpp)
-set(SDL2_DIR ${DM_ROOT}/src/core/SDL2)
+set(LIBTORCH_DIR  ${DM_ROOT}/src/core/dm_torch/dist)
+set(VULKANHPP_DIR ${DM_ROOT}/src/core/gpu/dm_vulkan)
+set(SDL2_DIR ${DM_ROOT}/src/core/dm_sdl)
 set(MUJOCO_DIR ${DM_ROOT}/src/core/physics/mujoco)
 
 # ── SDL2 (Native Core) ────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ file(GLOB DM_ALG_SRCS  ${DM_SRC}/algorithms/*.c ${DM_SRC}/algorithms/*.cpp)
 
 # Models — C++ files only (train.cpp are standalone binaries, excluded here)
 file(GLOB_RECURSE DM_MODEL_SRCS ${DM_SRC}/models/**/*.cpp)
-set(DM_PYTORCH_CUSTOM_SRCS ${DM_SRC}/core/pytorch/torch/csrc/api/src/nn/modules/ohm_qpa.cpp)
+set(DM_PYTORCH_CUSTOM_SRCS ${DM_SRC}/core/dm_torch/torch/csrc/api/src/nn/modules/ohm_qpa.cpp)
 list(APPEND DM_MODEL_SRCS ${DM_PYTORCH_CUSTOM_SRCS})
 list(FILTER DM_MODEL_SRCS EXCLUDE REGEX ".*/train\\.cpp$")
 list(FILTER DM_MODEL_SRCS EXCLUDE REGEX ".*/infer\\.cpp$")

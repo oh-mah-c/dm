@@ -1,0 +1,12 @@
+# This is a generated file and its contents are an internal implementation detail.
+# The download step will be re-executed if anything in this file changes.
+# No other meaning or use of this file is supported.
+
+method=url
+command=/usr/bin/cmake;-P;/home/autocookie/pomaieco/dm/src/core/dm_torch/build_test/confu-deps/six-download/six-prefix/src/six-stamp/download-six.cmake;COMMAND;/usr/bin/cmake;-P;/home/autocookie/pomaieco/dm/src/core/dm_torch/build_test/confu-deps/six-download/six-prefix/src/six-stamp/verify-six.cmake;COMMAND;/usr/bin/cmake;-P;/home/autocookie/pomaieco/dm/src/core/dm_torch/build_test/confu-deps/six-download/six-prefix/src/six-stamp/extract-six.cmake
+source_dir=/home/autocookie/pomaieco/dm/src/core/dm_torch/build_test/confu-srcs/six
+work_dir=/home/autocookie/pomaieco/dm/src/core/dm_torch/build_test/confu-srcs
+url(s)=https://pypi.python.org/packages/16/d8/bc6316cf98419719bd59c91742194c111b6f2e85abac88e496adefaf7afe/six-1.11.0.tar.gz
+hash=SHA256=70e8a77beed4562e7f14fe23a786b54f6296e34344c23bc42f07b15018ff98e9
+no_extract=
+
