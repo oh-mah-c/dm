@@ -1362,46 +1362,7 @@ install(FILES
   "${TORCH_SRC_DIR}/library.h"
   "${TORCH_SRC_DIR}/custom_class_detail.h"
   DESTINATION ${TORCH_INSTALL_INCLUDE_DIR}/torch)
-if(BUILD_TEST)
-  if(BUILD_LITE_INTERPRETER)
-    add_subdirectory(
-      ${TORCH_ROOT}/test/cpp/lite_interpreter_runtime
-      ${CMAKE_BINARY_DIR}/test_lite_interpreter_runtime
-    )
-    add_subdirectory(
-      ${TORCH_ROOT}/test/mobile/lightweight_dispatch
-      ${CMAKE_BINARY_DIR}/test_codegen_unboxing
-    )
-  else()
-    add_subdirectory(${TORCH_ROOT}/test/cpp/jit ${CMAKE_BINARY_DIR}/test_jit)
-    add_subdirectory(${TORCH_ROOT}/test/cpp/lazy ${CMAKE_BINARY_DIR}/test_lazy)
-    add_subdirectory(${TORCH_ROOT}/test/cpp/profiler ${CMAKE_BINARY_DIR}/test_profiler)
-    add_subdirectory(${TORCH_ROOT}/test/inductor ${CMAKE_BINARY_DIR}/test_inductor)
-    add_subdirectory(${TORCH_ROOT}/test/cpp/aoti_abi_check ${CMAKE_BINARY_DIR}/test_aoti_abi_check)
-    add_subdirectory(${TORCH_ROOT}/test/cpp/shim ${CMAKE_BINARY_DIR}/test_shim)
-    if(BUILD_AOT_INDUCTOR_TEST)
-      add_subdirectory(${TORCH_ROOT}/test/cpp/aoti_inference ${CMAKE_BINARY_DIR}/test_aoti_inference)
-    endif()
-
-    if(USE_DISTRIBUTED)
-      add_subdirectory(${TORCH_ROOT}/test/cpp/c10d ${CMAKE_BINARY_DIR}/test_cpp_c10d)
-      if(NOT WIN32)
-        add_subdirectory(${TORCH_ROOT}/test/cpp/dist_autograd ${CMAKE_BINARY_DIR}/dist_autograd)
-        add_subdirectory(${TORCH_ROOT}/test/cpp/rpc ${CMAKE_BINARY_DIR}/test_cpp_rpc)
-      endif()
-    endif()
-    if(NOT NO_API)
-      add_subdirectory(${TORCH_ROOT}/test/cpp/api ${CMAKE_BINARY_DIR}/test_api)
-    endif()
-
-    if(USE_LLVM AND LLVM_FOUND)
-      add_subdirectory(
-        ${TORCH_ROOT}/test/mobile/nnc
-        ${CMAKE_BINARY_DIR}/test_mobile_nnc
-      )
-    endif()
-  endif()
-endif()
+# Test build disabled manually to avoid missing directory errors
 
 # CMake config for external projects.
 configure_file(

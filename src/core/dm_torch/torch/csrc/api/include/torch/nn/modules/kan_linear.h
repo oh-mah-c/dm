@@ -389,8 +389,8 @@ inline void KANLinearImpl::extend_grid(int64_t new_G,
         auto targets = old_vals.select(2, i); // [N, n_out]
         // lstsq: min ||Bi @ c - targets||^2
         // torch::linalg_lstsq returns (solution, residuals, rank, sv)
-        auto result = std::get<0>(torch::linalg_lstsq(Bi, targets, c10::nullopt,
-                                                       c10::nullopt)); // [new_nc, n_out]
+        auto result = std::get<0>(torch::linalg_lstsq(Bi, targets, std::nullopt,
+                                                       std::nullopt)); // [new_nc, n_out]
         // result: [new_G+k, n_out]  → new_sw[:, i, :] = result^T
         new_sw.select(1, i).copy_(result.t()); // [n_out, new_G+k]
     }

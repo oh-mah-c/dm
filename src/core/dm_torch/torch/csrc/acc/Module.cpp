@@ -124,7 +124,7 @@ bool registerPythonPrivateUse1Hook(const py::object& hook) {
   }
   hook.inc_ref();
   at::RegisterPrivateUse1HooksInterface(
-      hook.cast<PrivateUse1HooksInterface*>());
+      hook.cast<at::PrivateUse1HooksInterface*>());
   return true;
 }
 

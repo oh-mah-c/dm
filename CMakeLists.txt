@@ -106,6 +106,7 @@ target_link_libraries(dm_core PUBLIC
     icuuc   # ICU Unicode (sentencepiece_lite)
     icui18n
     icudata
+    /usr/local/cuda-12.4/lib64/libcupti.so
 )
 
 target_compile_definitions(dm_core PUBLIC
