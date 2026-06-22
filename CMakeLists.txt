@@ -28,6 +28,9 @@ list(APPEND CMAKE_PREFIX_PATH ${LIBTORCH_DIR})
 find_package(Torch REQUIRED)
 message(STATUS "Torch libraries: ${TORCH_LIBRARIES}")
 
+# ── ggml (Native Core) ────────────────────────────────────────────────────────
+add_subdirectory(${DM_ROOT}/src/core/dm_ggml EXCLUDE_FROM_ALL)
+
 # ── Vulkan (C API — for dm_gpu.c) ────────────────────────────────────────────
 find_package(Vulkan REQUIRED)
 message(STATUS "Vulkan: ${Vulkan_LIBRARIES}")
@@ -47,9 +50,10 @@ add_subdirectory(${MUJOCO_DIR} EXCLUDE_FROM_ALL)
 
 # Core C files (dm_arena, dm_dataset, etc.)
 file(GLOB DM_CORE_SRCS ${DM_SRC}/core/*.c)
+list(APPEND DM_CORE_SRCS ${DM_SRC}/core/bridge/ohm_bifrost_tensor.cpp)
 
-# GPU files (pure C Vulkan backend)
-file(GLOB DM_GPU_SRCS  ${DM_SRC}/core/gpu/*.c)
+# GPU files (pure C Vulkan backend & C++ Renderer)
+file(GLOB DM_GPU_SRCS  ${DM_SRC}/core/gpu/*.c ${DM_SRC}/core/gpu/*.cpp)
 
 # Tokenizer
 file(GLOB DM_TOK_SRCS  ${DM_SRC}/tokenizer/*.c)
@@ -91,6 +95,7 @@ target_include_directories(dm_core PUBLIC
     ${VULKANHPP_INCLUDE}
     ${Vulkan_INCLUDE_DIRS}
     ${SDL2_DIR}/include
+    ${DM_ROOT}/src/core/dm_ggml/include
     # LibTorch headers (C++ — used by any .cpp that links dm_core)
     ${TORCH_INCLUDE_DIRS}
 )
@@ -99,6 +104,7 @@ target_link_libraries(dm_core PUBLIC
     SDL2::SDL2-static
     Vulkan::Vulkan
     mujoco::mujoco
+    ggml
     ${TORCH_LIBRARIES}
     m       # math
     dl      # dlopen (Vulkan loader)

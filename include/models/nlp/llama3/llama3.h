@@ -217,6 +217,10 @@ struct Llama3ModelImpl : torch::nn::Module {
     torch::Tensor forward(const torch::Tensor& tokens,
                           const torch::Tensor& targets = torch::Tensor{});
 
+    // Forward pass starting from continuous embeddings [B, T, dim] instead of discrete tokens
+    // Returns the hidden state of the last layer [B, T, dim] (before LM Head)
+    torch::Tensor forward_embeds(const torch::Tensor& embeds);
+
     // Single-token inference with KV-cache
     // kv_caches_k / kv_caches_v: vectors of n_layers tensors,
     //   each [1, seq_len, n_kv_heads, head_dim]

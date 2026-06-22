@@ -306,6 +306,28 @@ torch::Tensor Llama3ModelImpl::forward(
     return logits;
 }
 
+torch::Tensor Llama3ModelImpl::forward_embeds(const torch::Tensor& embeds) {
+    int64_t B = embeds.size(0);
+    int64_t T = embeds.size(1);
+
+    auto x = embeds; // [B, T, dim]
+    if (!drop.is_empty() && is_training())
+        x = drop->forward(x);
+
+    auto fc = freqs_cos.slice(0, 0, T);
+    auto fs = freqs_sin.slice(0, 0, T);
+
+    for (int64_t i = 0; i < (int64_t)layers->size(); ++i) {
+        // Run transformer block
+        x = layers->at<Llama3BlockImpl>(i).forward(x, fc, fs);
+    }
+
+    x = norm->forward(x);
+    // Note: We do NOT pass through `output` linear layer (LM Head), 
+    // we return the final hidden state to be used by Embodied ActionHead!
+    return x;
+}
+
 torch::Tensor Llama3ModelImpl::forward_one(
     int64_t token, int64_t pos,
     std::vector<torch::Tensor>& kv_caches_k,
