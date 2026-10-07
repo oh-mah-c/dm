@@ -147,11 +147,19 @@ static int mkdir_p(const char *path) {
     for (char *p = tmp + 1; *p; p++) {
         if (*p == '/') {
             *p = '\0';
+#ifdef _WIN32
+            if (mkdir(tmp) != 0 && errno != EEXIST) return -1;
+#else
             if (mkdir(tmp, 0775) != 0 && errno != EEXIST) return -1;
+#endif
             *p = '/';
         }
     }
+#ifdef _WIN32
+    if (mkdir(tmp) != 0 && errno != EEXIST) return -1;
+#else
     if (mkdir(tmp, 0775) != 0 && errno != EEXIST) return -1;
+#endif
     return 0;
 }
 

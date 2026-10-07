@@ -145,6 +145,7 @@
 #include "models/vision/mobilenet_tiny.h"
 #include "models/vision/resnet.h"
 #include "models/vision/swin.h"
+#include "models/vision/vit.h"
 #include "models/mlp_train.h"
 #include "models/vision/tinyvit.h"
 #include "algorithms/prefixspan.h"
@@ -157,6 +158,18 @@
 #include <time.h>
 
 int output_json = 0;
+
+__attribute__((weak)) int dm_volt_cli(int argc, char **argv) { (void)argc; (void)argv; printf("Volt CLI not compiled in.\n"); return 1; }
+__attribute__((weak)) int dm_tinystories_cli(int argc, char **argv) { (void)argc; (void)argv; printf("TinyStories CLI not compiled in.\n"); return 1; }
+__attribute__((weak)) int dm_tiny_transformer_cli(int argc, char **argv) { (void)argc; (void)argv; printf("TinyTransformer CLI not compiled in.\n"); return 1; }
+__attribute__((weak)) int dm_bert_cli(int argc, char **argv) { (void)argc; (void)argv; printf("BERT CLI not compiled in.\n"); return 1; }
+__attribute__((weak)) int dm_textbook_generator_cli(int argc, char **argv) { (void)argc; (void)argv; printf("Textbook generator CLI not compiled in.\n"); return 1; }
+__attribute__((weak)) int dm_mobilenet_tiny_cli(int argc, char **argv) { (void)argc; (void)argv; printf("MobileNet CLI not compiled in.\n"); return 1; }
+__attribute__((weak)) int dm_resnet18_cli(int argc, char **argv) { (void)argc; (void)argv; printf("ResNet18 CLI not compiled in.\n"); return 1; }
+__attribute__((weak)) int dm_vit_cli(int argc, char **argv) { (void)argc; (void)argv; printf("ViT CLI not compiled in.\n"); return 1; }
+__attribute__((weak)) int dm_swin_cli(int argc, char **argv) { (void)argc; (void)argv; printf("Swin CLI not compiled in.\n"); return 1; }
+__attribute__((weak)) int dm_mlp_train_cli(int argc, char **argv) { (void)argc; (void)argv; printf("MLP Train CLI not compiled in.\n"); return 1; }
+__attribute__((weak)) int dm_tinyvit_cli(int argc, char **argv) { (void)argc; (void)argv; printf("TinyViT CLI not compiled in.\n"); return 1; }
 
 extern DM_Algorithm bio_huif_ga_algo;
 extern DM_Algorithm tmku_algo;

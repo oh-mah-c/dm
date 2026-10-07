@@ -171,3 +171,7 @@ src\algorithms\vhuqi.c
 src\algorithms\vifp.c
 src\algorithms\weak_mfhoi_miner.c
 src\algorithms\zart.c
+src\core\dm_block.c
+src\algorithms\prefixspan.c
+src\algorithms\spade.c
+src\core\dm_dtype.c

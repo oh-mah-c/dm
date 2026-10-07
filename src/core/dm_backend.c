@@ -58,17 +58,19 @@ static int            g_inited = 0;
  * For a more robust runtime check we attempt to dlsym "TFE_NewContext" from
  * the process image.  If it resolves, libtensorflow was loaded.
  */
+#if defined(_WIN32)
+#  include <windows.h>
+#elif defined(__GNUC__) || defined(__clang__)
+#  include <dlfcn.h>
+#endif
+
 static int probe_tf(void)
 {
 #if defined(__GNUC__) || defined(__clang__)
-    /* dlsym approach — works on Linux/macOS */
 #  ifndef _WIN32
-#    include <dlfcn.h>  /* NOLINT — include inside function is intentional */
     void *sym = dlsym(RTLD_DEFAULT, "TFE_NewContext");
     return sym != NULL ? 1 : 0;
 #  else
-    /* Windows: check with GetProcAddress on a well-known module name */
-#    include <windows.h>
     HMODULE hm = GetModuleHandleA("tensorflow.dll");
     if (!hm) hm = GetModuleHandleA("libtensorflow.dll");
     if (!hm) return 0;
