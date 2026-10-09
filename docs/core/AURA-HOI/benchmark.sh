@@ -140,6 +140,8 @@ OUT  = Path("docs/core/AURA-HOI")
 ITEMSET_CSV = OUT / "itemset_counts.csv"
 
 df = pd.read_csv(CSV)
+df["alpha"]       = pd.to_numeric(df["alpha"],       errors="coerce")
+df["minsup"]      = pd.to_numeric(df["minsup"],      errors="coerce")
 df["time_s"]      = pd.to_numeric(df["time_s"],      errors="coerce")
 df["peak_ram_mb"] = pd.to_numeric(df["peak_ram_mb"], errors="coerce")
 df["itemsets"]    = pd.to_numeric(df["itemsets"],     errors="coerce")
