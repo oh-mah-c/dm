@@ -511,6 +511,8 @@ DM_API DM_Status dm_image_patchify_raw(const float *in_nhwc,
  *   DM_BACKEND=auto        auto-detect (default)
  * ───────────────────────────────────────────────────────────────────────── */
 
+#ifndef DM_BACKEND_DEFINED
+#define DM_BACKEND_DEFINED
 typedef enum {
     DM_BACKEND_CPU             = 0,   /* pure-C, always available             */
     DM_BACKEND_VULKAN_COMPUTE  = 1,   /* Vulkan portable compute              */
@@ -518,10 +520,11 @@ typedef enum {
     DM_BACKEND_TENSORFLOW      = 3,   /* TFE — XLA/cuDNN/oneDNN               */
     DM_BACKEND_CUDA            = 4,   /* CUDA/Tensor Core (future)            */
     DM_BACKEND_ROCM            = 5,   /* ROCm/HIP (future)                    */
+    DM_BACKEND_EXTERNAL        = 6,   /* External handle / custom backend     */
     DM_BACKEND_AUTO            = 255  /* runtime picks best available         */
 } DM_Backend;
 
-typedef struct {
+typedef struct DM_BackendInfo {
     DM_Backend active;
     int        tf_available;
     int        vulkan_available;
@@ -535,6 +538,7 @@ DM_API DM_Backend     dm_backend_get   (void);
 DM_API void           dm_backend_set   (DM_Backend b);
 DM_API DM_BackendInfo dm_backend_query (void);
 DM_API const char    *dm_backend_name  (DM_Backend b);
+#endif
 
 /* ─────────────────────────────────────────────────────────────────────────
  * § 8  Engine — dm_engine core (TFE backend, NCHW float32)
@@ -556,6 +560,8 @@ DM_API const char    *dm_backend_name  (DM_Backend b);
  *   Linear weights    — [out][in]
  *   Sequence buffers  — row-major [seq_len × d_model]
  * ───────────────────────────────────────────────────────────────────────── */
+
+typedef struct DM_Block DM_Block;
 
 typedef struct {
     int    n, c, h, w;

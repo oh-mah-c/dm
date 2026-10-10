@@ -20,7 +20,7 @@ extern "C" {
 #define DM_MAX_NAME 128
 #define DM_MAX_INVARIANTS 16
 
-typedef struct {
+typedef struct DM_Block {
     DM_BlockKind kind;
     DM_DType dtype;
     DM_Layout layout;

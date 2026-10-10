@@ -100,6 +100,7 @@ int dm_linear(const DM_Block *in, DM_Block *out,
 /* ── Softmax (TFE) ───────────────────────────────────────────────────────── */
 void dm_softmax     (DM_Block *t);               /* [n,c,1,1] over channel dim */
 void dm_softmax_last_dim(DM_Block *t);           /* Softmax over the last dimension */
+void dm_softmax_rows(float *x, int rows, int cols); /* row-wise softmax */
 
 /* ── Matrix multiplications (TFE MatMul) ────────────────────────────────── */
 /* C = A @ B^T   A[M×K], B[N×K] → C[M×N] */

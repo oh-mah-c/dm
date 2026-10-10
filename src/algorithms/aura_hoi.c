@@ -1,6 +1,7 @@
 #include "algorithms/aura_hoi.h"
 #include "core/dm_benchmark.h"
 #include "core/dm_dataset_types.h"
+#include "core/dm_threadpool.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -354,100 +355,107 @@ static inline int intersect_tids_and_check(const AURACtx *ctx,
     return 0;
 }
 
+/* Forward declarations */
+static void aura_dfs_tid_raw_engine(AURACtx *ctx, AURATidNode *classes, size_t class_size);
+static void aura_dfs_tid_closed_engine(AURACtx *ctx, size_t depth, AURATidNode *classes, size_t class_size);
+
 /* ── Pure TID-List Raw Fullset DFS Engine ────────────────────────────────── */
-static void aura_dfs_tid_raw_engine(AURACtx *ctx, AURATidNode *classes, size_t class_size) {
-    if (class_size < 2 || should_stop(ctx)) return;
+static void aura_process_root_item_raw(AURACtx *ctx, AURATidNode *classes, size_t class_size, size_t i) {
+    if (should_stop(ctx)) return;
+    AURATidNode *P1 = &classes[i];
+    size_t remaining = class_size - i - 1;
+    if (remaining == 0) return;
     
-    for (size_t i = 0; i < class_size; i++) {
-        if (should_stop(ctx)) return;
-        AURATidNode *P1 = &classes[i];
-        size_t remaining = class_size - i - 1;
-        if (remaining == 0) continue;
+    /* ── Mathematically Safe Residual Upper Bound Pruning ───────────────
+     * Theorem: For any descendant X = P1 \cup Z with Z \subseteq {classes[i+1..class_size-1]}:
+     * |X| \le P1->length + remaining.
+     * Furthermore, |X| \le |t_q| for any supporting transaction q \in T(X).
+     * Since T(X) \subseteq T(P1), we have:
+     * socc(X) \le \sum_{q \in T(P1)} min(P1->length + remaining, |t_q|) / |t_q|
+     *         \le (P1->length + remaining) * P1->recip_sum.
+     * If this upper bound < threshold_value, NO valid HOI descendant can exist! */
+    double max_possible_k = (double)(P1->length + remaining);
+    if (ctx->uniform_length) {
+        if (max_possible_k > (double)ctx->first_len) max_possible_k = (double)ctx->first_len;
+        double max_desc_score = (max_possible_k * (double)P1->num_tids) / (double)ctx->first_len;
+        if (max_desc_score + 1e-12 < ctx->threshold_value) {
+            ctx->pruned_envelope += remaining;
+            return;
+        }
+    } else {
+        double max_desc_score = max_possible_k * P1->recip_sum;
+        if (max_desc_score + 1e-12 < ctx->threshold_value || (double)P1->num_tids + 1e-12 < ctx->threshold_value) {
+            ctx->pruned_envelope += remaining;
+            return;
+        }
+    }
+    
+    size_t mem_mark = mempool_mark(&ctx->pool);
+    
+    /* Allocate child headers on stack / pool */
+    AURATidNode *children = (AURATidNode *)malloc(remaining * sizeof(AURATidNode));
+    if (!children) return;
+    size_t child_count = 0;
+    
+    for (size_t j = i + 1; j < class_size; j++) {
+        AURATidNode *P2 = &classes[j];
+        ctx->visited_nodes++;
         
-        /* ── Mathematically Safe Residual Upper Bound Pruning ───────────────
-         * Theorem: For any descendant X = P1 \cup Z with Z \subseteq {classes[i+1..class_size-1]}:
-         * |X| \le P1->length + remaining.
-         * Furthermore, |X| \le |t_q| for any supporting transaction q \in T(X).
-         * Since T(X) \subseteq T(P1), we have:
-         * socc(X) \le \sum_{q \in T(P1)} min(P1->length + remaining, |t_q|) / |t_q|
-         *         \le (P1->length + remaining) * P1->recip_sum.
-         * If this upper bound < threshold_value, NO valid HOI descendant can exist! */
-        double max_possible_k = (double)(P1->length + remaining);
-        if (ctx->uniform_length) {
-            if (max_possible_k > (double)ctx->first_len) max_possible_k = (double)ctx->first_len;
-            double max_desc_score = (max_possible_k * (double)P1->num_tids) / (double)ctx->first_len;
-            if (max_desc_score + 1e-12 < ctx->threshold_value) {
-                ctx->pruned_envelope += remaining;
-                continue;
+        size_t new_size = 0;
+        size_t new_k = P1->length + 1;
+        size_t R_count = class_size - j - 1;
+        int is_ho = 0;
+        double recip_sum = 0.0;
+        
+        if (intersect_tids_and_check(ctx, P1, P2, ctx->tid_scratch, &new_size,
+                                     new_k, R_count, &is_ho, &recip_sum)) {
+            /* Allocate TID array from pool */
+            uint32_t *tids_copy = mempool_alloc(&ctx->pool, new_size);
+            int pool_alloc_ok = (tids_copy != NULL);
+            if (!pool_alloc_ok) {
+                tids_copy = (uint32_t *)malloc(new_size * sizeof(uint32_t));
+            }
+            memcpy(tids_copy, ctx->tid_scratch, new_size * sizeof(uint32_t));
+            
+            AURATidNode *ch = &children[child_count++];
+            ch->item = P2->item;
+            ch->length = (uint32_t)new_k;
+            ch->num_tids = new_size;
+            ch->recip_sum = recip_sum;
+            ch->tids = tids_copy;
+            
+            if (is_ho) {
+                ctx->raw_hoi_count++;
+                ctx->raw_total_output_items += new_k;
             }
         } else {
-            double max_desc_score = max_possible_k * P1->recip_sum;
-            if (max_desc_score + 1e-12 < ctx->threshold_value || (double)P1->num_tids + 1e-12 < ctx->threshold_value) {
-                ctx->pruned_envelope += remaining;
-                continue;
+            if (new_size < ctx->min_support) ctx->pruned_support++;
+            else ctx->pruned_envelope++;
+        }
+    }
+    
+    if (child_count > 0) {
+        aura_dfs_tid_raw_engine(ctx, children, child_count);
+    }
+    
+    /* If any child had to use standard malloc, free it */
+    if (ctx->pool.used + ctx->ntrans > ctx->pool.capacity) {
+        for (size_t c = 0; c < child_count; c++) {
+            if (children[c].tids < ctx->pool.pool ||
+                children[c].tids >= ctx->pool.pool + ctx->pool.capacity) {
+                free(children[c].tids);
             }
         }
-        
-        size_t mem_mark = mempool_mark(&ctx->pool);
-        
-        /* Allocate child headers on stack / pool */
-        AURATidNode *children = (AURATidNode *)malloc(remaining * sizeof(AURATidNode));
-        if (!children) continue;
-        size_t child_count = 0;
-        
-        for (size_t j = i + 1; j < class_size; j++) {
-            AURATidNode *P2 = &classes[j];
-            ctx->visited_nodes++;
-            
-            size_t new_size = 0;
-            size_t new_k = P1->length + 1;
-            size_t R_count = class_size - j - 1;
-            int is_ho = 0;
-            double recip_sum = 0.0;
-            
-            if (intersect_tids_and_check(ctx, P1, P2, ctx->tid_scratch, &new_size,
-                                         new_k, R_count, &is_ho, &recip_sum)) {
-                /* Allocate TID array from pool */
-                uint32_t *tids_copy = mempool_alloc(&ctx->pool, new_size);
-                int pool_alloc_ok = (tids_copy != NULL);
-                if (!pool_alloc_ok) {
-                    tids_copy = (uint32_t *)malloc(new_size * sizeof(uint32_t));
-                }
-                memcpy(tids_copy, ctx->tid_scratch, new_size * sizeof(uint32_t));
-                
-                AURATidNode *ch = &children[child_count++];
-                ch->item = P2->item;
-                ch->length = (uint32_t)new_k;
-                ch->num_tids = new_size;
-                ch->recip_sum = recip_sum;
-                ch->tids = tids_copy;
-                
-                if (is_ho) {
-                    ctx->raw_hoi_count++;
-                    ctx->raw_total_output_items += new_k;
-                }
-            } else {
-                if (new_size < ctx->min_support) ctx->pruned_support++;
-                else ctx->pruned_envelope++;
-            }
-        }
-        
-        if (child_count > 0) {
-            aura_dfs_tid_raw_engine(ctx, children, child_count);
-        }
-        
-        /* If any child had to use standard malloc, free it */
-        if (ctx->pool.used + ctx->ntrans > ctx->pool.capacity) {
-            for (size_t c = 0; c < child_count; c++) {
-                if (children[c].tids < ctx->pool.pool ||
-                    children[c].tids >= ctx->pool.pool + ctx->pool.capacity) {
-                    free(children[c].tids);
-                }
-            }
-        }
-        
-        free(children);
-        mempool_rewind(&ctx->pool, mem_mark);
+    }
+    
+    free(children);
+    mempool_rewind(&ctx->pool, mem_mark);
+}
+
+static void aura_dfs_tid_raw_engine(AURACtx *ctx, AURATidNode *classes, size_t class_size) {
+    if (class_size < 2 || should_stop(ctx)) return;
+    for (size_t i = 0; i < class_size; i++) {
+        aura_process_root_item_raw(ctx, classes, class_size, i);
     }
 }
 
@@ -473,131 +481,243 @@ static int tid_is_subset(const uint32_t *sub, size_t n_sub, const uint32_t *sup,
     return (i == n_sub);
 }
 
+static void aura_process_root_item_closed(AURACtx *ctx, size_t depth,
+                                         AURATidNode *classes, size_t class_size, size_t i) {
+    if (should_stop(ctx)) return;
+    AURATidNode *P1 = &classes[i];
+    
+    /* Backward closure check: Check against previous siblings in this equivalence class */
+    int backward = 0;
+    for (size_t prev = 0; prev < i; prev++) {
+        if (tid_is_subset(P1->tids, P1->num_tids, classes[prev].tids, classes[prev].num_tids)) {
+            backward = 1;
+            break;
+        }
+    }
+    if (backward) {
+        ctx->pruned_backward++;
+        return;
+    }
+    
+    /* Record item into current prefix path */
+    ctx->prefix_items[depth] = ctx->active_items[P1->item];
+    size_t current_len = depth + 1;
+    
+    /* Identify absorbed items (Closure Jump): items that appear in 100% of P1's transactions */
+    size_t mem_mark = mempool_mark(&ctx->pool);
+    size_t remaining = class_size - i - 1;
+    AURATidNode *children = NULL;
+    if (remaining > 0) {
+        children = (AURATidNode *)malloc(remaining * sizeof(AURATidNode));
+    }
+    size_t child_count = 0;
+    
+    for (size_t j = i + 1; j < class_size; j++) {
+        AURATidNode *P2 = &classes[j];
+        
+        /* Theorem 2: Pre-Intersection Sibling Pruning in O(1) */
+        size_t R_count = class_size - j - 1;
+        size_t max_desc_len = current_len + 1 + R_count;
+        size_t min_supp = (P1->num_tids < P2->num_tids) ? P1->num_tids : P2->num_tids;
+        if (min_supp < ctx->min_support) continue;
+        if ((double)min_supp + 1e-12 < ctx->threshold_value) continue;
+        
+        double min_rsum = (P1->recip_sum < P2->recip_sum) ? P1->recip_sum : P2->recip_sum;
+        if ((double)max_desc_len * min_rsum + 1e-12 < ctx->threshold_value) continue;
+        
+        ctx->visited_nodes++;
+        
+        size_t new_size = 0;
+        size_t new_k = current_len + 1;
+        int is_ho = 0;
+        double recip_sum = 0.0;
+        
+        if (intersect_tids_and_check(ctx, P1, P2, ctx->tid_scratch, &new_size,
+                                     new_k, R_count, &is_ho, &recip_sum)) {
+            if (new_size == P1->num_tids) {
+                /* Closure Absorption Jump! Item occurs in identical transaction set */
+                ctx->prefix_items[current_len++] = ctx->active_items[P2->item];
+                ctx->closure_jumps++;
+            } else {
+                /* Genuine branching child */
+                uint32_t *tids_copy = mempool_alloc(&ctx->pool, new_size);
+                if (!tids_copy) tids_copy = (uint32_t *)malloc(new_size * sizeof(uint32_t));
+                memcpy(tids_copy, ctx->tid_scratch, new_size * sizeof(uint32_t));
+                
+                AURATidNode *ch = &children[child_count++];
+                ch->item = P2->item;
+                ch->length = (uint32_t)new_k;
+                ch->num_tids = new_size;
+                ch->recip_sum = recip_sum;
+                ch->tids = tids_copy;
+            }
+        } else {
+            if (new_size < ctx->min_support) ctx->pruned_support++;
+            else ctx->pruned_envelope++;
+        }
+    }
+    
+    /* Evaluate closed representative pattern */
+    double avg_occ = ((double)current_len * P1->recip_sum) / (double)P1->num_tids;
+    double score = ctx->summed_occupancy_mode
+        ? ((double)current_len * P1->recip_sum)
+        : avg_occ;
+    
+    if (score + 1e-12 >= ctx->threshold_value) {
+        ctx->raw_hoi_count++;
+        if (ledger_add(&ctx->ledger, ctx->prefix_items, current_len, P1->tids, P1->num_tids, avg_occ)) {
+            ctx->total_output_items += current_len;
+        } else {
+            ctx->ledger_duplicates++;
+        }
+    }
+    
+    /* Recurse into children equivalence classes with Safe Residual Upper Bound Pruning */
+    if (child_count > 0) {
+        double max_possible_k = (double)(current_len + child_count);
+        int prune_children = 0;
+        if (ctx->uniform_length) {
+            if (max_possible_k > (double)ctx->first_len) max_possible_k = (double)ctx->first_len;
+            double max_desc_score = (max_possible_k * (double)P1->num_tids) / (double)ctx->first_len;
+            if (max_desc_score + 1e-12 < ctx->threshold_value) prune_children = 1;
+        } else {
+            double max_desc_score = max_possible_k * P1->recip_sum;
+            if (max_desc_score + 1e-12 < ctx->threshold_value) prune_children = 1;
+        }
+        if (prune_children) {
+            ctx->pruned_envelope += child_count;
+        } else {
+            aura_dfs_tid_closed_engine(ctx, current_len, children, child_count);
+        }
+    }
+    
+    /* Cleanup */
+    if (ctx->pool.used + ctx->ntrans > ctx->pool.capacity) {
+        for (size_t c = 0; c < child_count; c++) {
+            if (children[c].tids < ctx->pool.pool ||
+                children[c].tids >= ctx->pool.pool + ctx->pool.capacity) {
+                free(children[c].tids);
+            }
+        }
+    }
+    if (children) free(children);
+    mempool_rewind(&ctx->pool, mem_mark);
+}
+
 static void aura_dfs_tid_closed_engine(AURACtx *ctx, size_t depth,
                                        AURATidNode *classes, size_t class_size) {
     if (class_size == 0 || should_stop(ctx)) return;
     
     for (size_t i = 0; i < class_size; i++) {
-        if (should_stop(ctx)) return;
-        AURATidNode *P1 = &classes[i];
-        
-        /* Backward closure check: Check against previous siblings in this equivalence class */
-        int backward = 0;
-        for (size_t prev = 0; prev < i; prev++) {
-            if (tid_is_subset(P1->tids, P1->num_tids, classes[prev].tids, classes[prev].num_tids)) {
-                backward = 1;
-                break;
-            }
-        }
-        if (backward) {
-            ctx->pruned_backward++;
-            continue;
-        }
-        
-        /* Record item into current prefix path */
-        ctx->prefix_items[depth] = ctx->active_items[P1->item];
-        size_t current_len = depth + 1;
-        
-        /* Identify absorbed items (Closure Jump): items that appear in 100% of P1's transactions */
-        size_t mem_mark = mempool_mark(&ctx->pool);
-        size_t remaining = class_size - i - 1;
-        AURATidNode *children = NULL;
-        if (remaining > 0) {
-            children = (AURATidNode *)malloc(remaining * sizeof(AURATidNode));
-        }
-        size_t child_count = 0;
-        
-        for (size_t j = i + 1; j < class_size; j++) {
-            AURATidNode *P2 = &classes[j];
-            
-            /* Theorem 2: Pre-Intersection Sibling Pruning in O(1) */
-            size_t R_count = class_size - j - 1;
-            size_t max_desc_len = current_len + 1 + R_count;
-            size_t min_supp = (P1->num_tids < P2->num_tids) ? P1->num_tids : P2->num_tids;
-            if (min_supp < ctx->min_support) continue;
-            if ((double)min_supp + 1e-12 < ctx->threshold_value) continue;
-            
-            double min_rsum = (P1->recip_sum < P2->recip_sum) ? P1->recip_sum : P2->recip_sum;
-            if ((double)max_desc_len * min_rsum + 1e-12 < ctx->threshold_value) continue;
-            
-            ctx->visited_nodes++;
-            
-            size_t new_size = 0;
-            size_t new_k = current_len + 1;
-            int is_ho = 0;
-            double recip_sum = 0.0;
-            
-            if (intersect_tids_and_check(ctx, P1, P2, ctx->tid_scratch, &new_size,
-                                         new_k, R_count, &is_ho, &recip_sum)) {
-                if (new_size == P1->num_tids) {
-                    /* Closure Absorption Jump! Item occurs in identical transaction set */
-                    ctx->prefix_items[current_len++] = ctx->active_items[P2->item];
-                    ctx->closure_jumps++;
-                } else {
-                    /* Genuine branching child */
-                    uint32_t *tids_copy = mempool_alloc(&ctx->pool, new_size);
-                    if (!tids_copy) tids_copy = (uint32_t *)malloc(new_size * sizeof(uint32_t));
-                    memcpy(tids_copy, ctx->tid_scratch, new_size * sizeof(uint32_t));
-                    
-                    AURATidNode *ch = &children[child_count++];
-                    ch->item = P2->item;
-                    ch->length = (uint32_t)new_k;
-                    ch->num_tids = new_size;
-                    ch->recip_sum = recip_sum;
-                    ch->tids = tids_copy;
-                }
-            } else {
-                if (new_size < ctx->min_support) ctx->pruned_support++;
-                else ctx->pruned_envelope++;
-            }
-        }
-        
-        /* Evaluate closed representative pattern */
-        double avg_occ = ((double)current_len * P1->recip_sum) / (double)P1->num_tids;
-        double score = ctx->summed_occupancy_mode
-            ? ((double)current_len * P1->recip_sum)
-            : avg_occ;
-        
-        if (score + 1e-12 >= ctx->threshold_value) {
-            ctx->raw_hoi_count++;
-            if (ledger_add(&ctx->ledger, ctx->prefix_items, current_len, P1->tids, P1->num_tids, avg_occ)) {
-                ctx->total_output_items += current_len;
-            } else {
-                ctx->ledger_duplicates++;
-            }
-        }
-        
-        /* Recurse into children equivalence classes with Safe Residual Upper Bound Pruning */
-        if (child_count > 0) {
-            double max_possible_k = (double)(current_len + child_count);
-            int prune_children = 0;
-            if (ctx->uniform_length) {
-                if (max_possible_k > (double)ctx->first_len) max_possible_k = (double)ctx->first_len;
-                double max_desc_score = (max_possible_k * (double)P1->num_tids) / (double)ctx->first_len;
-                if (max_desc_score + 1e-12 < ctx->threshold_value) prune_children = 1;
-            } else {
-                double max_desc_score = max_possible_k * P1->recip_sum;
-                if (max_desc_score + 1e-12 < ctx->threshold_value) prune_children = 1;
-            }
-            if (prune_children) {
-                ctx->pruned_envelope += child_count;
-            } else {
-                aura_dfs_tid_closed_engine(ctx, current_len, children, child_count);
-            }
-        }
-        
-        /* Cleanup */
-        if (ctx->pool.used + ctx->ntrans > ctx->pool.capacity) {
-            for (size_t c = 0; c < child_count; c++) {
-                if (children[c].tids < ctx->pool.pool ||
-                    children[c].tids >= ctx->pool.pool + ctx->pool.capacity) {
-                    free(children[c].tids);
-                }
-            }
-        }
-        if (children) free(children);
-        mempool_rewind(&ctx->pool, mem_mark);
+        aura_process_root_item_closed(ctx, depth, classes, class_size, i);
     }
+}
+
+/* ── Multicore Parallel Worker Structures & Loop Functions ───────────────── */
+typedef struct {
+    AURACtx *main_ctx;
+    AURATidNode *C1;
+    size_t c1_count;
+    size_t next_i;
+    pthread_mutex_t task_mutex;
+    pthread_mutex_t reduce_mutex;
+    size_t pool_elements;
+    size_t max_item_supp;
+    size_t active_count;
+} AURAParallelShared;
+
+static void aura_parallel_worker_raw(void *arg) {
+    AURAParallelShared *ps = (AURAParallelShared *)arg;
+    AURACtx local_ctx;
+    memcpy(&local_ctx, ps->main_ctx, sizeof(AURACtx));
+    
+    mempool_init(&local_ctx.pool, ps->pool_elements);
+    local_ctx.tid_scratch = (uint32_t *)malloc((ps->max_item_supp + 1) * sizeof(uint32_t));
+    local_ctx.prefix_items = (uint32_t *)malloc((ps->active_count + 1) * sizeof(uint32_t));
+    
+    local_ctx.raw_hoi_count = 0;
+    local_ctx.raw_total_output_items = 0;
+    local_ctx.visited_nodes = 0;
+    local_ctx.pruned_support = 0;
+    local_ctx.pruned_envelope = 0;
+    local_ctx.pruned_backward = 0;
+    local_ctx.closure_jumps = 0;
+    
+    while (1) {
+        pthread_mutex_lock(&ps->task_mutex);
+        size_t i = ps->next_i++;
+        pthread_mutex_unlock(&ps->task_mutex);
+        
+        if (i >= ps->c1_count || should_stop(ps->main_ctx)) break;
+        
+        aura_process_root_item_raw(&local_ctx, ps->C1, ps->c1_count, i);
+    }
+    
+    pthread_mutex_lock(&ps->reduce_mutex);
+    ps->main_ctx->raw_hoi_count += local_ctx.raw_hoi_count;
+    ps->main_ctx->raw_total_output_items += local_ctx.raw_total_output_items;
+    ps->main_ctx->visited_nodes += local_ctx.visited_nodes;
+    ps->main_ctx->pruned_support += local_ctx.pruned_support;
+    ps->main_ctx->pruned_envelope += local_ctx.pruned_envelope;
+    ps->main_ctx->pruned_backward += local_ctx.pruned_backward;
+    ps->main_ctx->closure_jumps += local_ctx.closure_jumps;
+    pthread_mutex_unlock(&ps->reduce_mutex);
+    
+    free(local_ctx.tid_scratch);
+    free(local_ctx.prefix_items);
+    mempool_free(&local_ctx.pool);
+}
+
+static void aura_parallel_worker_closed(void *arg) {
+    AURAParallelShared *ps = (AURAParallelShared *)arg;
+    AURACtx local_ctx;
+    memcpy(&local_ctx, ps->main_ctx, sizeof(AURACtx));
+    
+    mempool_init(&local_ctx.pool, ps->pool_elements);
+    local_ctx.tid_scratch = (uint32_t *)malloc((ps->max_item_supp + 1) * sizeof(uint32_t));
+    local_ctx.prefix_items = (uint32_t *)malloc((ps->active_count + 1) * sizeof(uint32_t));
+    ledger_init(&local_ctx.ledger, 256);
+    
+    local_ctx.raw_hoi_count = 0;
+    local_ctx.total_output_items = 0;
+    local_ctx.visited_nodes = 0;
+    local_ctx.pruned_support = 0;
+    local_ctx.pruned_envelope = 0;
+    local_ctx.pruned_backward = 0;
+    local_ctx.closure_jumps = 0;
+    local_ctx.ledger_duplicates = 0;
+    
+    while (1) {
+        pthread_mutex_lock(&ps->task_mutex);
+        size_t i = ps->next_i++;
+        pthread_mutex_unlock(&ps->task_mutex);
+        
+        if (i >= ps->c1_count || should_stop(ps->main_ctx)) break;
+        
+        aura_process_root_item_closed(&local_ctx, 0, ps->C1, ps->c1_count, i);
+    }
+    
+    pthread_mutex_lock(&ps->reduce_mutex);
+    ps->main_ctx->raw_hoi_count += local_ctx.raw_hoi_count;
+    ps->main_ctx->visited_nodes += local_ctx.visited_nodes;
+    ps->main_ctx->pruned_support += local_ctx.pruned_support;
+    ps->main_ctx->pruned_envelope += local_ctx.pruned_envelope;
+    ps->main_ctx->pruned_backward += local_ctx.pruned_backward;
+    ps->main_ctx->closure_jumps += local_ctx.closure_jumps;
+    ps->main_ctx->ledger_duplicates += local_ctx.ledger_duplicates;
+    
+    for (size_t k = 0; k < local_ctx.ledger.count; k++) {
+        ledger_add(&ps->main_ctx->ledger, local_ctx.ledger.data[k].items,
+                   local_ctx.ledger.data[k].len, local_ctx.ledger.data[k].tids,
+                   local_ctx.ledger.data[k].support, local_ctx.ledger.data[k].occupancy);
+    }
+    ps->main_ctx->total_output_items += local_ctx.total_output_items;
+    pthread_mutex_unlock(&ps->reduce_mutex);
+    
+    ledger_free(&local_ctx.ledger);
+    free(local_ctx.tid_scratch);
+    free(local_ctx.prefix_items);
+    mempool_free(&local_ctx.pool);
 }
 
 /* ── Entry Point ────────────────────────────────────────────────────────── */
@@ -812,12 +932,49 @@ static DM_Status run(DM_Dataset *ds, void *params) {
         }
     }
 
+    int num_threads = (p && p->threads > 0) ? p->threads : dm_get_num_threads();
+    if (num_threads < 1) num_threads = 1;
+    if (num_threads > (int)c1_count && c1_count > 0) num_threads = (int)c1_count;
+
+    if (num_threads > 1 && c1_count > 1) {
+        AURAParallelShared ps;
+        memset(&ps, 0, sizeof(ps));
+        ps.main_ctx = &ctx;
+        ps.C1 = C1;
+        ps.c1_count = c1_count;
+        ps.next_i = 0;
+        pthread_mutex_init(&ps.task_mutex, NULL);
+        pthread_mutex_init(&ps.reduce_mutex, NULL);
+        ps.pool_elements = pool_elements;
+        ps.max_item_supp = max_item_supp;
+        ps.active_count = ctx.active_count;
+
+        DM_ThreadPool *pool = dm_threadpool_create(num_threads);
+        if (pool) {
+            printf("[AURA-HOI] Multicore Mode Enabled: %d worker threads across %zu root branches\n", num_threads, c1_count);
+            for (int t = 0; t < num_threads; t++) {
+                dm_threadpool_submit(pool, ctx.emit_raw_view ? aura_parallel_worker_raw : aura_parallel_worker_closed, &ps);
+            }
+            dm_threadpool_wait(pool);
+            dm_threadpool_destroy(pool);
+        } else {
+            if (ctx.emit_raw_view) aura_dfs_tid_raw_engine(&ctx, C1, c1_count);
+            else aura_dfs_tid_closed_engine(&ctx, 0, C1, c1_count);
+        }
+        pthread_mutex_destroy(&ps.task_mutex);
+        pthread_mutex_destroy(&ps.reduce_mutex);
+    } else {
+        if (ctx.emit_raw_view) {
+            aura_dfs_tid_raw_engine(&ctx, C1, c1_count);
+        } else {
+            aura_dfs_tid_closed_engine(&ctx, 0, C1, c1_count);
+        }
+    }
+
     if (ctx.emit_raw_view) {
-        aura_dfs_tid_raw_engine(&ctx, C1, c1_count);
         printf("[AURA-HOI] Complete. Raw fullset HO itemsets found: %zu\n", ctx.raw_hoi_count);
         dm_bench_record_results(ctx.raw_hoi_count, ctx.raw_total_output_items);
     } else {
-        aura_dfs_tid_closed_engine(&ctx, 0, C1, c1_count);
         printf("[AURA-HOI] Complete. Auditable closed HOI representatives found: %zu\n", ctx.ledger.count);
         dm_bench_record_results(ctx.ledger.count, ctx.total_output_items);
     }

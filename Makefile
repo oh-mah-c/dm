@@ -4,7 +4,15 @@ VULKAN_CFLAGS = -I$(VULKAN_HEADERS_DIR)/include
 TF_IFLAGS = -Isrc/core/dm_engine \
             -Isrc/core/dm_engine/third_party/xla \
             -Isrc/core/dm_engine/third_party/xla/third_party/tsl
-CFLAGS = -D_POSIX_C_SOURCE=200809L -Iinclude -Iinclude/core $(VULKAN_CFLAGS) $(TF_IFLAGS) -Wall -Wextra -O2 -pthread -fPIC
+ifneq ($(wildcard third_party/icu/usr/include),)
+    ICU_CFLAGS = -Ithird_party/icu/usr/include
+    ICU_LDFLAGS = -Lthird_party/icu/usr/lib/x86_64-linux-gnu -licuuc
+else
+    ICU_CFLAGS =
+    ICU_LDFLAGS = -licuuc
+endif
+CFLAGS = -D_POSIX_C_SOURCE=200809L -Iinclude -Iinclude/core $(VULKAN_CFLAGS) $(TF_IFLAGS) $(ICU_CFLAGS) -Wall -Wextra -O2 -pthread -fPIC
+TF_LDFLAGS = -L.venv/lib/python3.12/site-packages/tensorflow -ltensorflow_cc -ltensorflow_framework -Wl,-rpath,.venv/lib/python3.12/site-packages/tensorflow
 SRC_DIR = src
 BUILD_DIR = build
 OBJ_DIR = $(BUILD_DIR)/obj
@@ -90,21 +98,30 @@ MOBILENET_TINY_TARGET = $(BIN_DIR)/dm_mobilenet_tiny
 CONNECT_TARGET = $(BIN_DIR)/dm_connect
 RUN_TARGET = $(BIN_DIR)/dm_run
 MFHOI_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/mfhoi_miner.c $(MFHOI_COMMON_SOURCES))
-TMKU_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/tmku_miner.c $(SRC_DIR)/algorithms/tmku.c $(SRC_DIR)/core/dm_dataset.c $(SRC_DIR)/core/dm_registry.c $(SRC_DIR)/core/dm_benchmark.c)
-MHOUI_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/mhoui_miner.c $(SRC_DIR)/algorithms/mhoui.c $(SRC_DIR)/core/dm_dataset.c $(SRC_DIR)/core/dm_registry.c $(SRC_DIR)/core/dm_benchmark.c)
-VIFP_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/vifp_miner.c $(SRC_DIR)/algorithms/vifp.c $(SRC_DIR)/core/dm_dataset.c $(SRC_DIR)/core/dm_registry.c $(SRC_DIR)/core/dm_benchmark.c)
-HUPP_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/hupp_miner.c $(SRC_DIR)/algorithms/hupp.c $(SRC_DIR)/core/dm_benchmark.c)
-CHUO_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/chuo_miner.c $(SRC_DIR)/algorithms/chuo_miner.c $(SRC_DIR)/core/dm_dataset.c $(SRC_DIR)/core/dm_benchmark.c)
-PSO_CLASSIFIER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/pso_classifier.c $(SRC_DIR)/algorithms/pso_classifier.c $(SRC_DIR)/core/dm_benchmark.c)
-TKU_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/tku_miner.c $(SRC_DIR)/algorithms/tku_miner.c $(SRC_DIR)/core/dm_dataset.c $(SRC_DIR)/core/dm_benchmark.c $(SRC_DIR)/core/dm_arena.c $(SRC_DIR)/algorithms/laga.c $(SRC_DIR)/tokenizer/faro_tokenizer.c $(SRC_DIR)/tokenizer/tokenizer_variants.c)
-KCLOTREE_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/kclotree_miner.c $(SRC_DIR)/algorithms/kclotree_miner.c $(SRC_DIR)/core/dm_benchmark.c)
-TIPN_HOUI_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/tipn_houi_miner.c $(SRC_DIR)/algorithms/tipn_houi.c $(SRC_DIR)/core/dm_benchmark.c)
-HTK_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/htk_miner.c $(SRC_DIR)/algorithms/htk_miner.c $(SRC_DIR)/core/dm_benchmark.c)
-TOPKPHM_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/topkphm_miner.c $(SRC_DIR)/algorithms/topkphm.c $(SRC_DIR)/core/dm_benchmark.c)
-TKU_PSO_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/tku_pso_miner.c $(SRC_DIR)/algorithms/tku_pso.c $(SRC_DIR)/core/dm_dataset.c $(SRC_DIR)/core/dm_benchmark.c)
+BENCHMARK_COMMON_SOURCES = $(SRC_DIR)/core/dm_benchmark.c \
+                           $(SRC_DIR)/core/dm_arena.c \
+                           $(SRC_DIR)/algorithms/laga.c \
+                           $(SRC_DIR)/tokenizer/faro_tokenizer.c \
+                           $(SRC_DIR)/tokenizer/tokenizer_variants.c \
+                           $(SRC_DIR)/core/dm_block.c \
+                           $(SRC_DIR)/core/dm_meta.c \
+                           $(SRC_DIR)/core/dm_dtype.c
+
+TMKU_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/tmku_miner.c $(SRC_DIR)/algorithms/tmku.c $(SRC_DIR)/core/dm_dataset.c $(SRC_DIR)/core/dm_registry.c $(BENCHMARK_COMMON_SOURCES))
+MHOUI_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/mhoui_miner.c $(SRC_DIR)/algorithms/mhoui.c $(SRC_DIR)/core/dm_dataset.c $(SRC_DIR)/core/dm_registry.c $(BENCHMARK_COMMON_SOURCES))
+VIFP_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/vifp_miner.c $(SRC_DIR)/algorithms/vifp.c $(SRC_DIR)/core/dm_dataset.c $(SRC_DIR)/core/dm_registry.c $(BENCHMARK_COMMON_SOURCES))
+HUPP_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/hupp_miner.c $(SRC_DIR)/algorithms/hupp.c $(BENCHMARK_COMMON_SOURCES))
+CHUO_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/chuo_miner.c $(SRC_DIR)/algorithms/chuo_miner.c $(SRC_DIR)/core/dm_dataset.c $(BENCHMARK_COMMON_SOURCES))
+PSO_CLASSIFIER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/pso_classifier.c $(SRC_DIR)/algorithms/pso_classifier.c $(BENCHMARK_COMMON_SOURCES))
+TKU_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/tku_miner.c $(SRC_DIR)/algorithms/tku_miner.c $(SRC_DIR)/core/dm_dataset.c $(BENCHMARK_COMMON_SOURCES))
+KCLOTREE_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/kclotree_miner.c $(SRC_DIR)/algorithms/kclotree_miner.c $(BENCHMARK_COMMON_SOURCES))
+TIPN_HOUI_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/tipn_houi_miner.c $(SRC_DIR)/algorithms/tipn_houi.c $(BENCHMARK_COMMON_SOURCES))
+HTK_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/htk_miner.c $(SRC_DIR)/algorithms/htk_miner.c $(BENCHMARK_COMMON_SOURCES))
+TOPKPHM_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/topkphm_miner.c $(SRC_DIR)/algorithms/topkphm.c $(BENCHMARK_COMMON_SOURCES))
+TKU_PSO_MINER_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/tku_pso_miner.c $(SRC_DIR)/algorithms/tku_pso.c $(SRC_DIR)/core/dm_dataset.c $(BENCHMARK_COMMON_SOURCES))
 EXPERIMENT_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/experiments/run_mfhoi_experiments.c $(MFHOI_COMMON_SOURCES))
 ITEMSET_BENCH_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/itemset_mining_bench.c)
-CONNECT_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/dm_connect.c $(SRC_DIR)/core/dm_flat.c $(SRC_DIR)/core/dm_arena.c $(SRC_DIR)/core/dm_mmap.c $(SRC_DIR)/core/dm_benchmark.c $(SRC_DIR)/tokenizer/faro_tokenizer.c $(SRC_DIR)/tokenizer/tokenizer_variants.c)
+CONNECT_OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_DIR)/tools/dm_connect.c $(SRC_DIR)/core/dm_flat.c $(SRC_DIR)/core/dm_mmap.c $(BENCHMARK_COMMON_SOURCES))
 RUN_SOURCES = $(SRC_DIR)/tools/dm_run.c \
               $(wildcard $(SRC_DIR)/core/*.c) \
               $(SRC_DIR)/tokenizer/faro_tokenizer.c \
@@ -148,7 +165,6 @@ LIBDM_SO    = libdm.so
 LIBDM_DYLIB = libdm.dylib
 
 LDFLAGS = -lm -pthread
-ICU_LDFLAGS = -licuuc
 VULKAN_LDFLAGS =
 ifneq ($(OS),Windows_NT)
     VULKAN_LDFLAGS += -ldl
@@ -165,14 +181,11 @@ vulkan: $(TARGET) $(BPE_TARGET) $(UNIGRAM_TARGET) $(SENTENCEPIECE_TARGET) $(TOKE
 # ─── Shared library targets ────────────────────────────────────────────────
 $(LIBDM_SO): $(LIB_OBJECTS)
 	$(CC) -shared -fPIC -DDM_BUILDING_LIB $(LIB_OBJECTS) \
-	    -o $@ $(LDFLAGS) $(ICU_LDFLAGS) $(VULKAN_LDFLAGS) \
-	    -L.venv/lib/python3.12/site-packages/tensorflow \
-	    -ltensorflow_cc -ltensorflow_framework \
-	    -Wl,-rpath,.venv/lib/python3.12/site-packages/tensorflow
+	    -o $@ $(LDFLAGS) $(ICU_LDFLAGS) $(VULKAN_LDFLAGS) $(TF_LDFLAGS)
 
 $(LIBDM_DYLIB): $(LIB_OBJECTS)
 	$(CC) -shared -DDM_BUILDING_LIB $(LIB_OBJECTS) \
-	    -o $@ $(LDFLAGS) $(ICU_LDFLAGS) $(VULKAN_LDFLAGS)
+	    -o $@ $(LDFLAGS) $(ICU_LDFLAGS) $(VULKAN_LDFLAGS) $(TF_LDFLAGS)
 
 # Pattern rule to compile the lib facade with -DDM_BUILDING_LIB
 $(OBJ_DIR)/lib/dm_lib.o: $(SRC_DIR)/lib/dm_lib.c
@@ -181,7 +194,7 @@ $(OBJ_DIR)/lib/dm_lib.o: $(SRC_DIR)/lib/dm_lib.c
 # ─── Main executable ────────────────────────────────────────────────────────
 $(TARGET): $(OBJECTS)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(OBJECTS) -o $@ $(LDFLAGS) $(ICU_LDFLAGS) $(VULKAN_LDFLAGS) -L.venv/lib/python3.12/site-packages/tensorflow -ltensorflow_cc -ltensorflow_framework -Wl,-rpath,.venv/lib/python3.12/site-packages/tensorflow
+	$(CC) $(OBJECTS) -o $@ $(LDFLAGS) $(ICU_LDFLAGS) $(VULKAN_LDFLAGS) $(TF_LDFLAGS)
 
 $(MFHOI_MINER_TARGET): $(MFHOI_MINER_OBJECTS)
 	@mkdir -p $(BIN_DIR)
@@ -245,7 +258,7 @@ $(CONNECT_TARGET): $(CONNECT_OBJECTS)
 
 $(RUN_TARGET): $(RUN_OBJECTS)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(RUN_OBJECTS) -o $@ $(LDFLAGS) $(ICU_LDFLAGS) $(VULKAN_LDFLAGS)
+	$(CC) $(RUN_OBJECTS) -o $@ $(LDFLAGS) $(ICU_LDFLAGS) $(VULKAN_LDFLAGS) $(TF_LDFLAGS)
 
 $(HUST_TARGET): $(SRC_DIR)/tokenizer/hust_tokenize.c
 	@mkdir -p $(BIN_DIR)
@@ -305,7 +318,7 @@ $(TEXTBOOK_GENERATOR_TARGET): $(SRC_DIR)/tools/dm_textbook_generator.c $(SRC_DIR
 
 $(MOBILENET_TINY_TARGET): $(SRC_DIR)/tools/dm_mobilenet_tiny.c $(SRC_DIR)/models/vision/mobilenet_tiny.c $(SRC_DIR)/core/dm_engine.c $(SRC_DIR)/core/dm_block.c $(SRC_DIR)/core/dm_dtype.c $(SRC_DIR)/lowering/dm_lowering.c $(SRC_DIR)/lowering/dm_lower_tf.c $(SRC_DIR)/lowering/dm_lower_cpu.c $(SRC_DIR)/lowering/dm_lower_vulkan.c $(SRC_DIR)/encoding/image_patchify.c include/models/vision/mobilenet_tiny.h include/core/dm_engine.h include/encoding/image_patchify.h
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) $(TF_IFLAGS) $(SRC_DIR)/tools/dm_mobilenet_tiny.c $(SRC_DIR)/models/vision/mobilenet_tiny.c $(SRC_DIR)/core/dm_engine.c $(SRC_DIR)/core/dm_block.c $(SRC_DIR)/core/dm_dtype.c $(SRC_DIR)/lowering/dm_lowering.c $(SRC_DIR)/lowering/dm_lower_tf.c $(SRC_DIR)/lowering/dm_lower_cpu.c $(SRC_DIR)/lowering/dm_lower_vulkan.c $(SRC_DIR)/encoding/image_patchify.c -o $@ $(LDFLAGS) -L.venv/lib/python3.12/site-packages/tensorflow -ltensorflow_cc -ltensorflow_framework -Wl,-rpath,.venv/lib/python3.12/site-packages/tensorflow
+	$(CC) $(CFLAGS) $(TF_IFLAGS) $(SRC_DIR)/tools/dm_mobilenet_tiny.c $(SRC_DIR)/models/vision/mobilenet_tiny.c $(SRC_DIR)/core/dm_engine.c $(SRC_DIR)/core/dm_block.c $(SRC_DIR)/core/dm_dtype.c $(SRC_DIR)/lowering/dm_lowering.c $(SRC_DIR)/lowering/dm_lower_tf.c $(SRC_DIR)/lowering/dm_lower_cpu.c $(SRC_DIR)/lowering/dm_lower_vulkan.c $(SRC_DIR)/encoding/image_patchify.c -o $@ $(LDFLAGS) $(TF_LDFLAGS)
 
 shaders: $(SPV_SHADERS)
 

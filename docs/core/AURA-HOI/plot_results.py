@@ -69,7 +69,9 @@ for dataset in sorted(df["dataset"].unique()):
         ax.set_title(ylabel, fontsize=10, fontweight="bold")
         ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.7)
         if col in ["time_s", "visited_nodes"]:
-            ax.set_yscale("log")
+            valid_vals = sub[sub[col] > 0][col].dropna()
+            if not valid_vals.empty:
+                ax.set_yscale("log")
         if has_data:
             ax.legend(fontsize=8)
         else:

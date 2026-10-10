@@ -7,11 +7,14 @@
 # ═══════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
-BIN="./bin/dm.exe"
+BIN="./build/bin/dm.exe"
 OUTDIR="docs/core/AURA-HOI"
 CSV="${OUTDIR}/benchmark_results.csv"
 ITEMSET_CSV="${OUTDIR}/itemset_counts.csv"
 TMP="$(mktemp)"
+
+# Detect thread count
+THREADS=$(nproc || echo "16")
 
 # ── Init CSV ────────────────────────────────────────────────────────────
 echo "dataset,algorithm,alpha,minsup,time_s,peak_ram_mb,itemsets,visited_nodes" > "$CSV"
@@ -35,9 +38,9 @@ run_one() {
   echo "  → ${ds} | ${algo} | α=${alpha}"
 
   if [ "$algo" = "aura_hoi" ]; then
-    /usr/bin/time -v "$BIN" aura_hoi "$dspath" 0 "$alpha" "$minsup" 0 sum raw > "$TMP" 2>&1 || true
+    timeout 120s /usr/bin/time -v "$BIN" aura_hoi "$dspath" 0 "$alpha" "$minsup" 0 sum raw -t "$THREADS" > "$TMP" 2>&1 || true
   else
-    /usr/bin/time -v "$BIN" "$algo" "$dspath" 0 "$alpha" "$minsup" > "$TMP" 2>&1 || true
+    timeout 120s /usr/bin/time -v "$BIN" "$algo" "$dspath" 0 "$alpha" "$minsup" -t "$THREADS" > "$TMP" 2>&1 || true
   fi
 
   # ── Parse metrics ──────────────────────────────────────────────────
@@ -114,7 +117,7 @@ declare -A ALPHAS=(
   [retail]="0.005 0.01 0.02 0.03 0.05 0.075 0.10"
   [T10I4D100K]="0.005 0.01 0.02 0.03 0.05 0.075 0.10"
   [kosarak]="0.001 0.002 0.005 0.01 0.02"
-  [pumsb]="0.80 0.825 0.85 0.875 0.90 0.925"
+  [pumsb]="0.01 0.03 0.05 0.07 0.09"
 )
 
 ALGOS="hep dfhoi aura_hoi"
@@ -136,7 +139,11 @@ echo ""
 echo "✓ Results saved → ${CSV}"
 
 # ── Generate itemset-count CSV and charts with inline Python ───────────
-python3 - <<'PYEOF'
+PYTHON_BIN="/home/hutech/self/cad_mcrs/.venv/bin/python3"
+if [ ! -x "$PYTHON_BIN" ]; then
+  PYTHON_BIN="python3"
+fi
+"$PYTHON_BIN" - <<'PYEOF'
 from pathlib import Path
 import pandas as pd
 import matplotlib

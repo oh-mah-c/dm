@@ -420,7 +420,7 @@ static void faro_free_wrapper(Tokenizer *self) {
     }
 }
 
-extern int output_json;
+__attribute__((weak)) int output_json = 0;
 
 static void faro_print_stats_wrapper(Tokenizer *self, const char *input_path, size_t file_size, double elapsed_sec, size_t tx_count, long peak_rss) {
     FaroTokenizerImpl *tok = (FaroTokenizerImpl *)self->impl;

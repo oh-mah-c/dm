@@ -21,6 +21,8 @@ extern "C" {
 
 /* ── Backend tier enum ──────────────────────────────────────────────────── */
 
+#ifndef DM_BACKEND_DEFINED
+#define DM_BACKEND_DEFINED
 typedef enum {
     DM_BACKEND_CPU             = 0,   /* pure-C, always available             */
     DM_BACKEND_VULKAN_COMPUTE  = 1,   /* Vulkan compute shader (portable)     */
@@ -34,7 +36,7 @@ typedef enum {
 
 /* ── Runtime capability info ─────────────────────────────────────────────── */
 
-typedef struct {
+typedef struct DM_BackendInfo {
     DM_Backend active;              /* currently selected backend             */
     int        tf_available;        /* 1 if TFE context init succeeded        */
     int        vulkan_available;    /* 1 if Vulkan context init succeeded     */
@@ -66,6 +68,7 @@ DM_BackendInfo dm_backend_query(void);
 
 /** Human-readable name for a backend constant. */
 const char *dm_backend_name(DM_Backend b);
+#endif
 
 /* ── Internal dispatch entry points ─────────────────────────────────────── */
 

@@ -12,6 +12,7 @@ typedef struct {
     int emit_raw_view;
     size_t top_k;
     int summed_occupancy_mode;
+    int threads;
 } DM_AURA_HOI_Params;
 
 extern DM_Algorithm aura_hoi_algo;

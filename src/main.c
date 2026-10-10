@@ -1,5 +1,6 @@
 #include "core/dm_algorithm.h"
 #include "core/dm_benchmark.h"
+#include "core/dm_threadpool.h"
 #include "algorithms/ais.h"
 #include "algorithms/apriori.h"
 #include "algorithms/eclat.h"
@@ -595,8 +596,10 @@ int main(int argc, char **argv) {
     dm_register_algorithm(&tmku_algo);
     dm_register_algorithm(&hiep_algo);
 
+    dm_parse_thread_args(&argc, argv);
+
     if (argc < 3) {
-        printf("Usage: %s <algo_id> <dataset_path> [type_id] [min_support]\n", argv[0]);
+        printf("Usage: %s <algo_id> <dataset_path> [type_id] [min_support] [--threads N / -t N]\n", argv[0]);
         printf("MFHOI: %s mfhoi <dataset_path> 0 <min_support> <min_occupancy> [strong:0|1]\n", argv[0]);
         printf("CLOE-HOI: %s cloe_hoi <transactional_dataset> 0 <min_occupancy> [min_support] [max_seconds]\n", argv[0]);
         printf("AURA-HOI: %s aura_hoi <transactional_dataset> 0 <min_occupancy> [min_support] [max_seconds] [avg|sum] [closed|raw]\n", argv[0]);
@@ -976,6 +979,7 @@ int main(int argc, char **argv) {
         aura_hoi_params.emit_raw_view = (argc >= 9 && strcmp(argv[8], "raw") == 0) ? 1 : 0;
         aura_hoi_params.top_k = 0;
         aura_hoi_params.summed_occupancy_mode = (argc >= 8 && strcmp(argv[7], "sum") == 0) ? 1 : 0;
+        aura_hoi_params.threads = dm_get_num_threads();
         params = &aura_hoi_params;
     } else if (strcmp(algo_id, "sparc_hoi") == 0) {
         sparc_hoi_params.min_occupancy = min_support;

@@ -113,67 +113,13 @@ extern int dm_tinystories_cli         (int argc, char **argv);
 extern int dm_bert_cli                (int argc, char **argv);
 extern int dm_textbook_generator_cli  (int argc, char **argv);
 
-/* §7 Image utilities (internal names) */
-extern int dm_image_load_ppm_rgb_f32  (const char *path, DM_Tensor *out);
-extern int dm_image_resize_nearest    (const DM_Tensor *in, DM_Tensor *out, int h, int w);
-extern int dm_image_patchify          (const DM_Tensor *in, DM_Tensor *out, int ph, int pw);
+#include "core/dm_engine.h"
+#include "encoding/image_patchify.h"
+#include "models/vision/resnet.h"
+#include "models/vision/vit.h"
+#include "models/vision/mobilenet_tiny.h"
 
-/* §8 Engine — internal dm_engine symbols (dm_op_* wrappers below) */
-extern int  dm_conv2d_same          (const DM_Tensor *in, DM_Tensor *out,
-                                     const float *w, const float *b,
-                                     int out_c, int kernel, int stride);
-extern int  dm_depthwise_conv2d_same(const DM_Tensor *in, DM_Tensor *out,
-                                     const float *w, const float *b,
-                                     int kernel, int stride);
-extern int  dm_pointwise_conv2d     (const DM_Tensor *in, DM_Tensor *out,
-                                     const float *w, const float *b, int out_c);
-extern int  dm_linear               (const DM_Tensor *in, DM_Tensor *out,
-                                     const float *w, const float *b, int out_c);
-extern int  dm_global_avg_pool      (const DM_Tensor *in, DM_Tensor *out);
-extern int  dm_max_pool2d_same      (const DM_Tensor *in, DM_Tensor *out,
-                                     int kernel, int stride);
-extern int  dm_tensor_add           (DM_Tensor *out, const DM_Tensor *in);
-extern int  dm_batch_norm           (DM_Tensor *t,
-                                     const float *gamma, const float *beta,
-                                     const float *mean,  const float *var, float eps);
-extern int  dm_layer_norm_seq       (float *x, int seq_len, int d_model,
-                                     const float *gamma, const float *beta, float eps);
-extern void dm_relu                 (DM_Tensor *t);
-extern void dm_relu6                (DM_Tensor *t);
-extern void dm_tanh_inplace         (DM_Tensor *t);
-extern void dm_sigmoid_inplace      (DM_Tensor *t);
-extern void dm_gelu_inplace         (float *x, int n);
-extern void dm_softmax              (DM_Tensor *t);
-extern void dm_softmax_rows         (float *x, int rows, int cols);
-extern void dm_matmul_nt            (const float *A, const float *B, float *C,
-                                     int M, int N, int K);
-extern void dm_matmul_nn            (const float *A, const float *B, float *C,
-                                     int M, int K, int N);
-/* Backward passes */
-extern int  dm_linear_backward      (const DM_Tensor *in,
-                                     const DM_Tensor *grad_out,
-                                     DM_Tensor *grad_in,
-                                     float *grad_w, float *grad_b,
-                                     const float *w, int out_c);
-extern void dm_relu_backward        (const DM_Tensor *in,
-                                     const DM_Tensor *grad_out,
-                                     DM_Tensor *grad_in);
-extern void dm_tanh_backward        (const DM_Tensor *out,
-                                     const DM_Tensor *grad_out,
-                                     DM_Tensor *grad_in);
-/* Maxout */
-extern int  dm_maxout               (const DM_Tensor *in, DM_Tensor *out,
-                                     int k, int *argmax);
-extern int  dm_maxout_backward      (const DM_Tensor *grad_out,
-                                     DM_Tensor *grad_in,
-                                     int k, const int *argmax);
-/* Dropout */
-extern void dm_dropout              (const DM_Tensor *in, DM_Tensor *out,
-                                     float drop_prob, int *mask);
-extern void dm_dropout_backward     (const DM_Tensor *grad_out,
-                                     DM_Tensor *grad_in,
-                                     float drop_prob, const int *mask);
-/* Optimisers */
+/* Optimisers (not in headers) */
 extern void dm_adam_step            (float *param, float *grad, float *m, float *v,
                                      int n, float lr, float beta1, float beta2,
                                      float eps, float weight_decay, int t);
@@ -1171,10 +1117,6 @@ DM_API DM_Status dm_vision_eval(DM_Vision v, const char *manifest_path,
     return DM_ERR_NOT_SUPPORTED;
 }
 
-/* Forward-declare the internal mobilenet forward pass */
-extern int dm_mobilenet_tiny_forward(DM_Tensor *in, DM_Tensor *logits,
-                                      int classes, unsigned int seed);
-
 DM_API DM_Status dm_vision_predict(DM_Vision v, const float *rgb,
                                      int h, int w,
                                      float *out_probs, int n_classes)
@@ -1183,7 +1125,7 @@ DM_API DM_Status dm_vision_predict(DM_Vision v, const float *rgb,
     _VisionHandle *vh = (_VisionHandle *)v;
     int cls = n_classes > 0 ? n_classes : vh->classes;
 
-    DM_Tensor in, logits;
+    DM_Block in, logits;
     if (dm_tensor_alloc(&in, 1, 3, h, w) != 0) return DM_ERR_MEMORY;
     if (dm_tensor_alloc(&logits, 1, cls, 1, 1) != 0) {
         dm_tensor_free(&in); return DM_ERR_MEMORY;
@@ -1193,11 +1135,13 @@ DM_API DM_Status dm_vision_predict(DM_Vision v, const float *rgb,
             for (int c = 0; c < 3; c++)
                 dm_tensor_set(&in, 0, c, y, x, rgb[(y * w + x) * 3 + c]);
 
-    int rc = dm_mobilenet_tiny_forward(&in, &logits, cls, vh->seed);
+    DM_WeightCache *cache = dm_weight_cache_new();
+    int rc = dm_mobilenet_tiny_forward(&in, &logits, cache, cls, vh->seed);
     if (rc == 0) {
-        dm_op_softmax(&logits);
-        for (int i = 0; i < cls; i++) out_probs[i] = logits.data[i];
+        dm_softmax(&logits);
+        for (int i = 0; i < cls; i++) out_probs[i] = ((float*)logits.data)[i];
     }
+    dm_weight_cache_free(cache);
     dm_tensor_free(&in); dm_tensor_free(&logits);
     return rc == 0 ? DM_OK : DM_ERR_GENERIC;
 }
@@ -1216,7 +1160,7 @@ DM_API DM_Status dm_vision_forward_raw(const float *rgb_nhwc,
     for (int b = 0; b < n; b++) {
         const float *src = rgb_nhwc + b * h * w * 3;
         float *dst = out_logits + b * classes;
-        DM_Tensor in, logits;
+        DM_Block in, logits;
         if (dm_tensor_alloc(&in, 1, 3, h, w) != 0) return DM_ERR_MEMORY;
         if (dm_tensor_alloc(&logits, 1, classes, 1, 1) != 0) {
             dm_tensor_free(&in); return DM_ERR_MEMORY;
@@ -1225,8 +1169,10 @@ DM_API DM_Status dm_vision_forward_raw(const float *rgb_nhwc,
             for (int x = 0; x < w; x++)
                 for (int c = 0; c < 3; c++)
                     dm_tensor_set(&in, 0, c, y, x, src[(y * w + x) * 3 + c]);
-        int rc = dm_mobilenet_tiny_forward(&in, &logits, classes, 42);
-        if (rc == 0) for (int i = 0; i < classes; i++) dst[i] = logits.data[i];
+        DM_WeightCache *cache = dm_weight_cache_new();
+        int rc = dm_mobilenet_tiny_forward(&in, &logits, cache, classes, 42);
+        if (rc == 0) for (int i = 0; i < classes; i++) dst[i] = ((float*)logits.data)[i];
+        dm_weight_cache_free(cache);
         dm_tensor_free(&in); dm_tensor_free(&logits);
         if (rc != 0) return DM_ERR_GENERIC;
     }
@@ -1584,7 +1530,7 @@ DM_API DM_Status dm_image_load_resize(const char *path,
                                        int out_w, int out_h, float *out_buf)
 {
     if (!path || !out_buf) return DM_ERR_INVALID_PARAM;
-    DM_Tensor raw, resized;
+    DM_Block raw, resized;
     memset(&raw,     0, sizeof(raw));
     memset(&resized, 0, sizeof(resized));
 
@@ -1610,7 +1556,7 @@ DM_API DM_Status dm_image_patchify_raw(const float *in_nhwc,
                                         float *out_buf, int *out_patches)
 {
     if (!in_nhwc || !out_buf) return DM_ERR_INVALID_PARAM;
-    DM_Tensor in, out;
+    DM_Block in, out;
     if (dm_tensor_alloc(&in, n, c, h, w) != 0) return DM_ERR_MEMORY;
 
     for (int bi = 0; bi < n; bi++)
@@ -1626,7 +1572,7 @@ DM_API DM_Status dm_image_patchify_raw(const float *in_nhwc,
     }
     size_t total = dm_tensor_count(&out);
     memcpy(out_buf, out.data, total * sizeof(float));
-    if (out_patches) *out_patches = out.h;
+    if (out_patches) *out_patches = (int)(DM_NCHW_H(&out) * DM_NCHW_W(&out));
 
     dm_tensor_free(&in); dm_tensor_free(&out);
     return DM_OK;
@@ -1644,48 +1590,85 @@ DM_API DM_Status dm_image_patchify_raw(const float *in_nhwc,
  * ========================================================================= */
 
 /* ── Convolutions ────────────────────────────────────────────────────────── */
-DM_API DM_Status dm_op_conv2d_same(const DM_Tensor *in, DM_Tensor *out,
+DM_API DM_Status dm_op_conv2d_same(const DM_Block *in, DM_Block *out,
                                     const float *w, const float *b,
                                     int out_c, int kernel, int stride)
 {
-    return dm_conv2d_same(in, out, w, b, out_c, kernel, stride) == 0
-           ? DM_OK : DM_ERR_GENERIC;
+    DM_Block wb = {0}, bb = {0};
+    dm_block_create(&wb, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){out_c, DM_NCHW_C(in), kernel, kernel});
+    wb.data = (void*)w; wb.owns_data = 0;
+    if (b) {
+        dm_block_create(&bb, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){1, out_c, 1, 1});
+        bb.data = (void*)b; bb.owns_data = 0;
+    }
+    int rc = dm_conv2d_same(in, out, &wb, b ? &bb : NULL, out_c, kernel, stride);
+    dm_block_free(&wb);
+    if (b) dm_block_free(&bb);
+    return rc == 0 ? DM_OK : DM_ERR_GENERIC;
 }
 
-DM_API DM_Status dm_op_depthwise_conv(const DM_Tensor *in, DM_Tensor *out,
+DM_API DM_Status dm_op_depthwise_conv(const DM_Block *in, DM_Block *out,
                                        const float *w, const float *b,
                                        int kernel, int stride)
 {
-    return dm_depthwise_conv2d_same(in, out, w, b, kernel, stride) == 0
-           ? DM_OK : DM_ERR_GENERIC;
+    DM_Block wb = {0}, bb = {0};
+    dm_block_create(&wb, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 3, (int64_t[]){DM_NCHW_C(in), kernel, kernel});
+    wb.data = (void*)w; wb.owns_data = 0;
+    if (b) {
+        dm_block_create(&bb, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){1, DM_NCHW_C(in), 1, 1});
+        bb.data = (void*)b; bb.owns_data = 0;
+    }
+    int rc = dm_depthwise_conv2d_same(in, out, &wb, b ? &bb : NULL, kernel, stride);
+    dm_block_free(&wb);
+    if (b) dm_block_free(&bb);
+    return rc == 0 ? DM_OK : DM_ERR_GENERIC;
 }
 
-DM_API DM_Status dm_op_pointwise_conv(const DM_Tensor *in, DM_Tensor *out,
+DM_API DM_Status dm_op_pointwise_conv(const DM_Block *in, DM_Block *out,
                                        const float *w, const float *b, int out_c)
 {
-    return dm_pointwise_conv2d(in, out, w, b, out_c) == 0
-           ? DM_OK : DM_ERR_GENERIC;
+    DM_Block wb = {0}, bb = {0};
+    dm_block_create(&wb, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 2, (int64_t[]){out_c, DM_NCHW_C(in)});
+    wb.data = (void*)w; wb.owns_data = 0;
+    if (b) {
+        dm_block_create(&bb, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){1, out_c, 1, 1});
+        bb.data = (void*)b; bb.owns_data = 0;
+    }
+    int rc = dm_pointwise_conv2d(in, out, &wb, b ? &bb : NULL, out_c);
+    dm_block_free(&wb);
+    if (b) dm_block_free(&bb);
+    return rc == 0 ? DM_OK : DM_ERR_GENERIC;
 }
 
 /* ── Linear ──────────────────────────────────────────────────────────────── */
-DM_API DM_Status dm_op_linear(const DM_Tensor *in, DM_Tensor *out,
+DM_API DM_Status dm_op_linear(const DM_Block *in, DM_Block *out,
                                const float *w, const float *b, int out_c)
 {
-    return dm_linear(in, out, w, b, out_c) == 0 ? DM_OK : DM_ERR_GENERIC;
+    DM_Block wb = {0}, bb = {0};
+    dm_block_create(&wb, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 2, (int64_t[]){out_c, DM_NCHW_C(in)});
+    wb.data = (void*)w; wb.owns_data = 0;
+    if (b) {
+        dm_block_create(&bb, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 4, (int64_t[]){1, out_c, 1, 1});
+        bb.data = (void*)b; bb.owns_data = 0;
+    }
+    int rc = dm_linear(in, out, &wb, b ? &bb : NULL, out_c);
+    dm_block_free(&wb);
+    if (b) dm_block_free(&bb);
+    return rc == 0 ? DM_OK : DM_ERR_GENERIC;
 }
 
 /* ── Pooling ─────────────────────────────────────────────────────────────── */
-DM_API DM_Status dm_op_global_avg_pool(const DM_Tensor *in, DM_Tensor *out) {
+DM_API DM_Status dm_op_global_avg_pool(const DM_Block *in, DM_Block *out) {
     return dm_global_avg_pool(in, out) == 0 ? DM_OK : DM_ERR_GENERIC;
 }
 
-DM_API DM_Status dm_op_max_pool2d_same(const DM_Tensor *in, DM_Tensor *out,
+DM_API DM_Status dm_op_max_pool2d_same(const DM_Block *in, DM_Block *out,
                                         int kernel, int stride) {
     return dm_max_pool2d_same(in, out, kernel, stride) == 0 ? DM_OK : DM_ERR_GENERIC;
 }
 
 /* ── Normalisation ───────────────────────────────────────────────────────── */
-DM_API DM_Status dm_op_batch_norm(DM_Tensor *t,
+DM_API DM_Status dm_op_batch_norm(DM_Block *t,
                                    const float *gamma, const float *beta,
                                    const float *mean,  const float *var, float eps) {
     return dm_batch_norm(t, gamma, beta, mean, var, eps) == 0 ? DM_OK : DM_ERR_GENERIC;
@@ -1693,73 +1676,101 @@ DM_API DM_Status dm_op_batch_norm(DM_Tensor *t,
 
 DM_API DM_Status dm_op_layer_norm(float *x, int seq_len, int d_model,
                                    const float *gamma, const float *beta, float eps) {
-    return dm_layer_norm_seq(x, seq_len, d_model, gamma, beta, eps) == 0
-           ? DM_OK : DM_ERR_GENERIC;
+    DM_Block bx = {0}, bg = {0}, bb = {0};
+    dm_block_create(&bx, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 2, (int64_t[]){seq_len, d_model});
+    bx.data = x; bx.owns_data = 0;
+    dm_block_create(&bg, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 1, (int64_t[]){d_model});
+    bg.data = (void*)gamma; bg.owns_data = 0;
+    dm_block_create(&bb, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 1, (int64_t[]){d_model});
+    bb.data = (void*)beta; bb.owns_data = 0;
+    int rc = dm_layer_norm_seq(&bx, &bg, &bb, eps);
+    dm_block_free(&bx); dm_block_free(&bg); dm_block_free(&bb);
+    return rc == 0 ? DM_OK : DM_ERR_GENERIC;
 }
 
 /* ── Elementwise ─────────────────────────────────────────────────────────── */
-DM_API DM_Status dm_op_tensor_add(DM_Tensor *out, const DM_Tensor *in) {
+DM_API DM_Status dm_op_tensor_add(DM_Block *out, const DM_Block *in) {
     return dm_tensor_add(out, in) == 0 ? DM_OK : DM_ERR_GENERIC;
 }
 
 /* ── Activations ─────────────────────────────────────────────────────────── */
-DM_API void dm_op_relu    (DM_Tensor *t) { dm_relu(t);            }
-DM_API void dm_op_relu6   (DM_Tensor *t) { dm_relu6(t);           }
-DM_API void dm_op_tanh    (DM_Tensor *t) { dm_tanh_inplace(t);    }
-DM_API void dm_op_sigmoid (DM_Tensor *t) { dm_sigmoid_inplace(t); }
+DM_API void dm_op_relu    (DM_Block *t) { dm_relu(t);            }
+DM_API void dm_op_relu6   (DM_Block *t) { dm_relu6(t);           }
+DM_API void dm_op_tanh    (DM_Block *t) { dm_tanh_inplace(t);    }
+DM_API void dm_op_sigmoid (DM_Block *t) { dm_sigmoid_inplace(t); }
 DM_API void dm_op_gelu    (float *x, int n) { dm_gelu_inplace(x, n); }
 
 /* ── Softmax ─────────────────────────────────────────────────────────────── */
-DM_API void dm_op_softmax      (DM_Tensor *t)              { dm_softmax(t);            }
+DM_API void dm_op_softmax      (DM_Block *t)              { dm_softmax(t);            }
 DM_API void dm_op_softmax_rows (float *x, int rows, int cols) { dm_softmax_rows(x, rows, cols); }
 
 /* ── Matrix multiplication ───────────────────────────────────────────────── */
 DM_API void dm_op_matmul_nt(const float *A, const float *B, float *C,
                               int M, int N, int K) {
-    dm_matmul_nt(A, B, C, M, N, K);
+    DM_Block bA = {0}, bB = {0}, bC = {0};
+    dm_block_create(&bA, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 2, (int64_t[]){M, K});
+    bA.data = (void*)A; bA.owns_data = 0;
+    dm_block_create(&bB, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 2, (int64_t[]){N, K});
+    bB.data = (void*)B; bB.owns_data = 0;
+    dm_block_create(&bC, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 2, (int64_t[]){M, N});
+    bC.data = (void*)C; bC.owns_data = 0;
+    dm_matmul_nt(&bA, &bB, &bC);
+    dm_block_free(&bA); dm_block_free(&bB); dm_block_free(&bC);
 }
 DM_API void dm_op_matmul_nn(const float *A, const float *B, float *C,
                               int M, int K, int N) {
-    dm_matmul_nn(A, B, C, M, K, N);
+    DM_Block bA = {0}, bB = {0}, bC = {0};
+    dm_block_create(&bA, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 2, (int64_t[]){M, K});
+    bA.data = (void*)A; bA.owns_data = 0;
+    dm_block_create(&bB, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 2, (int64_t[]){K, N});
+    bB.data = (void*)B; bB.owns_data = 0;
+    dm_block_create(&bC, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 2, (int64_t[]){M, N});
+    bC.data = (void*)C; bC.owns_data = 0;
+    dm_matmul_nn(&bA, &bB, &bC);
+    dm_block_free(&bA); dm_block_free(&bB); dm_block_free(&bC);
 }
 
 /* ── Backward passes ─────────────────────────────────────────────────────── */
-DM_API DM_Status dm_op_linear_backward(const DM_Tensor *in,
-                                        const DM_Tensor *grad_out,
-                                        DM_Tensor *grad_in,
+DM_API DM_Status dm_op_linear_backward(const DM_Block *in,
+                                        const DM_Block *grad_out,
+                                        DM_Block *grad_in,
                                         float *grad_w, float *grad_b,
                                         const float *w, int out_c) {
-    return dm_linear_backward(in, grad_out, grad_in, grad_w, grad_b, w, out_c) == 0
-           ? DM_OK : DM_ERR_GENERIC;
+    DM_Block wb = {0};
+    dm_block_create(&wb, DM_KIND_DENSE, DM_DTYPE_F32, DM_LAYOUT_ROW_MAJOR, DM_BACKEND_CPU, 2, (int64_t[]){out_c, DM_NCHW_C(in)});
+    wb.data = (void*)w; wb.owns_data = 0;
+    int rc = dm_linear_backward(in, grad_out, grad_in, grad_w, grad_b, &wb, out_c);
+    dm_block_free(&wb);
+    return rc == 0 ? DM_OK : DM_ERR_GENERIC;
 }
-DM_API void dm_op_relu_backward(const DM_Tensor *in, const DM_Tensor *grad_out,
-                                 DM_Tensor *grad_in) {
+DM_API void dm_op_relu_backward(const DM_Block *in, const DM_Block *grad_out,
+                                 DM_Block *grad_in) {
     dm_relu_backward(in, grad_out, grad_in);
 }
-DM_API void dm_op_tanh_backward(const DM_Tensor *out, const DM_Tensor *grad_out,
-                                 DM_Tensor *grad_in) {
+DM_API void dm_op_tanh_backward(const DM_Block *out, const DM_Block *grad_out,
+                                 DM_Block *grad_in) {
     dm_tanh_backward(out, grad_out, grad_in);
 }
 
 /* ── Maxout ──────────────────────────────────────────────────────────────── */
-DM_API DM_Status dm_op_maxout(const DM_Tensor *in, DM_Tensor *out,
+DM_API DM_Status dm_op_maxout(const DM_Block *in, DM_Block *out,
                                int k, int *argmax) {
     return dm_maxout(in, out, k, argmax) == 0 ? DM_OK : DM_ERR_GENERIC;
 }
-DM_API DM_Status dm_op_maxout_backward(const DM_Tensor *grad_out,
-                                        DM_Tensor *grad_in,
+DM_API DM_Status dm_op_maxout_backward(const DM_Block *grad_out,
+                                        DM_Block *grad_in,
                                         int k, const int *argmax) {
     return dm_maxout_backward(grad_out, grad_in, k, argmax) == 0
            ? DM_OK : DM_ERR_GENERIC;
 }
 
 /* ── Dropout ─────────────────────────────────────────────────────────────── */
-DM_API void dm_op_dropout(const DM_Tensor *in, DM_Tensor *out,
+DM_API void dm_op_dropout(const DM_Block *in, DM_Block *out,
                            float drop_prob, int *mask) {
     dm_dropout(in, out, drop_prob, mask);
 }
-DM_API void dm_op_dropout_backward(const DM_Tensor *grad_out,
-                                    DM_Tensor *grad_in,
+DM_API void dm_op_dropout_backward(const DM_Block *grad_out,
+                                    DM_Block *grad_in,
                                     float drop_prob, const int *mask) {
     dm_dropout_backward(grad_out, grad_in, drop_prob, mask);
 }
@@ -1781,35 +1792,24 @@ DM_API void dm_op_sgd_momentum_step(float *param, float *grad, float *velocity,
                          weight_decay, nesterov);
 }
 
-extern int dm_resnet18_forward(const DM_Tensor *input, DM_Tensor *logits, int classes, unsigned int seed);
-extern int dm_resnet_basic_block(const DM_Tensor *in, DM_Tensor *out, int out_c, int stride, unsigned int seed);
-
-DM_API DM_Status dm_op_resnet18_forward(const DM_Tensor *input, DM_Tensor *logits, int classes, unsigned int seed) {
+DM_API DM_Status dm_op_resnet18_forward(const DM_Block *input, DM_Block *logits, int classes, unsigned int seed) {
     return dm_resnet18_forward(input, logits, classes, seed) == 0 ? DM_OK : DM_ERR_GENERIC;
 }
 
-DM_API DM_Status dm_op_resnet_basic_block(const DM_Tensor *in, DM_Tensor *out, int out_c, int stride, unsigned int seed) {
-    return dm_resnet_basic_block(in, out, out_c, stride, seed) == 0 ? DM_OK : DM_ERR_GENERIC;
+DM_API DM_Status dm_op_resnet_basic_block(const DM_Block *in, DM_Block *out, int out_c, int stride, unsigned int seed) {
+    DM_WeightCache *cache = dm_weight_cache_new();
+    int rc = dm_resnet_basic_block(cache, in, out, out_c, stride, seed);
+    dm_weight_cache_free(cache);
+    return rc == 0 ? DM_OK : DM_ERR_GENERIC;
 }
 
-/* ViT FFI wrappers — forward-declare only the symbols we need to avoid
- * re-including vit.h (which would conflict with the DM_Tensor already
- * defined via dm.h at the top of this translation unit).              */
-typedef int ViTVariant_int;
-typedef struct { int variant; int img_size; int patch_size; int num_layers;
-                 int d_model; int mlp_dim; int num_heads; int num_classes; } ViTConfig_fwd;
-
-extern void dm_vit_config_init(void *cfg, ViTVariant_int v, int nc, int sz);
-extern int  dm_vit_forward(const DM_Tensor *in, DM_Tensor *out, const void *cfg,
-                            const float *w, unsigned int seed);
-extern size_t dm_vit_param_count(const void *cfg);
-
-DM_API DM_Status dm_op_vit_forward(const DM_Tensor *input, DM_Tensor *logits,
+/* ViT FFI wrappers */
+DM_API DM_Status dm_op_vit_forward(const DM_Block *input, DM_Block *logits,
                                     int variant, int num_classes, unsigned int seed)
 {
     if (variant < 0 || variant > 4) return DM_ERR_GENERIC;
-    ViTConfig_fwd cfg;
-    dm_vit_config_init(&cfg, variant, num_classes, input ? input->h : 224);
+    ViTConfig cfg;
+    dm_vit_config_init(&cfg, (ViTVariant)variant, num_classes, input ? (int)DM_NCHW_H(input) : 224);
     return dm_vit_forward(input, logits, &cfg, NULL, seed) == 0
            ? DM_OK : DM_ERR_GENERIC;
 }
@@ -1818,8 +1818,8 @@ DM_API size_t dm_op_vit_param_count(int variant, int img_size, int patch_size,
                                      int num_classes)
 {
     if (variant < 0 || variant > 4) return 0;
-    ViTConfig_fwd cfg;
-    dm_vit_config_init(&cfg, variant, num_classes, img_size);
+    ViTConfig cfg;
+    dm_vit_config_init(&cfg, (ViTVariant)variant, num_classes, img_size);
     if (patch_size > 0) cfg.patch_size = patch_size;
     return dm_vit_param_count(&cfg);
 }
@@ -2140,9 +2140,9 @@ DM_API void dm_vae_free_raw(void *vae) {
 DM_API float dm_vae_train_step_raw(void *vae, const float *x_batch, int batch_size) {
     if (!vae || !x_batch) return 0.0f;
     DM_VAE *v = (DM_VAE*)vae;
-    DM_Tensor x;
+    DM_Block x = {0};
     dm_tensor_alloc(&x, batch_size, v->input_dim, 1, 1);
-    for (int i = 0; i < batch_size * v->input_dim; i++) x.data[i] = x_batch[i];
+    for (int i = 0; i < batch_size * v->input_dim; i++) ((float*)x.data)[i] = x_batch[i];
     float loss = dm_vae_train_step(v, &x);
     dm_tensor_free(&x);
     return loss;
@@ -2151,13 +2151,13 @@ DM_API float dm_vae_train_step_raw(void *vae, const float *x_batch, int batch_si
 DM_API void dm_vae_encode_raw(void *vae, const float *x_batch, int batch_size, float *mean_out, float *logvar_out) {
     if (!vae || !x_batch || !mean_out || !logvar_out) return;
     DM_VAE *v = (DM_VAE*)vae;
-    DM_Tensor x, mean, logvar;
+    DM_Block x = {0}, mean = {0}, logvar = {0};
     dm_tensor_alloc(&x, batch_size, v->input_dim, 1, 1);
-    for (int i = 0; i < batch_size * v->input_dim; i++) x.data[i] = x_batch[i];
+    for (int i = 0; i < batch_size * v->input_dim; i++) ((float*)x.data)[i] = x_batch[i];
     dm_vae_encode(v, &x, &mean, &logvar);
     for (int i = 0; i < batch_size * v->latent_dim; i++) {
-        mean_out[i] = mean.data[i];
-        logvar_out[i] = logvar.data[i];
+        mean_out[i] = ((float*)mean.data)[i];
+        logvar_out[i] = ((float*)logvar.data)[i];
     }
     dm_tensor_free(&x);
     dm_tensor_free(&mean);
@@ -2167,12 +2167,12 @@ DM_API void dm_vae_encode_raw(void *vae, const float *x_batch, int batch_size, f
 DM_API void dm_vae_decode_raw(void *vae, const float *z_batch, int batch_size, float *out) {
     if (!vae || !z_batch || !out) return;
     DM_VAE *v = (DM_VAE*)vae;
-    DM_Tensor z, dec_out;
+    DM_Block z = {0}, dec_out = {0};
     dm_tensor_alloc(&z, batch_size, v->latent_dim, 1, 1);
-    for (int i = 0; i < batch_size * v->latent_dim; i++) z.data[i] = z_batch[i];
+    for (int i = 0; i < batch_size * v->latent_dim; i++) ((float*)z.data)[i] = z_batch[i];
     dm_vae_decode(v, &z, &dec_out);
     for (int i = 0; i < batch_size * v->input_dim; i++) {
-        out[i] = dec_out.data[i];
+        out[i] = ((float*)dec_out.data)[i];
     }
     dm_tensor_free(&z);
     dm_tensor_free(&dec_out);
@@ -2198,14 +2198,14 @@ DM_API void dm_gan_free_raw(void *gan) {
 DM_API void dm_gan_generate_raw(void *gan, const float *z_batch, int batch_size, float *out) {
     if (!gan || !z_batch || !out) return;
     DM_GAN *g = (DM_GAN*)gan;
-    DM_Tensor z, dec_out;
+    DM_Block z = {0}, dec_out = {0};
     dm_tensor_alloc(&z, batch_size, g->noise_dim, 1, 1);
-    for (int i = 0; i < batch_size * g->noise_dim; i++) z.data[i] = z_batch[i];
+    for (int i = 0; i < batch_size * g->noise_dim; i++) ((float*)z.data)[i] = z_batch[i];
     dm_tensor_alloc(&dec_out, batch_size, g->input_dim, 1, 1);
     
     dm_gan_generate(g, &z, &dec_out);
     for (int i = 0; i < batch_size * g->input_dim; i++) {
-        out[i] = dec_out.data[i];
+        out[i] = ((float*)dec_out.data)[i];
     }
     dm_tensor_free(&z);
     dm_tensor_free(&dec_out);
@@ -2214,11 +2214,11 @@ DM_API void dm_gan_generate_raw(void *gan, const float *z_batch, int batch_size,
 DM_API float dm_gan_train_d_step_raw(void *gan, const float *real_x_batch, const float *z_batch, int batch_size) {
     if (!gan || !real_x_batch || !z_batch) return 0.0f;
     DM_GAN *g = (DM_GAN*)gan;
-    DM_Tensor x, z;
+    DM_Block x = {0}, z = {0};
     dm_tensor_alloc(&x, batch_size, g->input_dim, 1, 1);
     dm_tensor_alloc(&z, batch_size, g->noise_dim, 1, 1);
-    for (int i = 0; i < batch_size * g->input_dim; i++) x.data[i] = real_x_batch[i];
-    for (int i = 0; i < batch_size * g->noise_dim; i++) z.data[i] = z_batch[i];
+    for (int i = 0; i < batch_size * g->input_dim; i++) ((float*)x.data)[i] = real_x_batch[i];
+    for (int i = 0; i < batch_size * g->noise_dim; i++) ((float*)z.data)[i] = z_batch[i];
     
     float loss = dm_gan_train_d_step(g, &x, &z);
     
@@ -2230,9 +2230,9 @@ DM_API float dm_gan_train_d_step_raw(void *gan, const float *real_x_batch, const
 DM_API float dm_gan_train_g_step_raw(void *gan, const float *z_batch, int batch_size) {
     if (!gan || !z_batch) return 0.0f;
     DM_GAN *g = (DM_GAN*)gan;
-    DM_Tensor z;
+    DM_Block z = {0};
     dm_tensor_alloc(&z, batch_size, g->noise_dim, 1, 1);
-    for (int i = 0; i < batch_size * g->noise_dim; i++) z.data[i] = z_batch[i];
+    for (int i = 0; i < batch_size * g->noise_dim; i++) ((float*)z.data)[i] = z_batch[i];
 
     float loss = dm_gan_train_g_step(g, &z);
 
@@ -2381,20 +2381,6 @@ DM_API DM_Status dm_mobilenet_tiny_forward_raw2(const float *input_nchw,
                                                   unsigned int seed,
                                                   float *logits_out)
 {
-    DM_Tensor in, logits;
-    if (dm_tensor_alloc(&in, 1, 3, image_size, image_size) != 0) return DM_ERR_MEMORY;
-    int n = 3 * image_size * image_size;
-    for (int i = 0; i < n; i++) in.data[i] = input_nchw[i];
-    if (dm_tensor_alloc(&logits, 1, classes, 1, 1) != 0) {
-        dm_tensor_free(&in); return DM_ERR_MEMORY;
-    }
-    extern int dm_mobilenet_tiny_forward(DM_Tensor *in, DM_Tensor *logits,
-                                          int classes, unsigned int seed);
-    int rc = dm_mobilenet_tiny_forward(&in, &logits, classes, seed);
-    if (rc == 0)
-        for (int i = 0; i < classes; i++) logits_out[i] = logits.data[i];
-    dm_tensor_free(&in);
-    dm_tensor_free(&logits);
-    return rc == 0 ? DM_OK : DM_ERR_GENERIC;
+    return dm_mobilenet_tiny_forward_raw(input_nchw, image_size, classes, seed, NULL, NULL, logits_out);
 }
 

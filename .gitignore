@@ -78,3 +78,6 @@ test_corpus.txt
 x64/
 Debug/
 Release/
+
+bin
+bin_tools/
