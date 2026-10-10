@@ -434,8 +434,27 @@ static void aura_process_root_item_raw(AURACtx *ctx, AURATidNode *classes, size_
         }
     }
     
-    if (child_count > 0) {
-        aura_dfs_tid_raw_engine(ctx, children, child_count);
+    if (child_count > 1) {
+        /* Check if child class as a whole has enough tail length to reach threshold */
+        double max_child_k = (double)(P1->length + child_count);
+        int prune_subtree = 0;
+        if (ctx->uniform_length) {
+            if (max_child_k > (double)ctx->first_len) max_child_k = (double)ctx->first_len;
+            double max_child_score = (max_child_k * (double)P1->num_tids) / (double)ctx->first_len;
+            if (max_child_score + 1e-12 < ctx->threshold_value) prune_subtree = 1;
+        } else {
+            double max_child_score = max_child_k * P1->recip_sum;
+            if (max_child_score + 1e-12 < ctx->threshold_value) prune_subtree = 1;
+        }
+        
+        if (prune_subtree) {
+            ctx->pruned_envelope += child_count;
+        } else {
+            aura_dfs_tid_raw_engine(ctx, children, child_count);
+        }
+    } else if (child_count == 1) {
+        /* Single child has no siblings to join with (cannot form larger sets) */
+        ctx->pruned_envelope += 1;
     }
     
     /* If any child had to use standard malloc, free it */
