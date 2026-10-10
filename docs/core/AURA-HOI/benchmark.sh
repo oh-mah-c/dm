@@ -1,21 +1,20 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════
-# AURA-HOI Benchmark — runs all algorithms, collects metrics, plots charts
-# Usage: ./docs/core/AURA-HOI/benchmark.sh
+# AURA-HOI Benchmark Suite — runs all algorithms, collects metrics, plots charts
 # Outputs: docs/core/AURA-HOI/benchmark_results.csv
 #          docs/core/AURA-HOI/itemset_counts.csv
 #          docs/core/AURA-HOI/<dataset>_comparison.png
 # ═══════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
-BIN="./build/bin/dm.exe"
+BIN="./bin/dm.exe"
 OUTDIR="docs/core/AURA-HOI"
 CSV="${OUTDIR}/benchmark_results.csv"
 ITEMSET_CSV="${OUTDIR}/itemset_counts.csv"
 TMP="$(mktemp)"
 
 # ── Init CSV ────────────────────────────────────────────────────────────
-echo "dataset,algorithm,alpha,minsup,time_s,peak_ram_mb,itemsets" > "$CSV"
+echo "dataset,algorithm,alpha,minsup,time_s,peak_ram_mb,itemsets,visited_nodes" > "$CSV"
 
 ceil_alpha_n() {
   local alpha="$1" n="$2"
@@ -42,7 +41,11 @@ run_one() {
   fi
 
   # ── Parse metrics ──────────────────────────────────────────────────
-  time_s=$(grep -oP "TOTAL WALL TIME\s*:\s*\K[0-9.]+" "$TMP" 2>/dev/null | head -1 || echo "")
+  time_s=$(grep -oP "Algorithm Core\s*:\s*\K[0-9.]+" "$TMP" 2>/dev/null | head -1 || echo "")
+  if [ -z "$time_s" ]; then
+    time_s=$(grep -oP "TOTAL WALL TIME\s*:\s*\K[0-9.]+" "$TMP" 2>/dev/null | head -1 || echo "")
+  fi
+
   if [ -z "$time_s" ]; then
     wall_raw=$(grep -oP "Elapsed \(wall clock\) time.*?:\s*\K[0-9:.]+" "$TMP" 2>/dev/null | head -1 || echo "")
     if [ -n "$wall_raw" ]; then
@@ -58,7 +61,10 @@ else: print(p[0])
     time_s=$(python3 -c "print(${time_s}/1000.0)" 2>/dev/null || echo "$time_s")
   fi
 
-  ram_kb=$(grep -oP "Maximum resident set size \(kbytes\):\s*\K\d+" "$TMP" 2>/dev/null | head -1 || echo "0")
+  ram_kb=$(grep -oP "Peak RAM \(VmHWM\)\s*:\s*[0-9.]+\s*MB\s*\(\K\d+" "$TMP" 2>/dev/null | head -1 || echo "")
+  if [ -z "$ram_kb" ]; then
+    ram_kb=$(grep -oP "Maximum resident set size \(kbytes\):\s*\K\d+" "$TMP" 2>/dev/null | head -1 || echo "0")
+  fi
   ram_mb=$(python3 -c "print(${ram_kb:-0}/1024.0)" 2>/dev/null || echo "0")
 
   itemsets=$(grep -oP "Frequent Itemsets\s*:\s*\K\d+" "$TMP" 2>/dev/null | head -1 || echo "")
@@ -66,7 +72,9 @@ else: print(p[0])
     itemsets=$(grep -oiP "(?:high occupancy )?itemsets found:\s*\K\d+" "$TMP" 2>/dev/null | head -1 || echo "0")
   fi
 
-  echo "${ds},${algo},${alpha},${minsup},${time_s:-},${ram_mb},${itemsets:-0}" >> "$CSV"
+  v_nodes=$(grep -oP "visited_nodes=\K\d+" "$TMP" 2>/dev/null | head -1 || echo "0")
+
+  echo "${ds},${algo},${alpha},${minsup},${time_s:-},${ram_mb},${itemsets:-0},${v_nodes:-0}" >> "$CSV"
 }
 
 checked_ntrans() {
@@ -90,6 +98,7 @@ declare -A NTRANS=(
   [retail]=88162
   [T10I4D100K]=100000
   [kosarak]=990002
+  [pumsb]=49046
 )
 declare -A DATAFILES=(
   [mushrooms]="datasets/itemsets/mushrooms.txt"
@@ -97,6 +106,7 @@ declare -A DATAFILES=(
   [retail]="datasets/itemsets/retail.txt"
   [T10I4D100K]="datasets/itemsets/T10I4D100K.txt"
   [kosarak]="datasets/itemsets/kosarak.dat"
+  [pumsb]="datasets/itemsets/pumsb.txt"
 )
 declare -A ALPHAS=(
   [mushrooms]="0.05 0.075 0.10 0.125 0.15 0.20 0.30 0.40"
@@ -104,12 +114,13 @@ declare -A ALPHAS=(
   [retail]="0.005 0.01 0.02 0.03 0.05 0.075 0.10"
   [T10I4D100K]="0.005 0.01 0.02 0.03 0.05 0.075 0.10"
   [kosarak]="0.001 0.002 0.005 0.01 0.02"
+  [pumsb]="0.80 0.825 0.85 0.875 0.90 0.925"
 )
 
 ALGOS="hep dfhoi aura_hoi"
 
 # ── Run all configurations ──────────────────────────────────────────────
-for ds in mushrooms chess retail T10I4D100K kosarak; do
+for ds in mushrooms chess retail T10I4D100K kosarak pumsb; do
   ntrans="$(checked_ntrans "$ds")"
   echo "▶ Dataset: $ds (n=${ntrans})"
   for alpha in ${ALPHAS[$ds]}; do
@@ -125,10 +136,7 @@ echo ""
 echo "✓ Results saved → ${CSV}"
 
 # ── Generate itemset-count CSV and charts with inline Python ───────────
-VENV_PY="./.venv/bin/python3"
-[ -x "$VENV_PY" ] || VENV_PY="python3"
-
-$VENV_PY - <<'PYEOF'
+python3 - <<'PYEOF'
 from pathlib import Path
 import pandas as pd
 import matplotlib
@@ -140,11 +148,12 @@ OUT  = Path("docs/core/AURA-HOI")
 ITEMSET_CSV = OUT / "itemset_counts.csv"
 
 df = pd.read_csv(CSV)
-df["alpha"]       = pd.to_numeric(df["alpha"],       errors="coerce")
-df["minsup"]      = pd.to_numeric(df["minsup"],      errors="coerce")
-df["time_s"]      = pd.to_numeric(df["time_s"],      errors="coerce")
-df["peak_ram_mb"] = pd.to_numeric(df["peak_ram_mb"], errors="coerce")
-df["itemsets"]    = pd.to_numeric(df["itemsets"],     errors="coerce")
+df["alpha"]         = pd.to_numeric(df["alpha"],         errors="coerce")
+df["minsup"]        = pd.to_numeric(df["minsup"],        errors="coerce")
+df["time_s"]        = pd.to_numeric(df["time_s"],        errors="coerce")
+df["peak_ram_mb"]   = pd.to_numeric(df["peak_ram_mb"],   errors="coerce")
+df["itemsets"]      = pd.to_numeric(df["itemsets"],      errors="coerce")
+df["visited_nodes"] = pd.to_numeric(df["visited_nodes"], errors="coerce")
 
 itemset_stats = (
     df.pivot_table(
@@ -170,33 +179,36 @@ print(f"Saved: {ITEMSET_CSV}")
 COLORS = {"hep": "#e05c5c", "dfhoi": "#5c8de0", "aura_hoi": "#3dba6b"}
 LABELS = {"hep": "HEP",     "dfhoi": "DFHOI",   "aura_hoi": "AURA-HOI"}
 METRICS = [
-    ("time_s",      "Runtime (s)"),
-    ("peak_ram_mb", "Peak RAM (MB)"),
+    ("time_s",        "Runtime (s)"),
+    ("visited_nodes", "Search Space (Visited Nodes)"),
+    ("peak_ram_mb",   "Peak RAM (MB)"),
 ]
 
 for dataset in sorted(df["dataset"].unique()):
     sub = df[df["dataset"] == dataset].copy()
 
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4.5))
-    fig.suptitle(f"Dataset: {dataset}", fontsize=14, fontweight="bold", y=1.02)
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4.2))
+    fig.suptitle(f"Dataset: {dataset}", fontsize=13, fontweight="bold", y=1.02)
 
     for ax, (col, ylabel) in zip(axes, METRICS):
         has_data = False
         for algo in ["hep", "dfhoi", "aura_hoi"]:
             s = sub[sub["algorithm"] == algo].sort_values("alpha").dropna(subset=[col])
-            if s.empty or (s[col] == 0).all():
+            if s.empty:
                 continue
             ax.plot(
                 s["alpha"], s[col],
-                marker="o", linewidth=2.0, markersize=6,
+                marker="o", linewidth=2.0, markersize=5,
                 color=COLORS[algo], label=LABELS[algo],
             )
             has_data = True
 
-        ax.set_xlabel("Shared support/occupancy threshold α", fontsize=9)
+        ax.set_xlabel("Threshold α", fontsize=9)
         ax.set_ylabel(ylabel, fontsize=9)
         ax.set_title(ylabel, fontsize=10, fontweight="bold")
         ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.7)
+        if col in ["time_s", "visited_nodes"]:
+            ax.set_yscale("log")
         if has_data:
             ax.legend(fontsize=8)
         else:
@@ -210,9 +222,8 @@ for dataset in sorted(df["dataset"].unique()):
         print(f"  Saved: {out.name}")
     plt.close(fig)
 
-print("Charts done.")
+print("All Charts done.")
 PYEOF
 
 echo ""
-echo "✓ Charts → docs/core/AURA-HOI/<dataset>_comparison.png"
-echo "✓ Itemset counts → ${ITEMSET_CSV}"
+echo "✓ Full Benchmark Completed!"

@@ -136,6 +136,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     
     size_t total_ho_count = 0;
     size_t total_ho_footprint = 0;
+    size_t total_visited_nodes = 0;
 
     for (uint32_t i = 0; i <= ds->max_id; i++) {
         if (counts[i] >= xi) {
@@ -180,6 +181,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
                 }
                 
                 if (!match) break;
+                total_visited_nodes++;
                 
                 uint32_t *new_tids = malloc((P1->num_tids < P2->num_tids ? P1->num_tids : P2->num_tids) * sizeof(uint32_t));
                 size_t p1_idx = 0, p2_idx = 0, new_idx = 0;
@@ -226,7 +228,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     }
 
     free(g_tsize);
-    printf("[HEP] Complete. Total high occupancy itemsets found: %zu\n", total_ho_count);
+    printf("[HEP] Complete. Total high occupancy itemsets found: %zu (visited_nodes=%zu)\n", total_ho_count, total_visited_nodes);
     dm_bench_record_results(total_ho_count, total_ho_footprint);
 
     return DM_SUCCESS;

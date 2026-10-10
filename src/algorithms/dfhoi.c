@@ -57,7 +57,7 @@ static bool check_ubo_and_o(uint32_t *tids, size_t size, uint32_t *g_tsize, size
     return false;
 }
 
-static void mine_depth_hois(DFHOIItemset *classes, size_t class_size, uint32_t *g_tsize, double xi, size_t *total_ho_count, size_t *total_ho_footprint, uint32_t *buffer, bool hastheSameLength, uint32_t first_len) {
+static void mine_depth_hois(DFHOIItemset *classes, size_t class_size, uint32_t *g_tsize, double xi, size_t *total_ho_count, size_t *total_ho_footprint, size_t *total_visited_nodes, uint32_t *buffer, bool hastheSameLength, uint32_t first_len) {
     if (class_size < 2) return;
     
     for (size_t i = 0; i < class_size; i++) {
@@ -71,6 +71,7 @@ static void mine_depth_hois(DFHOIItemset *classes, size_t class_size, uint32_t *
         
         for (size_t j = i + 1; j < class_size; j++) {
             DFHOIItemset *P2 = &classes[j];
+            (*total_visited_nodes)++;
             
             size_t p1_idx = 0, p2_idx = 0, new_idx = 0;
             
@@ -105,7 +106,7 @@ static void mine_depth_hois(DFHOIItemset *classes, size_t class_size, uint32_t *
         }
         
         if (child_count > 0) {
-            mine_depth_hois(children, child_count, g_tsize, xi, total_ho_count, total_ho_footprint, buffer, hastheSameLength, first_len);
+            mine_depth_hois(children, child_count, g_tsize, xi, total_ho_count, total_ho_footprint, total_visited_nodes, buffer, hastheSameLength, first_len);
             
             for (size_t c = 0; c < child_count; c++) {
                 free(children[c].tids);
@@ -177,6 +178,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     
     size_t total_ho_count = 0;
     size_t total_ho_footprint = 0;
+    size_t total_visited_nodes = 0;
 
     for (uint32_t i = 0; i <= ds->max_id; i++) {
         if (counts[i] >= xi) {
@@ -200,7 +202,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     free(counts);
 
     uint32_t *buffer = malloc(ds->count * sizeof(uint32_t));
-    mine_depth_hois(C1, c1_count, g_tsize, xi, &total_ho_count, &total_ho_footprint, buffer, hastheSameLength, first_len);
+    mine_depth_hois(C1, c1_count, g_tsize, xi, &total_ho_count, &total_ho_footprint, &total_visited_nodes, buffer, hastheSameLength, first_len);
     free(buffer);
 
     for (size_t i = 0; i < c1_count; i++) {
@@ -209,7 +211,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     free(C1);
 
     free(g_tsize);
-    printf("[DFHOI] Complete. Total high occupancy itemsets found: %zu\n", total_ho_count);
+    printf("[DFHOI] Complete. Total high occupancy itemsets found: %zu (visited_nodes=%zu)\n", total_ho_count, total_visited_nodes);
     dm_bench_record_results(total_ho_count, total_ho_footprint);
 
     return DM_SUCCESS;
