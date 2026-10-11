@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.28 (MiKTeX 25.12) (preloaded format=pdflatex 2026.10.7)  10 OCT 2026 07:55
+This is pdfTeX, Version 3.141592653-2.6-1.40.28 (MiKTeX 25.12) (preloaded format=pdflatex 2026.10.7)  11 OCT 2026 10:18
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -97,22 +97,18 @@ Package: multicol 2025/10/21 v2.0b multicolumn formatting (FMi)
 \mc@col@check@num=\count292
 \g__mc_curr_col_int=\count293
 )
-(C:\Program Files\MiKTeX\tex/latex/oberdiek\aliascnt.sty
-Package: aliascnt 2018/09/07 v1.5 Alias counters (HO)
-)
 \c@chapter=\count294
-LaTeX Font Info:    Redeclaring math symbol \Gamma on input line 379.
-LaTeX Font Info:    Redeclaring math symbol \Delta on input line 380.
-LaTeX Font Info:    Redeclaring math symbol \Theta on input line 381.
-LaTeX Font Info:    Redeclaring math symbol \Lambda on input line 382.
-LaTeX Font Info:    Redeclaring math symbol \Xi on input line 383.
-LaTeX Font Info:    Redeclaring math symbol \Pi on input line 384.
-LaTeX Font Info:    Redeclaring math symbol \Sigma on input line 385.
-LaTeX Font Info:    Redeclaring math symbol \Upsilon on input line 386.
-LaTeX Font Info:    Redeclaring math symbol \Phi on input line 387.
-LaTeX Font Info:    Redeclaring math symbol \Psi on input line 388.
-LaTeX Font Info:    Redeclaring math symbol \Omega on input line 389.
-LaTeX Info: Redefining \vec on input line 394.
+LaTeX Font Info:    Redeclaring math symbol \Gamma on input line 387.
+LaTeX Font Info:    Redeclaring math symbol \Delta on input line 388.
+LaTeX Font Info:    Redeclaring math symbol \Theta on input line 389.
+LaTeX Font Info:    Redeclaring math symbol \Lambda on input line 390.
+LaTeX Font Info:    Redeclaring math symbol \Xi on input line 391.
+LaTeX Font Info:    Redeclaring math symbol \Pi on input line 392.
+LaTeX Font Info:    Redeclaring math symbol \Sigma on input line 393.
+LaTeX Font Info:    Redeclaring math symbol \Upsilon on input line 394.
+LaTeX Font Info:    Redeclaring math symbol \Phi on input line 395.
+LaTeX Font Info:    Redeclaring math symbol \Psi on input line 396.
+LaTeX Font Info:    Redeclaring math symbol \Omega on input line 397.
 \tocchpnum=\dimen158
 \tocsecnum=\dimen159
 \tocsectotal=\dimen160
@@ -200,10 +196,6 @@ LaTeX Info: Redefining \Bigg on input line 724.
 \big@size=\dimen173
 LaTeX Font Info:    Redeclaring font encoding OML on input line 742.
 LaTeX Font Info:    Redeclaring font encoding OMS on input line 743.
-
-
-Package amsmath Warning: Unable to redefine math accent \vec.
-
 \macc@depth=\count319
 LaTeX Info: Redefining \bmod on input line 904.
 LaTeX Info: Redefining \pmod on input line 909.
@@ -231,7 +223,8 @@ LaTeX Info: Redefining \Relbar on input line 970.
 \mathdisplay@stack=\toks27
 LaTeX Info: Redefining \[ on input line 2950.
 LaTeX Info: Redefining \] on input line 2951.
-) (C:\Program Files\MiKTeX\tex/latex/amsfonts\amssymb.sty
+)
+(C:\Program Files\MiKTeX\tex/latex/amsfonts\amssymb.sty
 Package: amssymb 2013/01/14 v3.01 AMS font symbols
 
 (C:\Program Files\MiKTeX\tex/latex/amsfonts\amsfonts.sty
@@ -553,9 +546,25 @@ LaTeX Font Info:    Trying to load font information for U+msb on input line 51.
 (C:\Program Files\MiKTeX\tex/latex/amsfonts\umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
-Underfull \vbox (badness 4832) has occurred while \output is active []
+Overfull \hbox (11.70375pt too wide) in paragraph at lines 53--54
+\T1/cmr/m/n/9 that tightly en-velopes fu-ture oc-cu-pancy with-out vi-o-lat-ing
+ non-monotonicity.
+ []
 
- [1
+
+Overfull \hbox (9.18326pt too wide) in paragraph at lines 53--54
+\T1/cmr/m/n/9 com-pre-hen-sive em-pir-i-cal eval-u-a-tions com-par-ing \T1/cmr/
+m/sc/9 AURA-HOI \T1/cmr/m/n/9 against state-
+ []
+
+
+Overfull \hbox (8.76854pt too wide) in paragraph at lines 53--54
+\T1/cmr/m/n/9 bench-mark datasets (\T1/cmtt/m/n/9 mushrooms\T1/cmr/m/n/9 , \T1/
+cmtt/m/n/9 chess\T1/cmr/m/n/9 , \T1/cmtt/m/n/9 retail\T1/cmr/m/n/9 , \T1/cmtt/m
+/n/9 T10I4D100K\T1/cmr/m/n/9 , and \T1/cmtt/m/n/9 kosarak\T1/cmr/m/n/9 )
+ []
+
+[1
 
 {C:/Users/Admin/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}]
 Overfull \hbox (1.4328pt too wide) in paragraph at lines 66--67
@@ -564,112 +573,174 @@ Overfull \hbox (1.4328pt too wide) in paragraph at lines 66--67
  []
 
 [2] [3] [4] [5] [6]
-Package hyperref Info: bookmark level for unknown algorithm defaults to 0 on in
-put line 219.
-
-Overfull \hbox (1.73352pt too wide) in paragraph at lines 263--264
-\T1/cmr/m/n/10 All al-go-rithms were im-ple-mented in stan-dard C and com-piled
- with GCC MinGW-
- []
-
-
-Overfull \hbox (5.2904pt too wide) in paragraph at lines 266--267
-\T1/cmr/m/n/10 (sparse syn-thetic bench-mark), and \T1/cmtt/m/n/10 kosarak \T1/
-cmr/m/n/10 (mas-sive click-stream log). The dataset
+Overfull \hbox (5.06125pt too wide) in paragraph at lines 204--205
+ []\T1/cmr/m/it/10 Tightness Char-ac-ter-i-za-tion and Asymp-totic Be-hav-ior.[
+] \T1/cmr/m/n/10 The tight-ness of $\OMS/cmsy/m/n/10 U[]\OT1/cmr/m/n/10 (\OML/c
+mm/m/it/10 P; R\OT1/cmr/m/n/10 )$
  []
 
 [7]
-Overfull \hbox (5.24327pt too wide) in paragraph at lines 327--328
+Overfull \hbox (3.12564pt too wide) in paragraph at lines 240--241
+\T1/cmr/m/n/10 trans-ac-tion weights ($\OML/cmm/m/it/10 O\OT1/cmr/m/n/10 (\OML/
+cmm/m/it/10 n [] n\OT1/cmr/m/n/10 )$\T1/cmr/m/n/10 ), eval-u-at-ing $\OMS/cmsy/
+m/n/10 U[]\OT1/cmr/m/n/10 (\OML/cmm/m/it/10 P; R\OT1/cmr/m/n/10 ) = (\OMS/cmsy/
+m/n/10 j\OML/cmm/m/it/10 P\OMS/cmsy/m/n/10 j \OT1/cmr/m/n/10 + \OMS/cmsy/m/n/10
+ j\OML/cmm/m/it/10 R\OMS/cmsy/m/n/10 j\OT1/cmr/m/n/10 ) \OMS/cmsy/m/n/10 ^^A \O
+ML/cmm/m/it/10 S[]\OT1/cmr/m/n/10 (\OML/cmm/m/it/10 P\OT1/cmr/m/n/10 )$
+ []
+
+[8]
+Overfull \hbox (4.93462pt too wide) in paragraph at lines 252--253
+ []\T1/cmr/m/it/10 Domain Rel-e-vance in In-tel-li-gent In-for-ma-tion Sys-tems
+:[] \T1/cmr/m/n/10 Tra-di-tional support-driven
+ []
+
+Package hyperref Info: bookmark level for unknown algorithm defaults to 0 on in
+put line 257.
+[9] [10]
+Overfull \hbox (5.24327pt too wide) in paragraph at lines 366--367
 []\T1/cmr/m/sc/10 AURA-HOI \T1/cmr/m/n/10 is faster than \T1/cmr/m/sc/10 HEP \T
 1/cmr/m/n/10 in \T1/cmr/bx/n/10 32 of 35 \T1/cmr/m/n/10 eval-u-ated con-fig-u-r
 a-tions ($\OT1/cmr/m/n/10 91\OML/cmm/m/it/10 :\OT1/cmr/m/n/10 4%$\T1/cmr/m/n/10
  ). 
  []
 
-[8]
-<mushrooms_comparison.pdf, id=184, 1004.01062pt x 312.16487pt>
-File: mushrooms_comparison.pdf Graphic file (type pdf)
-<use mushrooms_comparison.pdf>
-Package pdftex.def Info: mushrooms_comparison.pdf  used on input line 436.
-(pdftex.def)             Requested size: 319.35301pt x 99.28986pt.
-<chess_comparison.pdf, id=185, 1003.90898pt x 312.16487pt>
-File: chess_comparison.pdf Graphic file (type pdf)
-<use chess_comparison.pdf>
-Package pdftex.def Info: chess_comparison.pdf  used on input line 443.
-(pdftex.def)             Requested size: 319.35301pt x 99.29938pt.
-<kosarak_comparison.pdf, id=186, 1004.60991pt x 312.16487pt>
-File: kosarak_comparison.pdf Graphic file (type pdf)
-<use kosarak_comparison.pdf>
-Package pdftex.def Info: kosarak_comparison.pdf  used on input line 450.
-(pdftex.def)             Requested size: 319.35301pt x 99.2327pt.
- [9]
-Overfull \hbox (3.02965pt too wide) in paragraph at lines 461--462
+[11]
+<mushrooms_comparison.png, id=274, 1003.1076pt x 311.7246pt>
+File: mushrooms_comparison.png Graphic file (type png)
+<use mushrooms_comparison.png>
+Package pdftex.def Info: mushrooms_comparison.png  used on input line 475.
+(pdftex.def)             Requested size: 319.35301pt x 99.2402pt.
+<chess_comparison.png, id=276, 1003.1076pt x 311.7246pt>
+File: chess_comparison.png Graphic file (type png)
+<use chess_comparison.png>
+Package pdftex.def Info: chess_comparison.png  used on input line 482.
+(pdftex.def)             Requested size: 319.35301pt x 99.2402pt.
+<kosarak_comparison.png, id=277, 1000.6986pt x 311.7246pt>
+File: kosarak_comparison.png Graphic file (type png)
+<use kosarak_comparison.png>
+Package pdftex.def Info: kosarak_comparison.png  used on input line 489.
+(pdftex.def)             Requested size: 319.35301pt x 99.47803pt.
+<retail_comparison.png, id=278, 1002.144pt x 311.7246pt>
+File: retail_comparison.png Graphic file (type png)
+<use retail_comparison.png>
+Package pdftex.def Info: retail_comparison.png  used on input line 496.
+(pdftex.def)             Requested size: 319.35301pt x 99.33533pt.
+<T10I4D100K_comparison.png, id=279, 1002.144pt x 311.7246pt>
+File: T10I4D100K_comparison.png Graphic file (type png)
+<use T10I4D100K_comparison.png>
+Package pdftex.def Info: T10I4D100K_comparison.png  used on input line 503.
+(pdftex.def)             Requested size: 319.35301pt x 99.33533pt.
+<pumsb_comparison.png, id=280, 1003.1076pt x 311.7246pt>
+File: pumsb_comparison.png Graphic file (type png)
+<use pumsb_comparison.png>
+Package pdftex.def Info: pumsb_comparison.png  used on input line 510.
+(pdftex.def)             Requested size: 319.35301pt x 99.2402pt.
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [12]
+Overfull \hbox (3.02965pt too wide) in paragraph at lines 521--522
  []\T1/cmr/m/it/10 Massive Sparse Data (\T1/cmtt/m/it/10 kosarak\T1/cmr/m/it/10
  ):[] \T1/cmr/m/n/10 Prior bit-set de-signs suf-fered severely on \T1/cmtt/m/n/
 10 kosarak
  []
 
 
-Overfull \hbox (27.49583pt too wide) in paragraph at lines 464--465
+Overfull \hbox (27.49583pt too wide) in paragraph at lines 524--525
  []\T1/cmr/m/it/10 Sparse and Syn-thetic Datasets (\T1/cmtt/m/it/10 retail \T1/
 cmr/m/it/10 and \T1/cmtt/m/it/10 T10I4D100K\T1/cmr/m/it/10 ):[] \T1/cmr/m/n/10 
 On \T1/cmtt/m/n/10 retail \T1/cmr/m/n/10 and \T1/cmtt/m/n/10 T10I4D100K\T1/cmr/
 m/n/10 ,
  []
 
-[10 <./mushrooms_comparison.pdf> <./chess_comparison.pdf>] [11 <./kosarak_compa
-rison.pdf>] [12] [13] [14] (aura_hoi_reconstructed_theory_cited.aux)
+
+Overfull \hbox (5.90137pt too wide) in paragraph at lines 527--528
+\T1/cmr/m/n/10 (\T1/cmtt/m/n/10 mushrooms\T1/cmr/m/n/10 ) and mas-sive sparse (
+\T1/cmtt/m/n/10 kosarak\T1/cmr/m/n/10 ) datasets along-side the par-al-lel spee
+dup
+ []
+
+[13 <./mushrooms_comparison.png> <./chess_comparison.png>] [14 <./kosarak_compa
+rison.png> <./retail_comparison.png>]
+Overfull \hbox (5.93053pt too wide) in paragraph at lines 539--540
+\T1/cmr/m/n/10 Figure [][]8[][] fur-ther traces the gran-u-lar par-al-lel scal-
+ing curve across $\OML/cmm/m/it/10 T \OMS/cmsy/m/n/10 2 f\OT1/cmr/m/n/10 1\OML/
+cmm/m/it/10 ; \OT1/cmr/m/n/10 2\OML/cmm/m/it/10 ; \OT1/cmr/m/n/10 4\OML/cmm/m/i
+t/10 ; \OT1/cmr/m/n/10 8\OML/cmm/m/it/10 ; \OT1/cmr/m/n/10 16\OMS/cmsy/m/n/10 g
+$\T1/cmr/m/n/10 ,
+ []
+
+<thread_comparison.png, id=315, 1000.2168pt x 312.6882pt>
+File: thread_comparison.png Graphic file (type png)
+<use thread_comparison.png>
+Package pdftex.def Info: thread_comparison.png  used on input line 543.
+(pdftex.def)             Requested size: 319.35301pt x 99.83801pt.
+<parallel_scalability.png, id=316, 715.2321pt x 296.0661pt>
+File: parallel_scalability.png Graphic file (type png)
+<use parallel_scalability.png>
+Package pdftex.def Info: parallel_scalability.png  used on input line 550.
+(pdftex.def)             Requested size: 319.35301pt x 132.19397pt.
+[15 <./T10I4D100K_comparison.png> <./pumsb_comparison.png>] [16 <./thread_compa
+rison.png> <./parallel_scalability.png>] [17]
+Underfull \hbox (badness 1221) in paragraph at lines 643--644
+[]\T1/cmr/m/n/9 Y^^Yld^^Yr^^Ym, ù.: Min-ing top-k high oc-cu-pancy item-sets. B
+lack Sea Jour-nal of
+ []
+
+[18] [19] (aura_hoi_reconstructed_theory_cited.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2025-12-24>
  ***********
 Package rerunfilecheck Info: File `aura_hoi_reconstructed_theory_cited.out' has
  not changed.
-(rerunfilecheck)             Checksum: EFDD56134F8D09AC5A91C84772D45FF3;740.
+(rerunfilecheck)             Checksum: 8B142B8D304816D4C8AC0765CC66CB0A;538.
  ) 
 Here is how much of TeX's memory you used:
- 11909 strings out of 467870
- 177351 string characters out of 5428422
- 645149 words of memory out of 5000000
- 40533 multiletter control sequences out of 15000+600000
- 645673 words of font info for 80 fonts, out of 8000000 for 9000
+ 11992 strings out of 467870
+ 178795 string characters out of 5428422
+ 638819 words of memory out of 5000000
+ 40574 multiletter control sequences out of 15000+600000
+ 647025 words of font info for 82 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 75i,12n,79p,2130b,599s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 75i,12n,79p,2378b,597s stack positions out of 10000i,1000n,20000p,200000b,200000s
  <C:\Users\Admin\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecit
 1000.pk> <C:\Users\Admin\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi60
-0\ectt1000.pk> <C:\Users\Admin\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec
-/dpi600\eccc1000.pk> <C:\Users\Admin\AppData\Local\MiKTeX\fonts/pk/ljfour/jknap
-pen/ec/dpi600\ecbx1000.pk> <C:\Users\Admin\AppData\Local\MiKTeX\fonts/pk/ljfour
-/jknappen/ec/dpi600\ecti1000.pk> <C:\Users\Admin\AppData\Local\MiKTeX\fonts/pk/
-ljfour/jknappen/ec/dpi600\ecbx1200.pk> <C:\Users\Admin\AppData\Local\MiKTeX\fon
-ts/pk/ljfour/jknappen/ec/dpi600\tcrm0900.pk> <C:\Users\Admin\AppData\Local\MiKT
-eX\fonts/pk/ljfour/jknappen/ec/dpi600\ecti0900.pk> <C:\Users\Admin\AppData\Loca
-l\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\eccc0900.pk> <C:\Users\Admin\AppDat
-a\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecbx0900.pk> <C:\Users\Admin\
-AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ectt0900.pk> <C:\Users\
-Admin\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecrm0900.pk> <C:\
-Users\Admin\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecrm1000.pk
-> <C:\Users\Admin\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecbx1
-440.pk> <C:\Users\Admin\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600
-\ecxc1440.pk><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmex10.pfb
-><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cmextra/cmex9.pfb><C:/Pro
-gram Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi10.pfb><C:/Program Files/M
-iKTeX/fonts/type1/public/amsfonts/cm/cmmi5.pfb><C:/Program Files/MiKTeX/fonts/t
-ype1/public/amsfonts/cm/cmmi6.pfb><C:/Program Files/MiKTeX/fonts/type1/public/a
-msfonts/cm/cmmi7.pfb><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cm
-mi9.pfb><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmr10.pfb><C:/P
-rogram Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmr5.pfb><C:/Program Files/M
-iKTeX/fonts/type1/public/amsfonts/cm/cmr6.pfb><C:/Program Files/MiKTeX/fonts/ty
-pe1/public/amsfonts/cm/cmr7.pfb><C:/Program Files/MiKTeX/fonts/type1/public/ams
-fonts/cm/cmr9.pfb><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy1
-0.pfb><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy6.pfb><C:/Pro
-gram Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy7.pfb><C:/Program Files/Mi
-KTeX/fonts/type1/public/amsfonts/cm/cmsy9.pfb><C:/Program Files/MiKTeX/fonts/ty
-pe1/public/amsfonts/symbols/msam10.pfb>
-Output written on aura_hoi_reconstructed_theory_cited.pdf (14 pages, 518162 byt
-es).
+0\eccc0700.pk> <C:\Users\Admin\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec
+/dpi600\ectt1000.pk> <C:\Users\Admin\AppData\Local\MiKTeX\fonts/pk/ljfour/jknap
+pen/ec/dpi600\eccc1000.pk> <C:\Users\Admin\AppData\Local\MiKTeX\fonts/pk/ljfour
+/jknappen/ec/dpi600\ecbx1000.pk> <C:\Users\Admin\AppData\Local\MiKTeX\fonts/pk/
+ljfour/jknappen/ec/dpi600\ecti1000.pk> <C:\Users\Admin\AppData\Local\MiKTeX\fon
+ts/pk/ljfour/jknappen/ec/dpi600\ecbx1200.pk> <C:\Users\Admin\AppData\Local\MiKT
+eX\fonts/pk/ljfour/jknappen/ec/dpi600\tcrm0900.pk> <C:\Users\Admin\AppData\Loca
+l\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecti0900.pk> <C:\Users\Admin\AppDat
+a\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\eccc0900.pk> <C:\Users\Admin\
+AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecbx0900.pk> <C:\Users\
+Admin\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ectt0900.pk> <C:\
+Users\Admin\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecrm0900.pk
+> <C:\Users\Admin\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecrm1
+000.pk> <C:\Users\Admin\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600
+\ecbx1440.pk> <C:\Users\Admin\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/
+dpi600\ecxc1440.pk><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmex
+10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cmextra/cmex9.pfb><
+C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi10.pfb><C:/Program F
+iles/MiKTeX/fonts/type1/public/amsfonts/cm/cmmi5.pfb><C:/Program Files/MiKTeX/f
+onts/type1/public/amsfonts/cm/cmmi6.pfb><C:/Program Files/MiKTeX/fonts/type1/pu
+blic/amsfonts/cm/cmmi7.pfb><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts
+/cm/cmmi9.pfb><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmr10.pfb
+><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmr5.pfb><C:/Program F
+iles/MiKTeX/fonts/type1/public/amsfonts/cm/cmr6.pfb><C:/Program Files/MiKTeX/fo
+nts/type1/public/amsfonts/cm/cmr7.pfb><C:/Program Files/MiKTeX/fonts/type1/publ
+ic/amsfonts/cm/cmr9.pfb><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm
+/cmsy10.pfb><C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy6.pfb><
+C:/Program Files/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy7.pfb><C:/Program Fi
+les/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy9.pfb><C:/Program Files/MiKTeX/fo
+nts/type1/public/amsfonts/symbols/msam10.pfb>
+Output written on aura_hoi_reconstructed_theory_cited.pdf (19 pages, 1461095 by
+tes).
 PDF statistics:
- 1122 PDF objects out of 1200 (max. 8388607)
- 89 named destinations out of 1000 (max. 500000)
- 24 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 1107 PDF objects out of 1200 (max. 8388607)
+ 133 named destinations out of 1000 (max. 500000)
+ 49 words of extra memory for PDF output out of 10000 (max. 10000000)
 

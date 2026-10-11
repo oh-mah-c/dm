@@ -50,7 +50,15 @@
 
 \LoadClass[twoside]{article}
 \RequirePackage{multicol} % needed for the list of participants, index
-\RequirePackage{aliascnt}
+\ifdefined\NewCounterAlias
+  \let\newaliascnt\NewCounterAlias
+\else
+  \newcommand{\newaliascnt}[2]{%
+    \@definecounter{#1}%
+    \@namedef{the#1}{\@nameuse{the#2}}%
+    \expandafter\let\csname c@#1\expandafter\endcsname\csname c@#2\endcsname
+  }
+\fi
 
 \setlength{\textwidth}{12.2cm}
 \setlength{\textheight}{19.3cm}

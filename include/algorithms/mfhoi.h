@@ -28,14 +28,14 @@ typedef struct {
 
 typedef struct {
     int item;
-    unsigned long *bitset;
+    uint64_t *bitset;
     int support;
 } VerticalItem;
 
 typedef struct {
     int *items;
     int length;
-    unsigned long *tidset;
+    uint64_t *tidset;
     int support;
     double avg_occ;
 } Pattern;

@@ -1,0 +1,132 @@
+\begin{thebibliography}{10}
+\providecommand{\url}[1]{\texttt{#1}}
+\providecommand{\urlprefix}{URL }
+\providecommand{\doi}[1]{https://doi.org/#1}
+
+\bibitem{aggarwal2014frequent}
+Aggarwal, C.C., Han, J. (eds.): Frequent Pattern Mining. Springer (2014)
+
+\bibitem{agrawal1994fast}
+Agrawal, R., Srikant, R.: Fast algorithms for mining association rules in large
+  databases. In: Proceedings of the 20th International Conference on Very Large
+  Data Bases (VLDB). pp. 487--499 (1994)
+
+\bibitem{borgelt2003fimi}
+Borgelt, C.: Efficient implementations of {Apriori} and {Eclat}. In:
+  Proceedings of the IEEE ICDM Workshop on Frequent Itemset Mining
+  Implementations (FIMI) (2003)
+
+\bibitem{burdick2005mafia}
+Burdick, D., Calimlim, M., Flannick, J., Gehrke, J., Yiu, T.: {MAFIA}: A
+  maximal frequent itemset algorithm. IEEE Transactions on Knowledge and Data
+  Engineering  \textbf{17}(11),  1490--1504 (2005)
+
+\bibitem{burdick2001mafia}
+Burdick, D., Calimlim, M., Gehrke, J.: {MAFIA}: A maximal frequent itemset
+  algorithm for transactional databases. In: Proceedings of the 17th
+  International Conference on Data Engineering (ICDE). pp. 443--452 (2001)
+
+\bibitem{cho2026damped}
+Cho, M., Kim, H., Kim, H., Ryu, T., Lee, C., Kim, H., Vo, B., Lin, J.C.W., Yun,
+  U.: Damped window based high occupancy pattern mining with one scanning of
+  data streams. Engineering Applications of Artificial Intelligence
+  \textbf{174},  114511 (2026)
+
+\bibitem{datta2022high}
+Datta, S., Mali, K., Ghosh, U.: High occupancy itemset mining with
+  consideration of transaction occupancy. Arabian Journal for Science and
+  Engineering  \textbf{47}(2),  2061--2075 (2022)
+
+\bibitem{deng2020mining}
+Deng, Z.H.: Mining high occupancy itemsets. Future Generation Computer Systems
+  \textbf{102},  222--229 (2020)
+
+\bibitem{ucirepository1981}
+Dua, D., Graff, C.: {UCI} machine learning repository.
+  \url{https://archive.ics.uci.edu/ml} (2017)
+
+\bibitem{duong2024efficient}
+Duong, H., Pham, H., Truong, T.C., Fournier-Viger, P.: Efficient algorithms to
+  mine concise representations of frequent high utility occupancy patterns.
+  Applied Intelligence  \textbf{54}(5),  4012--4042 (2024)
+
+\bibitem{gan2020huopm}
+Gan, W., Lin, J.C.W., Fournier-Viger, P., Chao, H.C., Yu, P.S.: {HUOPM}:
+  High-utility occupancy pattern mining. IEEE Transactions on Cybernetics
+  \textbf{50}(3),  1195--1208 (2020)
+
+\bibitem{fimi2003repository}
+Goethals, B., Zaki, M.J.: Frequent itemset mining implementations repository
+  ({FIMI}). \url{http://fimi.uantwerpen.be/} (2003)
+
+\bibitem{gouda2005genmax}
+Gouda, K., Zaki, M.J.: {GenMax}: An efficient algorithm for mining maximal
+  frequent itemsets. Data Mining and Knowledge Discovery  \textbf{11}(3),
+  223--242 (2005)
+
+\bibitem{grahne2005fast}
+Grahne, G., Zhu, J.: Fast algorithms for frequent itemset mining using
+  {FP}-trees. IEEE Transactions on Knowledge and Data Engineering
+  \textbf{17}(10),  1347--1362 (2005)
+
+\bibitem{han2000mining}
+Han, J., Pei, J., Yin, Y.: Mining frequent patterns without candidate
+  generation. In: Proceedings of the 2000 ACM SIGMOD International Conference
+  on Management of Data. pp. 1--12 (2000)
+
+\bibitem{ngo2026efficient}
+Ngo, T.K., Nguyen, H.S., Pedrycz, W., Vo, B.: Efficient algorithms for mining
+  top-$k$ high occupancy itemsets. Information Sciences  \textbf{741},  123226
+  (2026)
+
+\bibitem{nguyen2023efficient}
+Nguyen, L.T.T., Mai, T., Pham, G.H., Yun, U., Vo, B.: An efficient method for
+  mining high occupancy itemsets based on equivalence class and early pruning.
+  Knowledge-Based Systems  \textbf{267},  110441 (2023)
+
+\bibitem{park2025sliding}
+Park, S., Ryu, T., Kim, D., Kim, D., Kim, H., Cho, M., Yun, U.: Sliding
+  window-based high utility occupancy pattern mining for data streams.
+  Information Sciences  \textbf{698},  121750 (2025)
+
+\bibitem{pasquier1999discovering}
+Pasquier, N., Bastide, Y., Taouil, R., Lakhal, L.: Discovering frequent closed
+  itemsets for association rules. In: Proceedings of the 7th International
+  Conference on Database Theory (ICDT). Lecture Notes in Computer Science,
+  vol.~1540, pp. 398--416. Springer (1999)
+
+\bibitem{tang2012incorporating}
+Tang, L., Zhang, L., Luo, P., Wang, M.: Incorporating occupancy into frequent
+  pattern mining for high quality pattern recommendation. In: Proceedings of
+  the 21st ACM International Conference on Information and Knowledge Management
+  (CIKM). pp. 75--84 (2012)
+
+\bibitem{uno2003lcm}
+Uno, T., Asai, T., Uchida, Y., Arimura, H.: {LCM}: An efficient algorithm for
+  enumerating the frequent closed item sets. In: Proceedings of the IEEE ICDM
+  Workshop on Frequent Itemset Mining Implementations (FIMI) (2003)
+
+\bibitem{vo2017novel}
+Vo, B., Nguyen, S., Le, T.: A novel approach for mining maximal frequent
+  patterns. Expert Systems with Applications  \textbf{73},  178--186 (2017)
+
+\bibitem{vo2015nlist}
+Vo, B., Nguyen, S., Le, T., Snasel, V.: An {N}-list-based algorithm for mining
+  frequent closed patterns. Expert Systems with Applications  \textbf{42}(19),
+  6648--6657 (2015)
+
+\bibitem{zaki2002charm}
+Zaki, M.J., Hsiao, C.J.: {CHARM}: An efficient algorithm for closed itemset
+  mining. In: Proceedings of the 2002 SIAM International Conference on Data
+  Mining (SDM). pp. 457--473 (2002)
+
+\bibitem{zaki2000scalable}
+Zaki, M.J.: Scalable algorithms for association mining. IEEE Transactions on
+  Knowledge and Data Engineering  \textbf{12}(3),  372--390 (2000)
+
+\bibitem{zhang2015occupancy}
+Zhang, L., Luo, P., Tang, L., Chen, E., Liu, Q., Wang, M., Xiong, H.:
+  Occupancy-based frequent pattern mining. ACM Transactions on Knowledge
+  Discovery from Data  \textbf{10}(2),  14:1--14:33 (2015)
+
+\end{thebibliography}

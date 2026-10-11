@@ -1,0 +1,74 @@
+\documentclass[10.5pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[top=0.85in,bottom=0.85in,left=0.9in,right=0.9in]{geometry}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!70!black,
+  urlcolor=blue!70!black
+}
+
+\pagestyle{empty}
+
+\begin{document}
+
+\noindent
+\textbf{Quan Van} \hfill \today \\
+Independent Researcher, Hanoi, Vietnam \\
+Email: \href{mailto:vanhaminhquan2406@gmail.com}{vanhaminhquan2406@gmail.com} \quad $|$ \quad ORCID: \href{https://orcid.org/0009-0002-8222-0076}{0009-0002-8222-0076}
+
+\vspace{0.8em}
+\hrule
+\vspace{1.0em}
+
+\noindent
+\textbf{To the Editors-in-Chief and Editorial Board} \\
+\textit{Journal of Systems Science and Complexity} (Springer) \\[0.8em]
+\textbf{Subject:} Submission of original research manuscript entitled \\
+\textbf{``AURA-HOI: High-Occupancy Itemset Mining via Equivalence Classes and Residual Envelope Pruning''} \\[0.8em]
+
+\noindent
+Dear Editors-in-Chief and Distinguished Editorial Board Members,
+
+\vspace{0.5em}
+I am pleased to submit our original research manuscript entitled \textbf{``AURA-HOI: High-Occupancy Itemset Mining via Equivalence Classes and Residual Envelope Pruning''} for consideration for publication as a regular research article in the \textit{Journal of Systems Science and Complexity} (JSSC).
+
+\vspace{0.5em}
+\noindent
+\textbf{Context and Importance of the Research:} \\
+Frequent itemset mining (FIM) is a foundational paradigm in discrete data analysis and complex systems modeling. However, classical frequency-based metrics often fail to capture semantic cohesion and proportional coverage, frequently extracting trivial or diffuse co-occurrences. \emph{High-Occupancy Itemset Mining} (HOIM) addresses this limitation by discovering pattern assemblies that occupy a dominant fraction of their supporting transactions. Nonetheless, occupancy fundamentally lacks the anti-monotonic downward-closure property of classical support. Navigating this non-monotonic combinatorial search space ($O(2^m)$) without incurring false negatives or computational explosion has remained a longstanding challenge.
+
+\vspace{0.5em}
+\noindent
+\textbf{Key Theoretical and Algorithmic Contributions:} \\
+To overcome these challenges, we introduce \textbf{AURA-HOI}, a mathematically disciplined, efficient, and auditable framework:
+\begin{itemize}\itemsep 2pt
+    \item \textbf{Safe Residual Upper Bound Pruning:} We prove the \emph{Safe Residual Upper Bound Theorem} ($\mathcal{U}_{\mathrm{safe}}$) and analytical tightness characterizations, guaranteeing zero false negatives while pruning dense subtrees. Crucially, $\mathcal{U}_{\mathrm{safe}}$ evaluates in strict $O(1)$ constant time, sharply bounding the effective branching factor.
+    \item \textbf{Pure TID-List Equivalence Classes:} We discard inefficient horizontal bitsets and dynamic projected lists in favor of vertical TID-list prefix equivalence classes, eliminating memory churn and scaling seamlessly across both dense and sparse clickstream regimes.
+    \item \textbf{Stack-Bounded Memory Arena:} An internal mark-and-rewind memory allocator (`AURAMemPool`) bounds peak resident memory strictly to recursion stack depth $O(d_{\max} \cdot n + m)$, eliminating dynamic heap churn.
+    \item \textbf{Exhaustive Verification and Auditability:} Across 35 experimental configurations on five benchmark datasets, AURA-HOI achieves $100\%$ exact itemset count parity against state-of-the-art exact baselines (\textsc{HEP} and \textsc{DFHOI}), while reducing search space nodes by up to $94.7\%$ on \texttt{mushrooms} and up to $100\%$ on \texttt{chess}, achieving single-threaded speedups of up to $23.5\times$ and $715\times$, respectively.
+\end{itemize}
+
+\vspace{0.5em}
+\noindent
+\textbf{Appropriateness for the Journal of Systems Science and Complexity:} \\
+JSSC is dedicated to fundamental advances in complex systems, optimization, and computer mathematics. Our work directly aligns with the journal's scope by solving a foundational combinatorial complexity problem in discrete data systems, establishing formal mathematical bounds for non-monotonic search spaces, and bridging theoretical complexity bounds with practical large-scale data system scalability.
+
+\vspace{0.5em}
+\noindent
+\textbf{Declarations:} \\
+This manuscript is original work, has not been published previously, is not under consideration elsewhere, and will not be submitted elsewhere while under review by JSSC. The author declares no conflicts of interest.
+
+\vspace{0.8em}
+\noindent
+Sincerely yours,
+
+\vspace{0.8em}
+\noindent
+\textbf{Quan Van} \\
+Independent Researcher, Hanoi, Vietnam \\
+Email: \href{mailto:vanhaminhquan2406@gmail.com}{vanhaminhquan2406@gmail.com}
+
+\end{document}

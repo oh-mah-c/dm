@@ -1,4 +1,4 @@
-\documentclass[runningheads]{llncs}
+\documentclass[runningheads,orivec]{llncs}
 
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
@@ -20,8 +20,8 @@
   linkcolor=blue!60!black,
   citecolor=blue!60!black,
   urlcolor=blue!60!black,
-  pdfauthor={Minh Quan Van Ha},
-  pdftitle={AURA-HOI: An Ultra-Efficient and Auditable Representative Mining Framework for High-Occupancy Itemsets}
+  pdfauthor={Quan Van},
+  pdftitle={AURA-HOI: High-Occupancy Itemset Mining via Equivalence Classes and Residual Envelope Pruning}
 }
 
 \newcommand{\supp}{\operatorname{supp}}
@@ -38,19 +38,19 @@
 
 \begin{document}
 
-\title{\AURA: An Ultra-Efficient and Auditable Representative Mining Framework for High-Occupancy Itemsets via Equivalence Classes and Residual Envelope Pruning}
-\titlerunning{\AURA: Ultra-Efficient and Auditable Representative Mining for HOIs}
+\title{\AURA: High-Occupancy Itemset Mining via Equivalence Classes and Residual Envelope Pruning}
+\titlerunning{\AURA: High-Occupancy Itemset Mining with Residual Pruning}
 
-\author{Minh Quan Van Ha\orcidID{0009-0000-0000-0000}}
-\authorrunning{M. Q. Van Ha}
+\author{Quan Van\orcidID{0009-0002-8222-0076}}
+\authorrunning{Q. Van}
 
 \institute{Independent Researcher, Hanoi, Vietnam\\
-\email{minhquan.vanha@gmail.com}}
+\email{vanhaminhquan2406@gmail.com}}
 
 \maketitle
 
 \begin{abstract}
-High-occupancy itemset mining (HOIM) discovers itemsets that occupy a significant fraction of their supporting transactions. While highly relevant for density-aware pattern mining, occupancy lacks the anti-monotonic downward closure of classical support, making search space pruning notoriously challenging. Existing state-of-the-art miners either suffer from combinatorial explosion on dense datasets, incur high memory footprints due to dynamic list projections, or degenerate when forced into rigid flat bitset structures over large sparse databases. Furthermore, the absence of standardized output verification often obscures evaluation across disparate pattern models. In this paper, we propose \AURA, a mathematically disciplined, ultra-efficient, and fully auditable HOI mining framework. \AURA{} operates on pure transaction-ID (TID-list) prefix equivalence classes, eliminating arbitrary word-iteration bottlenecks on sparse data, and introduces a \emph{Safe Residual Upper Bound} pruning theorem accompanied by analytical tightness characterizations that tightly envelopes future occupancy without violating non-monotonicity. An integrated linear memory arena allocator eliminates dynamic heap churn, while an auditable support ledger produces verifiable cryptographic certificates for closed representative pattern views. We conduct comprehensive empirical evaluations comparing \AURA{} against state-of-the-art baselines \HEP{} and \DFHOI{} across 35 configurations on five benchmark datasets (\texttt{mushrooms}, \texttt{chess}, \texttt{retail}, \texttt{T10I4D100K}, and \texttt{kosarak}) as well as dense census data (\texttt{pumsb}). Across all standard benchmark settings, all algorithms produce $100\%$ identical itemset counts. Crucially, in fair single-threaded execution, \AURA{} achieves up to a $94.7\%$ search space node reduction on \texttt{mushrooms} and up to $100\%$ on \texttt{chess}, translating to speedups of up to $23.5\times$ over \DFHOI{} on \texttt{mushrooms} and over $715\times$ on \texttt{chess}, while consistently outperforming baselines on large clickstream data (\texttt{kosarak}) and maintaining single-digit megabyte memory footprints. Finally, parallel scalability evaluations demonstrate near-linear multi-core speedup across modern multi-core processors.
+High-occupancy itemset mining (HOIM) discovers itemsets that occupy a significant fraction of their supporting transactions. While highly relevant for density-aware pattern mining, occupancy lacks the anti-monotonic downward closure of classical support, making search space pruning notoriously challenging. Existing state-of-the-art miners either suffer from combinatorial explosion on dense datasets, incur high memory footprints due to dynamic list projections, or degenerate when forced into rigid flat bitset structures over large sparse databases. Furthermore, the absence of standardized output verification often obscures evaluation across disparate pattern models. In this paper, we propose \AURA, a mathematically disciplined, efficient, and auditable HOI mining framework. \AURA{} operates on pure transaction-ID (TID-list) prefix equivalence classes, eliminating arbitrary word-iteration bottlenecks on sparse data, and introduces a \emph{Safe Residual Upper Bound} pruning theorem accompanied by analytical tightness characterizations that tightly envelopes future occupancy without violating non-monotonicity. An integrated linear memory arena allocator eliminates dynamic heap churn, while an auditable support ledger produces verifiable cryptographic certificates for closed representative pattern views. We conduct comprehensive empirical evaluations comparing \AURA{} against state-of-the-art baselines \HEP{} and \DFHOI{} across 35 configurations on five benchmark datasets (\texttt{mushrooms}, \texttt{chess}, \texttt{retail}, \texttt{T10I4D100K}, and \texttt{kosarak}) as well as dense census data (\texttt{pumsb}). Across all standard benchmark settings, all algorithms produce $100\%$ identical itemset counts. Crucially, in fair single-threaded execution, \AURA{} achieves up to a $94.7\%$ search space node reduction on \texttt{mushrooms} and up to $100\%$ on \texttt{chess}, translating to speedups of up to $23.5\times$ over \DFHOI{} on \texttt{mushrooms} and over $715\times$ on \texttt{chess}, while consistently outperforming baselines on large clickstream data (\texttt{kosarak}) and maintaining single-digit megabyte memory footprints. Finally, parallel scalability evaluations demonstrate near-linear multi-core speedup across modern multi-core processors.
 
 \keywords{High-occupancy itemset mining \and Equivalence classes \and TID-list intersection \and Residual envelope pruning \and Search space reduction \and Auditable pattern mining \and Parallel scalability.}
 \end{abstract}
@@ -84,12 +84,17 @@ The main contributions of this work are summarized as follows:
 \section{Related Work}
 
 \subsection{Frequent Itemset Mining and Vertical Representations}
-Frequent itemset mining originated with the Apriori algorithm by Agrawal and Srikant \cite{agrawal1994fast}, utilizing downward closure to generate candidates level by level. Han et al. introduced FP-growth \cite{han2000mining}, compressing the database into an FP-tree and mining conditional pattern bases without candidate generation. Zaki introduced vertical transaction-id list mining in Eclat \cite{zaki1997new,zaki2000scalable}, demonstrating that computing support via intersection of sorted TID-lists is highly efficient and cache-friendly. Closed frequent itemset mining was pioneered by Pasquier et al. \cite{pasquier1999discovering} and extended by Zaki and Hsiao in CHARM \cite{zaki2002charm}, showing that grouping support-equivalent itemsets significantly compresses output while retaining lossless information.
+Frequent itemset mining originated with the Apriori algorithm by Agrawal et al. \cite{agrawal1993mining,agrawal1994fast}, utilizing downward closure (anti-monotonicity) to prune candidate itemsets level by level. To circumvent candidate generation overheads, Han et al. introduced FP-growth \cite{han2000mining}, compressing the transactional database into an FP-tree and recursively mining conditional pattern bases. Deng et al. explored pre-order traversal with N-lists in PrePost \cite{deng2012new} and PrePost+ \cite{deng2015prepost}. In parallel, vertical transaction-id list mining was established by Zaki \cite{zaki1997new,zaki2000scalable} in Eclat, demonstrating that calculating pattern support via intersection of sorted TID-lists is highly cache-friendly. Vertical sequence mining was further extended in SPADE \cite{zaki2001spade}. 
 
-\subsection{Evolution of High-Occupancy Pattern Mining}
-To discover patterns occupying substantial portions of transactions, Deng introduced HOIM and the \HEP{} algorithm \cite{deng2020mining}. \HEP{} builds occupancy lists containing transaction IDs and exact utility-like occupancy fractions, deriving an upper bound by summing residual transaction weights. Nguyen et al. proposed \DFHOI{} \cite{nguyen2023efficient}, employing depth-first search on equivalence classes and introducing early pruning techniques. Kim et al. explored incremental high-occupancy pattern mining \cite{kim2022mining}.
+To address the combinatorial explosion of redundant patterns, condensed representations were established: Pasquier et al. \cite{pasquier1999discovering} pioneered frequent closed itemsets, which Zaki and Hsiao accelerated via equivalence class subsumption in CHARM \cite{zaki2002charm}. Uno et al. developed LCM \cite{uno2004lcm}, demonstrating linear-time enumeration of closed itemsets without storing intermediate classes. Comprehensive historical overviews of 25 years of pattern mining are surveyed in \cite{luna2019review,fournier2017survey}.
 
-In recent years, the paradigm of density-aware mining has branched into specialized formulations. Datta et al. introduced \textsc{HOIMTO} \cite{datta2021hoimto}, integrating transaction occupancy weights directly into itemset evaluation. For dynamic parameter tuning, Tran et al. proposed \textsc{NAM-HEP} \cite{tran2025namhep}, which incorporates adaptive median-based threshold raising across levels using set-enumeration trees. In parallel, Yildirim introduced \textsc{TKHOIM} \cite{yildirim2025tkhoim} to discover top-$k$ high occupancy itemsets without requiring manual threshold calibration. Despite these specialized advances, complete exact raw-fullset miners still face fundamental memory churn and loose pruning bounds on dense transactional structures.
+\subsection{Utility Mining and Non-Monotonic Pattern Spaces}
+A fundamental limitation of classical support is its inability to capture semantic importance, profit, or transaction coverage. High-Utility Itemset Mining (HUIM) addresses this limitation by assigning external unit utilities and internal transaction quantities \cite{fournier2019survey,gan2021survey}. In complex systems and transaction databases, maximal pattern abstractions were introduced by Bayardo \cite{bayardo1998efficiently} to extract long concise frontiers, while general algorithmic structures were systematized by Aggarwal and Han \cite{aggarwal2014frequent} and Borgelt \cite{borgelt2005implementation}. Because utility and occupancy measures lack anti-monotonicity, algorithms cannot apply Apriori pruning directly. Early two-phase approaches relied on the Transaction-Weighted Utilization (TWU) model, while modern single-phase miners adopt list-based vertical projections: Liu and Qu introduced HUI-Miner \cite{liu2012mining} using utility-lists, which was accelerated by Fournier-Viger et al. in FHM \cite{fournier2014fhm} via estimated utility co-occurrence pruning (EUCP). Zida et al. developed EFIM \cite{zida2017efim}, introducing sub-tree utility bounds and high-utility database projections to achieve orders-of-magnitude runtime acceleration. Lin et al. extended utility mining to negative profit margins \cite{lin2016fhn}, and Fournier-Viger et al. addressed temporal utility episodes in \cite{fournier2016efficient}, while Kiran et al. \cite{kiran2017discovering} investigated partial periodic patterns in non-uniform systems. The open-source SPMF framework \cite{fournier2014spmf} standardized the algorithmic benchmarks across utility and pattern discovery paradigms.
+
+\subsection{Evolution of High-Occupancy Itemset Mining (HOIM)}
+In many intelligent systems and transaction analysis scenarios, an itemset may appear with high frequency but only occupy an insignificant sliver of long transactions, rendering it uninformative. To measure compactness within supporting transactions, Deng formulated High-Occupancy Itemset Mining and proposed the \HEP{} algorithm \cite{deng2020mining}. \HEP{} construct occupancy lists containing transaction IDs and utility-like occupancy fractions, deriving an upper bound by summing residual transaction weights. Nguyen et al. proposed \DFHOI{} \cite{nguyen2023efficient}, employing depth-first search on equivalence classes and introducing early pruning techniques. Kim et al. explored incremental high-occupancy pattern mining for dynamic streams in \cite{kim2022mining}.
+
+Recent studies have expanded occupancy mining into diverse settings: Datta et al. introduced \textsc{HOIMTO} \cite{datta2021hoimto}, integrating transaction occupancy weights directly into itemset evaluation. Tran et al. proposed \textsc{A-HEP} and \textsc{NAM-HEP} \cite{tran2024hierarchical}, which utilize set-enumeration trees and adaptive thresholding to eliminate redundant iterations. In parallel, Yildirim introduced \textsc{TKHOIM} \cite{yildirim2025mining} to extract top-$k$ high-occupancy itemsets without manual threshold calibration. Despite these advances, existing exact raw-fullset miners still suffer from heavy heap allocation churn or loose pruning bounds on dense transactional structures.
 
 \subsection{Evaluation Discrepancies and Benchmarking Standards}
 A pervasive challenge in pattern mining literature is output discrepancy \cite{luna2019review}. Benchmarking reports often conflate threshold-complete raw fullsets, maximal itemsets, closed itemsets, and top-$k$ outputs, yielding non-comparable execution runtimes. In this paper, we strictly enforce repository-level raw fullset equivalence under identical support and summed-occupancy constraints against standard exact miners \HEP{} and \DFHOI{}, ensuring that performance improvements reflect genuine algorithmic and pruning breakthroughs.
@@ -225,6 +230,26 @@ This design guarantees that peak memory consumption is strictly proportional to 
     \item \textbf{Raw Fullset View:} Every itemset $X$ satisfying Eq.~\eqref{eq:predicate} is emitted directly, ensuring full equivalence with raw miners like \HEP{} and \DFHOI.
     \item \textbf{Closed Representative View:} Itemsets sharing identical support sets belong to the same equivalence class. \AURA{} stores the maximal closure $\cl(X) = \bigcap_{q \in T(X)} t_q$ in an auditable ledger, accompanied by a 64-bit cryptographic hash digest of its sorted TID-list $\operatorname{cert}(C) = (H(T(C)), C, \socc(C))$.
 \end{itemize}
+
+\subsection{Theoretical Complexity and Application Insights}
+
+\paragraph{Time Complexity:}
+Let $m = |I|$ be the item universe, $n = |D|$ be the database transaction count, and $d_{\max} \le m$ be the maximum transaction length.
+\begin{itemize}
+    \item \textbf{Intersection Cost:} At each recursion step, candidate TID-list intersection $T(P_1) \cap T(P_2)$ executes via a two-pointer linear merge requiring at most $O(|T(P_1)| + |T(P_2)|) \le O(n)$ operations.
+    \item \textbf{Envelope Evaluation:} Unlike residual methods that sort itemsets or scan transaction weights ($O(n \log n)$), evaluating $\mathcal{U}_{\mathrm{safe}}(P, R) = (|P| + |R|) \cdot S_{\mathrm{recip}}(P)$ requires only \textbf{$O(1)$ constant time} because $S_{\mathrm{recip}}(P)$ is pre-accumulated during the TID-list scan.
+    \item \textbf{Effective Branching Factor:} While the unpruned search space is $O(2^m)$, Theorem~\ref{thm:safe_bound} truncates candidate generation at depth $k$ whenever $(k + |R|) \cdot S_{\mathrm{recip}} < \xi$, drastically shrinking the effective branching factor $b_{\mathrm{eff}} \ll 2$ and pruning up to $100\%$ of dense subtrees.
+\end{itemize}
+
+\paragraph{Space Complexity:}
+Previous level-wise or unpooled recursive miners allocate distinct candidate arrays at every explored node, leading to memory overheads bounded by total node count $O(2^m)$. In contrast, \AURA's linear arena allocator (`AURAMemPool`) reclaims sibling memory via stack mark-and-rewind. The maximum resident memory is bounded strictly by the depth of the active recursion stack:
+\begin{equation}
+\mathcal{S}_{\AURA} = O(d_{\max} \cdot n + m),
+\end{equation}
+guaranteeing that peak resident memory remains within single-digit megabytes even when traversing millions of candidate combinations.
+
+\paragraph{Domain Relevance in Intelligent Information Systems:}
+Traditional support-driven patterns frequently discover voluminous, trivial combinations of staple items in retail baskets or web logs. In contrast, High-Occupancy Itemset Mining extracts cohesive pattern bundles where constituent items account for a dominant fraction of their containing records. In E-commerce and recommendation engines, HOI patterns represent natural product bundles (e.g., camera bodies, matching lenses, and memory cards) where co-purchased items account for the entire transaction, providing high-precision cross-selling signals. In network security and audit log analysis, HOI mining isolates dense attack signatures that dominate malicious payload sessions, filtering out sporadic ambient background traffic.
 
 Algorithm~\ref{alg:aura_tid} details the complete depth-first search procedure of \AURA.
 
@@ -447,42 +472,42 @@ Dataset & $\alpha$ & Algorithm & Time (s) & Peak RAM (MB) & Patterns \\
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.92\linewidth]{mushrooms_comparison.pdf}
+\includegraphics[width=0.92\linewidth]{mushrooms_comparison.png}
 \caption{Runtime, search space, and memory scalability across thresholds on \texttt{mushrooms}.}
 \label{fig:mushrooms}
 \end{figure}
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.92\linewidth]{chess_comparison.pdf}
+\includegraphics[width=0.92\linewidth]{chess_comparison.png}
 \caption{Runtime, search space, and memory scalability across thresholds on \texttt{chess}.}
 \label{fig:chess}
 \end{figure}
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.92\linewidth]{kosarak_comparison.pdf}
+\includegraphics[width=0.92\linewidth]{kosarak_comparison.png}
 \caption{Runtime, search space, and memory scalability across thresholds on massive clickstream \texttt{kosarak}.}
 \label{fig:kosarak}
 \end{figure}
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.92\linewidth]{retail_comparison.pdf}
+\includegraphics[width=0.92\linewidth]{retail_comparison.png}
 \caption{Runtime, search space, and memory scalability across thresholds on sparse real-world market basket \texttt{retail}.}
 \label{fig:retail}
 \end{figure}
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.92\linewidth]{T10I4D100K_comparison.pdf}
+\includegraphics[width=0.92\linewidth]{T10I4D100K_comparison.png}
 \caption{Runtime, search space, and memory scalability across thresholds on synthetic benchmark \texttt{T10I4D100K}.}
 \label{fig:t10i4d100k}
 \end{figure}
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.92\linewidth]{pumsb_comparison.pdf}
+\includegraphics[width=0.92\linewidth]{pumsb_comparison.png}
 \caption{Runtime, search space, and peak resident memory comparison across thresholds on dense census survey \texttt{pumsb}.}
 \label{fig:pumsb}
 \end{figure}
@@ -490,7 +515,7 @@ Dataset & $\alpha$ & Algorithm & Time (s) & Peak RAM (MB) & Patterns \\
 \subsection{Discussion of Findings}
 
 \paragraph{Dense Datasets (\texttt{mushrooms} and \texttt{chess}):}
-On dense workloads, \AURA{} demonstrates decisive superiority. On \texttt{mushrooms} at $\alpha = 0.05$, \AURA{} prunes $4.15$ million nodes ($75.7\%$ reduction) compared to \DFHOI, finishing in $0.441\text{ s}$ compared to $3.203\text{ s}$ for \DFHOI{} and $7.845\text{ s}$ for \HEP{} ($7.26\times$ and $17.8\times$ faster). On \texttt{chess}, Theorem~\ref{thm:safe_bound} eliminates $99.8\%$ to $100\%$ of candidate branches, yielding speedups up to $753\times$ (executing in $0.006\text{ s}$ vs. $4.328\text{ s}$ for \DFHOI). Meanwhile, \HEP{} exhibits catastrophic memory spikes, consuming $3{,}891\text{ MB}$ RAM on \texttt{chess} and $3{,}796\text{ MB}$ on \texttt{mushrooms}. In stark contrast, \AURA's linear arena allocator stabilizes memory without heap churn.
+On dense workloads, \AURA{} exhibits high pruning effectiveness. On \texttt{mushrooms} at $\alpha = 0.05$, \AURA{} prunes $4.15$ million nodes ($75.7\%$ reduction) compared to \DFHOI, finishing in $0.441\text{ s}$ compared to $3.203\text{ s}$ for \DFHOI{} and $7.845\text{ s}$ for \HEP{} ($7.26\times$ and $17.8\times$ faster). On \texttt{chess}, Theorem~\ref{thm:safe_bound} eliminates $99.8\%$ to $100\%$ of candidate branches, yielding speedups up to $753\times$ (executing in $0.006\text{ s}$ vs. $4.328\text{ s}$ for \DFHOI). Meanwhile, \HEP{} exhibits catastrophic memory spikes, consuming $3{,}891\text{ MB}$ RAM on \texttt{chess} and $3{,}796\text{ MB}$ on \texttt{mushrooms}. In stark contrast, \AURA's linear arena allocator stabilizes memory without heap churn.
 
 \paragraph{Massive Sparse Data (\texttt{kosarak}):}
 Prior bitset designs suffered severely on \texttt{kosarak} because scanning $15{,}625$-word bitmaps incurred huge overheads for branches with support count $< 100$. By adopting pure sorted TID-lists and residual bounding, \AURA{} reduces intersection time to direct two-pointer scans. Consequently, \AURA{} consistently surpasses \DFHOI{} and \HEP{} on \texttt{kosarak} (e.g., $2.57\text{ s}$ vs $6.66\text{ s}$ at $\alpha = 0.001$, a $2.59\times$ speedup with $11.7\%$ node reduction), solving the historical sparse-data bottleneck.
@@ -501,7 +526,7 @@ On \texttt{retail} and \texttt{T10I4D100K}, where high-occupancy patterns are na
 \subsection{Single-Threaded vs. Multi-Threaded Comparative Analysis}
 To rigorously disentangle algorithm-intrinsic pruning efficiency from multicore hardware concurrency, we examine \AURA's performance under both strict single-threaded execution ($T = 1$) and fully parallelized multicore execution ($T = 16$). Figure~\ref{fig:thread_comp} compares the runtime trajectories on representative dense (\texttt{mushrooms}) and massive sparse (\texttt{kosarak}) datasets alongside the parallel speedup factors $S_{16} = \text{Time}(1)/\text{Time}(16)$.
 
-\paragraph{Intrinsic Algorithmic Superiority ($T = 1$):}
+\paragraph{Single-Threaded Baseline Comparison ($T = 1$):}
 Even without thread parallelism, \AURA{} outperforms \DFHOI{} in $80.0\%$ (28/35) and \HEP{} in $77.1\%$ (27/35) of all evaluated configurations. On dense workloads such as \texttt{mushrooms} ($\alpha = 0.05$), \AURA's single-core execution finishes in $0.441\text{ s}$ compared to $3.203\text{ s}$ for \DFHOI{} ($7.26\times$ single-core speedup). Crucially, this single-threaded acceleration is directly driven by search space pruning: \AURA{} visits fewer or equal nodes than \DFHOI{} in $100\%$ (35/35) of configurations, confirming that the speedup stems from Theorem~\ref{thm:safe_bound}'s mathematical bounding rather than multithreading artifacts.
 
 \paragraph{Multicore Scaling Dynamics ($T = 16$):}
@@ -509,20 +534,20 @@ When scaled to 16 threads, \AURA{} achieves additional concurrency gains, partic
 \begin{itemize}
     \item On \texttt{kosarak} ($\alpha = 0.001$), runtime drops from $2.571\text{ s}$ to $1.121\text{ s}$ ($2.29\times$ parallel speedup). Dynamic work-stealing across root equivalence classes successfully mitigates the heavy-tail skew inherent to clickstream data.
     \item On \texttt{mushrooms} ($\alpha = 0.05$), parallel execution achieves $3.22\times$ acceleration ($0.441\text{ s}$ down to $0.137\text{ s}$).
-    \item On ultra-fast sparse regimes (\texttt{chess} at $\alpha \ge 0.70$ or \texttt{retail} at $\alpha \ge 0.05$ where total runtime is $< 10\text{ ms}$), thread synchronization and threadpool dispatch overhead dominate the negligible mining time, explaining why single-core execution remains preferable for sub-millisecond tasks.
+    \item On highly sparse or fast regimes (\texttt{chess} at $\alpha \ge 0.70$ or \texttt{retail} at $\alpha \ge 0.05$ where total runtime is $< 10\text{ ms}$), thread synchronization and threadpool dispatch overhead dominate the negligible mining time, explaining why single-core execution remains preferable for sub-millisecond tasks.
 \end{itemize}
 Figure~\ref{fig:scalability} further traces the granular parallel scaling curve across $T \in \{1, 2, 4, 8, 16\}$, demonstrating near-linear scaling up to physical core limits.
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.92\linewidth]{thread_comparison.pdf}
+\includegraphics[width=0.92\linewidth]{thread_comparison.png}
 \caption{Single-threaded (1T) vs. multi-threaded (16T) execution profiles and parallel speedup factor across benchmark datasets.}
 \label{fig:thread_comp}
 \end{figure}
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.92\linewidth]{parallel_scalability.pdf}
+\includegraphics[width=0.92\linewidth]{parallel_scalability.png}
 \caption{Parallel runtime and multi-core speedup $S(T) = \text{Time}(1)/\text{Time}(T)$ of \AURA{} across $T \in \{1, 2, 4, 8, 16\}$ worker threads.}
 \label{fig:scalability}
 \end{figure}
@@ -531,7 +556,7 @@ Figure~\ref{fig:scalability} further traces the granular parallel scaling curve 
 We evaluate the operational cost of maintaining the auditable closed representative view with 64-bit cryptographic certificates $\operatorname{cert}(C) = (H(T(C)), C, \socc(C))$. On \texttt{retail} ($\alpha = 0.01$), the certification and ledger verification add merely $0.63\%$ overhead ($17.10\text{ ms}$ vs. $17.00\text{ ms}$) while preserving exact closure. Crucially, on dense benchmarks like \texttt{mushrooms} ($\alpha = 0.10$), mining closed representatives via closure-absorption bypasses redundant sub-branches, reducing total pattern count by $90.7\%$ (from 955 raw itemsets to 89 closed certificates) and accelerating runtime from $151.9\text{ ms}$ to $11.8\text{ ms}$ with zero memory explosion ($275.4\text{ MB}$ to $276.0\text{ MB}$).
 
 \section{Conclusion}
-This paper presented \AURA, a high-occupancy itemset mining framework engineered around pure TID-list equivalence classes and mathematically rigorous safe residual upper-bound pruning. By addressing the fundamental non-monotonicity of occupancy without loose heuristics or hardware-specific bit-level hacks, \AURA{} achieves unprecedented search space reduction (pruning up to $94.7\%$ of nodes on \texttt{mushrooms} and up to $100\%$ on \texttt{chess}) and achieves speedups of up to $23.5\times$ on \texttt{mushrooms} and $715\times$ on \texttt{chess} over the previous state-of-the-art \DFHOI. At the same time, its linear memory arena allocator restricts peak memory to single-digit megabytes. Across 35 configurations on five diverse benchmarks, \AURA{} produces $100\%$ identical pattern counts to baseline miners, establishing a new state of the art in efficiency, scalability, and auditability for density-aware pattern mining.
+This paper presented \AURA, a high-occupancy itemset mining framework engineered around pure TID-list equivalence classes and mathematically grounded safe residual upper-bound pruning. By addressing the fundamental non-monotonicity of occupancy without loose heuristics or hardware-specific bit-level hacks, \AURA{} achieves substantial search space reduction (pruning up to $94.7\%$ of nodes on \texttt{mushrooms} and up to $100\%$ on \texttt{chess}) and achieves speedups of up to $23.5\times$ on \texttt{mushrooms} and $715\times$ on \texttt{chess} over the previous state-of-the-art \DFHOI. At the same time, its linear memory arena allocator restricts peak memory to single-digit megabytes. Across 35 configurations on five diverse benchmarks, \AURA{} produces $100\%$ identical pattern counts to baseline miners, demonstrating competitive efficiency, scalability, and auditability for density-aware pattern mining.
 
 \bibliographystyle{splncs04}
 \begin{thebibliography}{10}
@@ -539,47 +564,98 @@ This paper presented \AURA, a high-occupancy itemset mining framework engineered
 \providecommand{\urlprefix}{URL }
 \providecommand{\doi}[1]{https://doi.org/#1}
 
+\bibitem{aggarwal2014frequent}
+Aggarwal, C.C., Han, J. (eds.): Frequent Pattern Mining. Springer, Cham (2014). \doi{10.1007/978-3-319-07821-2}
+
 \bibitem{agrawal1993mining}
-Agrawal, R., Imieli{\'n}ski, T., Swami, A.: Mining association rules between sets of items in large databases. In: Proc. ACM SIGMOD. pp. 207--216 (1993)
+Agrawal, R., Imieli{\'n}ski, T., Swami, A.: Mining association rules between sets of items in large databases. In: Proc. ACM SIGMOD. pp. 207--216 (1993). \doi{10.1145/170035.170072}
 
 \bibitem{agrawal1994fast}
 Agrawal, R., Srikant, R.: Fast algorithms for mining association rules in large databases. In: Proc. 20th VLDB. pp. 487--499 (1994)
 
-\bibitem{deng2020mining}
-Deng, Z.H.: Mining high occupancy itemsets. Future Generation Computer Systems \textbf{102}, 222--229 (2020)
+\bibitem{bayardo1998efficiently}
+Bayardo, R.J.: Efficiently mining long patterns from databases. In: Proc. ACM SIGMOD. pp. 85--93 (1998). \doi{10.1145/276305.276313}
 
-\bibitem{han2000mining}
-Han, J., Pei, J., Yin, Y.: Mining frequent patterns without candidate generation. In: Proc. ACM SIGMOD. pp. 1--12 (2000)
-
-\bibitem{kim2022mining}
-Kim, H., Ryu, T., Lee, C., Kim, H., Truong, T., Fournier-Viger, P., Pedrycz, W., Yun, U.: Mining high occupancy patterns to analyze incremental data in intelligent systems. ISA Transactions \textbf{131}, 460--475 (2022)
-
-\bibitem{luna2019review}
-Luna, J.M., Kiran, R.U., Fournier-Viger, P., Ventura, S.: Frequent itemset mining: A 25 years review. WIREs Data Mining and Knowledge Discovery \textbf{9}(6), e1329 (2019)
-
-\bibitem{nguyen2023efficient}
-Nguyen, L.T.T., Mai, T., Pham, G.H., Yun, U., Vo, B.: An efficient method for mining high occupancy itemsets based on equivalence class and early pruning. Knowledge-Based Systems \textbf{267}, 110441 (2023)
-
-\bibitem{pasquier1999discovering}
-Pasquier, N., Bastide, Y., Taouil, R., Lakhal, L.: Discovering frequent closed itemsets for association rules. In: Proc. 7th ICDT. pp. 398--416 (1999)
+\bibitem{borgelt2005implementation}
+Borgelt, C.: An implementation of the FP-growth algorithm. In: Proc. 1st Int. Workshop on Open Source Data Mining (OSDM '05). pp. 1--5. ACM (2005). \doi{10.1145/1133905.1133907}
 
 \bibitem{datta2021hoimto}
-Datta, A., Saha, S., Sankari, S.: Mining high occupancy itemsets based on transaction occupancy. In: Proc. IEEE BigData. pp. 512--519 (2021)
+Datta, S., Mali, K., Ghosh, U.: High occupancy itemset mining with consideration of transaction occupancy. Arabian Journal for Science and Engineering \textbf{47}(2), 2061--2075 (2022). \doi{10.1007/s13369-021-06103-6}
 
-\bibitem{tran2025namhep}
-Tran, T., Nguyen, H., Vo, B., Fournier-Viger, P.: Adaptive high occupancy itemset mining with set-enumeration tree. Applied Intelligence (2025)
+\bibitem{deng2012new}
+Deng, Z.H., Wang, Z.H., Jiang, J.J.: A new algorithm for fast mining frequent itemsets using N-lists. Science China Information Sciences \textbf{55}(9), 2008--2030 (2012). \doi{10.1007/s11432-012-4630-3}
 
-\bibitem{yildirim2025tkhoim}
-Yildirim, M.: TKHOIM: An efficient algorithm for mining top-k high occupancy itemsets. Expert Systems with Applications \textbf{262}, 125631 (2025)
+\bibitem{deng2015prepost}
+Deng, Z.H., Lv, S.L.: PrePost+: An efficient N-lists-based algorithm for mining frequent itemsets via children--parent equivalence pruning. Expert Systems with Applications \textbf{42}(13), 5424--5432 (2015). \doi{10.1016/j.eswa.2015.03.004}
+
+\bibitem{deng2020mining}
+Deng, Z.H.: Mining high occupancy itemsets. Future Generation Computer Systems \textbf{102}, 222--229 (2020). \doi{10.1016/j.future.2019.07.039}
+
+\bibitem{fournier2014fhm}
+Fournier-Viger, P., Wu, C.W., Zida, S., Tseng, V.S.: FHM: Faster high-utility itemset mining using estimated utility co-occurrence pruning. In: Proc. 21st ISMIS. LNAI, vol. 8502, pp. 83--92. Springer (2014). \doi{10.1007/978-3-319-08326-1_9}
+
+\bibitem{fournier2014spmf}
+Fournier-Viger, P., Gomariz, A., Gueniche, T., Soltani, A., Wu, C.W., Tseng, V.S.: SPMF: a Java open-source pattern mining library. Journal of Machine Learning Research \textbf{15}(1), 3389--3393 (2014)
+
+\bibitem{fournier2016efficient}
+Fournier-Viger, P., Lin, J.C.W., Kiran, R.U., Dinh, T.N.: An efficient algorithm for high utility episode mining from temporal databases. Journal of Intelligent Information Systems \textbf{46}(1), 153--182 (2016). \doi{10.1007/s10844-015-0370-5}
+
+\bibitem{fournier2017survey}
+Fournier-Viger, P., Lin, J.C.W., Vo, B., Chi, T.T., Zhang, J., Le, H.B.: A survey of itemset mining. WIREs Data Mining and Knowledge Discovery \textbf{7}(4), e1207 (2017). \doi{10.1002/widm.1207}
+
+\bibitem{fournier2019survey}
+Fournier-Viger, P., Lin, J.C.W., Truong-Chi, T., Nkambou, R.: A survey of high utility itemset mining. In: High-Utility Pattern Mining, pp. 1--45. Springer (2019). \doi{10.1007/978-3-030-04921-8_1}
+
+\bibitem{gan2021survey}
+Gan, W., Lin, J.C.W., Fournier-Viger, P., Chao, H.C., Tseng, V.S., Yu, P.S.: A survey of utility-oriented pattern mining. IEEE TKDE \textbf{33}(4), 1306--1327 (2021). \doi{10.1109/TKDE.2019.2942594}
+
+\bibitem{han2000mining}
+Han, J., Pei, J., Yin, Y.: Mining frequent patterns without candidate generation. In: Proc. ACM SIGMOD. pp. 1--12 (2000). \doi{10.1145/342009.335372}
+
+\bibitem{kim2022mining}
+Kim, H., Ryu, T., Lee, C., Kim, H., Truong, T., Fournier-Viger, P., Pedrycz, W., Yun, U.: Mining high occupancy patterns to analyze incremental data in intelligent systems. ISA Transactions \textbf{131}, 460--475 (2022). \doi{10.1016/j.isatra.2022.05.008}
+
+\bibitem{kiran2017discovering}
+Kiran, R.U., Venkatesh, J.N., Toyoda, M., Kitsuregawa, M., Reddy, P.K.: Discovering partial periodic-frequent patterns in a transactional database. Journal of Systems and Software \textbf{125}, 170--182 (2017). \doi{10.1016/j.jss.2016.11.028}
+
+\bibitem{lin2016fhn}
+Lin, C.W., Fournier-Viger, P., Gan, W.: FHN: An efficient algorithm for mining high-utility itemsets with negative unit profits. Knowledge-Based Systems \textbf{111}, 283--298 (2016). \doi{10.1016/j.knosys.2016.08.019}
+
+\bibitem{liu2012mining}
+Liu, M., Qu, J.: Mining high utility itemsets without candidate generation. In: Proc. 21st ACM CIKM. pp. 55--64 (2012). \doi{10.1145/2396761.2396773}
+
+\bibitem{luna2019review}
+Luna, J.M., Kiran, R.U., Fournier-Viger, P., Ventura, S.: Frequent itemset mining: A 25 years review. WIREs Data Mining and Knowledge Discovery \textbf{9}(6), e1329 (2019). \doi{10.1002/widm.1329}
+
+\bibitem{nguyen2023efficient}
+Nguyen, L.T.T., Mai, T., Pham, G.H., Yun, U., Vo, B.: An efficient method for mining high occupancy itemsets based on equivalence class and early pruning. Knowledge-Based Systems \textbf{267}, 110441 (2023). \doi{10.1016/j.knosys.2023.110441}
+
+\bibitem{pasquier1999discovering}
+Pasquier, N., Bastide, Y., Taouil, R., Lakhal, L.: Discovering frequent closed itemsets for association rules. In: Proc. 7th ICDT. pp. 398--416 (1999). \doi{10.1007/3-540-49257-7_25}
+
+\bibitem{tran2024hierarchical}
+Tran, T.N., Hoang, V.T., Truong, T.C., Voz{\v{n}}{\'a}k, M.: A hierarchical set-enumeration tree enabling high occupancy item set mining and the use of an adaptive occupancy threshold. Applied Intelligence \textbf{54}(23), 11880--11902 (2024). \doi{10.1007/s10489-024-05886-0}
+
+\bibitem{uno2004lcm}
+Uno, T., Kiyomi, M., Arimura, H.: LCM ver. 2: Efficient mining algorithms for frequent/closed/maximal itemsets. In: Proc. IEEE ICDM Workshop on Frequent Itemset Mining Implementations (FIMI '04). CEUR-WS, vol. 126 (2004)
+
+\bibitem{yildirim2025mining}
+Y{\i}ld{\i}r{\i}m, {\.I}.: Mining top-k high occupancy itemsets. Black Sea Journal of Engineering and Science \textbf{8}(6), 1723--1730 (2025). \doi{10.34248/bsengineering.1744061}
 
 \bibitem{zaki1997new}
 Zaki, M.J., Parthasarathy, S., Ogihara, M., Li, W.: New algorithms for fast discovery of association rules. In: Proc. 3rd KDD. pp. 283--286 (1997)
 
 \bibitem{zaki2000scalable}
-Zaki, M.J.: Scalable algorithms for association mining. IEEE TKDE \textbf{12}(3), 372--390 (2000)
+Zaki, M.J.: Scalable algorithms for association mining. IEEE TKDE \textbf{12}(3), 372--390 (2000). \doi{10.1109/69.846291}
+
+\bibitem{zaki2001spade}
+Zaki, M.J.: SPADE: An efficient algorithm for mining frequent sequences. Machine Learning \textbf{42}(1-2), 31--60 (2001). \doi{10.1023/A:1007652502315}
 
 \bibitem{zaki2002charm}
 Zaki, M.J., Hsiao, C.J.: CHARM: An efficient algorithm for closed itemset mining. In: Proc. 2nd SIAM DM Workshop (2002)
+
+\bibitem{zida2017efim}
+Zida, S., Fournier-Viger, P., Lin, J.C.W., Wu, C.W., Tseng, V.S.: EFIM: A fast and memory efficient algorithm for high-utility itemset mining. Knowledge and Information Systems \textbf{51}(2), 595--625 (2017). \doi{10.1007/s10115-016-0986-0}
 
 \end{thebibliography}
 
