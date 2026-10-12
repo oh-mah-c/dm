@@ -467,7 +467,7 @@ Because every pattern in $\mathcal{M}$ is a verified maximal member of $\FHO$, n
 
 \subsection{Experimental Setup and Benchmark Datasets}
 
-All experiments were executed on an AMD Ryzen 7 5800H processor (16 logical threads, 16~GB DDR4 RAM) running Windows 11, compiled with GCC 15.1.0 using \texttt{-O3} optimization flags. All algorithms were run to full convergence without artificial pattern caps or premature termination.
+All algorithms were implemented in standard C and compiled with GCC with \texttt{-O3} optimization flags. Benchmarks were conducted on a dedicated workstation powered by an Intel Core i7-10700 processor (8 physical cores, 16 hardware threads, base 2.90 GHz, turbo 4.80 GHz, 16 MB L3 cache) and 32 GB of DDR4 RAM running Ubuntu Linux 24.04 LTS (kernel 6.8.0). All algorithms were run to full convergence without artificial pattern caps or premature termination.
 
 We evaluated \MFHOIMiner{} across 13 diverse transactional databases from the FIMI repository \cite{fimi2003repository} and the UCI Machine Learning Repository \cite{ucirepository1981}, covering market-basket data, sensor logs, game records, census data, and synthetic benchmarks. Table~\ref{tab:datasets} summarizes the structural characteristics of the benchmark databases.
 
