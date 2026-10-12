@@ -44,8 +44,7 @@
 \author{Quan Van\orcidID{0009-0002-8222-0076}}
 \authorrunning{Q. Van}
 
-\institute{Independent Researcher, Hanoi, Vietnam\\
-\email{vanhaminhquan2406@gmail.com}}
+\institute{\email{vanhaminhquan2406@gmail.com}}
 
 \maketitle
 
@@ -561,64 +560,81 @@ Table~\ref{tab:execution_summary} presents the representative performance profil
 }
 \end{table}
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.90\linewidth]{runtime_comparison.png}
-\caption{Aggregate median execution runtime across benchmark datasets.}
-\label{fig:runtime_comp}
-\end{figure}
-
-Figure~\ref{fig:runtime_comp} illustrates the aggregate median runtime across the entire experimental suite. While \textsc{Apriori} scales poorly due to massive candidate generation, \MFHOIMiner{} demonstrates high computational efficiency, running in a fraction of a second on sparse datasets and closely matching unconstrained search while pruning orders of magnitude more nodes.
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.90\linewidth]{pattern_reduction.png}
-\caption{Aggregate median number of discovered itemsets, demonstrating substantial output compactness achieved by \MFHOIMiner{}.}
-\label{fig:pattern_reduc}
-\end{figure}
-
-Figure~\ref{fig:pattern_reduc} demonstrates the core output compression benefit: \MFHOIMiner{} condenses the pattern volume by orders of magnitude compared to unconstrained frequent and high-occupancy itemset mining methods, confirming the hierarchy:
+As reported in Table~\ref{tab:execution_summary}, \MFHOIMiner{} consistently outperforms classical baseline approaches by pruning orders of magnitude more nodes while producing an exceptionally compact, non-redundant pattern set. Crucially, the pattern volume adheres strictly to the structural containment hierarchy:
 \begin{equation}
 |\FI| \gg |\FHO| \gg |\FCI| \gg |\MFHOI|.
 \end{equation}
+On dense transactional databases like \texttt{Chess}, \texttt{Connect}, and \texttt{Mushrooms}, the reduction ratio relative to unconstrained mining exceeds $75\%$ to $95\%$, proving that an overwhelming proportion of raw high-occupancy itemsets are strictly redundant sub-components of larger maximal itemsets.
 
-\subsection{Dominance and Pattern Compression Ablation}
 
-Figures~\ref{fig:ablation_out}--\ref{fig:ablation_comp} provide an exhaustive ablation analysis across all 13 benchmarks.
+\subsection{Comparative Scalability Profiles Across Mining Paradigms}
+\label{sec:multiminer_scalability}
+
+To establish the algorithmic competitiveness and practical efficiency of \MFHOIMiner{}, we benchmarked our direct maximal in-process miner against representative state-of-the-art miners across four distinct paradigm classes:
+\begin{enumerate}
+    \item \textbf{Direct In-Process Maximal HOI Mining:} \MFHOIMiner{} (Ours), executing direct search over the Galois closure lattice with closure leaps, dual-boundary envelope pruning, and ternary backtracking.
+    \item \textbf{Classical Maximal Frequent Itemset Mining (MFI):} \textsc{GenMax}~\cite{gouda2005genmax} and \textsc{MAFIA}~\cite{burdick2005mafia}, which explore the maximal support boundary using progressive focusing and bitmap head-union-tail lookahead, but lack internal transaction occupancy constraints.
+    \item \textbf{Frequent Closed Itemset Mining (FCI):} \textsc{LCM}~\cite{uno2003lcm}, an optimal linear-time closed miner utilizing prefix-preserving closure extension.
+    \item \textbf{Raw Frequent High-Occupancy Itemset Mining (HOI):} \textsc{HEP}~\cite{deng2020mining} and \textsc{DFHOI}~\cite{nguyen2023efficient}, discovering unconstrained raw HOIs via residual occupancy bounds without maximal compression.
+\end{enumerate}
+
+Figures~\ref{fig:chess_profile}--\ref{fig:t10i4d100k_profile} depict the comparative execution runtime, peak resident memory, and discovered pattern volume across varying support thresholds $\alpha$ on dense (\texttt{Chess}, \texttt{Mushrooms}, \texttt{Pumsb}) and sparse transactional benchmarks (\texttt{Retail}, \texttt{T10I4D100K}). Figure~\ref{fig:compression_ratio} presents the resulting pattern compression ratios against the condensed baseline miners.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.90\linewidth]{ablation_output.png}
-\caption{Total number of itemsets produced by unconstrained HOI mining versus \MFHOIMiner{} on each benchmark dataset.}
-\label{fig:ablation_out}
+\includegraphics[width=\linewidth]{chess_multiminer_comparison.png}
+\caption{Multi-miner scalability profile on \texttt{Chess} ($\beta = 0.40$): execution runtime, peak resident memory (MB), and output pattern volume across support thresholds $\alpha \in [0.50, 0.70]$. \emph{Note:} \textsc{GenMax} and \textsc{MAFIA} run faster because they only evaluate support anti-monotonicity, but they fail to filter low-occupancy patterns, emitting up to $99.3\%$ redundant/diluted patterns.}
+\label{fig:chess_profile}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.90\linewidth]{ablation_reduction.png}
-\caption{Pattern reduction ratio of \MFHOIMiner{} relative to unconstrained \textsc{FHO-Miner}. Higher values indicate stronger pattern compression.}
-\label{fig:ablation_red}
+\includegraphics[width=\linewidth]{mushrooms_multiminer_comparison.png}
+\caption{Multi-miner scalability profile on \texttt{Mushrooms} ($\beta = 0.35$): execution runtime, peak resident memory (MB), and output pattern volume across support thresholds $\alpha \in [0.15, 0.35]$. \emph{Note:} \textsc{GenMax} and \textsc{MAFIA} explore unconstrained support without calculating transaction reciprocal occupancy, producing hundreds of non-dense patterns.}
+\label{fig:mushrooms_profile}
 \end{figure}
-
-As shown in Figures~\ref{fig:ablation_out} and \ref{fig:ablation_red}, \MFHOIMiner{} consistently achieves reduction ratios between $75\%$ and $95\%$ on dense datasets such as \texttt{Chess}, \texttt{Connect}, and \texttt{SYN-DENSE}. This proves that in dense transactional regimes, an overwhelming proportion of frequent high-occupancy itemsets are strictly redundant sub-components of larger maximal itemsets.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.90\linewidth]{compression_factor.png}
-\caption{Compression factor ($|\FHO| / |\MFHOI|$) achieved by \MFHOIMiner{} across all benchmark datasets.}
-\label{fig:ablation_comp}
+\includegraphics[width=\linewidth]{pumsb_multiminer_comparison.png}
+\caption{Multi-miner scalability profile on \texttt{Pumsb} ($\beta = 0.50$): execution runtime, peak resident memory (MB), and output pattern volume across support thresholds $\alpha \in [0.80, 0.90]$.}
+\label{fig:pumsb_profile}
 \end{figure}
-
-Figure~\ref{fig:ablation_comp} reports the compression factor ($|\FHO| / |\MFHOI|$), which exceeds $10\times$ to $40\times$ across dense and long-transaction datasets. This compression is achieved without loss of pattern coverage: any transaction cluster supported by a high-occupancy pattern is represented by its most complete, non-dominated maximal ancestor.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.90\linewidth]{pareto_tradeoff.png}
-\caption{Runtime versus output volume trade-off landscape across evaluated algorithms. Algorithms situated in the lower-left region provide superior efficiency and pattern compactness.}
-\label{fig:pareto}
+\includegraphics[width=\linewidth]{retail_multiminer_comparison.png}
+\caption{Multi-miner scalability profile on sparse \texttt{Retail} ($\beta = 0.20$): execution runtime, peak resident memory (MB), and output pattern volume across support thresholds $\alpha \in [0.005, 0.030]$.}
+\label{fig:retail_profile}
 \end{figure}
 
-Finally, Figure~\ref{fig:pareto} visualizes the multi-objective Pareto trade-off between execution latency and output pattern size. Algorithms positioned towards the lower-left quadrant provide the most desirable operating characteristics. \MFHOIMiner{} establishes a superior Pareto frontier, substantially reducing output complexity while preserving computational tractability.
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{T10I4D100K_multiminer_comparison.png}
+\caption{Multi-miner scalability profile on synthetic \texttt{T10I4D100K} ($\beta = 0.20$): execution runtime, peak resident memory (MB), and output pattern volume across support thresholds $\alpha \in [0.005, 0.030]$.}
+\label{fig:t10i4d100k_profile}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.88\linewidth]{compression_ratio_multiminer.png}
+\caption{Pattern reduction ratio of \MFHOIMiner{} relative to condensed baselines \textsc{GenMax} (Maximal) and \textsc{LCM} (Closed) across benchmarks. \MFHOIMiner{} condenses pattern volumes by $74.6\% - 99.3\%$ relative to \textsc{GenMax} and up to $99.98\%$ relative to \textsc{LCM}.}
+\label{fig:compression_ratio}
+\end{figure}
+
+\subsubsection{Theoretical Justification and Behavioral Analysis.}
+The empirical trajectories across Figures~\ref{fig:chess_profile}--\ref{fig:compression_ratio} exhibit several structural characteristics governed by our theoretical foundations:
+
+\begin{itemize}
+    \item \textbf{Peak Memory Boundedness and Prevention of Memory Blow-up:}
+    On the dense census benchmark \texttt{Pumsb} ($n = 49{,}046$, uniform transaction length $L = 74$), classical raw HOI miner \textsc{HEP} experiences severe memory ballooning, escalating to $10{,}807.5\text{ MB}$ ($>10.5\text{ GB}$) at $\alpha = 0.80$ due to exponential level-wise candidate generation and list projection overheads. In sharp contrast, \MFHOIMiner{} maintains an invariant, stable memory profile ($\approx 314.2\text{ MB}$), closely matching the low footprint of \textsc{GenMax} ($301.5\text{ MB}$) and \textsc{MAFIA} ($301.2\text{ MB}$). This behavior is a direct consequence of Theorem~\ref{thm:suffocation} (Occupancy Suffocation Point): because transaction lengths in \texttt{Pumsb} are uniformly 74, any itemset satisfying $\aocc(X) \ge 0.50$ must strictly satisfy $|X| \ge 37$. When candidate prefixes cannot reach this ceiling under tight support sets, \MFHOIMiner{} terminates branch expansion in $O(1)$ operations, entirely circumventing explosive recursion and deep state allocation.
+
+    \item \textbf{Runtime Trajectories across Density Regimes:}
+    On dense workloads (\texttt{Chess} and \texttt{Mushrooms}), raw closed miner \textsc{LCM} requires up to $19.23\text{ s}$ and $37.02\text{ s}$ respectively because the closed Galois lattice contains hundreds of thousands of redundant closed sub-patterns ($|\FCI| > 369{,}451$ on \texttt{Chess}). \MFHOIMiner{} outpaces \textsc{LCM} by an order of magnitude ($2.43\text{ s}$ vs. $19.23\text{ s}$) and runs faster than unconstrained \textsc{HEP} ($7.54\text{ s}$) and \textsc{DFHOI} ($4.30\text{ s}$). While unconstrained MFI miners (\textsc{GenMax} and \textsc{MAFIA}) execute faster because they evaluate solely support anti-monotonicity without computing transaction reciprocal sums or multi-tier envelope bounds, they fail fundamentally to filter low-occupancy patterns, producing thousands of diluted itemsets that occupy less than $10\%$ of their parent transactions.
+
+    \item \textbf{Pattern Cardinality Compression ($\vert\MFHOI\vert \ll \vert\MFI\vert \ll \vert\FCI\vert$):}
+    Across all evaluated domains, \MFHOIMiner{} yields the most concise and actionable pattern frontier. On \texttt{Chess} ($\alpha=0.50$), \textsc{LCM} materializes $369{,}451$ closed itemsets and \textsc{GenMax} extracts $11{,}463$ maximal frequent itemsets; \MFHOIMiner{} compresses the output space to merely $80$ verified maximal high-occupancy patterns—representing a $99.30\%$ output reduction over \textsc{GenMax} and a $99.98\%$ reduction over \textsc{LCM}. This validates the dual-boundary geometry: by enforcing both closure maximality and tight occupancy completeness, \MFHOIMiner{} isolates only the truly dense cores of the database, eliminating redundant combinatorial noise for downstream analytical applications.
+\end{itemize}
 
 \section{Conclusion}
 \label{sec:conclusion}
