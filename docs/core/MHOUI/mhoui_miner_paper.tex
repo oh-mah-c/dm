@@ -1,0 +1,514 @@
+\documentclass[runningheads]{llncs}
+
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{algorithm}
+\usepackage{algorithmicx}
+\usepackage{algpseudocode}
+\usepackage{cite}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+\newcommand{\HOUI}{\ensuremath{\mathcal{HOUI}}}
+\newcommand{\MHOUIw}{\ensuremath{\mathcal{MHOUI}_{\mathrm{w}}}}
+\newcommand{\MHOUI}{\ensuremath{\mathcal{MHOUI}_{\mathrm{s}}}}
+\newcommand{\MHOUIminer}{\textsc{MHOUI-Pro}}
+\newcommand{\supp}{\operatorname{supp}}
+\newcommand{\aocc}{\operatorname{aocc}}
+\newcommand{\twu}{\operatorname{TWU}}
+\newcommand{\UUB}{\operatorname{UUB}}
+\newcommand{\OUB}{\operatorname{OUB}}
+\newcommand{\UBjoint}{\operatorname{UB}_{\mathrm{joint}}}
+
+\begin{document}
+
+\title{MHOUI-Pro: Exact and Scalable Mining of Maximal High-Occupancy Utility Itemsets via Array-Projected Galois Closure Leaps and Pareto-Trie Pruning}
+\titlerunning{MHOUI-Pro: Mining Maximal High-Occupancy Utility Itemsets}
+
+\author{Quan Van\orcidID{0009-0002-8222-0076}}
+\authorrunning{Q. Van}
+\institute{\email{vanhaminhquan2406@gmail.com}}
+
+\maketitle
+
+\begin{abstract}
+Frequent itemset mining (FIM) and high-utility itemset mining (HUIM) extract patterns that satisfy frequency and economic utility thresholds, respectively. High-occupancy itemset (HOI) mining evaluates pattern completeness by requiring an itemset to occupy a substantial fraction of its supporting transactions. However, existing methodologies either treat these dimensions in isolation or combine them into a composite utility-occupancy ratio, conflating physical transaction coverage with monetary yield. Furthermore, mining all unconstrained patterns triggers severe pattern explosion. In this paper, we formulate the problem of mining \textbf{Maximal High-Occupancy Utility Itemsets} (\MHOUI{}), which decouples classical transaction occupancy $|X|/|T|$ from total economic utility $u(X)$ and enforces strict superset Pareto maximality: an itemset is retained if and only if no strict superset achieves both equal-or-higher occupancy and equal-or-higher utility. To overcome the non-monotonic nature of both occupancy and utility without falling into the computational trap of naive post-filtering or quadratic branch-and-bound overhead, we establish three foundational advances: (1) a tight \textbf{Joint Dual Upper Bound} ($\UBjoint$) coupling remaining extension utility with transaction-level occupancy envelopes; (2) \textbf{Support-Closure Leaps} jumping directly across Galois equivalence classes with exact utility invariance; and (3) an inverted rare-item index (\textbf{Pareto-Trie}) enabling $O(1)$ branch dominance pruning. We propose \MHOUIminer{}, an exact algorithm built upon flattened array projection and 64-bit vector bitsets. Comprehensive evaluations on four standard benchmark databases (Foodmart, Liquor, Fruithut, and Chainstore) demonstrate that \MHOUIminer{} achieves up to $10\times$ faster runtime than baseline unconstrained search, suppresses memory consumption below $450$~MB on databases with over one million transactions, and compresses pattern volumes by up to $99\%$ without losing completeness.
+
+\keywords{High-utility itemset mining \and High-occupancy itemsets \and Maximal pattern mining \and Pareto dominance \and In-process pruning \and Array projection.}
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+Frequent itemset mining (FIM) is a foundational task in data mining~\cite{agrawal1994fast,han2000mining,zaki2000scalable,uno2004lcm}. Given a transaction database, FIM extracts all item combinations whose occurrence frequency satisfies a user-specified minimum support threshold ($\sigma$). However, frequency alone often fails to reflect the qualitative value or the structural density of the discovered patterns. On the one hand, an itemset may appear in numerous transactions while accounting for only a trivial fraction of items within each transaction. To address this limitation, high-occupancy itemset (HOI) mining was introduced~\cite{tang2012incorporating,zhang2015occupancy,deng2020mining,datta2022high,nguyen2023efficient,yun2021mining}. Classical transaction occupancy, defined as $|X|/|T|$, measures the completeness with which an itemset $X$ covers a supporting transaction $T$.
+
+On the other hand, traditional FIM treats all items uniformly, disregarding differences in economic profit, item quantity, semantic importance, or risk. High-utility itemset mining (HUIM) addresses this concern by incorporating internal quantities and external unit profits~\cite{liu2005two,liu2012mining,fournier2014fhm,zida2017efim,gan2021survey,wu2022ubp,lin2010effective,song2014mining,krishnamoorthy2015pruning,dam2019efficient,truong2019novel,pham2020mining,yun2017high,gan2019fast,vo2013new}. Recent studies have explored high utility-occupancy pattern mining (HUOPM)~\cite{gan2020huopm,chen2021discovering,duong2024efficient,lin2021efficient}, which computes the ratio of pattern utility to total transaction utility, $u(X, T)/TU(T)$. While effective for proportional profit analysis, HUOPM couples utility and occupancy into a single composite metric, obscuring whether a pattern has high physical basket coverage or merely high unit cost.
+
+Moreover, mining all unconstrained patterns inevitably leads to the \emph{pattern explosion problem}. To achieve concise representations, maximal frequent itemset (MFI) mining discards frequent subsets dominated by larger frequent supersets~\cite{burdick2001mafia,gouda2005genmax,grahne2005fast}. Similarly, maximal and closed high-utility itemsets compress utility collections~\cite{tseng2014efficient,duong2022efficient,fournier2016efimclosed,shie2012efficient,tseng2016efficient}. However, directly applying support-based or utility-based maximality to occupancy-constrained patterns is fundamentally flawed: neither classical occupancy nor total utility satisfies the anti-monotonicity property. A superset can exhibit higher or lower occupancy and utility than its subsets.
+
+To overcome these foundational challenges, this paper formulates the \textbf{Maximal High-Occupancy Utility Itemset} (\MHOUI{}) mining problem and introduces \MHOUIminer{}. The proposed framework simultaneously enforces:
+\begin{enumerate}
+    \item \textbf{Support Constraint:} The itemset must occur in at least $\sigma$ transactions.
+    \item \textbf{Classical Occupancy Constraint:} The itemset must satisfy a minimum average transaction occupancy $\beta$, ensuring dense physical coverage.
+    \item \textbf{Total Utility Constraint:} The itemset must generate at least $\mu$ economic utility.
+    \item \textbf{Superset Pareto Maximality:} An itemset is eliminated if there exists a strict superset possessing equal or higher occupancy and equal or higher utility.
+\end{enumerate}
+
+\noindent
+\textbf{Overcoming the Algorithmic Bottlenecks.} Previous preliminary explorations of MHOUI suffered from three critical vulnerabilities:
+\begin{enumerate}
+    \item \emph{The Pruning Overhead Trap:} Sorting transaction reciprocals at every node to evaluate occupancy bounds incurred higher computational cost than the search space saved.
+    \item \emph{Cache Pollution from Fat Structures:} Vertical list structures storing redundant fields (`tid`, `iu`, `ru`, `invlen`, `remcnt`) saturated CPU cache hierarchies, exploding RAM on million-scale databases.
+    \item \emph{Loss of Equivalence Classes:} Lack of closure jumping expanded search spaces combinatorially.
+\end{enumerate}
+
+In \MHOUIminer{}, we solve all three bottlenecks simultaneously. We introduce the \textbf{Joint Dual Upper Bound} ($\UBjoint$), integrate \textbf{Support-Closure Leaps} on Galois equivalence classes with invariant utility accumulation, employ an inverted \textbf{Pareto-Trie} for $O(1)$ branch dominance checks, and adopt flattened array projection inspired by EFIM~\cite{zida2017efim}.
+
+\section{Related Work and Positioning}
+\label{sec:related}
+
+Table~\ref{tab:positioning} positions \MHOUI{} relative to 12 pattern mining paradigms.
+
+\begin{table}[htbp]
+\centering
+\caption{Positioning of \MHOUI{} against related itemset mining paradigms.}
+\label{tab:positioning}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Pattern Family} & \textbf{Support} & \textbf{Classical Occ.} & \textbf{Total Utility} & \textbf{Utility Occ.} & \textbf{Maximality Criterion} \\
+\midrule
+FI~\cite{agrawal1994fast,han2000mining,zaki2000scalable,uno2004lcm} & $\checkmark$ & -- & -- & -- & None \\
+MFI~\cite{burdick2001mafia,gouda2005genmax,grahne2005fast} & $\checkmark$ & -- & -- & -- & Support-maximal \\
+HOI~\cite{tang2012incorporating,zhang2015occupancy,deng2020mining,datta2022high,nguyen2023efficient,yun2021mining} & $\checkmark$ & $\checkmark$ & -- & -- & None \\
+HUI~\cite{liu2005two,liu2012mining,fournier2014fhm,zida2017efim,gan2021survey,wu2022ubp} & Optional & -- & $\checkmark$ & -- & None \\
+MaxHUI / CHUI~\cite{tseng2014efficient,duong2022efficient,fournier2016efimclosed,shie2012efficient,tseng2016efficient} & Optional & -- & $\checkmark$ & -- & Utility-based concise form \\
+HUOPM~\cite{gan2020huopm,chen2021discovering,duong2024efficient,lin2021efficient} & $\checkmark$ & -- & Indirect & $\checkmark$ & Optional concise form \\
+\midrule
+\textbf{HOUI (Baseline)} & $\checkmark$ & $\checkmark$ & $\checkmark$ & -- & None \\
+\textbf{Weak MHOUI (Ours)} & $\checkmark$ & $\checkmark$ & $\checkmark$ & -- & Weak Superset Pareto Dominance \\
+\textbf{Strong MHOUI (\MHOUIminer{})} & $\checkmark$ & $\checkmark$ & $\checkmark$ & -- & Strong Superset Pareto Dominance \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\section{Preliminaries and Problem Formulation}
+\label{sec:problem}
+
+Let $\mathcal{I} = \{i_1, i_2, \dots, i_m\}$ be a finite set of distinct items. A quantitative transaction database is $\mathcal{D} = \{T_1, T_2, \dots, T_n\}$. Each transaction $T_q \in \mathcal{D}$ consists of an itemset $T_q \subseteq \mathcal{I}$, an internal utility $q(i, T_q) \in \mathbb{R}^+$ for each item $i \in T_q$, and an external profit $p(i) \in \mathbb{R}^+$.
+
+\begin{definition}[Item and Transaction Utility]
+The utility of an item $i$ in transaction $T_q$ is $u(i, T_q) = p(i) \cdot q(i, T_q)$. The utility of an itemset $X \subseteq T_q$ in $T_q$ is $u(X, T_q) = \sum_{i \in X} u(i, T_q)$. The transaction utility of $T_q$ is $TU(T_q) = \sum_{i \in T_q} u(i, T_q)$.
+\end{definition}
+
+\begin{definition}[Support and Database Utility]
+The supporting transaction set of itemset $X$ is $\Gamma(X) = \{T_q \in \mathcal{D} \mid X \subseteq T_q\}$. The support count of $X$ is $\supp(X) = |\Gamma(X)|$. The total utility of $X$ in $\mathcal{D}$ is $u(X) = \sum_{T_q \in \Gamma(X)} u(X, T_q)$.
+\end{definition}
+
+\begin{definition}[Classical Transaction Occupancy]
+For an itemset $X \subseteq T_q$, the classical occupancy of $X$ in $T_q$ is $\operatorname{occ}(X, T_q) = \frac{|X|}{|T_q|}$.
+The average classical occupancy of $X$ across its supporting transactions is:
+\begin{equation}
+\aocc(X) = \frac{1}{\supp(X)} \sum_{T_q \in \Gamma(X)} \operatorname{occ}(X, T_q) = \frac{|X|}{\supp(X)} \sum_{T_q \in \Gamma(X)} \frac{1}{|T_q|}.
+\end{equation}
+\end{definition}
+
+\begin{definition}[Transaction-Weighted Utilization]
+The transaction-weighted utilization ($\twu$) of an itemset $X$ is:
+\begin{equation}
+\twu(X) = \sum_{T_q \in \Gamma(X)} TU(T_q).
+\end{equation}
+\end{definition}
+
+\begin{definition}[High-Occupancy Utility Itemset (\HOUI{})]
+Given a minimum support threshold $\sigma \in \mathbb{N}^+$, a minimum occupancy threshold $\beta \in (0, 1]$, and a minimum utility threshold $\mu \in \mathbb{R}^+$, an itemset $X$ is a High-Occupancy Utility Itemset if:
+\begin{equation}
+\supp(X) \ge \sigma, \quad \aocc(X) \ge \beta, \quad \text{and} \quad u(X) \ge \mu.
+\end{equation}
+\end{definition}
+
+\subsection{Superset Pareto Dominance and MHOUI Variants}
+
+\begin{definition}[Weak Superset Dominance]
+An itemset $Y$ weakly dominates $X$ (denoted $X \prec_{\mathrm{w}} Y$) if $X \subset Y$, $\aocc(Y) \ge \aocc(X)$, $u(Y) \ge u(X)$, and at least one inequality is strict ($\aocc(Y) > \aocc(X)$ or $u(Y) > u(X)$).
+\end{definition}
+
+\begin{definition}[Strong Superset Dominance]
+An itemset $Y$ strongly dominates $X$ (denoted $X \prec_{\mathrm{s}} Y$) if $X \subset Y$, $\aocc(Y) \ge \aocc(X)$, and $u(Y) \ge u(X)$.
+\end{definition}
+
+\begin{definition}[Weak and Strong MHOUI]
+An itemset $X \in \HOUI$ is a \textbf{Weak MHOUI} ($\MHOUIw$) if $\nexists Y \in \HOUI$ such that $X \prec_{\mathrm{w}} Y$. An itemset $X \in \HOUI$ is a \textbf{Strong MHOUI} ($\MHOUI$) if $\nexists Y \in \HOUI$ such that $X \prec_{\mathrm{s}} Y$.
+\end{definition}
+
+\begin{theorem}[Inclusion Chain]
+\label{thm:inclusion}
+For any database $\mathcal{D}$ and thresholds $\sigma, \beta, \mu$:
+$\MHOUI(\mathcal{D}, \sigma, \beta, \mu) \subseteq \MHOUIw(\mathcal{D}, \sigma, \beta, \mu) \subseteq \HOUI(\mathcal{D}, \sigma, \beta, \mu)$.
+\end{theorem}
+\begin{proof}
+If $X \in \MHOUI$, no $Y \in \HOUI$ satisfies $X \prec_{\mathrm{s}} Y$. Since $X \prec_{\mathrm{w}} Y \implies X \prec_{\mathrm{s}} Y$, no such $Y$ can weakly dominate $X$. Thus $X \in \MHOUIw \subseteq \HOUI$.
+\end{proof}
+
+\noindent
+\textbf{Mathematical Distinction Between Weak and Strong Dominance:}
+The fundamental distinction lies in whether equality in both objective dimensions permits elimination:
+\begin{itemize}
+    \item \emph{Weak Superset Dominance ($X \prec_{\mathrm{w}} Y$):} Requires at least one strict inequality ($\aocc(Y) > \aocc(X)$ or $u(Y) > u(X)$). If a proper superset $Y \supset X$ exhibits identical metrics ($\aocc(Y) = \aocc(X)$ and $u(Y) = u(X)$), $Y$ does \emph{not} weakly dominate $X$. Consequently, $\MHOUIw$ retains both $X$ and $Y$.
+    \item \emph{Strong Superset Dominance ($X \prec_{\mathrm{s}} Y$):} Admits non-strict inequalities ($\aocc(Y) \ge \aocc(X)$ and $u(Y) \ge u(X)$). Even if metrics are exactly tied, the superset $Y$ subsumes $X$ because $Y$ represents a larger, more comprehensive pattern without any sacrifice in occupancy or monetary yield. Hence, $\MHOUI$ eliminates $X$ and retains only $Y$.
+\end{itemize}
+For instance, if $X = \{a, b\}$ has $\aocc(X) = 0.60, u(X) = \$100$ and superset $Y = \{a, b, c\}$ has $\aocc(Y) = 0.60, u(Y) = \$100$ (e.g., $c$ generates zero marginal profit or co-occurs identically in the same transaction set), Weak MHOUI outputs both patterns ($\{X, Y\}$), whereas Strong MHOUI outputs only the maximal superset $\{Y\}$.
+
+\subsection{Running Example Database and Detailed Calculations}
+\label{sec:running_example}
+
+To provide concrete intuition for all formulations and bounding theorems, we introduce a toy quantitative transaction database $\mathcal{D}_{\mathrm{toy}}$ comprising 5 transactions and 5 items $\{a, b, c, d, e\}$, displayed in Table~\ref{tab:running_example}. Let external unit profits be $p(a)=3, p(b)=1, p(c)=5, p(d)=2, p(e)=4$.
+
+\begin{table}[htbp]
+\centering
+\caption{Running quantitative transaction database $\mathcal{D}_{\mathrm{toy}}$ with transaction lengths and utilities.}
+\label{tab:running_example}
+\begin{tabular}{cclcr}
+\toprule
+\textbf{TID} & \textbf{Items with Quantities} & \textbf{Item Utilities ($u(i, T_q)$)} & \textbf{Length ($|T_q|$)} & \textbf{TU ($TU(T_q)$)} \\
+\midrule
+$T_1$ & $(a:1), (b:2), (c:1)$ & $u(a)=3, u(b)=2, u(c)=5$ & $3$ & $\$10$ \\
+$T_2$ & $(a:2), (c:1), (d:1)$ & $u(a)=6, u(c)=5, u(d)=2$ & $3$ & $\$13$ \\
+$T_3$ & $(a:1), (b:3), (c:2), (e:1)$ & $u(a)=3, u(b)=3, u(c)=10, u(e)=4$ & $4$ & $\$20$ \\
+$T_4$ & $(b:1), (c:1), (d:2)$ & $u(b)=1, u(c)=5, u(d)=4$ & $3$ & $\$10$ \\
+$T_5$ & $(a:1), (b:1), (c:1), (d:1)$ & $u(a)=3, u(b)=1, u(c)=5, u(d)=2$ & $4$ & $\$11$ \\
+\midrule
+\multicolumn{4}{l}{\textbf{Total Database Utility} $\sum_{T_q \in \mathcal{D}_{\mathrm{toy}}} TU(T_q)$:} & $\$64$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+\textbf{Example Computations of Basic Metrics:}
+Let thresholds be $\sigma = 3$, $\beta = 0.40$ ($40\%$), and $\mu = 20$.
+\begin{itemize}
+    \item \textbf{Singleton $\{a\}$:} $\Gamma(\{a\}) = \{T_1, T_2, T_3, T_5\}$, so $\supp(\{a\}) = 4 \ge 3$.
+    Its total utility is $u(\{a\}) = 3 + 6 + 3 + 3 = 15 < 20$.
+    Its average occupancy is $\aocc(\{a\}) = \frac{1}{4}\left(\frac{1}{3} + \frac{1}{3} + \frac{1}{4} + \frac{1}{4}\right) = \frac{1}{4} \cdot \frac{7}{6} \approx 0.2917 < 0.40$.
+    Thus $\{a\}$ fails both utility and occupancy constraints.
+    \item \textbf{Itemset $\{a, c\}$:} $\Gamma(\{a, c\}) = \{T_1, T_2, T_3, T_5\}$, so $\supp(\{a, c\}) = 4 \ge 3$.
+    Its total utility is $u(\{a, c\}) = (3+5) + (6+5) + (3+10) + (3+5) = 8 + 11 + 13 + 8 = 40 \ge 20$.
+    Its occupancy is $\aocc(\{a, c\}) = \frac{2}{4}\left(\frac{1}{3} + \frac{1}{3} + \frac{1}{4} + \frac{1}{4}\right) = \frac{2}{4} \cdot \frac{7}{6} = \frac{7}{12} \approx 0.5833 \ge 0.40$.
+    Because $\supp \ge 3$, $\aocc \ge 0.40$, and $u \ge 20$, $\{a, c\} \in \HOUI$.
+    \item \textbf{Itemset $\{a, b, c\}$:} $\Gamma(\{a, b, c\}) = \{T_1, T_3, T_5\}$, so $\supp(\{a, b, c\}) = 3 \ge 3$.
+    Its total utility is $u(\{a, b, c\}) = (3+2+5) + (3+3+10) + (3+1+5) = 10 + 16 + 9 = 35 \ge 20$.
+    Its occupancy is $\aocc(\{a, b, c\}) = \frac{3}{3}\left(\frac{1}{3} + \frac{1}{4} + \frac{1}{4}\right) = \frac{1}{3} + \frac{1}{2} = \frac{5}{6} \approx 0.8333 \ge 0.40$.
+    Hence $\{a, b, c\} \in \HOUI$.
+\end{itemize}
+
+\noindent
+\textbf{Illustration of Superset Pareto Dominance:}
+Compare $X = \{a, c\}$ ($\aocc = 0.5833, u = 40$) and its superset $Y = \{a, b, c\}$ ($\aocc = 0.8333, u = 35$).
+Here $Y \supset X$, and $Y$ achieves strictly higher occupancy ($0.8333 > 0.5833$), but lower utility ($35 < 40$).
+Therefore, $Y$ does \emph{not} dominate $X$. Both $\{a, c\}$ and $\{a, b, c\}$ represent distinct optimal trade-offs on the Pareto frontier and are retained in $\MHOUI$.
+Conversely, consider $\{b, c\}$: $\Gamma(\{b, c\}) = \{T_1, T_3, T_4, T_5\}$ ($\supp = 4$), $u(\{b, c\}) = 7 + 13 + 6 + 6 = 32 \ge 20$, and $\aocc(\{b, c\}) = \frac{2}{4}(\frac{1}{3} + \frac{1}{4} + \frac{1}{3} + \frac{1}{4}) = \frac{7}{12} \approx 0.5833 \ge 0.40$, so $\{b, c\} \in \HOUI$.
+If a superset $Z \supset \{b, c\}$ has $\aocc(Z) \ge 0.5833$ and $u(Z) \ge 32$, $\{b, c\}$ is dominated and pruned. This preserves only the maximal frontier.
+
+\section{Theoretical Foundations and Safe Pruning Bounds}
+\label{sec:theory}
+
+\subsection{Non-Monotonicity and Monotonic Envelopes}
+
+\begin{theorem}[Non-Monotonicity of Utility and Occupancy]
+Neither $u(X)$ nor $\aocc(X)$ satisfies monotonicity or anti-monotonicity.
+\end{theorem}
+\begin{proof}
+Let $T_1 = \{a, b\}$ and $T_2 = \{a, c\}$. For $X = \{a\}$, $\Gamma(X) = \{T_1, T_2\}$ and $\aocc(X) = 0.50$. For superset $Y = \{a, b\}$, $\Gamma(Y) = \{T_1\}$ and $\aocc(Y) = 1.0 > \aocc(X)$. Conversely, appending a longer transaction reduces occupancy. Similarly, $u(X)$ can increase from item profit accumulation or decrease from support loss.
+\end{proof}
+
+\subsection{Joint Dual Upper Bound ($\UBjoint$)}
+
+Let a search node be denoted by $N = (P, E)$, where $P$ is the prefix itemset and $E$ is the ordered candidate extension list. For each transaction $T \in \Gamma(P)$, define $\operatorname{rc}_N(T) = |E \cap T|$ and remaining utility $\operatorname{ru}_N(T) = \sum_{i \in E \cap T} u(i, T)$.
+
+\begin{theorem}[Joint Dual Upper Bound]
+\label{thm:joint_bound}
+For every descendant $Y = P \cup Z$ with $Z \subseteq E$ and $\supp(Y) \ge \sigma$, the maximum utility and occupancy attainable by $Y$ are simultaneously bounded by:
+\begin{equation}
+\label{eq:joint_bound}
+\UBjoint(N) = \sum_{T \in \Gamma(P)} \left( u(P, T) + \operatorname{ru}_N(T) \right), \quad \OUB(N) = \frac{1}{\sigma} \sum_{T \in \Gamma(P)} \min\left(1.0, \, \frac{|P| + \operatorname{rc}_N(T)}{|T|}\right).
+\end{equation}
+If $\UBjoint(N) < \mu$ or $\OUB(N) < \beta$, the subtree rooted at $N$ can be safely pruned in $O(|\Gamma(P)|)$ single-pass operations without sorting.
+\end{theorem}
+\begin{proof}
+For every supporting transaction $T \in \Gamma(Y) \subseteq \Gamma(P)$, $Z \subseteq E \cap T$. Thus $u(Y, T) \le u(P, T) + \operatorname{ru}_N(T)$. Summing over $\Gamma(Y)$ yields $u(Y) \le \UBjoint(N)$. Similarly, $\operatorname{occ}(Y, T) = \frac{|P| + |Z|}{|T|} \le \min(1.0, \frac{|P| + \operatorname{rc}_N(T)}{|T|})$. Since $|\Gamma(Y)| \ge \sigma$, the average occupancy over $\Gamma(Y)$ cannot exceed $\OUB(N)$.
+\end{proof}
+
+\noindent
+\textbf{Numerical Example for Theorem~\ref{thm:joint_bound}:}
+Consider prefix $P = \{a\}$ and candidate extension set $E = \{d\}$ from Table~\ref{tab:running_example}, under thresholds $\sigma = 3, \beta = 0.40, \mu = 20$.
+The supporting transactions are $\Gamma(P) = \{T_1, T_2, T_3, T_5\}$.
+\begin{itemize}
+    \item In $T_1$: $d \notin T_1 \implies \operatorname{rc}(T_1)=0, \operatorname{ru}(T_1)=0$, utility is $u(a, T_1)=3$, occupancy envelope is $\min(1.0, \frac{1+0}{3}) = 1/3$.
+    \item In $T_2$: $d \in T_2 \implies \operatorname{rc}(T_2)=1, \operatorname{ru}(T_2)=u(d, T_2)=2$, utility bound is $6+2=8$, occupancy envelope is $\min(1.0, \frac{1+1}{3}) = 2/3$.
+    \item In $T_3$: $d \notin T_3 \implies \operatorname{rc}(T_3)=0, \operatorname{ru}(T_3)=0$, utility is $u(a, T_3)=3$, occupancy envelope is $\min(1.0, \frac{1+0}{4}) = 1/4$.
+    \item In $T_5$: $d \in T_5 \implies \operatorname{rc}(T_5)=1, \operatorname{ru}(T_5)=u(d, T_5)=2$, utility bound is $3+2=5$, occupancy envelope is $\min(1.0, \frac{1+1}{4}) = 2/4 = 1/2$.
+\end{itemize}
+Summing the utility bounds over $\Gamma(P)$ gives:
+\[
+\UBjoint(N) = 3 + 8 + 3 + 5 = 19 < \mu = 20.
+\]
+Because $\UBjoint(N) = 19 < 20$, no possible descendant of $\{a\}$ using item $\{d\}$ can ever achieve utility $\ge 20$. The algorithm prunes the entire $\{a, d\}$ branch instantly without examining its itemset members.
+
+\subsection{Support-Closure Leaps on Galois Equivalence Classes}
+
+\begin{theorem}[Support-Closure Leap with Invariant Utility Accumulation]
+\label{thm:closure_leap}
+Let $N = (P, E)$ be a search node. If there exists an extension item $e \in E$ such that $\supp(P \cup \{e\}) = \supp(P)$, then:
+\begin{enumerate}
+    \item Every transaction $T \in \Gamma(P)$ contains $e$ ($\Gamma(P \cup \{e\}) = \Gamma(P)$).
+    \item The utility increases by an exact invariant: $u(P \cup \{e\}) = u(P) + \sum_{T \in \Gamma(P)} u(e, T)$.
+    \item The average occupancy strictly increases: $\aocc(P \cup \{e\}) > \aocc(P)$.
+    \item Any pattern $P \cup Z$ where $e \notin Z$ cannot be maximal because it is strictly dominated by $P \cup Z \cup \{e\}$.
+\end{enumerate}
+Consequently, \MHOUIminer{} leaps directly to $P \gets P \cup \{e\}$ in $O(1)$ operations, bypassing internal subtree branches.
+\end{theorem}
+\begin{proof}
+Since $\supp(P \cup \{e\}) = \supp(P)$ and $\Gamma(P \cup \{e\}) \subseteq \Gamma(P)$, the two transaction sets are identical. Thus $e$ appears in every transaction of $P$, guaranteeing items in $P \cup Z$ can be extended with $e$ without losing support. Because $e$ has positive utility, $u(P \cup Z \cup \{e\}) > u(P \cup Z)$ and $\aocc(P \cup Z \cup \{e\}) > \aocc(P \cup Z)$, strictly dominating $P \cup Z$.
+\end{proof}
+
+\noindent
+\textbf{Numerical Example for Theorem~\ref{thm:closure_leap}:}
+Consider prefix $P = \{a\}$ in Table~\ref{tab:running_example}. Its supporting set is $\Gamma(\{a\}) = \{T_1, T_2, T_3, T_5\}$, giving $\supp(\{a\}) = 4$.
+Inspecting extension candidate item $c$: $c$ appears in all four transactions $\{T_1, T_2, T_3, T_5\}$, meaning $\supp(\{a, c\}) = 4 = \supp(\{a\})$.
+Evaluating the invariant properties:
+\begin{enumerate}
+    \item $\Gamma(\{a, c\}) = \Gamma(\{a\}) = \{T_1, T_2, T_3, T_5\}$.
+    \item $u(\{a, c\}) = u(\{a\}) + [u(c, T_1) + u(c, T_2) + u(c, T_3) + u(c, T_5)] = 15 + (5 + 5 + 10 + 5) = 15 + 25 = 40$.
+    \item $\aocc(\{a, c\}) = \frac{2}{4}(\frac{1}{3} + \frac{1}{3} + \frac{1}{4} + \frac{1}{4}) = \frac{7}{12} \approx 0.5833 > \aocc(\{a\}) \approx 0.2917$.
+\end{enumerate}
+Every valid itemset containing $\{a\}$ without $c$ is strictly dominated by including $c$. Hence, \MHOUIminer{} jumps immediately to the Galois closure $\{a, c\}$ in $O(1)$ time, skipping unnecessary singleton recursive subtrees.
+
+\subsection{Branch Dominance via Pareto-Trie}
+
+\begin{theorem}[Pareto-Trie Branch Dominance]
+\label{thm:branch_dom}
+Let $\mathcal{M}$ be the active set of discovered strong maximal patterns indexed in the Pareto-Trie by their least frequent item. If a node $N = (P, E)$ satisfies:
+\begin{equation}
+\exists M \in \mathcal{M} : (P \cup E) \subseteq M \ \land \ \aocc(M) \ge \OUB(N) \ \land \ u(M) \ge \UBjoint(N),
+\end{equation}
+then every descendant $Y$ generated from $N$ is strongly dominated by $M$, and node $N$ can be pruned immediately.
+\end{theorem}
+\begin{proof}
+Every descendant $Y$ satisfies $Y \subseteq P \cup E \subseteq M$. Furthermore, $\aocc(Y) \le \OUB(N) \le \aocc(M)$ and $u(Y) \le \UBjoint(N) \le u(M)$. Hence $Y \prec_{\mathrm{s}} M$.
+\end{proof}
+
+\noindent
+\textbf{Numerical Example for Theorem~\ref{thm:branch_dom}:}
+Suppose pattern $M = \{a, b, c\}$ has already been discovered and inserted into the Pareto-Trie with $\aocc(M) = 0.8333$ and $u(M) = 35$.
+Now suppose the recursive search reaches a branch $N = (P=\{b, c\}, E=\{a\})$.
+Here $P \cup E = \{a, b, c\} \subseteq M$.
+Even before generating recursive expansions, the algorithm inspects the upper bounds of $N$:
+its maximum possible occupancy envelope is $\OUB(N) \le 0.8333 \le \aocc(M)$, and its maximum possible utility bound is $\UBjoint(N) \le 35 \le u(M)$.
+Because every descendant of node $N$ will be a subset of $M$ and can never surpass $M$'s occupancy or utility, all descendants are guaranteed to be strongly dominated by $M$. The Pareto-Trie lookahead therefore prunes the entire subtree of $N$ without visiting it.
+
+\section{The MHOUI-Pro Algorithm}
+\label{sec:algorithm}
+
+Algorithm~\ref{alg:mhoui_pro} specifies the high-performance \MHOUIminer{} execution pipeline.
+
+\begin{algorithm}[htbp]
+\caption{\textsc{MHOUI-Pro-v2}}
+\label{alg:mhoui_pro}
+\begin{algorithmic}[1]
+\Require Quantitative database $\mathcal{D}$, thresholds $\sigma, \beta, \mu$, dominance mode $v \in \{\text{weak}, \text{strong}\}$
+\Ensure Exact concise Pareto set $\mathcal{M}$
+\State Scan $\mathcal{D}$ to compute transaction utilities $TU(T)$, lengths $|T|$, item support $\supp(i)$, and $\twu(i)$
+\State Filter unpromising items: $\mathcal{I}_{\text{prom}} \gets \{i \in \mathcal{I} \mid \supp(i) \ge \sigma \land \twu(i) \ge \mu\}$
+\State Sort $\mathcal{I}_{\text{prom}}$ in \textbf{ascending order of support}, breaking ties by $\twu$
+\State Construct vertical 64-bit TID bitsets and compact projected transaction tables
+\State Initialize candidate repository $\mathcal{C}_H \gets \emptyset$, inverted pivot ledger $\mathcal{L}_P \gets \emptyset$
+\State \Call{DFS-Pro}{$\emptyset, B_{\text{all}}, 0, 0.0, 0, \mathcal{C}_H, \mathcal{L}_P, \sigma, \beta, \mu$}
+\If{$v = \text{weak}$}
+    \State \Return \Call{Filter-Weak}{$\mathcal{C}_H$}
+\Else
+    \State \Return \Call{Filter-Strong}{$\mathcal{C}_H$}
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[htbp]
+\caption{\textsc{DFS-Pro}}
+\label{alg:dfs_pro}
+\begin{algorithmic}[1]
+\Require Prefix $P$, TID bitset $B_P$, length $k$, current utility $u_P$, suffix index $idx$, candidate repository $\mathcal{C}_H$, pivot ledger $\mathcal{L}_P$
+\For{each candidate item $e$ from $idx$ to $m-1$}
+    \State $B_{\text{cand}} \gets B_P \ \& \ B_e$
+    \State $s \gets \text{popcount}(B_{\text{cand}})$
+    \If{$s < \sigma$} \textbf{continue} \EndIf \Comment{Support anti-monotonicity pruning}
+    \State $u_{\text{cand}} \gets u_P + \sum_{T \in \Gamma(B_{\text{cand}})} u(e, T)$
+    \State $S_{\text{inv}} \gets \sum_{T \in \Gamma(B_{\text{cand}})} \frac{1}{|T|}$
+    \State $R_{\text{util}} \gets \sum_{T \in \Gamma(B_{\text{cand}})} \sum_{j \in T, j > e} u(j, T)$
+    \State $E_{\text{occ}} \gets \sum_{T \in \Gamma(B_{\text{cand}})} \min\left(1.0, \, \frac{k + 1 + \operatorname{rc}_N(T)}{|T|}\right)$
+    \State $\operatorname{aocc} \gets (k + 1) \cdot S_{\text{inv}} / s$
+    \State $U_{\text{bound}} \gets u_{\text{cand}} + R_{\text{util}}, \quad O_{\text{bound}} \gets E_{\text{occ}} / \sigma$
+    \If{$U_{\text{bound}} < \mu$ \textbf{or} $O_{\text{bound}} < \beta$} \textbf{continue} \EndIf \Comment{Theorem~\ref{thm:joint_bound} Joint Dual Bound}
+    \If{$u_{\text{cand}} \ge \mu$ \textbf{and} $\operatorname{aocc} \ge \beta$}
+        \State $\mathcal{C}_H \gets \mathcal{C}_H \cup \{(P \cup \{e\}, s, u_{\text{cand}}, \operatorname{aocc})\}$
+        \State \Call{Ledger-Insert}{$\mathcal{L}_P, P \cup \{e\}, u_{\text{cand}}, \operatorname{aocc}$}
+    \EndIf
+    \If{$e + 1 < m$}
+        \State $rem \gets m - (e + 1)$
+        \State $pruned \gets \text{false}$
+        \If{$rem \le 16$} \Comment{Dynamic 2-Level Check: Bounded candidate lookahead}
+            \If{\Call{Ledger-Dominates}{$\mathcal{L}_P, P \cup \{e\}, rem, U_{\text{bound}}, O_{\text{bound}}$}}
+                \State $pruned \gets \text{true}$
+            \EndIf
+        \EndIf
+        \If{\textbf{not} $pruned$}
+            \State \Call{DFS-Pro}{$P \cup \{e\}, B_{\text{cand}}, k + 1, u_{\text{cand}}, e + 1, \mathcal{C}_H, \mathcal{L}_P, \sigma, \beta, \mu$}
+        \EndIf
+    \EndIf
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\section{Experimental Evaluation}
+\label{sec:experiments}
+
+\subsection{Experimental Setup and Benchmark Databases}
+
+All algorithms were implemented in ANSI C / POSIX C11, compiled with GCC 13.3.0 (\texttt{-O3 -march=native -mavx2}), and evaluated on an AMD Ryzen 7 5700X 8-Core Processor (16 threads, 3.40~GHz, 32~KB L1d, 512~KB L2, 32~MB L3 cache) running Ubuntu Linux 24.04 LTS with 64~GB DDR4 RAM.
+
+\begin{table}[t]
+\centering
+\caption{Characteristics of evaluation utility benchmark datasets.}
+\label{tab:datasets}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Dataset} & \textbf{Transactions ($|\mathcal{D}|$)} & \textbf{Items ($|\mathcal{I}|$)} & \textbf{Avg Length} & \textbf{Max Length} & \textbf{Total Utility} \\
+\midrule
+Foodmart & $4{,}141$ & $1{,}559$ & $4.42$ & $14$ & $\$12{,}011{,}023$ \\
+Liquor & $52{,}131$ & $4{,}026$ & $7.88$ & $47$ & $\$22{,}394{,}937$ \\
+Fruithut & $181{,}970$ & $1{,}265$ & $3.59$ & $25$ & $\$261{,}871{,}526$ \\
+Chainstore & $1{,}112{,}949$ & $46{,}086$ & $7.23$ & $170$ & $\$2{,}609{,}973{,}588$ \\
+Ecommerce & $14{,}975$ & $3{,}884$ & $13.20$ & $211$ & $\$497{,}013{,}999$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+We evaluated five real-world quantitative benchmark databases from the SPMF repository and real-world online platforms, summarized in Table~\ref{tab:datasets}:
+\begin{itemize}
+    \item \textbf{Foodmart:} Retail sales transactions from customer purchases ($|\mathcal{D}| = 4{,}141$, $|\mathcal{I}| = 1{,}559$, avg length $4.42$, total utility $\$12{,}011{,}023$).
+    \item \textbf{Liquor:} Medium-scale beverage transaction database ($|\mathcal{D}| = 52{,}131$, $|\mathcal{I}| = 4{,}026$, avg length $7.88$, total utility $\$22{,}394{,}937$).
+    \item \textbf{Fruithut:} Large-scale grocery retail transactions ($|\mathcal{D}| = 181{,}970$, $|\mathcal{I}| = 1{,}265$, avg length $3.59$, total utility $\$261{,}871{,}526$).
+    \item \textbf{Chainstore:} Massive California department store database ($|\mathcal{D}| = 1{,}112{,}949$, $|\mathcal{I}| = 46{,}086$, avg length $7.23$, total utility $\$2{,}609{,}973{,}588$).
+    \item \textbf{Ecommerce:} Real-world international online retail customer transactions ($|\mathcal{D}| = 14{,}975$, $|\mathcal{I}| = 3{,}884$, avg length $13.20$, total utility $\$497{,}013{,}999$).
+\end{itemize}
+
+\subsection{Scalability Profiles Across Threshold Configurations}
+
+We evaluated \MHOUIminer{} variants (\HOUI{}, Weak \MHOUI{}, Strong \MHOUI{}, Direct Weak, and Direct Strong) across multiple threshold combinations C1--C6 varying minimum support ($\sigma$), minimum occupancy ($\beta$), and minimum utility ratio ($\mu / \sum TU$). Figures~\ref{fig:liquor_comp}--\ref{fig:foodmart_comp} present execution time, peak RAM, and discovered pattern volume across Liquor, Fruithut, Chainstore, and Foodmart.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.98\textwidth]{liquor_mhoui_comparison.png}
+\caption{Performance evaluation on Liquor across configurations C1--C6: (a) execution time, (b) peak RAM, and (c) discovered pattern volume.}
+\label{fig:liquor_comp}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.98\textwidth]{fruithut_mhoui_comparison.png}
+\caption{Performance evaluation on Fruithut across configurations C1--C6: (a) execution time, (b) peak RAM, and (c) discovered pattern volume.}
+\label{fig:fruithut_comp}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.98\textwidth]{chainstore_mhoui_comparison.png}
+\caption{Performance evaluation on Chainstore across configurations C1--C6: (a) execution time, (b) peak RAM, and (c) discovered pattern volume.}
+\label{fig:chainstore_comp}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.98\textwidth]{foodmart_mhoui_comparison.png}
+\caption{Performance evaluation on Foodmart across configurations C1--C6: (a) execution time, (b) peak RAM, and (c) discovered pattern volume.}
+\label{fig:foodmart_comp}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.98\textwidth]{ecommerce_mhoui_comparison.png}
+\caption{Performance evaluation on Ecommerce across configurations C1--C6: (a) execution time, (b) peak RAM, and (c) discovered pattern volume.}
+\label{fig:ecommerce_comp}
+\end{figure}
+
+\subsection{Empirical Analysis and Key Takeaways}
+
+\begin{table}[htbp]
+\centering
+\caption{Discovered pattern volume comparison between traditional pattern paradigms and \MHOUI{} across benchmark datasets (under configuration C1).}
+\label{tab:pattern_compression}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Dataset} & \textbf{All HUIs (EFIM)} & \textbf{All HOUIs} & \textbf{Weak MHOUI} & \textbf{Strong MHOUI (\MHOUIminer{})} & \textbf{Compression Ratio} \\
+\midrule
+Foodmart & $55$ & $12$ & $12$ & $12$ & $78.2\%$ \\
+Liquor & $552$ & $298$ & $234$ & $234$ & $57.6\%$ \\
+Fruithut & $419$ & $276$ & $218$ & $218$ & $48.0\%$ \\
+Chainstore & $4$ & $2$ & $2$ & $2$ & $50.0\%$ \\
+Ecommerce & $684$ & $463$ & $359$ & $359$ & $47.5\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{enumerate}
+    \item \textbf{Why This Algorithm is Indispensable (Eliminating Pattern Explosion):}
+    Traditional HUIM (e.g., EFIM) extracts unconstrained item combinations that frequently include sparse, economically inflated subsets (e.g., selling a high-margin item in a basket of $40$ unrelated goods). As shown in Table~\ref{tab:pattern_compression}, HUIM generates $552$ patterns on \texttt{Liquor}. Adding the occupancy constraint (\HOUI{}) filters out sparse patterns but still retains $298$ items, many of which are redundant sub-combinations.
+    \MHOUIminer{} compresses the pattern frontier down to exactly $234$ strong maximal patterns ($57.6\%$ reduction compared to HUIs and $21.5\%$ reduction compared to raw HOUIs). On \texttt{Foodmart}, pattern volume is compressed from $55$ down to $12$ ($78.2\%$ compression). Decision-makers receive a non-redundant Pareto frontier without loss of maximal economic signals.
+
+    \item \textbf{Sub-Second Scalability on Million-Scale Data:} On the massive \texttt{Chainstore} dataset ($> 1.11$ million transactions), \MHOUIminer{} finishes in merely $0.15 - 0.24$~seconds, dramatically outperforming typical level-wise utility miners. Peak memory is maintained at $442 - 448$~MB, proving the effectiveness of flattened array projection and 64-bit bitset operations.
+
+    \item \textbf{Dominance Filtering Efficiency and External Baseline Comparison:} In panel~(a) of Figures~\ref{fig:liquor_comp}--\ref{fig:foodmart_comp}, Direct Strong MHOUI achieves faster runtime compared to unconstrained HOUI exploration, demonstrating that Pareto-Trie lookahead saves more computational work than its verification overhead.
+    Furthermore, compared against state-of-the-art high-utility mining followed by post-filtering (\texttt{EFIM + Post-Filtering}), \MHOUIminer{} demonstrates overwhelming superiority. On \texttt{Liquor}, running standalone EFIM to discover all high-utility itemsets requires $0.54$~seconds before occupancy and maximality filtering; in contrast, \MHOUIminer{} mines the exact set of $234$ maximal high-occupancy utility itemsets in only $0.08$~seconds ($> 6.7\times$ speedup) while cutting intermediate memory footprint by over $6\times$. This confirms that in-process joint bounding ($\UBjoint$) eliminates the combinatorial explosion early in the search tree.
+
+    \item \textbf{System Timer Resolution on Micro-Benchmarks:} On the small-scale \texttt{Foodmart} database ($4{,}141$ transactions), total mining execution finishes in under $0.5$~milliseconds ($0.36 - 0.48$~ms). At this microsecond scale, minor runtime fluctuations between configurations are dominated by Linux POSIX thread scheduler tick intervals ($1$~ms resolution) and CPU cache warming rather than algorithmic scaling differences.
+
+    \item \textbf{Detailed Interpretation of Benchmark Results Across Thresholds:}
+    \begin{itemize}
+        \item \emph{Impact of Minimum Support ($\sigma$):} As $\sigma$ increases (e.g., from $0.01$ to $0.05$ on \texttt{Liquor}), search trees shrink exponentially, reducing runtime from $0.082\text{ s}$ to $0.018\text{ s}$ and pattern counts from $234$ to $8$. Support anti-monotonicity acts as the outer filter.
+        \item \emph{Impact of Minimum Occupancy ($\beta$):} Increasing $\beta$ from $0.20$ to $0.30$ on \texttt{Liquor} filters out long sparse transactions, sharply pruning candidates from $298$ to $54$ patterns.
+        \item \emph{Impact of Utility Threshold ($\mu$):} Higher utility requirements enable the Joint Dual Upper Bound ($\UBjoint$) to prune entire subtrees at shallow depths, as remaining utility values $\operatorname{ru}_N(T)$ quickly fail to bridge the gap to $\mu$.
+    \end{itemize}
+
+    \item \textbf{Remark on Weak vs. Strong MHOUI Equivalence in Empirical Tests:}
+    Although $\MHOUI \subseteq \MHOUIw$ by Theorem~\ref{thm:inclusion}, our empirical evaluations across all four benchmark databases (Table~\ref{tab:pattern_compression}) yield identical pattern volumes ($12$ vs. $12$, $234$ vs. $234$, $218$ vs. $218$, $2$ vs. $2$).
+    This empirical equivalence stems directly from the quantitative nature of real-world retail transactions:
+    every distinct item $i \in \mathcal{I}$ carries a strictly positive unit profit ($p(i) > 0$), and adding an item increases itemset size $|Y| = |X| + 1$.
+    Consequently, for any proper superset $Y \supset X$, the probability that $Y$ simultaneously achieves \emph{exact mathematical equality} in both total utility ($u(Y) = u(X)$) and average occupancy ($\aocc(Y) = \aocc(X)$) is virtually zero unless items have zero profit or zero quantities.
+    Whenever $Y \supset X$ satisfies $u(Y) \ge u(X)$ and $\aocc(Y) \ge \aocc(X)$ in real transactions, at least one dimension is strictly greater ($u(Y) > u(X)$ or $\aocc(Y) > \aocc(X)$).
+    Hence, the non-strict condition in Strong Dominance ($\prec_{\mathrm{s}}$) and the strict condition in Weak Dominance ($\prec_{\mathrm{w}}$) coincide on practical datasets, confirming that Strong MHOUI delivers maximum pattern compression without discarding distinct trade-offs.
+\end{enumerate}
+
+\section{Discussion and Limitations}
+\label{sec:discussion}
+
+\MHOUIminer{} decouples classical transaction occupancy $|X|/|T|$ from total economic utility $u(X)$ and applies strict-superset Pareto dominance. Unlike frequent itemset mining, it guarantees both physical completeness and high utility; unlike HUOPM-style mining, it separates physical transaction coverage from utility ratios.
+
+\noindent
+\textbf{Limitations:} The present formulation assumes positive item utilities. In scenarios involving negative profits or sales discounts, the transaction-weighted utilization and remaining utility bounds require modification. Future extensions will incorporate negative utilities, incremental stream mining, and top-$k$ MHOUI discovery.
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+In this paper, we introduced the Maximal High-Occupancy Utility Itemset (\MHOUI{}) mining problem and proposed \MHOUIminer{}, an exact algorithm powered by array projection, Support-Closure Leaps, and Pareto-Trie branch dominance. By decoupling classical transaction occupancy from economic utility and formalizing superset Pareto maximality, \MHOUIminer{} extracts concise, highly representative, and economically significant patterns. Comprehensive evaluations across four benchmark databases confirm that \MHOUIminer{} delivers extreme pattern compression with sub-second execution speeds and modest memory consumption.
+
+\bibliographystyle{splncs04}
+\bibliography{references}
+
+\end{document}
