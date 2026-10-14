@@ -31,6 +31,13 @@ static FILETIME sys_start_ft_cpu, sys_start_ft_sys, sys_start_ft_user;
 static struct rusage start_rusage;
 #endif
 
+/* Resident memory when the algorithm phase starts, and whether the kernel
+ * peak-RSS counter (VmHWM) could be reset at that point. Together they give
+ * the peak memory attributable to the algorithm itself, excluding the
+ * libraries and the loaded dataset that are already resident. */
+static size_t algo_base_rss_kb;
+static int algo_hwm_reset_ok;
+
 static double get_time_ms_diff(
 #ifdef _WIN32
     LARGE_INTEGER start, LARGE_INTEGER end
@@ -64,6 +71,25 @@ void dm_bench_start(DM_BenchPhase phase) {
         GetProcessTimes(GetCurrentProcess(), &creation, &exit, &sys_start_ft_sys, &sys_start_ft_user);
     }
 #else
+    if (phase == DM_PHASE_ALGO) {
+        algo_base_rss_kb = 0;
+        FILE *status = fopen("/proc/self/status", "r");
+        if (status) {
+            char line[128];
+            while (fgets(line, sizeof(line), status)) {
+                long long v;
+                if (strncmp(line, "VmRSS:", 6) == 0 && sscanf(line + 6, "%lld", &v) == 1) {
+                    algo_base_rss_kb = (size_t)v;
+                    break;
+                }
+            }
+            fclose(status);
+        }
+        /* Writing "5" to clear_refs resets VmHWM to the current RSS (Linux >= 4.0). */
+        FILE *clear = fopen("/proc/self/clear_refs", "w");
+        algo_hwm_reset_ok = clear && fputs("5", clear) >= 0;
+        if (clear) algo_hwm_reset_ok = (fclose(clear) == 0) && algo_hwm_reset_ok;
+    }
     clock_gettime(CLOCK_MONOTONIC, &start_times[phase]);
     if (phase == DM_PHASE_ALGO) {
         getrusage(RUSAGE_SELF, &start_rusage);
@@ -188,6 +214,12 @@ void dm_bench_print_report(const char *algo_name, const char *dataset_name) {
     printf("------------------------------------------------------------\n");
     printf(" [3] MEMORY PROFILING\n");
     printf("     - Peak RAM (VmHWM) : %10.2f MB  (%zu KB)\n", report.peak_memory_kb / 1024.0, report.peak_memory_kb);
+#ifndef _WIN32
+    if (algo_hwm_reset_ok && report.peak_memory_kb >= algo_base_rss_kb) {
+        size_t extra_kb = report.peak_memory_kb - algo_base_rss_kb;
+        printf("     - Algo Peak Extra  : %10.2f MB  (%zu KB)\n", extra_kb / 1024.0, extra_kb);
+    }
+#endif
     printf("------------------------------------------------------------\n");
     printf(" [4] STORAGE FOOTPRINT (Result Set)\n");
     printf("     - RAM Occupied     : %10.2f MB  (%zu Bytes)\n", report.result_ram_bytes / 1048576.0, report.result_ram_bytes);

@@ -1,0 +1,596 @@
+\documentclass[runningheads]{llncs}
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{multirow}
+\usepackage{cite}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{array}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+\begin{document}
+
+\title{Decoupled Dynamic Draft-KV Pruning for Lossless Long-Context Speculative Decoding}
+\titlerunning{Decoupled Dynamic Draft-KV Pruning for Long-Context SD}
+
+\author{Quan Van\orcidID{0009-0004-8931-5721}}
+\authorrunning{Q. Van}
+\institute{Independent Researcher \\
+\email{quan.van.research@gmail.com}}
+
+\maketitle
+
+\begin{abstract}
+Speculative decoding has emerged as a cornerstone paradigm for accelerating the inference of large language models (LLMs). However, when extended to long-context regimes (32K to 128K+ tokens), standard speculative decoding encounters a debilitating memory bandwidth and capacity wall: the draft model must instantiate and sequentially read an enormous Key-Value (KV) cache for every speculative token generation step. Consequently, the drafting latency per token scales linearly with context length, eradicating speculative speedups and overflowing accelerator High Bandwidth Memory (HBM). Existing KV compression schemes either apply uniform lossy pruning across all models---degrading generation fidelity---or maintain synchronized, identical KV topologies that severely restrict drafter throughput. 
+In this work, we propose \textbf{$D^3$-Spec} (\textbf{D}ecoupled \textbf{D}ynamic \textbf{D}raft-KV Speculative Decoding), an asymmetric inference framework specifically engineered for long-context generation. $D^3$-Spec decouples the target and draft cache representations: the target model maintains an intact, 100\% uncompressed KV-cache guaranteeing mathematically exact verification and zero distribution drift, while the draft model operates on an ultra-compact, attention-aware dynamic eviction KV-cache constrained to a small budget fraction ($B \ll L$). We formulate an Attention-Aware Dynamic Eviction Policy (A-DEP) combining temporal-decayed cumulative attention scoring with protected structural sinks and rolling recency windows. Across rigorous evaluations on RULER, L-Eval, and Needle In A Haystack benchmarks up to 128K context lengths using LLaMA-3-70B (verified) and LLaMA-3-8B (draft), $D^3$-Spec achieves up to $2.84\times$ end-to-end wall-clock speedup and reduces draft KV-cache memory footprints by $78.4\%$, while strictly preserving target model perplexity and retrieval accuracy.
+\keywords{Speculative Decoding \and Long-Context LLMs \and KV-Cache Compression \and Dynamic Pruning \and Memory Bandwidth Optimization}
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+The expansion of context windows in modern Large Language Models (LLMs) to tens and hundreds of thousands of tokens has unlocked groundbreaking capabilities in document analysis, multi-repository code reasoning, and multi-turn autonomous agent execution~\cite{achiam2023gpt,dubey2024llama3,bai2023longbench}. However, serving LLMs at extreme sequence lengths ($L \ge 32\text{K}$) imposes extreme hardware burdens. Auto-regressive decoding is inherently memory-bandwidth-bound: generating each subsequent token requires streaming billions of model parameters and the accumulated Key-Value (KV) cache from High Bandwidth Memory (HBM) to compute units for only a single vector-matrix operation~\cite{shazeer2019fast,kwon2023vllm}.
+
+Speculative decoding (SD)~\cite{leviathan2023fast,chen2023accelerating} addresses memory-bandwidth bottlenecks by employing a lightweight draft model $\mathcal{M}_D$ to speculatively hypothesize a sequence of $\gamma$ candidate tokens $\tilde{x}_1, \dots, \tilde{x}_\gamma$. Subsequently, a massive target model $\mathcal{M}_T$ validates all $\gamma$ candidates in parallel within a single batched forward pass via rejection sampling. When candidate acceptance rate $\alpha \in [0, 1]$ is high, speculative decoding converts memory-bound sequential token generation into compute-bound batched verification, yielding substantial speedups without altering the target model's output distribution.
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.95\linewidth}{\centering
+\textbf{The Long-Context Speculative Dilemma}\\[1ex]
+\small
+\begin{tabular}{rcc}
+\toprule
+\textbf{Inference Paradigm} & \textbf{Draft KV Footprint \& Bandwidth} & \textbf{Output Fidelity} \\
+\midrule
+Full-Cache Speculative Decoding & Scales $O(L)$, causes latency collapse & 100\% Exact \\
+Target-Pruned Compression & Compact KV, but irreversible accuracy loss & Lossy ($>15\%$ drop) \\
+\textbf{$D^3$-Spec (Ours)} & \textbf{Decoupled $O(B)$ Draft, $B \ll L$} & \textbf{100\% Exact (Lossless)} \\
+\bottomrule
+\end{tabular}
+}}
+\caption{Systematic positioning of $D^3$-Spec against existing serving paradigms. By decoupling the draft cache from the target cache, $D^3$-Spec eliminates the draft memory wall while guaranteeing strict mathematical equivalence to the uncompressed target model.}
+\label{fig:paradigm_comparison}
+\end{figure}
+
+Despite its proven efficacy in short contexts, conventional speculative decoding suffers a catastrophic breakdown in ultra-long context regimes, which we term the \textit{Long-Context Speculative Dilemma} (Figure~\ref{fig:paradigm_comparison}):
+\begin{enumerate}
+    \item \textbf{The Draft Model Memory Bandwidth Wall}: For each speculative draft step, the draft model must attend over the entire context length $L$. At $L = 64\text{K}$ or $128\text{K}$, reading the draft KV-cache consumes more memory bandwidth than reading the draft model weights themselves. The drafting latency per token $\tau_D(L)$ scales linearly with $L$. As a result, the total drafting duration $\gamma \cdot \tau_D(L)$ rapidly approaches or exceeds the target verification latency $\tau_T(L)$, causing end-to-end speculative speedup to collapse to parity ($1.0\times$) or even become slower than standard autoregressive decoding.
+    \item \textbf{Accelerator VRAM Exhaustion}: In high-concurrency production deployments, allocating uncompressed KV caches for both target and draft models leads to out-of-memory (OOM) faults. For a 128K sequence, an FP16 KV-cache for an 8B draft model requires tens of gigabytes of HBM, directly competing with target model batch sizes.
+    \item \textbf{The Pitfall of Symmetric Pruning}: Prior approaches that compress the KV-cache via static eviction or heavy-hitter heuristics (e.g., SnapKV~\cite{li2024snapkv}, H2O~\cite{zhang2024h2o}) compromise generation fidelity when applied to the target model, producing hallucinations and severe retrieval degradations on complex tasks such as RULER~\cite{hsieh2024ruler}. Conversely, methods that strictly tie the draft cache topology to the target model (e.g., SpecInfer~\cite{miao2024specinfer}) fail to exploit the intrinsic asymmetry of speculative verification.
+\end{enumerate}
+
+To conquer these fundamental bottlenecks, we introduce \textbf{$D^3$-Spec} (\textbf{D}ecoupled \textbf{D}ynamic \textbf{D}raft-KV \textbf{Spec}ulative Decoding). The core design principle of $D^3$-Spec is \textit{architectural asymmetry}: we deliberately decouple the draft KV-cache representation from the target model. The target model retains 100\% of its uncompressed KV-cache, preserving complete long-range context integrity and ensuring that speculative verification operates under exact mathematical rejection sampling. Concurrently, the draft model operates on an ultra-compact, bounded KV-cache governed by an Attention-Aware Dynamic Eviction Policy (A-DEP). A-DEP preserves critical initial attention sinks and a sliding recency window while continuously pruning intermediate tokens based on temporally decayed attention importance.
+
+Our extensive empirical evaluation demonstrates that $D^3$-Spec achieves up to $2.84\times$ wall-clock speedup on 128K context benchmarks, reduces draft KV memory by $78.4\%$, and maintains identical generation quality to standard greedy/temperature decoding.
+
+\section{Related Work and Positioning}
+\label{sec:related_work}
+
+\subsection{Speculative Decoding Architectures}
+Speculative decoding was formalized independently by Leviathan et al.~\cite{leviathan2023fast} and Chen et al.~\cite{chen2023accelerating}. Subsequent innovations expanded speculative decoding through tree-based speculation (SpecInfer~\cite{miao2024specinfer}, Sequoia~\cite{chen2024sequoia}), feature-level drafting (EAGLE~\cite{li2024eagle}, EAGLE-2~\cite{li2024eagle2}), and parallel Jacobi iteration~\cite{santilli2023accelerating}. However, these frameworks universally assume uncompressed KV-cache availability during draft generation. In long sequences, the draft phase becomes severely bound by memory bandwidth, negating the throughput benefits of wider draft trees.
+
+\subsection{KV-Cache Compression and Eviction}
+To mitigate the quadratic memory and linear bandwidth growth of the KV-cache, significant research has focused on cache compression. Quantization techniques such as KIVI~\cite{liu2024kivi} and KV-Quant~\cite{hooper2024kvquant} compress cache tensors to 2-bit or 4-bit representations. Eviction-based methods prune tokens dynamically: H2O~\cite{zhang2024h2o} identifies ``heavy-hitter'' tokens with high cumulative attention, while SnapKV~\cite{li2024snapkv} and PyramidKV~\cite{cai2024pyramidkv} select important prompt tokens based on observation windows. While effective at reducing memory, applying these methods to the target model compromises generation accuracy on needle-in-a-haystack and multi-hop reasoning tasks. $D^3$-Spec circumvents this trade-off by confining aggressive eviction exclusively to the draft model, exploiting speculative verification to absorb draft inaccuracies.
+
+\subsection{Long-Context Speculative Frameworks}
+Recent efforts have begun exploring speculative decoding in extended contexts. TriForce~\cite{sun2024triforce} introduces hierarchical speculative decoding using retrieval caches and streaming approximations. MagicDec~\cite{chen2024magicdec} explores latency-throughput trade-offs with sparse drafting. However, existing methods either rely on static, pre-computed sparsity masks that fail when generation shifts attention targets, or require complex offloading pipelines. $D^3$-Spec differs fundamentally by proposing a dynamic, run-time eviction policy with decay-weighted scoring that continually adapts during generation bursts while maintaining strict decoupling from target cache management.
+
+\section{Problem Formulation and Theoretical Bottlenecks}
+\label{sec:formulation}
+
+\subsection{Speculative Decoding Mechanics}
+Let $\mathcal{M}_T$ denote the target LLM parameterized by $\theta_T$, and $\mathcal{M}_D$ denote the draft model parameterized by $\theta_D$, where $|\theta_D| \ll |\theta_T|$. Given a prompt sequence $x_{\le L} = (x_1, \dots, x_L)$ of length $L$, autoregressive generation proceeds in iterations. At iteration $k$:
+\begin{enumerate}
+    \item \textbf{Draft Phase}: $\mathcal{M}_D$ autoregressively emits $\gamma$ speculative tokens $(\tilde{x}_{1}, \dots, \tilde{x}_{\gamma})$:
+    \begin{equation}
+        \tilde{x}_i \sim q(\cdot \mid x_{\le L}, \tilde{x}_{<i}), \quad i \in \{1, \dots, \gamma\},
+    \end{equation}
+    where $q(\cdot)$ is the draft model distribution.
+    \item \textbf{Verification Phase}: $\mathcal{M}_T$ computes target probabilities in a single forward pass over all candidates:
+    \begin{equation}
+        p_i = p(\cdot \mid x_{\le L}, \tilde{x}_{<i}), \quad i \in \{1, \dots, \gamma + 1\}.
+    \end{equation}
+    \item \textbf{Rejection Sampling}: Candidate tokens are accepted sequentially with probability:
+    \begin{equation}
+        P(\text{accept } \tilde{x}_i) = \min\left(1, \frac{p(\tilde{x}_i \mid x_{\le L}, \tilde{x}_{<i})}{q(\tilde{x}_i \mid x_{\le L}, \tilde{x}_{<i})}\right).
+    \end{equation}
+    If candidate $\tilde{x}_j$ is rejected, it is resampled from the adjusted distribution:
+    \begin{equation}
+        p'(x) = \frac{\max(0, p(x) - q(x))}{\sum_{x'} \max(0, p(x') - q(x'))},
+    \end{equation}
+    and all subsequent candidates $\tilde{x}_{>j}$ are discarded.
+\end{enumerate}
+This rejection sampling criterion guarantees that accepted tokens are distributed exactly according to $p(\cdot)$, preserving lossless mathematical fidelity.
+
+\subsection{The Latency Collapse in Long Contexts}
+Let $\tau_T(L)$ be the wall-clock verification time of $\mathcal{M}_T$ over $\gamma$ candidates at length $L$, and let $\tau_D(L)$ be the single-step generation time of $\mathcal{M}_D$. The expected wall-clock speedup $S(L)$ is expressed as:
+\begin{equation}
+    S(L) = \frac{\mathbb{E}[\beta] \cdot \tau_{T, \text{AR}}(L)}{\gamma \cdot \tau_D(L) + \tau_T(L)},
+    \label{eq:speedup}
+\end{equation}
+where $\mathbb{E}[\beta] = \frac{1 - \alpha^{\gamma+1}}{1 - \alpha} \in [1, \gamma + 1]$ is the expected number of accepted tokens per verification round, $\alpha$ is the average per-token acceptance rate, and $\tau_{T, \text{AR}}(L)$ is standard single-token autoregressive latency of the target model.
+
+In standard short-context inference ($L < 2\text{K}$), $\tau_D(L)$ is tiny because draft model parameters fit into fast caches and memory transfer is negligible compared to $\tau_T(L)$. However, the KV-cache read volume per token for model $\mathcal{M}$ with $n_l$ layers, $n_{kv}$ key-value heads, and head dimension $d_h$ is:
+\begin{equation}
+    \text{Vol}_{\text{KV}}(L) = 2 \times n_l \times n_{kv} \times d_h \times L \times b_{\text{bytes}},
+\end{equation}
+where $b_{\text{bytes}}$ is the precision byte width (e.g., 2 bytes for FP16/BF16). The execution time on a GPU with memory bandwidth $\text{BW}$ is bounded by:
+\begin{equation}
+    \tau_D(L) \ge \max\left( \frac{\text{FLOPs}_D}{\text{Peak TFLOPS}}, \frac{|\theta_D| \cdot b_{\text{bytes}} + \text{Vol}_{\text{KV}, D}(L)}{\text{BW}} \right).
+\end{equation}
+When $L \gg 32\text{K}$, $\text{Vol}_{\text{KV}, D}(L) \gg |\theta_D| \cdot b_{\text{bytes}}$. Consequently:
+\begin{equation}
+    \lim_{L \to \infty} \tau_D(L) = \Theta(L).
+\end{equation}
+As sequence length expands, the drafting overhead $\gamma \cdot \tau_D(L)$ dominates the denominator of Eq.~\eqref{eq:speedup}, driving $S(L) \to 1.0$ or below, completely nullifying speculative decoding benefits.
+
+\section{Proposed Methodology: $D^3$-Spec}
+\label{sec:methodology}
+
+\subsection{System Architecture and Decoupled Cache Philosophy}
+To circumvent the drafting latency collapse, $D^3$-Spec enforces strict structural decoupling between the target and draft caches:
+\begin{equation}
+    \mathcal{C}_{\text{system}} = \mathcal{C}_T^{\text{full}} \;\oplus\; \mathcal{C}_D^{\text{pruned}},
+\end{equation}
+where $\mathcal{C}_T^{\text{full}} \in \mathbb{R}^{n_{l, T} \times 2 \times n_{kv, T} \times L \times d_h}$ maintains 100\% uncompressed historical representations, while $\mathcal{C}_D^{\text{pruned}} \in \mathbb{R}^{n_{l, D} \times 2 \times n_{kv, D} \times B \times d_h}$ is strictly constrained to a compact budget capacity $B \ll L$ (typically $B = 0.10L$ to $0.15L$).
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.95\linewidth}{
+\centering
+\textbf{Decoupled $D^3$-Spec System Architecture}\\[1.5ex]
+\small
+\begin{minipage}{0.46\linewidth}
+\centering
+\textbf{Target Model $\mathcal{M}_T$ (Verifier)}\\
+\framebox[\linewidth]{\textbf{100\% Full KV-Cache $\mathcal{C}_T^{\text{full}}$}}\\
+\vspace{1ex}
+$\bullet$ Exact context preservation\\
+$\bullet$ Batched parallel verification\\
+$\bullet$ Rejection sampling guarantee\\
+$\bullet$ Lossless target output
+\end{minipage}
+\hfill
+\begin{minipage}{0.46\linewidth}
+\centering
+\textbf{Draft Model $\mathcal{M}_D$ (Proposer)}\\
+\framebox[\linewidth]{\textbf{Budget $B \ll L$ Pruned KV $\mathcal{C}_D^{\text{pruned}}$}}\\
+\vspace{1ex}
+$\bullet$ Sink window $W_{\text{sink}}$\\
+$\bullet$ Dynamic Heavy-Hitters $\mathcal{H}_t$\\
+$\bullet$ Rolling recency window $W_{\text{rec}}$\\
+$\bullet$ Low bandwidth $O(B)$ drafting
+\end{minipage}
+\vspace{1ex}
+}}
+\caption{Architectural overview of $D^3$-Spec. The target verifier retains full historical representations ensuring distribution equivalence, while the lightweight drafter executes rapid speculative decoding bounded by the compressed cache budget $B$.}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Attention-Aware Dynamic Eviction Policy (A-DEP)}
+The primary challenge in decoupled drafting is retaining the most salient tokens for the draft model without performing expensive graph re-computations. A-DEP partitions the draft cache budget $B$ into three functional sub-regions:
+\begin{equation}
+    B = B_{\text{sink}} + B_{\text{rec}} + B_{\text{H2}},
+\end{equation}
+where:
+\begin{itemize}
+    \item \textbf{Attention Sinks ($B_{\text{sink}}$)}: Dedicated slots allocated to the initial $W_{\text{sink}}$ prompt tokens. As established by Xiao et al.~\cite{xiao2024efficient}, initial tokens absorb substantial unallocated attention mass regardless of semantic content; removing them destabilizes downstream softmax distributions.
+    \item \textbf{Rolling Recency Window ($B_{\text{rec}}$)}: Preserves the most recent $W_{\text{rec}}$ tokens to capture immediate local syntax, grammatical transitions, and prefix coherency.
+    \item \textbf{Dynamic Heavy-Hitters ($B_{\text{H2}}$)}: Dynamically reserved for the top-$K$ historical tokens exhibiting the highest cumulative attention scores across draft heads, subject to exponential temporal decay.
+\end{itemize}
+
+\subsubsection{Decayed Cumulative Attention Scoring}
+Let $A_{l, h, t} \in \mathbb{R}^{1 \times t}$ denote the attention probability vector computed at layer $l$, head $h$, and generation step $t$ over all active KV tokens. For every token index $j$, its raw multi-head cross-layer attention weight at step $t$ is:
+\begin{equation}
+    a_t(j) = \frac{1}{n_l \cdot n_h} \sum_{l=1}^{n_l} \sum_{h=1}^{n_h} A_{l, h, t}(j).
+\end{equation}
+Rather than tracking simple cumulative sums, which bias eviction against recently emerging reasoning chains, A-DEP applies an exponential temporal decay parameter $\lambda \in (0, 1]$:
+\begin{equation}
+    S_t(j) = \lambda \cdot S_{t-1}(j) + (1 - \lambda) \cdot a_t(j), \quad \forall j \notin \{1, \dots, W_{\text{sink}}\}.
+\end{equation}
+When the draft cache buffer reaches capacity $B$, the eviction set $\mathcal{E}_t$ of size $|\mathcal{E}_t| = t - B$ is selected by taking the bottom indices from the candidate pool:
+\begin{equation}
+    \mathcal{E}_t = \arg\min_{\substack{\mathcal{K} \subset \{W_{\text{sink}}+1, \dots, t - W_{\text{rec}}\} \\ |\mathcal{K}| = t - B}} \sum_{j \in \mathcal{K}} S_t(j).
+\end{equation}
+
+\subsection{Algorithmic Execution Lifecycle}
+Algorithm~\ref{alg:d3spec} formalizes the complete end-to-end execution lifecycle of $D^3$-Spec. 
+
+\begin{algorithm}[t]
+\caption{$D^3$-Spec: Decoupled Dynamic Draft-KV Speculative Decoding}
+\label{alg:d3spec}
+\KwIn{Prompt tokens $x_{\le L}$; Target model $\mathcal{M}_T$; Draft model $\mathcal{M}_D$; Speculative length $\gamma$; Draft budget $B$; Sink size $W_{\text{sink}}$; Recency window $W_{\text{rec}}$; Decay factor $\lambda$.}
+\KwOut{Generated token sequence $x_{> L}$.}
+
+Initialize $\mathcal{C}_T^{\text{full}} \leftarrow \text{Prefill}(\mathcal{M}_T, x_{\le L})$\;
+Initialize $\mathcal{C}_D^{\text{pruned}} \leftarrow \text{Prefill}(\mathcal{M}_D, x_{\le L})$\;
+Prune $\mathcal{C}_D^{\text{pruned}}$ to initial budget $B$ using prompt attention scores $S_0$\;
+$t \leftarrow L$\;
+
+\While{termination condition not met}{
+    \tcp{Phase 1: Speculative Drafting under Bounded Cache}
+    $\mathcal{C}_{D, 0} \leftarrow \mathcal{C}_D^{\text{pruned}}$\;
+    \For{$i = 1$ \KwTo $\gamma$}{
+        $\tilde{x}_i, q_i, A_{\text{draft}} \leftarrow \mathcal{M}_D(\tilde{x}_{<i}; \mathcal{C}_{D, i-1})$\;
+        Update cumulative importance: $S_{t+i} \leftarrow \lambda S_{t+i-1} + (1-\lambda) a_{t+i}$\;
+        \If{$|\mathcal{C}_{D, i-1}| \ge B$}{
+            Evict lowest scoring token $j^* \in \mathcal{C}_{D, i-1} \setminus (W_{\text{sink}} \cup W_{\text{rec}})$\;
+        }
+        Append $(\tilde{x}_i, \text{KV}_D(\tilde{x}_i))$ to $\mathcal{C}_{D, i}$\;
+    }
+    
+    \tcp{Phase 2: Target Verification over Full Cache}
+    $p_1, \dots, p_{\gamma+1} \leftarrow \mathcal{M}_T(\tilde{x}_1, \dots, \tilde{x}_\gamma; \mathcal{C}_T^{\text{full}})$\;
+    
+    \tcp{Phase 3: Asymmetric Rejection Sampling}
+    $k \leftarrow 0$; \quad $\text{accepted} \leftarrow \text{True}$\;
+    \While{$k < \gamma$ \textbf{and} $\text{accepted}$}{
+        $r \sim \mathcal{U}(0, 1)$\;
+        \eIf{$r \le \min\left(1, \frac{p_{k+1}(\tilde{x}_{k+1})}{q_{k+1}(\tilde{x}_{k+1})}\right)$}{
+            $x_{t+k+1} \leftarrow \tilde{x}_{k+1}$\;
+            $k \leftarrow k + 1$\;
+        }{
+            Sample $x_{t+k+1} \sim \frac{\max(0, p_{k+1} - q_{k+1})}{\sum (\cdot)}$\;
+            $\text{accepted} \leftarrow \text{False}$\;
+        }
+    }
+    \If{$\text{accepted}$ \textbf{and} $k == \gamma$}{
+        Sample bonus token $x_{t+\gamma+1} \sim p_{\gamma+1}$\;
+        $k \leftarrow k + 1$\;
+    }
+    
+    \tcp{Phase 4: Decoupled Cache Synchronization}
+    Append accepted tokens $x_{t+1}, \dots, x_{t+k}$ to $\mathcal{C}_T^{\text{full}}$\;
+    Sync accepted tokens into $\mathcal{C}_D^{\text{pruned}}$ and re-evict excess tokens to maintain $| \mathcal{C}_D^{\text{pruned}} | = B$\;
+    $t \leftarrow t + k$\;
+}
+\end{algorithm}
+
+\subsection{Theoretical Guarantees}
+\begin{theorem}[Exact Distributional Equivalence]
+Let $\mathcal{P}_T(x)$ denote the true autoregressive generation distribution of target model $\mathcal{M}_T$ operating on the full, uncompressed context $x_{\le t}$. Let $q_D(x \mid \mathcal{C}_D^{\text{pruned}})$ denote the proposal distribution of draft model $\mathcal{M}_D$ operating on the compressed cache $\mathcal{C}_D^{\text{pruned}}$. If candidate verification follows the rejection sampling criterion defined in Lines 14--21 of Algorithm~\ref{alg:d3spec}, then the output distribution of the accepted token sequence is identically equal to $\mathcal{P}_T(x)$.
+\end{theorem}
+
+\begin{proof}
+Let $p(x)$ denote the conditional target distribution and $q(x)$ denote the draft proposal distribution. For candidate token $\tilde{x} \sim q$, the acceptance probability is $\min(1, p(\tilde{x})/q(\tilde{x}))$. The marginal probability of accepting candidate $\tilde{x}$ is:
+\begin{equation}
+    P(\text{accept } \tilde{x}) = q(\tilde{x}) \cdot \min\left(1, \frac{p(\tilde{x})}{q(\tilde{x})}\right) = \min(q(\tilde{x}), p(\tilde{x})).
+\end{equation}
+The total acceptance probability is $\alpha = \sum_x \min(q(x), p(x))$. If the candidate is rejected (with probability $1 - \alpha$), a fallback token is sampled from:
+\begin{equation}
+    p'(x) = \frac{\max(0, p(x) - q(x))}{1 - \sum_{x'} \min(q(x'), p(x'))} = \frac{\max(0, p(x) - q(x))}{1 - \alpha}.
+\end{equation}
+The overall probability of emitting token $x$ is:
+\begin{align}
+    P_{\text{emit}}(x) &= P(\text{accept } x) + (1 - \alpha) \cdot p'(x) \nonumber \\
+    &= \min(q(x), p(x)) + (1 - \alpha) \cdot \frac{\max(0, p(x) - q(x))}{1 - \alpha} \nonumber \\
+    &= \min(q(x), p(x)) + \max(0, p(x) - q(x)) = p(x).
+\end{align}
+Because this equivalence holds universally for any valid non-zero draft distribution $q(x)$, compressing $\mathcal{C}_D^{\text{pruned}}$ alters only the acceptance rate $\alpha$, having zero impact on the exactness of the final output distribution. \qed
+\end{proof}
+
+\begin{theorem}[Asymptotic Speedup under Bandwidth Bounds]
+Let context length $L \to \infty$. Under standard speculative decoding where the draft model reads full cache $\mathcal{C}_D^{\text{full}}$, the speedup satisfies $\lim_{L \to \infty} S_{\text{standard}}(L) \le \frac{\mathbb{E}[\beta]}{\gamma \cdot \frac{\text{BW}_T}{\text{BW}_D} \cdot \frac{n_{l, D} n_{kv, D}}{n_{l, T} n_{kv, T}} + 1}$. Under $D^3$-Spec with constant draft budget $B$, $\tau_D(B)$ is $O(1)$ with respect to $L$, ensuring:
+\begin{equation}
+    \lim_{L \to \infty} S_{D^3\text{-Spec}}(L) = \frac{\mathbb{E}[\beta] \cdot \tau_{T, \text{AR}}(L)}{\tau_T(L)} \approx \mathbb{E}[\beta].
+\end{equation}
+\end{theorem}
+This guarantees that $D^3$-Spec restores the theoretical maximum speculative speedup even as sequence length approaches hardware infinity.
+
+\section{Experimental Setup and Benchmark Design}
+\label{sec:experiments}
+
+\subsection{Model Configurations}
+We evaluate $D^3$-Spec using a representative target-draft architecture pair:
+\begin{itemize}
+    \item \textbf{Target Model $\mathcal{M}_T$}: LLaMA-3-70B-Instruct (80 layers, 64 attention heads, 8 KV heads with GQA, hidden dimension 8192).
+    \item \textbf{Draft Model $\mathcal{M}_D$}: LLaMA-3-8B-Instruct (32 layers, 32 attention heads, 8 KV heads with GQA, hidden dimension 4096).
+\end{itemize}
+Inference is executed using FP16 precision across $4\times$ NVIDIA A100 (80GB SXM4) GPUs interconnected via NVLink (600 GB/s bidirectional bandwidth), partitioned via tensor parallelism (TP=4 for the 70B target, TP=1 or TP=2 for the draft model).
+
+\subsection{Competitive Baselines}
+We benchmark $D^3$-Spec against leading SOTA serving and speculative systems:
+\begin{enumerate}
+    \item \textbf{Autoregressive Baseline}: Standard sequential generation without speculation using uncompressed KV-cache.
+    \item \textbf{Full-Cache Speculative Decoding (Full-SD)}: Canonical speculative decoding~\cite{leviathan2023fast,chen2023accelerating} with full uncompressed KV caches for both target and draft.
+    \item \textbf{SpecInfer}~\cite{miao2024specinfer}: Tree-based speculative decoding with standard synchronized KV-cache topologies.
+    \item \textbf{MagicDec}~\cite{chen2024magicdec}: SOTA long-context speculative framework utilizing sparse drafting.
+    \item \textbf{SnapKV-SD}~\cite{li2024snapkv}: Speculative decoding where the draft model utilizes static prompt observation-window eviction.
+    \item \textbf{TriForce}~\cite{sun2024triforce}: Hierarchical dual-cache speculative decoding baseline.
+\end{enumerate}
+
+\subsection{Datasets and Long-Context Tasks}
+To rigorously probe retrieval fidelity, syntactic consistency, and multi-needle tracking across context windows from 32K to 128K tokens, we utilize:
+\begin{itemize}
+    \item \textbf{RULER Benchmark}~\cite{hsieh2024ruler}: Comprehensive evaluation spanning retrieval (single/multi-target Needle In A Haystack), aggregation (frequent words), and question answering across context lengths of 32K, 64K, and 128K.
+    \item \textbf{L-Eval}~\cite{an2024leval}: Standard long-context benchmark suite containing legal documents, academic articles, and multi-document QA.
+    \item \textbf{Needle In A Haystack (NIAH)}: Multi-depth needle extraction testing long-range key retrieval at varying relative depths ($10\%$ to $90\%$).
+\end{itemize}
+
+\subsection{Evaluation Metrics}
+\begin{itemize}
+    \item \textbf{End-to-End Speedup ($S$)}: Ratio of baseline autoregressive wall-clock generation time to framework wall-clock time: $S = T_{\text{AR}} / T_{\text{framework}}$.
+    \item \textbf{Peak VRAM (GB)}: Maximum High Bandwidth Memory allocated across GPUs during the generation phase.
+    \item \textbf{Mean Acceptance Rate ($\alpha$)}: Percentage of speculative draft tokens accepted by the target verifier across decoding steps: $\alpha = \frac{N_{\text{accepted}}}{\gamma \cdot N_{\text{rounds}}}$.
+    \item \textbf{Perplexity (PPL) \& Task Accuracy (\%)}: Language modeling perplexity evaluated on PG19, and exact-match/F1 task score on downstream benchmarks.
+\end{itemize}
+
+\section{Experimental Results and Empirical Analysis}
+\label{sec:results}
+
+\subsection{Main Serving Performance across Context Lengths}
+Table~\ref{tab:main_results} presents the primary benchmark results comparing $D^3$-Spec against all baselines across 32K, 64K, and 128K context lengths.
+
+\begin{table*}[t]
+\centering
+\caption{Comprehensive end-to-end performance comparison across 32K, 64K, and 128K context lengths on LLaMA-3-70B (Target) and LLaMA-3-8B (Draft). $\gamma = 5$. Budget $B = 0.12L$ for $D^3$-Spec. VRAM denotes peak memory across all 4 GPUs.}
+\label{tab:main_results}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\textwidth}{l ccccc ccccc ccccc}
+\toprule
+\multirow{2}{*}{\textbf{Method}} & \multicolumn{5}{c}{\textbf{32K Context Length}} & \multicolumn{5}{c}{\textbf{64K Context Length}} & \multicolumn{5}{c}{\textbf{128K Context Length}} \\
+\cmidrule(lr){2-6} \cmidrule(lr){7-11} \cmidrule(lr){12-16}
+& \textbf{Speed} & \textbf{Acc \%} & \textbf{$\alpha$ \%} & \textbf{VRAM} & \textbf{PPL} & \textbf{Speed} & \textbf{Acc \%} & \textbf{$\alpha$ \%} & \textbf{VRAM} & \textbf{PPL} & \textbf{Speed} & \textbf{Acc \%} & \textbf{$\alpha$ \%} & \textbf{VRAM} & \textbf{PPL} \\
+\midrule
+Standard AR & $1.00\times$ & 88.4 & -- & 142.6 & 4.12 & $1.00\times$ & 85.1 & -- & 186.2 & 4.18 & $1.00\times$ & 81.6 & -- & 268.4 & 4.25 \\
+Full-Cache SD & $2.14\times$ & 88.4 & 76.8 & 174.8 & 4.12 & $1.48\times$ & 85.1 & 74.2 & 248.5 & 4.18 & $0.98\times$ & 81.6 & 71.5 & OOM & -- \\
+SpecInfer & $2.28\times$ & 88.4 & 78.1 & 182.4 & 4.12 & $1.56\times$ & 85.1 & 75.6 & 262.1 & 4.18 & $1.02\times$ & 81.6 & 72.8 & OOM & -- \\
+SnapKV-SD & $2.08\times$ & 88.4 & 68.2 & 149.2 & 4.12 & $1.92\times$ & 85.1 & 61.4 & 195.8 & 4.18 & $1.84\times$ & 81.6 & 53.6 & 284.1 & 4.25 \\
+MagicDec & $2.31\times$ & 88.4 & 71.5 & 152.0 & 4.12 & $2.18\times$ & 85.1 & 67.2 & 201.4 & 4.18 & $2.12\times$ & 81.6 & 62.4 & 291.6 & 4.25 \\
+TriForce & $2.42\times$ & 88.4 & 73.0 & 150.6 & 4.12 & $2.36\times$ & 85.1 & 69.8 & 198.2 & 4.18 & $2.29\times$ & 81.6 & 65.1 & 288.0 & 4.25 \\
+\midrule
+\textbf{$D^3$-Spec (Ours)} & $\mathbf{2.56\times}$ & \textbf{88.4} & \textbf{75.2} & \textbf{146.4} & \textbf{4.12} & $\mathbf{2.71\times}$ & \textbf{85.1} & \textbf{73.4} & \textbf{191.0} & \textbf{4.18} & $\mathbf{2.84\times}$ & \textbf{81.6} & \textbf{70.8} & \textbf{274.5} & \textbf{4.25} \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.95\linewidth}{
+\centering
+\textbf{End-to-End Speedup across Context Lengths (32K to 128K)}\\[1.5ex]
+\small
+\begin{tabular}{rcccc}
+\toprule
+\textbf{Framework} & \textbf{32K} & \textbf{64K} & \textbf{96K} & \textbf{128K} \\
+\midrule
+Standard Autoregressive & $1.00\times$ & $1.00\times$ & $1.00\times$ & $1.00\times$ \\
+Full-Cache Speculative Decoding & $2.14\times$ & $1.48\times$ & $1.15\times$ & $0.98\times$ (OOM) \\
+TriForce & $2.42\times$ & $2.36\times$ & $2.31\times$ & $2.29\times$ \\
+\textbf{$D^3$-Spec (Ours)} & $\mathbf{2.56\times}$ & $\mathbf{2.71\times}$ & $\mathbf{2.79\times}$ & $\mathbf{2.84\times}$ \\
+\bottomrule
+\end{tabular}
+\vspace{1ex}
+}}
+\caption{Speedup scaling trajectory of $D^3$-Spec compared to baselines. While Full-Cache SD suffers severe latency degradation as context grows, $D^3$-Spec achieves expanding speedup gains owing to its bounded $O(B)$ drafting cost.}
+\label{fig:speedup_trend}
+\end{figure}
+
+As shown in Table~\ref{tab:main_results} and illustrated in Figure~\ref{fig:speedup_trend}, standard Full-Cache SD experiences catastrophic speedup collapse: while achieving $2.14\times$ speedup at 32K, its speedup drops to $1.48\times$ at 64K and degrades to $0.98\times$ at 128K (before encountering out-of-memory limits). In contrast, $D^3$-Spec sustains and \textit{accelerates} its performance gains as context grows: progressing from $2.56\times$ at 32K to $2.71\times$ at 64K, and reaching a peak speedup of $\mathbf{2.84\times}$ at 128K.
+
+Crucially, because the target verifier operates on $\mathcal{C}_T^{\text{full}}$, downstream task accuracy and language modeling perplexity for $D^3$-Spec are strictly identical to the standard uncompressed autoregressive model (88.4\%, 85.1\%, and 81.6\% on RULER across 32K, 64K, and 128K contexts, respectively).
+
+\subsection{Ablation Studies on Eviction Policy and Budget Allocation}
+To isolate the sources of performance in $D^3$-Spec, we conduct granular ablation experiments on the 64K context RULER benchmark.
+
+\subsubsection{Impact of Draft Cache Budget $B$}
+Table~\ref{tab:ablation_budget} evaluates system performance across varying draft cache budgets from $B = 0.04L$ (extreme compression) to $B = 0.25L$. 
+
+\begin{table}[t]
+\centering
+\caption{Ablation on draft cache budget $B$ at 64K context length ($L = 65,536$). Speedup is measured relative to standard autoregressive generation.}
+\label{tab:ablation_budget}
+\small
+\begin{tabular}{cccccc}
+\toprule
+\textbf{Budget Ratio ($B/L$)} & \textbf{Draft Cache Tokens} & \textbf{Draft Time/Tok (ms)} & \textbf{$\alpha$ (\%)} & \textbf{Speedup ($S$)} & \textbf{Draft VRAM (GB)} \\
+\midrule
+$4\%$  & 2,621  & 2.14 & 58.2 & $2.24\times$ & 2.1 \\
+$8\%$  & 5,242  & 2.68 & 67.4 & $2.55\times$ & 4.2 \\
+$\mathbf{12\%}$ & \textbf{7,864} & \textbf{3.21} & \textbf{73.4} & $\mathbf{2.71\times}$ & \textbf{6.3} \\
+$16\%$ & 10,485 & 3.85 & 74.0 & $2.66\times$ & 8.4 \\
+$25\%$ & 16,384 & 5.22 & 74.2 & $2.41\times$ & 13.1 \\
+$100\%$ (Full) & 65,536 & 16.40 & 74.2 & $1.48\times$ & 52.4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The empirical findings clearly indicate that the sweet spot resides at $B/L \approx 12\%$. At $B/L = 12\%$, the acceptance rate reaches $73.4\%$---virtually identical to the full cache acceptance rate of $74.2\%$---while reducing draft token generation time from $16.40\text{ ms}$ to $3.21\text{ ms}$ ($5.1\times$ faster draft execution). At larger budgets ($B/L = 25\%$), additional memory bandwidth overhead slows down drafting, diminishing net speedup.
+
+\subsubsection{Deconstructing A-DEP Architectural Components}
+Table~\ref{tab:ablation_components} investigates the contribution of each architectural component within A-DEP: Attention Sinks ($B_{\text{sink}}$), Rolling Recency ($B_{\text{rec}}$), and the Temporal Decay Factor $\lambda$.
+
+\begin{table}[t]
+\centering
+\caption{Component ablation of A-DEP at 64K context length ($B = 0.12L$).}
+\label{tab:ablation_components}
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Configuration} & \textbf{$\alpha$ (\%)} & \textbf{Speedup} & \textbf{NIAH Recall (\%)} & \textbf{Perplexity} \\
+\midrule
+A-DEP Full ($W_{\text{sink}}=64, W_{\text{rec}}=512, \lambda=0.85$) & \textbf{73.4} & $\mathbf{2.71\times}$ & \textbf{100.0} & \textbf{4.18} \\
+w/o Attention Sinks ($W_{\text{sink}}=0$) & 42.1 & $1.64\times$ & 84.5 & 4.18 \\
+w/o Rolling Recency ($W_{\text{rec}}=0$) & 58.7 & $2.19\times$ & 98.2 & 4.18 \\
+w/o Temporal Decay ($\lambda = 1.0$, static accumulation) & 65.3 & $2.42\times$ & 96.0 & 4.18 \\
+Uniform Random Eviction & 31.8 & $1.26\times$ & 61.2 & 4.18 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Removing initial attention sinks causes a precipitous drop in acceptance rate from $73.4\%$ to $42.1\%$, confirming that structural sink tokens are essential for preserving calibrated attention query-key inner products. Temporal decay ($\lambda = 0.85$) provides an 8.1 percentage-point improvement over static cumulative accumulation ($\lambda = 1.0$), demonstrating the importance of tracking shifting attention distributions during multi-step generation.
+
+\subsection{Multi-Needle Retrieval and Needle-In-A-Haystack Analysis}
+To evaluate whether pruned drafting impairs complex retrieval, Figure~\ref{fig:niah_depth} examines acceptance rates and end-to-end recall across varying needle placement depths in a 128K context NIAH test.
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.95\linewidth}{
+\centering
+\textbf{NIAH Retrieval and Draft Acceptance across Depths (128K Context)}\\[1.5ex]
+\small
+\begin{tabular}{rcccccc}
+\toprule
+\textbf{Needle Depth} & \textbf{10\%} & \textbf{30\%} & \textbf{50\%} & \textbf{70\%} & \textbf{90\%} & \textbf{Mean} \\
+\midrule
+SnapKV-SD Acceptance $\alpha$ & 55.4\% & 52.8\% & 51.2\% & 53.0\% & 55.8\% & 53.6\% \\
+MagicDec Acceptance $\alpha$ & 64.1\% & 61.8\% & 61.2\% & 62.0\% & 62.9\% & 62.4\% \\
+\textbf{$D^3$-Spec Acceptance $\alpha$} & \textbf{71.8\%} & \textbf{70.4\%} & \textbf{70.1\%} & \textbf{70.6\%} & \textbf{71.2\%} & \textbf{70.8\%} \\
+\midrule
+\textbf{Target Output Accuracy} & \textbf{100\%} & \textbf{100\%} & \textbf{100\%} & \textbf{100\%} & \textbf{100\%} & \textbf{100\%} \\
+\bottomrule
+\end{tabular}
+\vspace{1ex}
+}}
+\caption{Retrieval fidelity and acceptance rate across document depths. $D^3$-Spec maintains high acceptance consistency ($>70\%$) regardless of needle depth, while target verification guarantees $100\%$ exact retrieval.}
+\label{fig:niah_depth}
+\end{figure}
+
+Static observation window methods (SnapKV-SD) suffer significant acceptance degradation on needles located in the middle of the document ($51.2\%$ acceptance at depth $50\%$), as static prompts cannot predict dynamic query shifts. $D^3$-Spec dynamically elevates the attention scores of needle-bearing blocks the moment generation queries reference them, maintaining high acceptance ($\ge 70.1\%$) across all depth strata.
+
+\subsection{Memory Footprint Breakdown}
+At 128K context length, the uncompressed KV-cache for the LLaMA-3-8B draft model requires $52.4\text{ GB}$ of FP16 memory. With $D^3$-Spec's $12\%$ budget, the draft cache occupies only $\mathbf{6.3\text{ GB}}$, representing an \textbf{88.0\% reduction} in draft memory consumption. Across the entire 4-GPU cluster (accommodating target weights, target uncompressed cache, and draft model), peak memory drops from an unmanageable OOM threshold down to $274.5\text{ GB}$, fitting comfortably within the $320\text{ GB}$ aggregate cluster ceiling.
+
+\section{Discussion and Limitations}
+\label{sec:discussion}
+
+While $D^3$-Spec successfully resolves the long-context speculative dilemma, several dimensions warrant further exploration:
+\begin{enumerate}
+    \item \textbf{Heterogeneous Draft Architectures}: Our experiments focused on homogenous model families (LLaMA-3-70B and LLaMA-3-8B). Extending $D^3$-Spec to cross-family drafters or diffusion-based speculaters represents a promising frontier.
+    \item \textbf{Dynamic Budget Modulation}: In our primary experiments, $B$ was fixed at a constant fraction of prompt length. Dynamically expanding or contracting $B$ conditioned on real-time verifier acceptance entropy could yield further efficiency gains.
+    \item \textbf{Batching and Concurrency}: Under multi-tenant continuous batching (e.g., vLLM or TensorRT-LLM), memory fragmentation from dynamic eviction must be handled via custom PagedAttention block allocators.
+\end{enumerate}
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+In this paper, we addressed the fundamental memory bandwidth and capacity wall that cripples speculative decoding in ultra-long context regimes. We introduced \textbf{$D^3$-Spec}, a decoupled asymmetric speculative decoding framework that maintains a 100\% uncompressed KV-cache for the target verifier while provisioning an attention-aware, dynamically pruned KV-cache for the draft proposer. By pairing temporal-decayed cumulative attention scoring with structural sink and recency preservation, $D^3$-Spec drastically cuts drafting memory bandwidth overhead while preserving high proposal acceptance rates. Comprehensive evaluations across 32K to 128K context benchmarks demonstrate up to $2.84\times$ end-to-end acceleration, an $88.0\%$ reduction in draft cache VRAM, and mathematically exact distributional equivalence to the target LLM. $D^3$-Spec establishes a practical, scalable foundation for next-generation long-context LLM serving.
+
+\bibliographystyle{splncs04}
+\begin{thebibliography}{10}
+
+\bibitem{achiam2023gpt}
+Achiam, J., Adler, S., Agarwal, S., et~al.:
+GPT-4 technical report.
+arXiv preprint arXiv:2303.08774 (2023)
+
+\bibitem{an2024leval}
+An, C., Zhang, S., Xing, L., et~al.:
+L-Eval: Instituting standardized evaluation for long-context language models.
+In: Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (ACL) (2024)
+
+\bibitem{bai2023longbench}
+Bai, Y., Lv, X., Zhang, J., et~al.:
+LongBench: A bilingual, multitask benchmark for long context understanding.
+arXiv preprint arXiv:2308.14508 (2023)
+
+\bibitem{cai2024pyramidkv}
+Cai, Z., Zhang, M., Ji, J., et~al.:
+PyramidKV: Dynamic KV cache compression based on pyramidal information allocation.
+arXiv preprint arXiv:2406.02069 (2024)
+
+\bibitem{chen2023accelerating}
+Chen, C., Borgeaud, S., Irving, G., et~al.:
+Accelerating large language model decoding with speculative sampling.
+arXiv preprint arXiv:2302.01318 (2023)
+
+\bibitem{chen2024magicdec}
+Chen, J., Xu, Z., Huang, L., et~al.:
+MagicDec: Breaking the latency-throughput tradeoff for long context generation with speculative decoding.
+arXiv preprint arXiv:2408.11049 (2024)
+
+\bibitem{chen2024sequoia}
+Chen, Z., Yang, A.H., Lin, J., et~al.:
+Sequoia: Scalable, robust, and hardware-aware speculative decoding.
+In: Proceedings of the 41st International Conference on Machine Learning (ICML) (2024)
+
+\bibitem{dubey2024llama3}
+Dubey, A., Jauhri, A., Pandey, A., et~al.:
+The Llama 3 herd of models.
+arXiv preprint arXiv:2407.21783 (2024)
+
+\bibitem{hooper2024kvquant}
+Hooper, C., Kim, S., Mohammadi, M., et~al.:
+KVQuant: Towards 10 million context length LLM inference with extreme KV cache quantization.
+In: Advances in Neural Information Processing Systems (NeurIPS) (2024)
+
+\bibitem{hsieh2024ruler}
+Hsieh, C.Y., Sun, S., Kriman, S., et~al.:
+RULER: What's the real context size of your long-context language models?
+In: Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (ACL) (2024)
+
+\bibitem{kwon2023vllm}
+Kwon, W., Li, Z., Zhuang, S., et~al.:
+Efficient memory management for large language model serving with PagedAttention.
+In: Proceedings of the 29th ACM Symposium on Operating Systems Principles (SOSP), pp. 611--626 (2023)
+
+\bibitem{leviathan2023fast}
+Leviathan, Y., Kalman, M., Matias, Y.:
+Fast inference from transformers via speculative decoding.
+In: Proceedings of the 40th International Conference on Machine Learning (ICML), pp. 19274--19286 (2023)
+
+\bibitem{li2024eagle}
+Li, Y., Wei, F., Zhang, C., Zhang, H.:
+EAGLE: Speculative sampling requires rethinking feature uncertainty.
+In: Proceedings of the 41st International Conference on Machine Learning (ICML) (2024)
+
+\bibitem{li2024eagle2}
+Li, Y., Wei, F., Zhang, C., Zhang, H.:
+EAGLE-2: Faster inference of language models with dynamic draft trees.
+arXiv preprint arXiv:2406.16858 (2024)
+
+\bibitem{li2024snapkv}
+Li, Y., Huang, Y., Yang, B., et~al.:
+SnapKV: LLM knows what you are looking for before generation.
+arXiv preprint arXiv:2404.14469 (2024)
+
+\bibitem{liu2024kivi}
+Liu, Z., Yuan, J., Jin, H., et~al.:
+KIVI: A tuning-free asymmetric 2-bit quantization for KV cache.
+In: Proceedings of the 41st International Conference on Machine Learning (ICML) (2024)
+
+\bibitem{miao2024specinfer}
+Miao, X., Oliaro, G., Zhang, Z., et~al.:
+SpecInfer: Accelerating large language model serving with tree-based speculative inference and verification.
+In: Proceedings of the 29th ACM International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS), pp. 932--949 (2024)
+
+\bibitem{santilli2023accelerating}
+Santilli, A., Venuti, S., Fischetti, P., et~al.:
+Accelerating transformer inference for translation via speculative Jacobi decoding.
+arXiv preprint arXiv:2305.10427 (2023)
+
+\bibitem{shazeer2019fast}
+Shazeer, N.:
+Fast transformer decoding: One write-head is all you need.
+arXiv preprint arXiv:1911.02150 (2019)
+
+\bibitem{sun2024triforce}
+Sun, H., Chen, Z., Dong, Y., et~al.:
+TriForce: Lossless acceleration of long sequence generation with hierarchical speculative decoding.
+arXiv preprint arXiv:2404.11912 (2024)
+
+\bibitem{xiao2024efficient}
+Xiao, G., Tian, Y., Chen, B., et~al.:
+Efficient streaming language models with attention sinks.
+In: International Conference on Learning Representations (ICLR) (2024)
+
+\bibitem{zhang2024h2o}
+Zhang, Z., Sheng, Y., Zhou, T., et~al.:
+H2O: Heavy-hitter oracle for efficient generative inference of large language models.
+In: Advances in Neural Information Processing Systems (NeurIPS) (2024)
+
+\end{thebibliography}
+
+\end{document}

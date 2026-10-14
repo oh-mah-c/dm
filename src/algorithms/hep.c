@@ -7,6 +7,13 @@
 #include <math.h>
 #include <stdbool.h>
 
+/* Threshold comparisons use a small relative tolerance so that itemsets whose
+ * occupancy equals the threshold exactly are not lost to floating-point
+ * rounding (e.g. 0.1 * 19 evaluates to 1.9000000000000001). */
+static inline int hoi_ge(double x, double threshold) {
+    return x >= threshold - 1e-9 * (1.0 + fabs(threshold));
+}
+
 typedef struct {
     uint32_t *items;
     size_t length;
@@ -56,7 +63,7 @@ static int cmp_trans_meta(const void *a, const void *b) {
 }
 
 static bool check_ubo_and_o(uint32_t *tids, size_t size, uint32_t *g_tsize, size_t k, double xi, bool *is_ho) {
-    if ((double)size < xi) return false;
+    if (!hoi_ge((double)size, xi)) return false;
 
     double current_sum = 0.0;
     double max_ubo = 0.0;
@@ -73,8 +80,8 @@ static bool check_ubo_and_o(uint32_t *tids, size_t size, uint32_t *g_tsize, size
         }
     }
     
-    if (max_ubo >= xi) {
-        *is_ho = ((k * current_sum) >= xi);
+    if (hoi_ge(max_ubo, xi)) {
+        *is_ho = hoi_ge(k * current_sum, xi);
         return true;
     }
     return false;
@@ -112,7 +119,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     uint32_t **item_tids = malloc((ds->max_id + 1) * sizeof(uint32_t*));
     uint32_t *item_idx = calloc(ds->max_id + 1, sizeof(uint32_t));
     for (uint32_t i = 0; i <= ds->max_id; i++) {
-        if (counts[i] >= xi) {
+        if (hoi_ge((double)counts[i], xi)) {
             item_tids[i] = malloc(counts[i] * sizeof(uint32_t));
         } else {
             item_tids[i] = NULL;
@@ -123,7 +130,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
         uint32_t orig = meta[i].orig_tid;
         for (size_t j = 0; j < data[orig].count; j++) {
             uint32_t item = data[orig].items[j];
-            if (counts[item] >= xi) {
+            if (hoi_ge((double)counts[item], xi)) {
                 item_tids[item][item_idx[item]++] = i;
             }
         }
@@ -139,7 +146,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     size_t total_visited_nodes = 0;
 
     for (uint32_t i = 0; i <= ds->max_id; i++) {
-        if (counts[i] >= xi) {
+        if (hoi_ge((double)counts[i], xi)) {
             bool is_ho = false;
             if (check_ubo_and_o(item_tids[i], counts[i], g_tsize, 1, xi, &is_ho)) {
                 HEPItemset it;
@@ -198,7 +205,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
                     }
                 }
                 
-                if (new_idx >= xi) {
+                if (hoi_ge((double)new_idx, xi)) {
                     bool is_ho = false;
                     if (check_ubo_and_o(new_tids, new_idx, g_tsize, k, xi, &is_ho)) {
                         HEPItemset P;

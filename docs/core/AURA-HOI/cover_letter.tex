@@ -1,74 +1,48 @@
-\documentclass[10.5pt,a4paper]{article}
+\documentclass[11pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
-\usepackage[top=0.85in,bottom=0.85in,left=0.9in,right=0.9in]{geometry}
-\usepackage{hyperref}
+\usepackage[T1]{fontenc}
+\usepackage[top=0.8in,bottom=0.8in,left=0.9in,right=0.9in]{geometry}
 \usepackage{xcolor}
-
-\hypersetup{
-  colorlinks=true,
-  linkcolor=blue!70!black,
-  urlcolor=blue!70!black
-}
-
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue!70!black,urlcolor=blue!70!black}
 \pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
 
 \begin{document}
 
-\noindent
 \textbf{Quan Van} \hfill \today \\
-Independent Researcher, Hanoi, Vietnam \\
-Email: \href{mailto:vanhaminhquan2406@gmail.com}{vanhaminhquan2406@gmail.com} \quad $|$ \quad ORCID: \href{https://orcid.org/0009-0002-8222-0076}{0009-0002-8222-0076}
+Independent Researcher, Ho Chi Minh City, Vietnam \\
+Email: \href{mailto:vanhaminhquan2406@gmail.com}{vanhaminhquan2406@gmail.com} \quad ORCID: \href{https://orcid.org/0009-0002-8222-0076}{0009-0002-8222-0076}
 
-\vspace{0.8em}
+\vspace{0.4em}
 \hrule
-\vspace{1.0em}
+\vspace{0.4em}
 
-\noindent
-\textbf{To the Editors-in-Chief and Editorial Board} \\
-\textit{Journal of Systems Science and Complexity} (Springer) \\[0.8em]
-\textbf{Subject:} Submission of original research manuscript entitled \\
-\textbf{``AURA-HOI: High-Occupancy Itemset Mining via Equivalence Classes and Residual Envelope Pruning''} \\[0.8em]
+To the Editors-in-Chief \\
+\textit{Journal of Intelligent Information Systems}
 
-\noindent
-Dear Editors-in-Chief and Distinguished Editorial Board Members,
+Dear Editors,
 
-\vspace{0.5em}
-I am pleased to submit our original research manuscript entitled \textbf{``AURA-HOI: High-Occupancy Itemset Mining via Equivalence Classes and Residual Envelope Pruning''} for consideration for publication as a regular research article in the \textit{Journal of Systems Science and Complexity} (JSSC).
+I submit the manuscript \textbf{``AURA-HOI: High-Occupancy Itemset Mining via Equivalence Classes and Residual Envelope Pruning''} for consideration as a research article in the \textit{Journal of Intelligent Information Systems}.
 
-\vspace{0.5em}
-\noindent
-\textbf{Context and Importance of the Research:} \\
-Frequent itemset mining (FIM) is a foundational paradigm in discrete data analysis and complex systems modeling. However, classical frequency-based metrics often fail to capture semantic cohesion and proportional coverage, frequently extracting trivial or diffuse co-occurrences. \emph{High-Occupancy Itemset Mining} (HOIM) addresses this limitation by discovering pattern assemblies that occupy a dominant fraction of their supporting transactions. Nonetheless, occupancy fundamentally lacks the anti-monotonic downward-closure property of classical support. Navigating this non-monotonic combinatorial search space ($O(2^m)$) without incurring false negatives or computational explosion has remained a longstanding challenge.
+\textbf{Problem.} Occupancy measures how much of its supporting transactions an itemset covers. It is not anti-monotone, so exact miners of high-occupancy itemsets prune the search with upper bounds. The manuscript shows that the bound used by the existing exact miners depends only on transaction lengths and reduces to the support when all transactions have the same length, a common situation in categorical data; these miners then enumerate every frequent itemset.
 
-\vspace{0.5em}
-\noindent
-\textbf{Key Theoretical and Algorithmic Contributions:} \\
-To overcome these challenges, we introduce \textbf{AURA-HOI}, a mathematically disciplined, efficient, and auditable framework:
-\begin{itemize}\itemsep 2pt
-    \item \textbf{Safe Residual Upper Bound Pruning:} We prove the \emph{Safe Residual Upper Bound Theorem} ($\mathcal{U}_{\mathrm{safe}}$) and analytical tightness characterizations, guaranteeing zero false negatives while pruning dense subtrees. Crucially, $\mathcal{U}_{\mathrm{safe}}$ evaluates in strict $O(1)$ constant time, sharply bounding the effective branching factor.
-    \item \textbf{Pure TID-List Equivalence Classes:} We discard inefficient horizontal bitsets and dynamic projected lists in favor of vertical TID-list prefix equivalence classes, eliminating memory churn and scaling seamlessly across both dense and sparse clickstream regimes.
-    \item \textbf{Stack-Bounded Memory Arena:} An internal mark-and-rewind memory allocator (`AURAMemPool`) bounds peak resident memory strictly to recursion stack depth $O(d_{\max} \cdot n + m)$, eliminating dynamic heap churn.
-    \item \textbf{Exhaustive Verification and Auditability:} Across 35 experimental configurations on five benchmark datasets, AURA-HOI achieves $100\%$ exact itemset count parity against state-of-the-art exact baselines (\textsc{HEP} and \textsc{DFHOI}), while reducing search space nodes by up to $94.7\%$ on \texttt{mushrooms} and up to $100\%$ on \texttt{chess}, achieving single-threaded speedups of up to $23.5\times$ and $715\times$, respectively.
+\textbf{Contributions.}
+\begin{itemize}\setlength{\itemsep}{2pt}
+\item A length-capped residual bound that combines transaction lengths with the largest itemset that can still be generated in a branch, with proofs that it is safe and never weaker than the two bounds it combines.
+\item AURA-HOI, a depth-first miner over equivalence classes of transaction-ID lists, with a proof that it returns exactly the set of high-occupancy itemsets, and a minimal counterexample showing that a natural shortcut in the residual computation loses results.
+\item A reproducible evaluation: verification against an exact rational-arithmetic oracle, output parity with two exact baselines (HEP and DFHOI) on nine public benchmarks, repeated single-threaded runs without a time limit, memory measured as the increase attributable to mining, an ablation study, a scalability study and a signed-rank test. The results also report where the method does not help.
 \end{itemize}
 
-\vspace{0.5em}
-\noindent
-\textbf{Appropriateness for the Journal of Systems Science and Complexity:} \\
-JSSC is dedicated to fundamental advances in complex systems, optimization, and computer mathematics. Our work directly aligns with the journal's scope by solving a foundational combinatorial complexity problem in discrete data systems, establishing formal mathematical bounds for non-monotonic search spaces, and bridging theoretical complexity bounds with practical large-scale data system scalability.
+\textbf{Fit with the journal.} JIIS publishes work at the intersection of artificial intelligence and data management, including data mining and knowledge discovery. The manuscript contributes an exact, provably correct pattern-mining algorithm and a verification protocol for comparing exact miners.
 
-\vspace{0.5em}
-\noindent
-\textbf{Declarations:} \\
-This manuscript is original work, has not been published previously, is not under consideration elsewhere, and will not be submitted elsewhere while under review by JSSC. The author declares no conflicts of interest.
+\textbf{Prior submission.} This manuscript is a revised version of a manuscript submitted to JIIS earlier this year (Manuscript ID 8f0df156-2539-436c-8fc5-f7878f5b3403), which I withdrew before peer review after finding errors in it. The method has since been corrected and proved, and all experiments have been repeated under the protocol described in the manuscript.
 
-\vspace{0.8em}
-\noindent
-Sincerely yours,
+\textbf{Declarations.} The manuscript is original, has not been published, and is not under consideration elsewhere. The research received no funding, and the author declares no competing interests.
 
-\vspace{0.8em}
-\noindent
+Sincerely, \\[0.3em]
 \textbf{Quan Van} \\
-Independent Researcher, Hanoi, Vietnam \\
-Email: \href{mailto:vanhaminhquan2406@gmail.com}{vanhaminhquan2406@gmail.com}
+Independent Researcher, Ho Chi Minh City, Vietnam
 
 \end{document}

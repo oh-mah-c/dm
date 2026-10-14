@@ -1,0 +1,26 @@
+nohup: ignoring input
+dataset=chess fraction=1.0 variant= alpha=0.5 algorithm=hep status=ok reps=5 time=7.681037 items=0 nodes=1706474 mem=3622.7
+dataset=chess fraction=1.0 variant= alpha=0.5 algorithm=dfhoi status=ok reps=5 time=4.331358 items=0 nodes=1706474 mem=2.29
+dataset=chess fraction=1.0 variant= alpha=0.5 algorithm=aura_hoi status=ok reps=5 time=0.006489 items=0 nodes=1514 mem=1.14
+dataset=chess fraction=1.0 variant= alpha=0.45 algorithm=hep status=ok reps=3 time=16.503201 items=0 nodes=3915414 mem=7271.49
+dataset=chess fraction=1.0 variant= alpha=0.45 algorithm=dfhoi status=ok reps=5 time=9.984537 items=0 nodes=3915414 mem=2.4
+dataset=chess fraction=1.0 variant= alpha=0.45 algorithm=aura_hoi status=ok reps=5 time=0.014214000000000001 items=0 nodes=3665 mem=1.65
+dataset=chess fraction=1.0 variant= alpha=0.4 algorithm=hep status=ok reps=3 time=36.05034199999999 items=0 nodes=9135742 mem=14299.02
+dataset=chess fraction=1.0 variant= alpha=0.4 algorithm=dfhoi status=ok reps=3 time=20.766981 items=0 nodes=9135742 mem=2.54
+dataset=chess fraction=1.0 variant= alpha=0.4 algorithm=aura_hoi status=ok reps=5 time=0.024592 items=0 nodes=6748 mem=1.64
+dataset=chess fraction=1.0 variant= alpha=0.35 algorithm=hep status=memory reps=1 time= items= nodes= mem=
+dataset=chess fraction=1.0 variant= alpha=0.35 algorithm=dfhoi status=ok reps=3 time=48.149145 items=0 nodes=21846519 mem=2.66
+dataset=chess fraction=1.0 variant= alpha=0.35 algorithm=aura_hoi status=ok reps=5 time=0.05896 items=0 nodes=18804 mem=1.86
+dataset=chess fraction=1.0 variant= alpha=0.3 algorithm=hep status=skipped reps= time= items= nodes= mem=
+dataset=chess fraction=1.0 variant= alpha=0.3 algorithm=dfhoi status=ok reps=3 time=107.33906900000001 items=0 nodes=54203841 mem=2.83
+dataset=chess fraction=1.0 variant= alpha=0.3 algorithm=aura_hoi status=ok reps=5 time=0.19580099999999998 items=0 nodes=68414 mem=2.27
+dataset=connect fraction=1.0 variant= alpha=0.8 algorithm=hep status=memory reps=1 time= items= nodes= mem=
+dataset=connect fraction=1.0 variant= alpha=0.8 algorithm=dfhoi status=ok reps=3 time=56.464116000000004 items=0 nodes=555010 mem=42.13
+dataset=connect fraction=1.0 variant= alpha=0.8 algorithm=aura_hoi status=ok reps=5 time=0.008882999999999999 items=0 nodes=0 mem=7.61
+dataset=connect fraction=1.0 variant= alpha=0.7 algorithm=hep status=skipped reps= time= items= nodes= mem=
+dataset=connect fraction=1.0 variant= alpha=0.7 algorithm=dfhoi status=ok reps=1 time=401.60497100000003 items=0 nodes=4249202 mem=52.52
+dataset=connect fraction=1.0 variant= alpha=0.7 algorithm=aura_hoi status=ok reps=5 time=0.008996 items=0 nodes=0 mem=8.25
+dataset=connect fraction=1.0 variant= alpha=0.6 algorithm=hep status=skipped reps= time= items= nodes= mem=
+dataset=connect fraction=1.0 variant= alpha=0.6 algorithm=dfhoi status=ok reps=1 time=2053.253488 items=0 nodes=21723577 mem=60.7
+dataset=connect fraction=1.0 variant= alpha=0.6 algorithm=aura_hoi status=ok reps=5 time=0.034453000000000004 items=0 nodes=177 mem=14.23
+dataset=connect fraction=1.0 variant= alpha=0.5 algorithm=hep status=skipped reps= time= items= nodes= mem=

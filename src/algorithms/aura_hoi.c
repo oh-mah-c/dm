@@ -260,6 +260,12 @@ typedef struct {
     size_t ledger_duplicates;
     size_t topk_updates;
     int limited;
+
+    /* Ablation switches (raw view only), read from the AURA_ABLATION
+     * environment variable; all zero by default. */
+    int abl_no_tail_cap;      /* node bound ignores the residual tail length */
+    int abl_no_class_bound;   /* skip the class-level residual bound */
+    int abl_no_arena;         /* allocate child TID-lists with malloc */
     
     /* Memory Pool & Pre-allocated Recursion Scratchpads */
     AURAMemPool pool;
@@ -286,6 +292,13 @@ static inline int should_stop(AURACtx *ctx) {
     return 0;
 }
 
+/* Threshold comparisons use a small relative tolerance so that itemsets whose
+ * occupancy equals the threshold exactly are not lost to floating-point
+ * rounding (e.g. 0.1 * 19 evaluates to 1.9000000000000001). */
+static inline int hoi_ge(double x, double threshold) {
+    return x >= threshold - 1e-9 * (1.0 + fabs(threshold));
+}
+
 /* ── Simultaneous TID Intersection with Cumulative UBO & Score ───────────── */
 /* Intersects P1->tids and P2->tids into out_tids, computing support, recip_sum, 
  * and testing UBO condition in a single linear pass over the common elements. */
@@ -294,7 +307,6 @@ static inline int intersect_tids_and_check(const AURACtx *ctx,
                                            uint32_t *out_tids, size_t *out_size,
                                            size_t new_k, size_t R_count,
                                            int *is_ho, double *out_recip_sum) {
-    (void)R_count;
     const uint32_t *t1 = P1->tids;
     const uint32_t *t2 = P2->tids;
     size_t n1 = P1->num_tids;
@@ -318,11 +330,17 @@ static inline int intersect_tids_and_check(const AURACtx *ctx,
     *out_size = count;
     if (count < ctx->min_support) return 0;
     
-    /* Uniform length fast-path (O(1)) */
+    /* Uniform length fast-path (O(1)): with all lengths equal to L, the
+     * length-capped bound reduces to min(L, new_k + R_count) * count / L. */
     if (ctx->uniform_length) {
-        double o_val = ((double)new_k * (double)count) / (double)ctx->first_len;
-        *is_ho = (o_val >= ctx->threshold_value);
-        *out_recip_sum = (double)count / (double)ctx->first_len;
+        double L = (double)ctx->first_len;
+        double cap = ctx->abl_no_tail_cap ? L : (double)(new_k + R_count);
+        if (cap > L) cap = L;
+        *out_size = count;
+        if (!hoi_ge(cap * (double)count / L, ctx->threshold_value)) return 0;
+        double o_val = ((double)new_k * (double)count) / L;
+        *is_ho = hoi_ge(o_val, ctx->threshold_value);
+        *out_recip_sum = (double)count / L;
         return 1;
     }
     
@@ -331,7 +349,7 @@ static inline int intersect_tids_and_check(const AURACtx *ctx,
     double max_ubo = 0.0;
     const uint32_t *g_tsize = ctx->g_tsize;
     const double *recip_table = ctx->recip_table;
-    uint32_t max_desc_len = (uint32_t)(new_k + R_count);
+    uint32_t max_desc_len = ctx->abl_no_tail_cap ? UINT32_MAX : (uint32_t)(new_k + R_count);
     
     for (int i = (int)count - 1; i >= 0; i--) {
         uint32_t tid = out_tids[i];
@@ -347,8 +365,8 @@ static inline int intersect_tids_and_check(const AURACtx *ctx,
         }
     }
     
-    if (max_ubo >= ctx->threshold_value) {
-        *is_ho = (((double)new_k * current_sum) >= ctx->threshold_value);
+    if (hoi_ge(max_ubo, ctx->threshold_value)) {
+        *is_ho = hoi_ge((double)new_k * current_sum, ctx->threshold_value);
         *out_recip_sum = current_sum;
         return 1;
     }
@@ -375,16 +393,18 @@ static void aura_process_root_item_raw(AURACtx *ctx, AURATidNode *classes, size_
      *         \le (P1->length + remaining) * P1->recip_sum.
      * If this upper bound < threshold_value, NO valid HOI descendant can exist! */
     double max_possible_k = (double)(P1->length + remaining);
-    if (ctx->uniform_length) {
+    if (ctx->abl_no_class_bound) {
+        /* Ablation: no class-level residual bound. */
+    } else if (ctx->uniform_length) {
         if (max_possible_k > (double)ctx->first_len) max_possible_k = (double)ctx->first_len;
         double max_desc_score = (max_possible_k * (double)P1->num_tids) / (double)ctx->first_len;
-        if (max_desc_score + 1e-12 < ctx->threshold_value) {
+        if (!hoi_ge(max_desc_score, ctx->threshold_value)) {
             ctx->pruned_envelope += remaining;
             return;
         }
     } else {
         double max_desc_score = max_possible_k * P1->recip_sum;
-        if (max_desc_score + 1e-12 < ctx->threshold_value || (double)P1->num_tids + 1e-12 < ctx->threshold_value) {
+        if (!hoi_ge(max_desc_score, ctx->threshold_value) || !hoi_ge((double)P1->num_tids, ctx->threshold_value)) {
             ctx->pruned_envelope += remaining;
             return;
         }
@@ -403,14 +423,19 @@ static void aura_process_root_item_raw(AURACtx *ctx, AURATidNode *classes, size_
         
         size_t new_size = 0;
         size_t new_k = P1->length + 1;
-        size_t R_count = class_size - j - 1;
+        /* A node X+{x_j} that fails the bound is removed from the child class,
+         * so it disappears both as a subtree root and as a tail item of its
+         * earlier siblings. Every itemset that could still contain it has at most
+         * |X| + 1 + (remaining - 1) items, so the tail used by the bound is the
+         * whole sibling set minus x_j, not only the items after j. */
+        size_t R_count = remaining - 1;
         int is_ho = 0;
         double recip_sum = 0.0;
         
         if (intersect_tids_and_check(ctx, P1, P2, ctx->tid_scratch, &new_size,
                                      new_k, R_count, &is_ho, &recip_sum)) {
             /* Allocate TID array from pool */
-            uint32_t *tids_copy = mempool_alloc(&ctx->pool, new_size);
+            uint32_t *tids_copy = ctx->abl_no_arena ? NULL : mempool_alloc(&ctx->pool, new_size);
             int pool_alloc_ok = (tids_copy != NULL);
             if (!pool_alloc_ok) {
                 tids_copy = (uint32_t *)malloc(new_size * sizeof(uint32_t));
@@ -438,13 +463,15 @@ static void aura_process_root_item_raw(AURACtx *ctx, AURATidNode *classes, size_
         /* Check if child class as a whole has enough tail length to reach threshold */
         double max_child_k = (double)(P1->length + child_count);
         int prune_subtree = 0;
-        if (ctx->uniform_length) {
+        if (ctx->abl_no_class_bound) {
+            /* Ablation: no class-level residual bound. */
+        } else if (ctx->uniform_length) {
             if (max_child_k > (double)ctx->first_len) max_child_k = (double)ctx->first_len;
             double max_child_score = (max_child_k * (double)P1->num_tids) / (double)ctx->first_len;
-            if (max_child_score + 1e-12 < ctx->threshold_value) prune_subtree = 1;
+            if (!hoi_ge(max_child_score, ctx->threshold_value)) prune_subtree = 1;
         } else {
             double max_child_score = max_child_k * P1->recip_sum;
-            if (max_child_score + 1e-12 < ctx->threshold_value) prune_subtree = 1;
+            if (!hoi_ge(max_child_score, ctx->threshold_value)) prune_subtree = 1;
         }
         
         if (prune_subtree) {
@@ -458,7 +485,7 @@ static void aura_process_root_item_raw(AURACtx *ctx, AURATidNode *classes, size_
     }
     
     /* If any child had to use standard malloc, free it */
-    if (ctx->pool.used + ctx->ntrans > ctx->pool.capacity) {
+    if (ctx->abl_no_arena || ctx->pool.used + ctx->ntrans > ctx->pool.capacity) {
         for (size_t c = 0; c < child_count; c++) {
             if (children[c].tids < ctx->pool.pool ||
                 children[c].tids >= ctx->pool.pool + ctx->pool.capacity) {
@@ -535,14 +562,16 @@ static void aura_process_root_item_closed(AURACtx *ctx, size_t depth,
         AURATidNode *P2 = &classes[j];
         
         /* Theorem 2: Pre-Intersection Sibling Pruning in O(1) */
-        size_t R_count = class_size - j - 1;
+        /* Same argument as in the raw engine: a skipped x_j is also lost as a
+         * tail item of earlier siblings, so all other siblings count. */
+        size_t R_count = class_size - i - 2;
         size_t max_desc_len = current_len + 1 + R_count;
         size_t min_supp = (P1->num_tids < P2->num_tids) ? P1->num_tids : P2->num_tids;
         if (min_supp < ctx->min_support) continue;
-        if ((double)min_supp + 1e-12 < ctx->threshold_value) continue;
+        if (!hoi_ge((double)min_supp, ctx->threshold_value)) continue;
         
         double min_rsum = (P1->recip_sum < P2->recip_sum) ? P1->recip_sum : P2->recip_sum;
-        if ((double)max_desc_len * min_rsum + 1e-12 < ctx->threshold_value) continue;
+        if (!hoi_ge((double)max_desc_len * min_rsum, ctx->threshold_value)) continue;
         
         ctx->visited_nodes++;
         
@@ -582,7 +611,7 @@ static void aura_process_root_item_closed(AURACtx *ctx, size_t depth,
         ? ((double)current_len * P1->recip_sum)
         : avg_occ;
     
-    if (score + 1e-12 >= ctx->threshold_value) {
+    if (hoi_ge(score, ctx->threshold_value)) {
         ctx->raw_hoi_count++;
         if (ledger_add(&ctx->ledger, ctx->prefix_items, current_len, P1->tids, P1->num_tids, avg_occ)) {
             ctx->total_output_items += current_len;
@@ -598,10 +627,10 @@ static void aura_process_root_item_closed(AURACtx *ctx, size_t depth,
         if (ctx->uniform_length) {
             if (max_possible_k > (double)ctx->first_len) max_possible_k = (double)ctx->first_len;
             double max_desc_score = (max_possible_k * (double)P1->num_tids) / (double)ctx->first_len;
-            if (max_desc_score + 1e-12 < ctx->threshold_value) prune_children = 1;
+            if (!hoi_ge(max_desc_score, ctx->threshold_value)) prune_children = 1;
         } else {
             double max_desc_score = max_possible_k * P1->recip_sum;
-            if (max_desc_score + 1e-12 < ctx->threshold_value) prune_children = 1;
+            if (!hoi_ge(max_desc_score, ctx->threshold_value)) prune_children = 1;
         }
         if (prune_children) {
             ctx->pruned_envelope += child_count;
@@ -762,6 +791,15 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     ctx.top_k = p ? p->top_k : 0;
     ctx.start_clock = clock();
 
+    const char *ablation = getenv("AURA_ABLATION");
+    if (ablation) {
+        ctx.abl_no_tail_cap = strstr(ablation, "no_tail_cap") != NULL;
+        ctx.abl_no_class_bound = strstr(ablation, "no_class_bound") != NULL;
+        ctx.abl_no_arena = strstr(ablation, "no_arena") != NULL;
+        printf("[AURA-HOI] Ablation: no_tail_cap=%d no_class_bound=%d no_arena=%d\n",
+               ctx.abl_no_tail_cap, ctx.abl_no_class_bound, ctx.abl_no_arena);
+    }
+
     /* ── Step 1: Preprocess Transaction Lengths & Length Equivalence ────── */
     TransMeta *meta = (TransMeta *)malloc(ctx.ntrans * sizeof(TransMeta));
     if (!meta) return DM_ERROR_MEMORY;
@@ -912,7 +950,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
         /* Check 1-item status */
         if (ctx.uniform_length) {
             double o_val = (double)dummy_size / (double)ctx.first_len;
-            is_ho = (o_val >= ctx.threshold_value);
+            is_ho = hoi_ge(o_val, ctx.threshold_value);
             recip_sum = ctx.item_recip_sums[i];
         } else {
             /* compute 1-item UBO check */
@@ -927,8 +965,8 @@ static DM_Status run(DM_Dataset *ds, void *params) {
                     if (current_ubo > max_ubo) max_ubo = current_ubo;
                 }
             }
-            if (max_ubo < ctx.threshold_value) continue;
-            is_ho = (current_sum >= ctx.threshold_value);
+            if (!hoi_ge(max_ubo, ctx.threshold_value)) continue;
+            is_ho = hoi_ge(current_sum, ctx.threshold_value);
             recip_sum = current_sum;
         }
 

@@ -1,0 +1,200 @@
+[
+  [
+    "2404.11912_TriForce_Lossless_Acceleration_of_Long_Sequence_Generation_with_Hierar.pdf",
+    "Topic 1: Long-Context Speculative Decoding",
+    "TriForce: Lossless Acceleration of Long Sequence Generation with Hierarchical Speculative Decoding",
+    "2404.11912"
+  ],
+  [
+    "2408.11049_MagicDec_Breaking_the_Latency-Throughput_Tradeoff_for_Long_Context_Gen.pdf",
+    "Topic 1: Long-Context Speculative Decoding",
+    "MagicDec: Breaking the Latency-Throughput Tradeoff for Long Context Generation with Speculative Decoding",
+    "2408.11049"
+  ],
+  [
+    "2502.17421_LongSpec_Long-Context_Lossless_Speculative_Decoding_with_Efficient_Dra.pdf",
+    "Topic 1: Long-Context Speculative Decoding",
+    "LongSpec: Long-Context Lossless Speculative Decoding with Efficient Drafting and Verification",
+    "2502.17421"
+  ],
+  [
+    "2505.20776_SpecExtend_A_Drop-in_Enhancement_for_Speculative_Decoding_of_Long_Sequ.pdf",
+    "Topic 1: Long-Context Speculative Decoding",
+    "SpecExtend: A Drop-in Enhancement for Speculative Decoding of Long Sequences",
+    "2505.20776"
+  ],
+  [
+    "2502.20330_RAPID_Long-Context_Inference_with_Retrieval-Augmented_Speculative_Deco.pdf",
+    "Topic 1: Long-Context Speculative Decoding",
+    "RAPID: Long-Context Inference with Retrieval-Augmented Speculative Decoding",
+    "2502.20330"
+  ],
+  [
+    "2510.07535_OWL_Overcoming_Window_Length-Dependence_in_Speculative_Decoding_for_Lo.pdf",
+    "Topic 1: Long-Context Speculative Decoding",
+    "OWL: Overcoming Window Length-Dependence in Speculative Decoding for Long-Context Inputs",
+    "2510.07535"
+  ],
+  [
+    "2512.00722_SpeContext_Enabling_Efficient_Long-context_Reasoning_with_Speculative.pdf",
+    "Topic 1: Long-Context Speculative Decoding",
+    "SpeContext: Enabling Efficient Long-context Reasoning with Speculative Context Sparsity in LLMs",
+    "2512.00722"
+  ],
+  [
+    "2512.02337_SpecPV_Improving_Self-Speculative_Decoding_for_Long-Context_Generation.pdf",
+    "Topic 1: Long-Context Speculative Decoding",
+    "SpecPV: Improving Self-Speculative Decoding for Long-Context Generation via Partial Verification",
+    "2512.02337"
+  ],
+  [
+    "2609.33184_Resource-Efficient_Speculative_Decoding_for_Long-Context_LLM_Serving.pdf",
+    "Topic 1: Long-Context Speculative Decoding",
+    "Resource-Efficient Speculative Decoding for Long-Context LLM Serving",
+    "2609.33184"
+  ],
+  [
+    "2609.17943_ASPIRE_Asynchronous_Batched_Self-Speculative_Decoding_for_Long-Context.pdf",
+    "Topic 1: Long-Context Speculative Decoding",
+    "ASPIRE: Asynchronous Batched Self-Speculative Decoding for Long-Context LLM Inference",
+    "2609.17943"
+  ],
+  [
+    "2610.05106_SharpDraft_Accelerating_Long-Context_Speculative_Decoding_with_Cardina.pdf",
+    "Topic 1: Long-Context Speculative Decoding",
+    "SharpDraft: Accelerating Long-Context Speculative Decoding with Cardinality-Aware Query Scaling",
+    "2610.05106"
+  ],
+  [
+    "2608.30252_Strong_Drafts_Need_Compact_Memories_Long-Context_Speculative_Decoding.pdf",
+    "Topic 2: KV-Cache Pruning/Compression for Draft Models",
+    "Strong Drafts Need Compact Memories: Long-Context Speculative Decoding with Compressed KV Cache",
+    "2608.30252"
+  ],
+  [
+    "2606.00144_BudgetDraft_Acceptance-Aware_Multi-View_Training_for_Sparse-KV_Specula.pdf",
+    "Topic 2: KV-Cache Pruning/Compression for Draft Models",
+    "BudgetDraft: Acceptance-Aware Multi-View Training for Sparse-KV Speculative Decoding",
+    "2606.00144"
+  ],
+  [
+    "2502.10424_QuantSpec_Self-Speculative_Decoding_with_Hierarchical_Quantized_KV_Cac.pdf",
+    "Topic 2: KV-Cache Pruning/Compression for Draft Models",
+    "QuantSpec: Self-Speculative Decoding with Hierarchical Quantized KV Cache",
+    "2502.10424"
+  ],
+  [
+    "2605.02888_SpecKV_Adaptive_Speculative_Decoding_with_Compression-Aware_Gamma_Sele.pdf",
+    "Topic 2: KV-Cache Pruning/Compression for Draft Models",
+    "SpecKV: Adaptive Speculative Decoding with Compression-Aware Gamma Selection",
+    "2605.02888"
+  ],
+  [
+    "2605.17613_VeriCache_Turning_Lossy_KV_Cache_into_Lossless_LLM_Inference.pdf",
+    "Topic 2: KV-Cache Pruning/Compression for Draft Models",
+    "VeriCache: Turning Lossy KV Cache into Lossless LLM Inference",
+    "2605.17613"
+  ],
+  [
+    "2607.27269_Beyond_KV_Reconstruction_Functional_Reconstruction_for_MLA_Draft_Model.pdf",
+    "Topic 2: KV-Cache Pruning/Compression for Draft Models",
+    "Beyond KV Reconstruction: Functional Reconstruction for MLA Draft Models in Speculative Decoding",
+    "2607.27269"
+  ],
+  [
+    "2607.27735_A_Sparse_Glimpse_of_the_Whole_Train-Free_Self-Speculative_Decoding.pdf",
+    "Topic 2: KV-Cache Pruning/Compression for Draft Models",
+    "A Sparse Glimpse of the Whole: Train-Free Self-Speculative Decoding",
+    "2607.27735"
+  ],
+  [
+    "2605.19893_SSV_Sparse_Speculative_Verification_for_Efficient_LLM_Inference.pdf",
+    "Topic 2: KV-Cache Pruning/Compression for Draft Models",
+    "SSV: Sparse Speculative Verification for Efficient LLM Inference",
+    "2605.19893"
+  ],
+  [
+    "2602.07223_Vegas_Self-Speculative_Decoding_with_Verification-Guided_Sparse_Attent.pdf",
+    "Topic 2: KV-Cache Pruning/Compression for Draft Models",
+    "Vegas: Self-Speculative Decoding with Verification-Guided Sparse Attention",
+    "2602.07223"
+  ],
+  [
+    "2610.13202_S3R_Fast_and_Faithful_RL_Rollouts_via_Self-Sparse_Speculative_Decoding.pdf",
+    "Topic 2: KV-Cache Pruning/Compression for Draft Models",
+    "S$^3$R: Fast and Faithful RL Rollouts via Self-Sparse Speculative Decoding",
+    "2610.13202"
+  ],
+  [
+    "2609.21704_SpecQuant_Speculative_Decoding_with_Multi-Parent_Quantization_for_Adap.pdf",
+    "Topic 2: KV-Cache Pruning/Compression for Draft Models",
+    "SpecQuant: Speculative Decoding with Multi-Parent Quantization for Adaptive LLM Inference",
+    "2609.21704"
+  ],
+  [
+    "2610.13708_Adaptive_DHiSparse_Speculative_Decoding_over_a_Load-Adaptive_KV_Hierar.pdf",
+    "Topic 3: Decoupled KV-Cache Strategies between Target and Draft LLMs",
+    "Adaptive DHiSparse: Speculative Decoding over a Load-Adaptive KV Hierarchy",
+    "2610.13708"
+  ],
+  [
+    "2607.07409_DeLS-Spec_Decoupled_Long-Short_Contexts_for_Parallel_Speculative_Draft.pdf",
+    "Topic 3: Decoupled KV-Cache Strategies between Target and Draft LLMs",
+    "DeLS-Spec: Decoupled Long-Short Contexts for Parallel Speculative Drafting",
+    "2607.07409"
+  ],
+  [
+    "2609.24197_H-Spec_Parallel_Speculative_Decoding_Without_a_Drafter-Side_KV_Cache.pdf",
+    "Topic 3: Decoupled KV-Cache Strategies between Target and Draft LLMs",
+    "H-Spec: Parallel Speculative Decoding Without a Drafter-Side KV Cache",
+    "2609.24197"
+  ],
+  [
+    "2606.24957_Dustin_Draft-Augmented_Sparse_Verification_for_Efficient_Long-Context.pdf",
+    "Topic 3: Decoupled KV-Cache Strategies between Target and Draft LLMs",
+    "Dustin: Draft-Augmented Sparse Verification for Efficient Long-Context Generation with Speculative Decoding",
+    "2606.24957"
+  ],
+  [
+    "2604.26412_When_Hidden_States_Drift_Can_KV_Caches_Rescue_Long-Range_Speculative_D.pdf",
+    "Topic 3: Decoupled KV-Cache Strategies between Target and Draft LLMs",
+    "When Hidden States Drift: Can KV Caches Rescue Long-Range Speculative Decoding?",
+    "2604.26412"
+  ],
+  [
+    "2608.08097_OasisKV_Scaling_In-Decode_KV_Cache_Beyond_HBM_with_Lookahead_Sparse_Pr.pdf",
+    "Topic 3: Decoupled KV-Cache Strategies between Target and Draft LLMs",
+    "OasisKV: Scaling In-Decode KV Cache Beyond HBM with Lookahead Sparse Prefetching",
+    "2608.08097"
+  ],
+  [
+    "2609.17008_FlexEE_Self-Speculative_and_KV-Compatible_Early_Exiting_for_Offloading.pdf",
+    "Topic 3: Decoupled KV-Cache Strategies between Target and Draft LLMs",
+    "FlexEE: Self-Speculative and KV-Compatible Early Exiting for Offloading-Aware LLM Inference",
+    "2609.17008"
+  ],
+  [
+    "2509.18344_Speculate_Deep_and_Accurate_Lossless_and_Training-Free_Acceleration_fo.pdf",
+    "Topic 3: Decoupled KV-Cache Strategies between Target and Draft LLMs",
+    "Speculate Deep and Accurate: Lossless and Training-Free Acceleration for Offloaded LLMs via Substitute Speculative Decoding",
+    "2509.18344"
+  ],
+  [
+    "2607.08642_DominoTree_Conditional_Tree-Structured_Drafting_with_Domino_for_Specul.pdf",
+    "Topic 3: Decoupled KV-Cache Strategies between Target and Draft LLMs",
+    "DominoTree: Conditional Tree-Structured Drafting with Domino for Speculative Decoding",
+    "2607.08642"
+  ],
+  [
+    "2401.15077_EAGLE_Speculative_Sampling_Requires_Rethinking_Feature_Uncertainty.pdf",
+    "Topic 3: Decoupled KV-Cache Strategies between Target and Draft LLMs",
+    "EAGLE: Speculative Sampling Requires Rethinking Feature Uncertainty",
+    "2401.15077"
+  ],
+  [
+    "2406.16858_EAGLE-2_Faster_Inference_of_Language_Models_with_Dynamic_Draft_Trees.pdf",
+    "Topic 3: Decoupled KV-Cache Strategies between Target and Draft LLMs",
+    "EAGLE-2: Faster Inference of Language Models with Dynamic Draft Trees",
+    "2406.16858"
+  ]
+]

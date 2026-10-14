@@ -381,7 +381,7 @@ Algorithm~\ref{alg:mhoui_pro} specifies the high-performance \MHOUIminer{} execu
 
 \subsection{Experimental Setup and Benchmark Databases}
 
-All algorithms were implemented in ANSI C / POSIX C11, compiled with GCC (\texttt{-O3 -march=native -mavx2}). Benchmarks were conducted on a dedicated workstation powered by an Intel Core i7-10700 processor (8 physical cores, 16 hardware threads, base 2.90 GHz, turbo 4.80 GHz, 16 MB L3 cache) and 32 GB of DDR4 RAM running Ubuntu Linux 24.04 LTS (kernel 6.8.0).
+All algorithms were implemented in ANSI C / POSIX C11, compiled with GCC 13.3 (\texttt{-O3 -march=native -mavx2}). Benchmarks were conducted on a dedicated workstation equipped with a commodity single NVIDIA GeForce GTX 1650 GPU (4GB / 4,096 MiB GDDR6 VRAM, Turing architecture), an 8-core/16-thread Intel Core i7-10700 CPU @ 2.90 GHz (max 4.80 GHz, 16 MB L3 cache), and 32 GB DDR4 host system memory, running Ubuntu Linux 24.04.5 LTS (kernel 6.8.0-146-generic).
 
 \begin{table}[t]
 \centering

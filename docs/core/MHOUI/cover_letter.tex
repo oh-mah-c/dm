@@ -1,0 +1,90 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{amsmath,amssymb}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!70!black,
+    urlcolor=blue!70!black
+}
+
+\begin{document}
+
+\begin{flushleft}
+    \textbf{Quan Van} \\
+    Corresponding Author \\
+    Email: \href{mailto:vanhaminhquan2406@gmail.com}{vanhaminhquan2406@gmail.com} \\
+    ORCID: \href{https://orcid.org/0009-0002-8222-0076}{0009-0002-8222-0076} \\
+    Date: October 13, 2026
+\end{flushleft}
+
+\vspace{0.5em}
+\hrule
+\vspace{1em}
+
+\begin{flushleft}
+    \textbf{To:} The Editor-in-Chief / Editorial Board \\
+    \textbf{Subject:} Submission of Original Research Manuscript
+\end{flushleft}
+
+\vspace{1em}
+
+Dear Editor-in-Chief and Esteemed Members of the Editorial Board,
+
+I am pleased to submit our original research manuscript entitled:
+
+\begin{quote}
+\textbf{``MHOUI-Pro: Exact and Scalable Mining of Maximal High-Occupancy Utility Itemsets via Array-Projected Galois Closure Leaps and Pareto-Trie Pruning''}
+\end{quote}
+
+for consideration for publication as a regular research article in your prestigious journal.
+
+\paragraph{Research Context and Problem Formulation}
+High-Utility Itemset Mining (HUIM) and High-Occupancy Itemset (HOI) mining are critical methodologies for discovering actionable knowledge in quantitative transactional databases. While HUIM identifies itemsets yielding substantial monetary profit, it neglects physical transaction coverage---often discovering inflated subsets that appear sparsely in large transactions. Conversely, HOI mining ensures pattern completeness by measuring basket coverage ($|X|/|T|$), yet overlooks the quantitative economic yield. Existing attempts to bridge these paradigms (e.g., HUOPM) couple utility and occupancy into a composite utility-occupancy ratio, obscuring whether a pattern exhibits high physical market-basket presence or merely inflated item prices.
+
+Furthermore, mining all unconstrained patterns leads to severe combinatorial explosion. Traditional maximal pattern mining cannot be straightforwardly extended here because \emph{neither} classical occupancy nor total utility satisfies anti-monotonicity. A candidate superset can arbitrarily yield higher or lower occupancy and utility than its subsets. Existing workflows resort to multi-phase extraction followed by quadratic pairwise filtering, which incurs prohibitive runtime and memory footprints on large-scale databases.
+
+\paragraph{Core Contributions and Novelty}
+To address this fundamental algorithmic bottleneck, our paper decouples transaction occupancy from monetary utility, defines the rigorous concept of \textbf{Maximal High-Occupancy Utility Itemsets} under strict superset Pareto dominance ($\mathcal{MHOUI}$), and introduces \textbf{MHOUI-Pro}, an exact in-process mining framework. The core technical innovations include:
+\begin{itemize}
+    \item \textbf{Decoupled Bi-Objective Pareto Formulation:} We formulate the exact Pareto boundary where an itemset is retained if and only if no proper superset achieves both equal-or-higher average occupancy and equal-or-higher utility, providing clear mathematical semantics for retail and business intelligence.
+    \item \textbf{Tight Joint Dual Upper Bound ($UB_{\mathrm{joint}}$, Theorem 3):} We establish a provably tight bounding mechanism that simultaneously bounds remaining transaction utility and transaction occupancy envelopes, enabling early subtree termination without unconstrained candidate expansion.
+    \item \textbf{Support-Closure Leaps (Theorem 4):} By proving invariant utility accumulation across Galois equivalence classes, MHOUI-Pro leaps directly across closed supports in $O(1)$ operations, eliminating redundant intermediate nodes.
+    \item \textbf{Inverted Pareto-Trie with $O(1)$ Dominance Pruning (Theorem 5):} We propose a specialized prefix index over rare items that provides instantaneous superset retrieval, turning what was historically an $O(|\mathcal{MHOUI}|)$ pairwise bottleneck into an $O(1)$ bitset verification step.
+    \item \textbf{Flattened Array Projection (EFIM-Style):} By discarding heavy utility-lists in favor of flat arrays and 64-bit vector bitsets, MHOUI-Pro attains exceptional memory locality and cache efficiency.
+    \item \textbf{Rigorous Benchmark Validation:} Evaluated across standard real-world benchmarks (including the million-transaction \texttt{Chainstore} dataset with $>1.11$M records), MHOUI-Pro achieves up to $10\times$ speedups over unconstrained baselines, suppresses peak RAM below $450$~MB, and compresses pattern volumes by up to $99\%$ while guaranteeing mathematical completeness.
+\end{itemize}
+
+\paragraph{Significance and Relevance to the Journal}
+This manuscript advances the state of the art in high-performance data mining by reconciling multi-objective Pareto optimization with non-monotonic constraint pruning. Given the journal's focus on scalable database systems, efficient data mining algorithms, and practical knowledge discovery, we believe this work will be of high interest to your readership and will establish a benchmark standard for maximal quantitative itemset discovery.
+
+\paragraph{Declarations}
+In accordance with ethical publishing standards, I confirm that:
+\begin{itemize}
+    \item This manuscript represents entirely original research and has not been published previously.
+    \item It is not under consideration for publication elsewhere, in whole or in part.
+    \item All evaluation datasets and baselines are standard and publicly reproducible.
+    \item The author has approved the manuscript and agrees with its submission.
+    \item There are no conflicts of interest to disclose.
+\end{itemize}
+
+Thank you very much for your time, consideration, and management of the peer-review process.
+
+\vspace{1.5em}
+
+Sincerely,
+
+\vspace{0.8em}
+\textbf{Quan Van} \\
+Corresponding Author \\
+\href{mailto:vanhaminhquan2406@gmail.com}{vanhaminhquan2406@gmail.com}
+
+\end{document}
