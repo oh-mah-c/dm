@@ -268,7 +268,7 @@ with $B(C) = 0$ if no $k$ satisfies $|Q_k| \ge \sigma$. Every itemset $Y = C \cu
 \begin{proof}
 Let $k = |Z| \ge 1$. Every $q \in \Gamma(Y)$ belongs to $\Gamma(C)$ and contains $Z \subseteq R$, so $\capa(q) \ge k$ and $\Gamma(Y) \subseteq Q_k$. Since $Y$ is an HOI, $|Q_k| \ge \supp(Y) \ge \sigma$ by Lemma~\ref{lem:occsupp}. As $|Y| = |C| + k$ and all terms are positive,
 \[
-\occ(Y) = (|C| + k) \sum_{q \in \Gamma(Y)} \frac{1}{|T_q|} \le (|C| + k) \, S_k \le B(C). \qedhere
+\occ(Y) = (|C| + k) \sum_{q \in \Gamma(Y)} \frac{1}{|T_q|} \le (|C| + k) \, S_k \le B(C).
 \]
 \end{proof}
 
@@ -278,7 +278,7 @@ $B(C) \le \ubo(C)$.
 \begin{proof}
 If $B(C) = 0$ there is nothing to prove. Otherwise let $k \ge 1$ attain the maximum in \eqref{eq:coupled}, so $Q_k \neq \emptyset$, and let $l = \min \{ |T_q| : q \in Q_k \}$, which is one of the lengths $l_x$ of Definition~\ref{def:ubo}. For $q \in Q_k$, $C$ and $T_q \cap R$ are disjoint subsets of $T_q$, so $|T_q| \ge |C| + \capa(q) \ge |C| + k$; hence $l \ge |C| + k$. Every $q \in Q_k$ satisfies $|T_q| \ge l$, so
 \[
-B(C) = (|C| + k) \, S_k \le l \sum_{q \in \Gamma(C),\, |T_q| \ge l} \frac{1}{|T_q|} = \ubo_x(C) \le \ubo(C). \qedhere
+B(C) = (|C| + k) \, S_k \le l \sum_{q \in \Gamma(C),\, |T_q| \ge l} \frac{1}{|T_q|} = \ubo_x(C) \le \ubo(C).
 \]
 \end{proof}
 
