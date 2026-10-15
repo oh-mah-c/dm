@@ -600,7 +600,7 @@ int main(int argc, char **argv) {
 
     if (argc < 3) {
         printf("Usage: %s <algo_id> <dataset_path> [type_id] [min_support] [--threads N / -t N]\n", argv[0]);
-        printf("MFHOI: %s mfhoi <dataset_path> 0 <min_support> <min_occupancy> [strong:0|1]\n", argv[0]);
+        printf("MHOI: %s mfhoi <dataset_path> 0 <min_occupancy xi (fraction of n if < 1)>\n", argv[0]);
         printf("CLOE-HOI: %s cloe_hoi <transactional_dataset> 0 <min_occupancy> [min_support] [max_seconds]\n", argv[0]);
         printf("AURA-HOI: %s aura_hoi <transactional_dataset> 0 <min_occupancy> [min_support] [max_seconds] [avg|sum] [closed|raw]\n", argv[0]);
         printf("SPARC-HOI: %s sparc_hoi <transactional_dataset> 0 <min_occupancy> [min_support] [max_seconds] [avg|sum]\n", argv[0]);
@@ -1010,10 +1010,11 @@ int main(int argc, char **argv) {
         mfhoi_params.output_algorithm = MFHOI_ALGO_STRONG;
         params = &mfhoi_params;
     } else if (strcmp(algo_id, "mfhoi") == 0) {
-        mfhoi_params.min_support = min_support;
-        mfhoi_params.min_occupancy = (argc >= 6) ? atof(argv[5]) : 0.3;
-        mfhoi_params.strong = (argc >= 7) ? (atoi(argv[6]) != 0) : false;
-        mfhoi_params.output_algorithm = mfhoi_params.strong ? MFHOI_ALGO_STRONG : MFHOI_ALGO_WEAK;
+        /* maximal high occupancy itemsets: one threshold xi, given like HEP */
+        mfhoi_params.min_support = 0.0;
+        mfhoi_params.min_occupancy = min_support;
+        mfhoi_params.strong = false;
+        mfhoi_params.output_algorithm = 0;
         params = &mfhoi_params;
     } else if (strcmp(algo_id, "houi_miner") == 0 || strcmp(algo_id, "weak_mhoui_miner") == 0 || strcmp(algo_id, "strong_mhoui_miner") == 0 || strcmp(algo_id, "direct_mhoui_miner") == 0 || strcmp(algo_id, "mhoui") == 0) {
         mhoui_params.min_support = min_support;
