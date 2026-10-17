@@ -1,3 +1,15 @@
+/**
+ * @file efim.c
+ * @brief EFIM: A Highly Efficient Algorithm for High-Utility Itemset Mining
+ *
+ * Reference:
+ *   Souleymane Zida, Philippe Fournier-Viger, Jerry Chun-Wei Lin, Cheng-Wei Wu, Vincent S. Tseng,
+ *   "EFIM: a highly efficient algorithm for mining high-utility itemsets,"
+ *   Knowledge and Information Systems (KAIS), vol. 51, no. 2, pp. 595-609, 2017.
+ *   DOI: 10.1007/s10115-016-0986-0
+ *   (Conference version: MICAI 2015, LNAI 9413, pp. 530-546).
+ */
+
 #include "algorithms/efim.h"
 #include "core/dm_dataset_types.h"
 #include "core/dm_benchmark.h"
@@ -7,6 +19,7 @@
 #include <stdbool.h>
 
 /* --- DATA STRUCTURES --- */
+
 
 typedef struct {
     uint32_t id;

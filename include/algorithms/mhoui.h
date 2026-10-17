@@ -68,6 +68,9 @@ typedef struct {
     double max_seconds;
     int direct;
     int strong_direct;
+    int disable_uub;       /**< Ablation: disable joint utility upper bound pruning */
+    int disable_oub;       /**< Ablation: disable joint occupancy envelope pruning */
+    int disable_dominance; /**< Ablation: disable branch Pareto dominance pruning */
 } MHOUILimits;
 
 int mhoui_parse_algorithm(const char *name, MHOUIAlgorithm *algo);

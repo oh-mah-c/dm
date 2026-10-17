@@ -27,6 +27,7 @@ typedef struct {
     int length;
     int *ranks;
     double *utils;
+    double *suf_utils;
 } CompactTransaction;
 
 typedef struct {
@@ -37,6 +38,9 @@ typedef struct {
     double total_database_utility;
     MHOUIItem *items;
     double *invlen_table; /* Precomputed 1.0 / length */
+    int *all_ranks;
+    double *all_utils;
+    double *all_suf_utils;
 } MHOUIDB;
 
 /* ── Dynamic Pareto-Trie for O(1) Superset Dominance Checking ────────────── */
@@ -63,6 +67,9 @@ typedef struct {
     double max_seconds;
     int direct;
     int strong_direct;
+    int disable_uub;
+    int disable_oub;
+    int disable_dominance;
     struct timespec start;
     
     MHOUPatternList *houi;
@@ -239,10 +246,9 @@ static int pcache_dominates_branch(const ParetoPatternCache *pc, const uint64_t 
 /* ── Database Preprocessing (Clean, Contiguous Memory Layout) ─────────────── */
 static void free_db(MHOUIDB *db) {
     if (!db) return;
-    for (int i = 0; i < db->transaction_count; i++) {
-        free(db->transactions[i].ranks);
-        free(db->transactions[i].utils);
-    }
+    free(db->all_ranks);
+    free(db->all_utils);
+    free(db->all_suf_utils);
     for (int i = 0; i < db->item_count; i++) {
         free(db->items[i].bitset);
     }
@@ -252,90 +258,240 @@ static void free_db(MHOUIDB *db) {
     memset(db, 0, sizeof(*db));
 }
 
+static int bsearch_u32(const uint32_t *arr, int n, uint32_t key) {
+    int lo = 0, hi = n - 1;
+    while (lo <= hi) {
+        int mid = lo + (hi - lo) / 2;
+        if (arr[mid] == key) return mid;
+        if (arr[mid] < key) lo = mid + 1;
+        else hi = mid - 1;
+    }
+    return -1;
+}
+
 static int build_db(DM_Dataset *ds, int minsup, double minutil, MHOUIDB *out) {
     if (!ds || ds->type != DM_TYPE_UTILITY || ds->count == 0) return -1;
     DM_Trans_Utility *src = (DM_Trans_Utility *)ds->payload;
     int max_id = (int)ds->max_id;
-    int *support = (int *)calloc((size_t)max_id + 1, sizeof(int));
-    double *twu = (double *)calloc((size_t)max_id + 1, sizeof(double));
-    if (!support || !twu) {
-        free(support);
-        free(twu);
-        return -1;
-    }
 
     out->transaction_count = (int)ds->count;
     out->word_count = word_count_for_bits(out->transaction_count);
     out->transactions = (CompactTransaction *)calloc(ds->count, sizeof(CompactTransaction));
     out->invlen_table = (double *)calloc(ds->count, sizeof(double));
+    if (!out->transactions || !out->invlen_table) return -1;
 
+    size_t total_trans_items = 0;
     for (size_t tid = 0; tid < ds->count; tid++) {
         out->total_database_utility += src[tid].total_utility;
         out->invlen_table[tid] = src[tid].count > 0 ? (1.0 / (double)src[tid].count) : 0.0;
-        for (size_t j = 0; j < src[tid].count; j++) {
-            uint32_t id = src[tid].items[j].id;
-            support[id]++;
-            twu[id] += src[tid].total_utility;
-        }
+        total_trans_items += src[tid].count;
     }
 
-    int kept = 0;
-    for (int id = 0; id <= max_id; id++) {
-        if (support[id] >= minsup && twu[id] + MHOUI_EPS >= minutil) kept++;
-    }
-    out->items = (MHOUIItem *)calloc((size_t)kept, sizeof(MHOUIItem));
-    out->item_count = kept;
-    int pos = 0;
-    for (int id = 0; id <= max_id; id++) {
-        if (support[id] >= minsup && twu[id] + MHOUI_EPS >= minutil) {
-            out->items[pos].item = (uint32_t)id;
-            out->items[pos].support = support[id];
-            out->items[pos].twu = twu[id];
-            out->items[pos].bitset = bitset_alloc(out->word_count);
-            pos++;
-        }
-    }
-    qsort(out->items, (size_t)out->item_count, sizeof(MHOUIItem), cmp_item_order);
-
-    int *rank_of_id = (int *)malloc(((size_t)max_id + 1) * sizeof(int));
-    for (int id = 0; id <= max_id; id++) rank_of_id[id] = -1;
-    for (int i = 0; i < out->item_count; i++) {
-        out->items[i].rank = i;
-        rank_of_id[out->items[i].item] = i;
+    out->all_ranks = (int *)malloc(total_trans_items * sizeof(int));
+    out->all_utils = (double *)malloc(total_trans_items * sizeof(double));
+    out->all_suf_utils = (double *)malloc((total_trans_items + ds->count) * sizeof(double));
+    if (total_trans_items > 0 && (!out->all_ranks || !out->all_utils || !out->all_suf_utils)) {
+        free_db(out);
+        return -1;
     }
 
-    for (size_t tid = 0; tid < ds->count; tid++) {
-        CompactTransaction *tr = &out->transactions[tid];
-        tr->tid = (int)tid;
-        tr->total_utility = src[tid].total_utility;
-        tr->ranks = (int *)malloc(src[tid].count * sizeof(int));
-        tr->utils = (double *)malloc(src[tid].count * sizeof(double));
-        for (size_t j = 0; j < src[tid].count; j++) {
-            int rank = rank_of_id[src[tid].items[j].id];
-            if (rank < 0) continue;
-            int w = tr->length++;
-            tr->ranks[w] = rank;
-            tr->utils[w] = src[tid].items[j].utility;
-            bitset_set(out->items[rank].bitset, (int)tid);
+    if (max_id <= 1000000) {
+        int *support = (int *)calloc((size_t)max_id + 1, sizeof(int));
+        double *twu = (double *)calloc((size_t)max_id + 1, sizeof(double));
+        if (!support || !twu) {
+            free(support);
+            free(twu);
+            return -1;
         }
-        /* Insertion sort ranks */
-        for (int a = 1; a < tr->length; a++) {
-            int rank = tr->ranks[a];
-            double util = tr->utils[a];
-            int b = a - 1;
-            while (b >= 0 && tr->ranks[b] > rank) {
-                tr->ranks[b + 1] = tr->ranks[b];
-                tr->utils[b + 1] = tr->utils[b];
-                b--;
+
+        for (size_t tid = 0; tid < ds->count; tid++) {
+            for (size_t j = 0; j < src[tid].count; j++) {
+                uint32_t id = src[tid].items[j].id;
+                support[id]++;
+                twu[id] += src[tid].total_utility;
             }
-            tr->ranks[b + 1] = rank;
-            tr->utils[b + 1] = util;
         }
-    }
 
-    free(rank_of_id);
-    free(support);
-    free(twu);
+        int kept = 0;
+        for (int id = 0; id <= max_id; id++) {
+            if (support[id] >= minsup && twu[id] + MHOUI_EPS >= minutil) kept++;
+        }
+        out->items = (MHOUIItem *)calloc((size_t)kept, sizeof(MHOUIItem));
+        out->item_count = kept;
+        int pos = 0;
+        for (int id = 0; id <= max_id; id++) {
+            if (support[id] >= minsup && twu[id] + MHOUI_EPS >= minutil) {
+                out->items[pos].item = (uint32_t)id;
+                out->items[pos].support = support[id];
+                out->items[pos].twu = twu[id];
+                out->items[pos].bitset = bitset_alloc(out->word_count);
+                pos++;
+            }
+        }
+        qsort(out->items, (size_t)out->item_count, sizeof(MHOUIItem), cmp_item_order);
+
+        int *rank_of_id = (int *)malloc(((size_t)max_id + 1) * sizeof(int));
+        if (!rank_of_id) { free(support); free(twu); return -1; }
+        for (int id = 0; id <= max_id; id++) rank_of_id[id] = -1;
+        for (int i = 0; i < out->item_count; i++) {
+            out->items[i].rank = i;
+            rank_of_id[out->items[i].item] = i;
+        }
+
+        size_t cur_offset = 0;
+        size_t cur_suf_offset = 0;
+        for (size_t tid = 0; tid < ds->count; tid++) {
+            CompactTransaction *tr = &out->transactions[tid];
+            tr->tid = (int)tid;
+            tr->total_utility = src[tid].total_utility;
+            tr->ranks = &out->all_ranks[cur_offset];
+            tr->utils = &out->all_utils[cur_offset];
+            tr->suf_utils = &out->all_suf_utils[cur_suf_offset];
+            cur_offset += src[tid].count;
+            cur_suf_offset += src[tid].count + 1;
+            for (size_t j = 0; j < src[tid].count; j++) {
+                int rank = rank_of_id[src[tid].items[j].id];
+                if (rank < 0) continue;
+                int w = tr->length++;
+                tr->ranks[w] = rank;
+                tr->utils[w] = src[tid].items[j].utility;
+                bitset_set(out->items[rank].bitset, (int)tid);
+            }
+            /* Insertion sort ranks */
+            for (int a = 1; a < tr->length; a++) {
+                int rank = tr->ranks[a];
+                double util = tr->utils[a];
+                int b = a - 1;
+                while (b >= 0 && tr->ranks[b] > rank) {
+                    tr->ranks[b + 1] = tr->ranks[b];
+                    tr->utils[b + 1] = tr->utils[b];
+                    b--;
+                }
+                tr->ranks[b + 1] = rank;
+                tr->utils[b + 1] = util;
+            }
+            /* Precompute suffix utilities */
+            tr->suf_utils[tr->length] = 0.0;
+            for (int a = tr->length - 1; a >= 0; a--) {
+                tr->suf_utils[a] = tr->suf_utils[a + 1] + tr->utils[a];
+            }
+        }
+
+        free(rank_of_id);
+        free(support);
+        free(twu);
+    } else {
+        /* Sparse item ID mode: compact unique item mapping */
+        size_t total_items = 0;
+        for (size_t tid = 0; tid < ds->count; tid++) total_items += src[tid].count;
+
+        uint32_t *all_ids = (uint32_t *)malloc(total_items * sizeof(uint32_t));
+        if (!all_ids) return -1;
+        size_t cur_pos = 0;
+        for (size_t tid = 0; tid < ds->count; tid++) {
+            for (size_t j = 0; j < src[tid].count; j++) {
+                all_ids[cur_pos++] = src[tid].items[j].id;
+            }
+        }
+        qsort(all_ids, total_items, sizeof(uint32_t), cmp_uint32);
+
+        /* Deduplicate */
+        int ucount = 0;
+        for (size_t i = 0; i < total_items; i++) {
+            if (i == 0 || all_ids[i] != all_ids[i - 1]) {
+                all_ids[ucount++] = all_ids[i];
+            }
+        }
+
+        int *support = (int *)calloc((size_t)ucount, sizeof(int));
+        double *twu = (double *)calloc((size_t)ucount, sizeof(double));
+        if (!support || !twu) {
+            free(all_ids); free(support); free(twu); return -1;
+        }
+
+        for (size_t tid = 0; tid < ds->count; tid++) {
+            for (size_t j = 0; j < src[tid].count; j++) {
+                int idx = bsearch_u32(all_ids, ucount, src[tid].items[j].id);
+                if (idx >= 0) {
+                    support[idx]++;
+                    twu[idx] += src[tid].total_utility;
+                }
+            }
+        }
+
+        int kept = 0;
+        for (int idx = 0; idx < ucount; idx++) {
+            if (support[idx] >= minsup && twu[idx] + MHOUI_EPS >= minutil) kept++;
+        }
+        out->items = (MHOUIItem *)calloc((size_t)kept, sizeof(MHOUIItem));
+        out->item_count = kept;
+        int pos = 0;
+        for (int idx = 0; idx < ucount; idx++) {
+            if (support[idx] >= minsup && twu[idx] + MHOUI_EPS >= minutil) {
+                out->items[pos].item = all_ids[idx];
+                out->items[pos].support = support[idx];
+                out->items[pos].twu = twu[idx];
+                out->items[pos].bitset = bitset_alloc(out->word_count);
+                pos++;
+            }
+        }
+        qsort(out->items, (size_t)out->item_count, sizeof(MHOUIItem), cmp_item_order);
+
+        int *rank_of_uidx = (int *)malloc((size_t)ucount * sizeof(int));
+        if (!rank_of_uidx) { free(all_ids); free(support); free(twu); return -1; }
+        for (int idx = 0; idx < ucount; idx++) rank_of_uidx[idx] = -1;
+        for (int i = 0; i < out->item_count; i++) {
+            out->items[i].rank = i;
+            int idx = bsearch_u32(all_ids, ucount, out->items[i].item);
+            if (idx >= 0) rank_of_uidx[idx] = i;
+        }
+
+        size_t cur_offset = 0;
+        size_t cur_suf_offset = 0;
+        for (size_t tid = 0; tid < ds->count; tid++) {
+            CompactTransaction *tr = &out->transactions[tid];
+            tr->tid = (int)tid;
+            tr->total_utility = src[tid].total_utility;
+            tr->ranks = &out->all_ranks[cur_offset];
+            tr->utils = &out->all_utils[cur_offset];
+            tr->suf_utils = &out->all_suf_utils[cur_suf_offset];
+            cur_offset += src[tid].count;
+            cur_suf_offset += src[tid].count + 1;
+            for (size_t j = 0; j < src[tid].count; j++) {
+                int idx = bsearch_u32(all_ids, ucount, src[tid].items[j].id);
+                if (idx < 0) continue;
+                int rank = rank_of_uidx[idx];
+                if (rank < 0) continue;
+                int w = tr->length++;
+                tr->ranks[w] = rank;
+                tr->utils[w] = src[tid].items[j].utility;
+                bitset_set(out->items[rank].bitset, (int)tid);
+            }
+            /* Insertion sort ranks */
+            for (int a = 1; a < tr->length; a++) {
+                int rank = tr->ranks[a];
+                double util = tr->utils[a];
+                int b = a - 1;
+                while (b >= 0 && tr->ranks[b] > rank) {
+                    tr->ranks[b + 1] = tr->ranks[b];
+                    tr->utils[b + 1] = tr->utils[b];
+                    b--;
+                }
+                tr->ranks[b + 1] = rank;
+                tr->utils[b + 1] = util;
+            }
+            /* Precompute suffix utilities */
+            tr->suf_utils[tr->length] = 0.0;
+            for (int a = tr->length - 1; a >= 0; a--) {
+                tr->suf_utils[a] = tr->suf_utils[a + 1] + tr->utils[a];
+            }
+        }
+
+        free(rank_of_uidx);
+        free(all_ids);
+        free(support);
+        free(twu);
+    }
     return 0;
 }
 
@@ -363,55 +519,83 @@ static void dfs_fast_mine(MHOUIContext *ctx, uint32_t *prefix, int *prefix_ranks
 
     const MHOUIDB *db = ctx->db;
     int word_count = db->word_count;
+    uint64_t *scratch_tidset = bitset_alloc(word_count);
+    if (!scratch_tidset) return;
 
     for (int idx = suffix_start; idx < db->item_count; idx++) {
         ctx->stats->generated_candidates++;
 
-        /* 1. Fast Bitset Support Check */
-        uint64_t *cand_tidset = bitset_alloc(word_count);
-        bitset_and(cand_tidset, tidset, db->items[idx].bitset, word_count);
-        int cand_sup = bitset_popcount(cand_tidset, word_count);
-
-        if (cand_sup < ctx->minsup) {
-            ctx->stats->pruned_support++;
-            free(cand_tidset);
-            continue;
+        int cand_sup;
+        if (prefix_len == 0) {
+            cand_sup = db->items[idx].support;
+            if (cand_sup < ctx->minsup) {
+                ctx->stats->pruned_support++;
+                continue;
+            }
+            memcpy(scratch_tidset, db->items[idx].bitset, (size_t)word_count * sizeof(uint64_t));
+        } else {
+            bitset_and(scratch_tidset, tidset, db->items[idx].bitset, word_count);
+            cand_sup = bitset_popcount(scratch_tidset, word_count);
+            if (cand_sup < ctx->minsup) {
+                ctx->stats->pruned_support++;
+                continue;
+            }
         }
 
         ctx->stats->visited_nodes++;
 
         /* 2. Fast Single-Pass Utility and Occupancy Accumulation */
-        double new_util = cur_utility;
+        int new_len = prefix_len + 1;
+        prefix[prefix_len] = db->items[idx].item;
+        prefix_ranks[prefix_len] = idx;
+
+        double new_util = 0.0;
         double inv_sum = 0.0;
         double rem_util_sum = 0.0;
         double ub_envelope_sum = 0.0;
 
         for (int w = 0; w < word_count; w++) {
-            uint64_t word = cand_tidset[w];
+            uint64_t word = scratch_tidset[w];
             while (word) {
                 int bit = __builtin_ctzll(word);
                 int tid = w * MHOUI_WORD_BITS + bit;
                 const CompactTransaction *tr = &db->transactions[tid];
 
-                double u = 0.0;
-                find_rank(tr, idx, &u);
-                new_util += u;
+                int tr_len = tr->length;
+                const int *tr_r = tr->ranks;
+                const double *tr_u = tr->utils;
+                const double *tr_suf = tr->suf_utils;
+
+                double tx_u = 0.0;
+                int p_idx = 0;
+                int k = 0;
+                int last_k = -1;
+
+                while (k < tr_len && p_idx < new_len) {
+                    int target = prefix_ranks[p_idx];
+                    int r = tr_r[k];
+                    if (r == target) {
+                        tx_u += tr_u[k];
+                        last_k = k;
+                        p_idx++;
+                        k++;
+                    } else if (r < target) {
+                        k++;
+                    } else {
+                        p_idx++;
+                    }
+                }
+
+                double r_util = (last_k >= 0) ? tr_suf[last_k + 1] : 0.0;
+                int r_cnt = (last_k >= 0) ? (tr_len - 1 - last_k) : 0;
+
+                new_util += tx_u;
 
                 double invlen = db->invlen_table[tid];
                 inv_sum += invlen;
-
-                /* Remaining utility & extension items in transaction */
-                double r_util = 0.0;
-                int r_cnt = 0;
-                for (int j = 0; j < tr->length; j++) {
-                    if (tr->ranks[j] > idx) {
-                        r_util += tr->utils[j];
-                        r_cnt++;
-                    }
-                }
                 rem_util_sum += r_util;
 
-                double max_possible_len = (double)(prefix_len + 1 + r_cnt);
+                double max_possible_len = (double)(new_len + r_cnt);
                 double occ_cap = max_possible_len * invlen;
                 if (occ_cap > 1.0) occ_cap = 1.0;
                 ub_envelope_sum += occ_cap;
@@ -420,69 +604,63 @@ static void dfs_fast_mine(MHOUIContext *ctx, uint32_t *prefix, int *prefix_ranks
             }
         }
 
-        int new_len = prefix_len + 1;
-        prefix[prefix_len] = db->items[idx].item;
-        prefix_ranks[prefix_len] = idx;
-
         double aocc = (double)new_len * inv_sum / (double)cand_sup;
         double uub = new_util + rem_util_sum;
         double oub2 = ub_envelope_sum / (double)ctx->minsup;
 
         /* 3. Pruning Checks */
-        if (uub + MHOUI_EPS < ctx->minutil) {
+        if (!ctx->disable_uub && (uub + MHOUI_EPS < ctx->minutil)) {
             ctx->stats->pruned_uub++;
-            free(cand_tidset);
             continue;
         }
 
-        if (oub2 > 0.0 && oub2 + MHOUI_EPS < ctx->minocc) {
+        if (!ctx->disable_oub && (oub2 > 0.0 && oub2 + MHOUI_EPS < ctx->minocc)) {
             ctx->stats->pruned_oub2++;
-            free(cand_tidset);
             continue;
         }
 
         /* 4. Output Collection */
         if (new_util + MHOUI_EPS >= ctx->minutil && aocc + MHOUI_EPS >= ctx->minocc) {
-            pattern_add(ctx->houi, prefix, new_len, cand_tidset, word_count, cand_sup, new_util, aocc);
+            pattern_add(ctx->houi, prefix, new_len, scratch_tidset, word_count, cand_sup, new_util, aocc);
             ctx->stats->houi_count = ctx->houi->count;
-            if (ctx->direct) {
-                pcache_add(&ctx->pcache, prefix_ranks, new_len, new_util, aocc, ctx->item_words);
-            }
             if (ctx->max_patterns > 0 && ctx->houi->count >= ctx->max_patterns) {
                 ctx->stats->status_limited = 1;
             }
+            if (ctx->direct && !ctx->disable_dominance) {
+                pcache_add(&ctx->pcache, prefix_ranks, new_len, new_util, aocc, ctx->item_words);
+            }
         }
 
-        /* 5. In-Process Branch Dominance Check (Inverted Pivot Bitset Ledger) */
+        /* 5. Subtree Exploration with Pareto Dominance Lookahead */
         if (!ctx->stats->status_limited && idx + 1 < db->item_count) {
-            int branch_pruned = 0;
-            int rem_candidates = db->item_count - (idx + 1);
-            /* Dynamic 2-Level Check: Only invoke fine-grained bitset superset test when remaining candidate list is bounded (<= 16) */
-            if (ctx->direct && ctx->pcache.count > 0 && rem_candidates <= 16) {
-                /* Construct temporary bitset of the branch prefix ranks + remaining candidate ranks */
-                memset(ctx->temp_branch_bs, 0, ctx->item_words * sizeof(uint64_t));
-                for (int p = 0; p < new_len; p++) {
-                    int r = prefix_ranks[p];
-                    ctx->temp_branch_bs[r / 64] |= (1ULL << (r % 64));
-                }
-                for (int s = idx + 1; s < db->item_count; s++) {
-                    ctx->temp_branch_bs[s / 64] |= (1ULL << (s % 64));
-                }
-                int branch_items_cnt = new_len + rem_candidates;
-                if (pcache_dominates_branch(&ctx->pcache, ctx->temp_branch_bs, branch_items_cnt, uub, oub2, ctx->strong_direct, ctx->item_words)) {
-                    ctx->stats->pruned_dominance++;
-                    branch_pruned = 1;
+            int prune_branch = 0;
+            if (ctx->direct && !ctx->disable_dominance && ctx->pcache.count > 0) {
+                int rem = db->item_count - (idx + 1);
+                if (rem <= 16) {
+                    memset(ctx->temp_branch_bs, 0, ctx->item_words * sizeof(uint64_t));
+                    for (int p = 0; p < new_len; p++) {
+                        int r = prefix_ranks[p];
+                        ctx->temp_branch_bs[r / 64] |= (1ULL << (r % 64));
+                    }
+                    for (int j = idx + 1; j < db->item_count; j++) {
+                        ctx->temp_branch_bs[j / 64] |= (1ULL << (j % 64));
+                    }
+                    if (pcache_dominates_branch(&ctx->pcache, ctx->temp_branch_bs, new_len + rem, uub, oub2, ctx->strong_direct, ctx->item_words)) {
+                        prune_branch = 1;
+                        ctx->stats->pruned_dominance++;
+                    }
                 }
             }
-
-            if (!branch_pruned) {
-                dfs_fast_mine(ctx, prefix, prefix_ranks, new_len, cand_tidset, cand_sup, new_util, idx + 1);
+            if (!prune_branch) {
+                uint64_t *child_tidset = bitset_clone(scratch_tidset, word_count);
+                dfs_fast_mine(ctx, prefix, prefix_ranks, new_len, child_tidset, cand_sup, new_util, idx + 1);
+                free(child_tidset);
             }
         }
 
-        free(cand_tidset);
-        if (ctx->stats->status_limited) return;
+        if (ctx->stats->status_limited) break;
     }
+    free(scratch_tidset);
 }
 
 /* ── Superset Dominance Filter ────────────────────────────────────────────── */
@@ -505,27 +683,43 @@ static void copy_pattern(MHOUPatternList *out, const MHOUPattern *p, int word_co
     pattern_add(out, p->items, p->length, p->tidset, word_count, p->support, p->utility, p->avg_occupancy);
 }
 
+typedef struct {
+    MHOUPattern pat;
+    uint64_t mask;
+} FilterPatternEntry;
+
 static void filter_mhoui(const MHOUPatternList *houi, MHOUPatternList *out, int word_count, int strong, int *removed) {
     mhoui_pattern_list_init(out);
     *removed = 0;
     if (!houi || houi->count == 0) return;
-    MHOUPattern *sorted = (MHOUPattern *)malloc((size_t)houi->count * sizeof(MHOUPattern));
-    memcpy(sorted, houi->patterns, (size_t)houi->count * sizeof(MHOUPattern));
-    qsort(sorted, (size_t)houi->count, sizeof(MHOUPattern), cmp_pattern_filter);
+    FilterPatternEntry *sorted = (FilterPatternEntry *)malloc((size_t)houi->count * sizeof(FilterPatternEntry));
+    if (!sorted) return;
+    for (int i = 0; i < houi->count; i++) {
+        sorted[i].pat = houi->patterns[i];
+        uint64_t m = 0;
+        for (int k = 0; k < houi->patterns[i].length; k++) {
+            m |= UINT64_C(1) << (houi->patterns[i].items[k] & 63);
+        }
+        sorted[i].mask = m;
+    }
+    qsort(sorted, (size_t)houi->count, sizeof(FilterPatternEntry), cmp_pattern_filter);
     for (int i = 0; i < houi->count; i++) {
         int dominated = 0;
+        uint64_t mask_i = sorted[i].mask;
+        const MHOUPattern *pi = &sorted[i].pat;
         for (int j = 0; j < i; j++) {
-            if (!proper_subset(&sorted[i], &sorted[j])) continue;
-            int ge_occ = sorted[j].avg_occupancy + MHOUI_EPS >= sorted[i].avg_occupancy;
-            int ge_util = sorted[j].utility + MHOUI_EPS >= sorted[i].utility;
-            int strict = sorted[j].avg_occupancy > sorted[i].avg_occupancy + MHOUI_EPS || sorted[j].utility > sorted[i].utility + MHOUI_EPS;
+            if ((mask_i & ~sorted[j].mask) != 0) continue;
+            if (!proper_subset(pi, &sorted[j].pat)) continue;
+            int ge_occ = sorted[j].pat.avg_occupancy + MHOUI_EPS >= pi->avg_occupancy;
+            int ge_util = sorted[j].pat.utility + MHOUI_EPS >= pi->utility;
+            int strict = sorted[j].pat.avg_occupancy > pi->avg_occupancy + MHOUI_EPS || sorted[j].pat.utility > pi->utility + MHOUI_EPS;
             if (ge_occ && ge_util && (strong || strict)) {
                 dominated = 1;
                 break;
             }
         }
         if (dominated) (*removed)++;
-        else copy_pattern(out, &sorted[i], word_count);
+        else copy_pattern(out, pi, word_count);
     }
     free(sorted);
 }
@@ -543,7 +737,11 @@ int mhoui_mine_dataset(DM_Dataset *ds, int minsup_count, double minocc, double m
     int *prefix_ranks = (int *)malloc((size_t)(db.item_count > 0 ? db.item_count : 1) * sizeof(int));
     
     uint64_t *all_tidset = bitset_alloc(db.word_count);
-    for (int t = 0; t < db.transaction_count; t++) bitset_set(all_tidset, t);
+    memset(all_tidset, 0xFF, (size_t)db.word_count * sizeof(uint64_t));
+    int rem_bits = db.transaction_count % 64;
+    if (rem_bits > 0 && db.word_count > 0) {
+        all_tidset[db.word_count - 1] = (UINT64_C(1) << rem_bits) - 1;
+    }
 
     size_t item_words = word_count_for_bits(db.item_count > 0 ? db.item_count : 64);
     
@@ -556,6 +754,9 @@ int mhoui_mine_dataset(DM_Dataset *ds, int minsup_count, double minocc, double m
         .max_seconds = limits ? limits->max_seconds : 0.0,
         .direct = limits ? limits->direct : 0,
         .strong_direct = limits ? limits->strong_direct : 1,
+        .disable_uub = limits ? limits->disable_uub : 0,
+        .disable_oub = limits ? limits->disable_oub : 0,
+        .disable_dominance = limits ? limits->disable_dominance : 0,
         .houi = &out->houi,
         .item_words = item_words,
         .temp_prefix_bs = (uint64_t *)calloc(item_words, sizeof(uint64_t)),
@@ -567,11 +768,21 @@ int mhoui_mine_dataset(DM_Dataset *ds, int minsup_count, double minocc, double m
     clock_gettime(CLOCK_MONOTONIC, &ctx.start);
     dfs_fast_mine(&ctx, prefix, prefix_ranks, 0, all_tidset, db.transaction_count, 0.0, 0);
 
-    filter_mhoui(&out->houi, &out->weak_mhoui, db.word_count, 0, &out->stats.weak_removed);
-    filter_mhoui(&out->houi, &out->strong_mhoui, db.word_count, 1, &out->stats.strong_removed);
+    if (limits && limits->direct) {
+        if (limits->strong_direct) {
+            filter_mhoui(&out->houi, &out->strong_mhoui, db.word_count, 1, &out->stats.strong_removed);
+            out->stats.strong_count = out->strong_mhoui.count;
+        } else {
+            filter_mhoui(&out->houi, &out->weak_mhoui, db.word_count, 0, &out->stats.weak_removed);
+            out->stats.weak_count = out->weak_mhoui.count;
+        }
+    } else {
+        filter_mhoui(&out->houi, &out->weak_mhoui, db.word_count, 0, &out->stats.weak_removed);
+        filter_mhoui(&out->houi, &out->strong_mhoui, db.word_count, 1, &out->stats.strong_removed);
+        out->stats.weak_count = out->weak_mhoui.count;
+        out->stats.strong_count = out->strong_mhoui.count;
+    }
     out->stats.houi_count = out->houi.count;
-    out->stats.weak_count = out->weak_mhoui.count;
-    out->stats.strong_count = out->strong_mhoui.count;
 
     pcache_free(&ctx.pcache);
     free(ctx.temp_prefix_bs);

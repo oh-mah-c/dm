@@ -127,6 +127,9 @@
 #include "algorithms/regular_mine.h"
 #include "algorithms/tmku.h"
 #include "algorithms/hiep.h"
+#include "algorithms/ocean.h"
+#include "algorithms/huopm.h"
+#include "algorithms/il_huopm.h"
 #include "algorithms/medm_gen.h"
 #include "algorithms/laga.h"
 #include "tokenizer/tokenizer.h"
@@ -201,6 +204,9 @@ extern DM_Algorithm vifp_algo;
 extern DM_Algorithm cloe_hoi_algo;
 extern DM_Algorithm aura_hoi_algo;
 extern DM_Algorithm sparc_hoi_algo;
+extern DM_Algorithm ocean_algo;
+extern DM_Algorithm huopm_algo;
+extern DM_Algorithm il_huopm_algo;
 
 static const char *arg_value_from(int argc, char **argv, int start, const char *key, const char *fallback) {
     for (int i = start; i + 1 < argc; i++) {
@@ -595,6 +601,7 @@ int main(int argc, char **argv) {
     dm_register_algorithm(&sparc_hoi_algo);
     dm_register_algorithm(&tmku_algo);
     dm_register_algorithm(&hiep_algo);
+    dm_register_algorithm(&ocean_algo);
 
     dm_parse_thread_args(&argc, argv);
 
@@ -605,6 +612,7 @@ int main(int argc, char **argv) {
         printf("AURA-HOI: %s aura_hoi <transactional_dataset> 0 <min_occupancy> [min_support] [max_seconds] [avg|sum] [closed|raw]\n", argv[0]);
         printf("SPARC-HOI: %s sparc_hoi <transactional_dataset> 0 <min_occupancy> [min_support] [max_seconds] [avg|sum]\n", argv[0]);
         printf("MHOUI: %s mhoui <utility_dataset> 1 <min_support> <min_occupancy> <min_utility> [strong:0|1] [direct:0|1]\n", argv[0]);
+        printf("OCEAN: %s ocean <utility_dataset> 1 <min_occupancy> [min_support]\n", argv[0]);
         printf("MHEINU: %s mheinu <utility_dataset> 1 <min_efficiency> [investment_file]\n", argv[0]);
         printf("DPHIM: %s dphim <utility_dataset> 1 <min_utility> [threads]\n", argv[0]);
         printf("Closed-FHUIM-Kinana: %s closed_fhuim_kinana <utility_dataset> 1 <min_utility> <min_support> [min_owl]\n", argv[0]);
@@ -751,6 +759,9 @@ int main(int argc, char **argv) {
     DM_FHUQI_Miner_Params fhuqi_miner_params;
     DM_TKQ_Params tkq_params;
     DM_EFIM_Params efim_params;
+    DM_OCEAN_Params ocean_params;
+    DM_HUOPM_Params huopm_params;
+    DM_IL_HUOPM_Params il_huopm_params;
     DM_HUI_Miner_Params huiminer_params;
     DM_UP_Growth_Params upgrowth_params;
     DM_IHUP_Params ihup_params;
@@ -849,6 +860,18 @@ int main(int argc, char **argv) {
     } else if (strcmp(algo_id, "efim") == 0) {
         efim_params.min_utility = min_support;
         params = &efim_params;
+    } else if (strcmp(algo_id, "ocean") == 0) {
+        ocean_params.min_occupancy = min_support; // arg4 is min_occupancy
+        ocean_params.min_support = (argc >= 6) ? atof(argv[5]) : 0.01; // arg5 is min_support ratio/count
+        params = &ocean_params;
+    } else if (strcmp(algo_id, "huopm") == 0) {
+        huopm_params.min_occupancy = min_support; // arg4 is min_occupancy
+        huopm_params.min_support = (argc >= 6) ? atof(argv[5]) : 0.01; // arg5 is min_support ratio/count
+        params = &huopm_params;
+    } else if (strcmp(algo_id, "il_huopm") == 0 || strcmp(algo_id, "huomil") == 0) {
+        il_huopm_params.min_occupancy = min_support; // arg4 is min_occupancy
+        il_huopm_params.min_support = (argc >= 6) ? atof(argv[5]) : 0.01; // arg5 is min_support ratio/count
+        params = &il_huopm_params;
     } else if (strcmp(algo_id, "dphim") == 0) {
         dphim_params.min_utility = min_support;
         dphim_params.threads = (argc >= 6) ? atoi(argv[5]) : 0;

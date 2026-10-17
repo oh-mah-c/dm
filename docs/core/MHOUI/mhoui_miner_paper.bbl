@@ -1,0 +1,202 @@
+\begin{thebibliography}{10}
+\providecommand{\url}[1]{\texttt{#1}}
+\providecommand{\urlprefix}{URL }
+\providecommand{\doi}[1]{https://doi.org/#1}
+
+\bibitem{agrawal1994fast}
+Agrawal, R., Srikant, R.: Fast algorithms for mining association rules in large
+  databases. In: Proceedings of the 20th International Conference on Very Large
+  Data Bases (VLDB). pp. 487--499 (1994)
+
+\bibitem{burdick2001mafia}
+Burdick, D., Calimlim, M., Gehrke, J.: {MAFIA}: A maximal frequent itemset
+  algorithm for transactional databases. In: Proceedings of the 17th
+  International Conference on Data Engineering (ICDE). pp. 443--452 (2001)
+
+\bibitem{chen2021discovering}
+Chen, C.M., Chen, L., Gan, W., Qiu, L., Ding, W.: Discovering high
+  utility-occupancy patterns from uncertain data. Information Sciences
+  \textbf{546},  1208--1229 (2021)
+
+\bibitem{dam2019efficient}
+Dam, T.L., Li, K., Fournier-Viger, P.: An efficient method for mining top-k
+  high utility itemsets without setting minimum utility threshold. Information
+  Sciences  \textbf{477},  326--347 (2019)
+
+\bibitem{datta2022high}
+Datta, S., Mali, K., Ghosh, U.: High occupancy itemset mining with
+  consideration of transaction occupancy. Arabian Journal for Science and
+  Engineering  \textbf{47}(2),  2061--2075 (2022)
+
+\bibitem{deng2020mining}
+Deng, Z.H.: Mining high occupancy itemsets. Future Generation Computer Systems
+  \textbf{102},  222--229 (2020)
+
+\bibitem{duong2024efficient}
+Duong, H., Pham, H., Truong, T., Fournier-Viger, P.: Efficient algorithms to
+  mine concise representations of frequent high utility occupancy patterns.
+  Applied Intelligence  \textbf{54}(5),  4012--4042 (2024)
+
+\bibitem{duong2022efficient}
+Duong, H.V., Hoang, T., Tran, T., Truong, T.C., Vo, B., Fournier-Viger, P.:
+  Efficient algorithms for mining closed and maximal high utility itemsets.
+  Knowledge-Based Systems  \textbf{257},  109921 (2022)
+
+\bibitem{fournier2014fhm}
+Fournier-Viger, P., Wu, C.W., Zida, S., Tseng, V.S.: {FHM}: Faster high-utility
+  itemset mining using estimated utility co-occurrence pruning. In: Proceedings
+  of the 21st International Symposium on Methodologies for Intelligent Systems
+  (ISMIS). Lecture Notes in Computer Science, vol.~8502, pp. 83--92 (2014)
+
+\bibitem{fournier2016efimclosed}
+Fournier-Viger, P., Zida, S., Lin, J.C.W., Wu, C.W., Tseng, V.S.:
+  {EFIM-Closed}: Fast and memory efficient discovery of closed high-utility
+  itemsets. In: Proceedings of the 12th International Conference on Machine
+  Learning and Data Mining in Pattern Recognition (MLDM). Lecture Notes in
+  Computer Science, vol.~9729, pp. 327--340 (2016)
+
+\bibitem{gan2021survey}
+Gan, W., Lin, J.C.W., Fournier-Viger, P., Chao, H.C., Tseng, V.S., Yu, P.S.: A
+  survey of utility-oriented pattern mining. IEEE Transactions on Knowledge and
+  Data Engineering  \textbf{33}(4),  1306--1327 (2021)
+
+\bibitem{gan2020huopm}
+Gan, W., Lin, J.C.W., Fournier-Viger, P., Chao, H.C., Yu, P.S.: {HUOPM}:
+  High-utility occupancy pattern mining. IEEE Transactions on Cybernetics
+  \textbf{50}(3),  1195--1208 (2020). \doi{10.1109/TCYB.2019.2894367}
+
+\bibitem{gan2019fast}
+Gan, W., Lin, J.C.W., Zhang, J., Chao, H.C.: Fast utility mining on sequence
+  data. IEEE Transactions on Cybernetics  \textbf{50}(2),  787--800 (2019)
+
+\bibitem{gouda2005genmax}
+Gouda, K., Zaki, M.J.: {GenMax}: An efficient algorithm for mining maximal
+  frequent itemsets. Data Mining and Knowledge Discovery  \textbf{11}(3),
+  223--242 (2005)
+
+\bibitem{grahne2005fast}
+Grahne, G., Zhu, J.: Fast algorithms for frequent itemset mining using
+  {FP}-trees. IEEE Transactions on Knowledge and Data Engineering
+  \textbf{17}(10),  1347--1362 (2005)
+
+\bibitem{han2000mining}
+Han, J., Pei, J., Yin, Y.: Mining frequent patterns without candidate
+  generation. In: Proceedings of the 2000 ACM SIGMOD International Conference
+  on Management of Data. pp. 1--12 (2000)
+
+\bibitem{krishnamoorthy2015pruning}
+Krishnamoorthy, S.: Pruning strategies for mining high utility itemsets. Expert
+  Systems with Applications  \textbf{42}(5),  2371--2381 (2015)
+
+\bibitem{lin2010effective}
+Lin, C.W., Hong, T.P., Lu, W.H.: An effective tree structure for mining high
+  utility itemsets. Expert Systems with Applications  \textbf{37}(10),
+  7317--7324 (2010)
+
+\bibitem{lin2021efficient}
+Lin, J.C.W., Li, Y., Gan, W., Fournier-Viger, P., Chao, H.C.: Efficient mining
+  of high utility-occupancy patterns with length constraints. Applied
+  Intelligence  \textbf{51},  2785--2801 (2021)
+
+\bibitem{liu2012mining}
+Liu, M., Qu, J.: Mining high utility itemsets without candidate generation. In:
+  Proceedings of the 21st ACM International Conference on Information and
+  Knowledge Management (CIKM). pp. 55--64 (2012)
+
+\bibitem{liu2005two}
+Liu, Y., keng Liao, W., Choudhary, A.: A two-phase algorithm for fast discovery
+  of high utility itemsets. In: Proceedings of the 9th Pacific-Asia Conference
+  on Knowledge Discovery and Data Mining (PAKDD). Lecture Notes in Computer
+  Science, vol.~3518, pp. 689--695 (2005)
+
+\bibitem{nguyen2023efficient}
+Nguyen, L.T.T., Mai, T., Pham, G.H., Yun, U., Vo, B.: An efficient method for
+  mining high occupancy itemsets based on equivalence class and early pruning.
+  Knowledge-Based Systems  \textbf{267},  110441 (2023)
+
+\bibitem{pham2020mining}
+Pham, T., Le, H.B., Fournier-Viger, P.: Mining cross-level high utility
+  itemsets with taxonomies. Knowledge-Based Systems  \textbf{195},  105658
+  (2020)
+
+\bibitem{rymon1992search}
+Rymon, R.: Search through systematic set enumeration. In: Proceedings of the
+  3rd International Conference on Principles of Knowledge Representation and
+  Reasoning (KR). pp. 539--550 (1992)
+
+\bibitem{shen2016ocean}
+Shen, B., Wen, Z., Zhao, Y., Zhou, D., Zheng, W.: {OCEAN}: Fast discovery of
+  high utility occupancy itemsets. In: Proceedings of the 21st International
+  Conference on Database Systems for Advanced Applications (DASFAA). Lecture
+  Notes in Computer Science, vol.~9642, pp. 355--369. Springer (2016).
+  \doi{10.1007/978-3-319-32025-0_22}
+
+\bibitem{shie2012efficient}
+Shie, B.E., Yu, P.S., Tseng, V.S.: Efficient algorithms for mining maximal high
+  utility itemsets from data streams with concept drift. Expert Systems with
+  Applications  \textbf{39}(10),  8608--8619 (2012)
+
+\bibitem{song2014mining}
+Song, W., Liu, Y., Li, J.: Mining high utility itemsets by dynamically pruning
+  the search space. Knowledge-Based Systems  \textbf{58},  15--23 (2014)
+
+\bibitem{tang2012incorporating}
+Tang, L., Zhang, L., Luo, P., Wang, M.: Incorporating occupancy into frequent
+  pattern mining for high quality pattern recommendation. In: Proceedings of
+  the 21st ACM International Conference on Information and Knowledge Management
+  (CIKM). pp. 75--84 (2012)
+
+\bibitem{truong2019novel}
+Truong, T.C., Duong, H.V., Le, H.B., Fournier-Viger, P.: A novel approach for
+  mining high average-utility itemsets in quantitative databases. Information
+  Sciences  \textbf{484},  409--432 (2019)
+
+\bibitem{tseng2014efficient}
+Tseng, V.S., Wu, C.W., Fournier-Viger, P., Yu, P.S.: Efficient algorithms for
+  mining the concise and lossless representation of high utility itemsets. IEEE
+  Transactions on Knowledge and Data Engineering  \textbf{27}(3),  726--739
+  (2014)
+
+\bibitem{tseng2016efficient}
+Tseng, V.S., Wu, C.W., Fournier-Viger, P., Yu, P.S.: Efficient algorithms for
+  mining top-k high utility itemsets. IEEE Transactions on Knowledge and Data
+  Engineering  \textbf{28}(1),  54--67 (2016)
+
+\bibitem{uno2004lcm}
+Uno, T., Asai, T., Uchida, Y., Arimura, H.: An efficient algorithm for
+  enumerating closed frequent itemsets. In: Proceedings of the 2004 IEEE ICDM
+  Workshop on Frequent Itemset Mining Implementations (FIMI) (2004)
+
+\bibitem{vo2013new}
+Vo, B., Nguyen, L.T.T., Le, H.B.: A new approach for mining closed high utility
+  itemsets. Information Sciences  \textbf{233},  179--192 (2013)
+
+\bibitem{wu2022ubp}
+Wu, J.M.T., Srivastava, G., Lin, J.C.W., Zhang, Y.: {UBP-Miner}: An efficient
+  bit based high utility itemset mining algorithm. Knowledge-Based Systems
+  \textbf{238},  107873 (2022)
+
+\bibitem{yun2021mining}
+Yun, U., Kim, D.G., Yoon, E., Vo, B.: Mining high occupancy patterns with
+  maximum condition from transactional databases. Applied Intelligence
+  \textbf{51},  824--840 (2021)
+
+\bibitem{yun2017high}
+Yun, U., Lee, G., Yoon, E.: High utility itemset mining with various discount
+  strategies. Knowledge-Based Systems  \textbf{123},  177--193 (2017)
+
+\bibitem{zaki2000scalable}
+Zaki, M.J.: Scalable algorithms for association mining. IEEE Transactions on
+  Knowledge and Data Engineering  \textbf{12}(3),  372--390 (2000)
+
+\bibitem{zhang2015occupancy}
+Zhang, L., Luo, P., Tang, L., Chen, E., Liu, Q., Wang, M., Xiong, H.:
+  Occupancy-based frequent pattern mining. ACM Transactions on Knowledge
+  Discovery from Data  \textbf{10}(2),  1--33 (2015)
+
+\bibitem{zida2017efim}
+Zida, S., Fournier-Viger, P., Lin, J.C.W., Wu, C.W., Tseng, V.S.: {EFIM}: A
+  fast and memory efficient algorithm for high-utility itemset mining.
+  Knowledge and Information Systems  \textbf{51}(2),  595--625 (2017)
+
+\end{thebibliography}

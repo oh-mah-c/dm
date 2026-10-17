@@ -84,8 +84,13 @@ int main(int argc, char **argv) {
     dm_bench_stop(DM_PHASE_ALGO);
 
     const MHOUPatternList *patterns = mhoui_select_patterns(&result, algo);
+#ifdef _WIN32
+    mkdir("results");
+    mkdir("results/patterns");
+#else
     mkdir("results", 0775);
     mkdir("results/patterns", 0775);
+#endif
     dm_bench_start(DM_PHASE_WRITE);
     mhoui_write_patterns(output, patterns, ds->count);
     dm_bench_stop(DM_PHASE_WRITE);

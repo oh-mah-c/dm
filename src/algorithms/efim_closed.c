@@ -1,3 +1,15 @@
+/**
+ * @file efim_closed.c
+ * @brief EFIM-Closed: Fast and Memory Efficient Discovery of Closed High-Utility Itemsets
+ *
+ * Reference:
+ *   Philippe Fournier-Viger, Souleymane Zida, Jerry Chun-Wei Lin, Cheng-Wei Wu, Vincent S. Tseng,
+ *   "EFIM-Closed: Fast and Memory Efficient Discovery of Closed High-Utility Itemsets,"
+ *   in Proc. 12th International Conference on Machine Learning and Data Mining in Pattern Recognition (MLDM 2016),
+ *   Springer LNAI 9729, 2016, pp. 199-213.
+ *   DOI: 10.1007/978-3-319-41920-6_16
+ */
+
 #include "algorithms/efim_closed.h"
 #include "core/dm_dataset_types.h"
 #include "core/dm_benchmark.h"
@@ -7,6 +19,7 @@
 #include <stdbool.h>
 
 /* --- DATA STRUCTURES --- */
+
 
 typedef struct {
     uint32_t id;
