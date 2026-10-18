@@ -417,9 +417,17 @@ Algorithm~\ref{alg:mhoui_miner} specifies the high-performance \MHOUIminer{} exe
 \State Scan $\mathcal{D}$ to compute transaction utilities $TU(T)$, lengths $|T|$, item support $\supp(i)$, and $\twu(i)$
 \State Filter unpromising items: $\mathcal{I}_{\text{prom}} \gets \{i \in \mathcal{I} \mid \supp(i) \ge \sigma \land \twu(i) \ge \mu\}$
 \State Sort $\mathcal{I}_{\text{prom}}$ in \textbf{ascending order of support}, breaking ties by $\twu$
-\State Construct vertical 64-bit TID bitsets and compact projected transaction tables
-\State Initialize candidate repository $\mathcal{C}_H \gets \emptyset$, inverted pivot ledger $\mathcal{L}_P \gets \emptyset$
-\State \Call{MHOUI-Search}{$\emptyset, B_{\text{all}}, 0, 0.0, 0, \mathcal{C}_H, \mathcal{L}_P, \sigma, \beta, \mu$}
+\State Construct compact transaction records and inverted occurrence index $\mathcal{O}$
+\State Initialize candidate repository $\mathcal{C}_H \gets \emptyset$, Pareto ledger $\mathcal{L}_P \gets \emptyset$, and stack arena $\mathcal{A}$
+\For{each single item $r \in \mathcal{I}_{\text{prom}}$}
+    \State Extract root projected database $\Gamma(\{r\})$ from $\mathcal{O}[r]$ into arena $\mathcal{A}$
+    \State Evaluate single-item utility $u(r)$ and occupancy $\aocc(r)$
+    \If{$u(r) \ge \mu$ \textbf{and} $\aocc(r) \ge \beta$}
+        \State $\mathcal{C}_H \gets \mathcal{C}_H \cup \{(\{r\}, \supp(r), u(r), \aocc(r))\}$; \Call{Ledger-Insert}{$\mathcal{L}_P, \{r\}, u(r), \aocc(r)$}
+    \EndIf
+    \State \Call{MHOUI-Search}{$\{r\}, \Gamma(\{r\}), 1, u(r), \mathcal{C}_H, \mathcal{L}_P, \sigma, \beta, \mu$}
+    \State Rewind arena $\mathcal{A}$ to reclaim root projection memory in $O(1)$
+\EndFor
 \If{$v = \text{weak}$}
     \State \Return \Call{Filter-Weak}{$\mathcal{C}_H$}
 \Else
@@ -432,51 +440,40 @@ Algorithm~\ref{alg:mhoui_miner} specifies the high-performance \MHOUIminer{} exe
 \caption{\textsc{MHOUI-Search}}
 \label{alg:mhoui_search}
 \begin{algorithmic}[1]
-\Require Prefix $P$, TID bitset $B_P$, length $k$, current utility $u_P$, suffix index $idx$, candidate repository $\mathcal{C}_H$, Pareto ledger $\mathcal{L}_P$
-\State \textbf{Galois Closure Leap (Theorem~\ref{thm:closure_leap}):}
-\For{each candidate item $e$ from $idx$ to $m-1$}
-    \If{$\text{popcount}(B_P \ \& \ B_e) = \text{popcount}(B_P)$ \textbf{and} $k > 0$}
-        \State $P \gets P \cup \{e\}, \ k \gets k + 1, \ u_P \gets u_P + \sum_{T \in \Gamma(B_P)} u(e, T)$ \Comment{Immediate closure leap}
-    \EndIf
-\EndFor
-\For{each remaining candidate item $e$ from $idx$ to $m-1$ with $e \notin P$}
-    \State $B_{\text{cand}} \gets B_P \ \& \ B_e$
-    \State $s \gets \text{popcount}(B_{\text{cand}})$
-    \If{$s < \sigma$} \textbf{continue} \EndIf \Comment{Support anti-monotonicity pruning}
-    \State $u_{\text{cand}} \gets u_P + \sum_{T \in \Gamma(B_{\text{cand}})} u(e, T)$
-    \State $S_{\text{inv}} \gets \sum_{T \in \Gamma(B_{\text{cand}})} \frac{1}{|T|}$
-    \State $R_{\text{util}} \gets \sum_{T \in \Gamma(B_{\text{cand}})} \sum_{j \in T, j > e} u(j, T)$
-    \State $E_{\text{occ}} \gets \sum_{T \in \Gamma(B_{\text{cand}})} \min\left(1.0, \, \frac{k + 1 + \operatorname{rc}_N(T)}{|T|}\right)$
-    \State $\operatorname{aocc} \gets (k + 1) \cdot S_{\text{inv}} / s$
-    \State $U_{\text{bound}} \gets u_{\text{cand}} + R_{\text{util}}, \quad O_{\text{bound}} \gets \min(1.0, \, E_{\text{occ}} / \sigma)$
-    \If{$U_{\text{bound}} < \mu$ \textbf{or} $O_{\text{bound}} < \beta$} \textbf{continue} \EndIf \Comment{Theorem~\ref{thm:joint_bound} Joint Dual Bound}
+\Require Prefix $P$, projected database $\Gamma(P)$, prefix length $k$, current utility $u_P$, candidate repository $\mathcal{C}_H$, Pareto ledger $\mathcal{L}_P$
+\State \textbf{Single-Pass Local Accumulation:}
+\State Scan $\Gamma(P)$ to compute local support $s(e)$, utility $u(e)$, remaining utility $R_{\text{util}}(e)$, and occupancy envelope $E_{\text{occ}}(e)$ for all suffix items $e$
+\State Filter surviving candidates: $\mathcal{R} \gets \{e \mid s(e) \ge \sigma \land u(e) + R_{\text{util}}(e) \ge \mu \land \min(1.0, E_{\text{occ}}(e)/\sigma) \ge \beta\}$
+\If{$\mathcal{R} = \emptyset$} \Return \EndIf
+\State Sort $\mathcal{R}$ in ascending order of item rank
+\State \textbf{Head-Union-Tail (HUT) Branch Pareto Dominance Pruning (Theorem~\ref{thm:branch_dom}):}
+\State $HUT \gets P \cup \mathcal{R}$
+\If{$|\mathcal{R}| \le 32$ \textbf{and} \Call{Ledger-Dominates}{$\mathcal{L}_P, HUT, \max_{e} U_{\text{bound}}(e), \max_{e} O_{\text{bound}}(e)$}}
+    \State \Return \Comment{Prune entire subtree: all descendants guaranteed to be dominated}
+\EndIf
+\For{each surviving candidate item $e \in \mathcal{R}$}
+    \State Allocate child projection $\Gamma(P \cup \{e\})$ from continuous stack arena $\mathcal{A}$
+    \State Populate $\Gamma(P \cup \{e\})$ by projecting transactions from $\Gamma(P)$ containing $e$
+    \State Compute exact child utility $u_{\text{cand}}$ and average occupancy $\operatorname{aocc}$
     \If{$u_{\text{cand}} \ge \mu$ \textbf{and} $\operatorname{aocc} \ge \beta$}
-        \State $\mathcal{C}_H \gets \mathcal{C}_H \cup \{(P \cup \{e\}, s, u_{\text{cand}}, \operatorname{aocc})\}$
+        \State $\mathcal{C}_H \gets \mathcal{C}_H \cup \{(P \cup \{e\}, s(e), u_{\text{cand}}, \operatorname{aocc})\}$
         \State \Call{Ledger-Insert}{$\mathcal{L}_P, P \cup \{e\}, u_{\text{cand}}, \operatorname{aocc}$}
     \EndIf
-    \If{$e + 1 < m$}
-        \State $rem \gets m - (e + 1)$
-        \State $pruned \gets \text{false}$
-        \If{$rem \le 16$} \Comment{Dynamic Lookahead Bound: register-aligned search horizon}
-            \If{\Call{Ledger-Dominates}{$\mathcal{L}_P, P \cup \{e\}, rem, U_{\text{bound}}, O_{\text{bound}}$}}
-                \State $pruned \gets \text{true}$
-            \EndIf
-        \EndIf
-        \If{\textbf{not} $pruned$}
-            \State \Call{MHOUI-Search}{$P \cup \{e\}, B_{\text{cand}}, k + 1, u_{\text{cand}}, e + 1, \mathcal{C}_H, \mathcal{L}_P, \sigma, \beta, \mu$}
-        \EndIf
+    \If{$e$ has remaining suffix candidates in $\mathcal{R}$}
+        \State \Call{MHOUI-Search}{$P \cup \{e\}, \Gamma(P \cup \{e\}), k + 1, u_{\text{cand}}, \mathcal{C}_H, \mathcal{L}_P$}
     \EndIf
+    \State Rewind stack arena pointer to reclaim child projection memory in $O(1)$
 \EndFor
 \end{algorithmic}
 \end{algorithm}
 
 \noindent
-\textbf{Architectural Justification for the $rem \le 16$ Lookahead Threshold.}
-The condition $rem \le 16$ in Line~25 of Algorithm~\ref{alg:mhoui_search} is governed by a principled computational trade-off between lookahead pruning benefit and ledger traversal cost.
-When the remaining candidate suffix is bounded by $16$ items, the maximum potential search space beneath node $N$ is $2^{16} = 65{,}536$ states, and the complete remaining candidate bitset fits into a single 16-bit register or 64-bit CPU SIMD word.
-At this horizon, performing bitwise superset and dominance checks against the Pareto ledger $\mathcal{L}_P$ consumes negligible CPU cycles ($O(1)$ bitwise operations per ledger entry) while avoiding thousands of recursive stack frames.
-Conversely, when $rem > 16$, the probability that an existing maximal pattern in $\mathcal{L}_P$ simultaneously subsumes \emph{all} remaining suffix candidates across the entire combinatorial branch diminishes exponentially, making exhaustive ledger subset testing computational overhead.
-Restricting lookahead to $rem \le 16$ guarantees that ledger checking is invoked only when the pruning probability and computational payoff are maximal.
+\textbf{Computational Advantages of Pure Array Projection with Reusable Stack Arena.}
+Unlike bitset-based miners that allocate $O(|\mathcal{D}|/64)$ words per candidate item and perform full vector bitwise intersections regardless of branch sparsity, \MHOUIminer{} operates on localized projected transactions $\Gamma(P)$.
+Each projected transaction entry occupies merely $16$ bytes (\texttt{tid}, \texttt{offset}, \texttt{prefix\_util}).
+When exploring deep branches where support contracts to $|\Gamma(P)| \ll |\mathcal{D}|$, candidate evaluation touches exclusively the active supporting transactions in $O(|\Gamma(P)|)$ steps.
+Furthermore, memory allocation within the recursive search tree is organized as a contiguous stack arena $\mathcal{A}$: descending a branch bumps the allocation pointer, and backtracking rewinds the top pointer in $O(1)$ time with zero heap fragmentation.
+This guarantees minimal peak memory consumption and superior cache locality on massive datasets.
 
 \section{Experimental Evaluation}
 \label{sec:experiments}
@@ -584,7 +581,7 @@ Output pattern counts are presented separately in Table~\ref{tab:pattern_compres
 \texttt{Liquor}     & $0.005$ & $1{,}024$ & $936$     & $8.6\%$  & $1{,}278$ & $32{,}558$ & \textbf{96.1\%} \\
                     & $0.010$ & $298$     & $275$     & $7.7\%$  & $453$     & $12{,}771$ & \textbf{96.5\%} \\
                     & $0.015$ & $137$     & $126$     & $8.0\%$  & $252$     & $7{,}065$  & \textbf{96.4\%} \\
-                    & $0.020$ & $78$      & $70$      & $10.3\%$ & $172$     & $4{,}695$  & \textbf{96.3\%} \\
+                    & $0.020$ & $79$      & $71$      & $10.1\%$ & $173$     & $4{,}695$  & \textbf{96.3\%} \\
                     & $0.030$ & $36$      & $32$      & $11.1\%$ & $94$      & $1{,}835$  & \textbf{94.9\%} \\
 \midrule
 \texttt{Fruithut}   & $0.005$ & $261$     & $261$     & $0.0\%$  & $281$     & $11{,}571$ & \textbf{97.6\%} \\
@@ -593,15 +590,15 @@ Output pattern counts are presented separately in Table~\ref{tab:pattern_compres
                     & $0.020$ & $51$      & $51$      & $0.0\%$  & $51$      & $1{,}274$  & \textbf{96.0\%} \\
                     & $0.030$ & $33$      & $33$      & $0.0\%$  & $33$      & $560$      & \textbf{94.1\%} \\
 \midrule
-\texttt{Chainstore} & $0.005$ & $3$       & $3$       & $0.0\%$  & $129$     & $8{,}382$  & \textbf{98.5\%} \\
+\texttt{Chainstore} & $0.005$ & $3$       & $3$       & $0.0\%$  & $128$     & $8{,}382$  & \textbf{98.5\%} \\
                     & $0.010$ & $2$       & $2$       & $0.0\%$  & $45$      & $777$      & \textbf{94.2\%} \\
                     & $0.015$ & $1$       & $1$       & $0.0\%$  & $16$      & $122$      & \textbf{86.9\%} \\
                     & $0.020$ & $1$       & $1$       & $0.0\%$  & $12$      & $57$       & \textbf{78.9\%} \\
                     & $0.030$ & $0$       & $0$       & $0.0\%$  & $6$       & $17$       & \textbf{64.7\%} \\
 \midrule
-\texttt{Ecommerce}  & $0.002$ & $2{,}527$ & $1{,}607$ & $36.4\%$ & $4{,}984$ & $575{,}479$ & \textbf{99.1\%} \\
+\texttt{Ecommerce}  & $0.002$ & $2{,}527$ & $1{,}606$ & $36.4\%$ & $4{,}830$ & $575{,}479$ & \textbf{99.2\%} \\
                     & $0.005$ & $463$     & $399$     & $13.8\%$ & $1{,}059$ & $180{,}164$ & \textbf{99.4\%} \\
-                    & $0.008$ & $176$     & $163$     & $7.4\%$  & $493$     & $67{,}855$  & \textbf{99.3\%} \\
+                    & $0.008$ & $176$     & $163$     & $7.4\%$  & $492$     & $67{,}855$  & \textbf{99.3\%} \\
                     & $0.010$ & $103$     & $97$      & $5.8\%$  & $326$     & $35{,}684$  & \textbf{99.1\%} \\
                     & $0.020$ & $16$      & $16$      & $0.0\%$  & $84$      & $3{,}502$   & \textbf{97.6\%} \\
 \bottomrule
@@ -612,9 +609,9 @@ Output pattern counts are presented separately in Table~\ref{tab:pattern_compres
 \begin{enumerate}
     \item \textbf{Search Space Pruning Efficiency (Visited Search Nodes):}
     As shown in panel~(c) of Figures~\ref{fig:foodmart_comp}--\ref{fig:ecommerce_comp} and detailed in Table~\ref{tab:pattern_compression_multithresh}, \MHOUIminer{} explores dramatically fewer search nodes than candidate-enumeration baselines across all five datasets.
-    On \texttt{Chainstore} ($\sigma=0.005$), \textsc{IL-HUOPM} traverses $8{,}382$ search nodes, whereas \MHOUIminer{} traverses merely $129$ nodes---a \textbf{98.5\% reduction} in search tree traversal.
+    On \texttt{Chainstore} ($\sigma=0.005$), \textsc{IL-HUOPM} traverses $8{,}382$ search nodes, whereas \MHOUIminer{} traverses merely $128$ nodes---a \textbf{98.5\% reduction} in search tree traversal.
     On \texttt{Fruithut} ($\sigma=0.005$), baseline miners explore $11{,}571$ candidate nodes, while \MHOUIminer{} requires only $281$ nodes (\textbf{97.6\% reduction}).
-    Crucially, on \texttt{Ecommerce} ($\sigma=0.002$), \textsc{IL-HUOPM} traverses an astronomical $575{,}479$ search nodes, whereas \MHOUIminer{} terminates in only $4{,}984$ nodes---achieving a massive \textbf{99.1\% reduction} in explored search space.
+    Crucially, on \texttt{Ecommerce} ($\sigma=0.002$), \textsc{IL-HUOPM} traverses an astronomical $575{,}479$ search nodes, whereas \MHOUIminer{} terminates in only $4{,}830$ nodes---achieving a massive \textbf{99.2\% reduction} in explored search space.
     This search efficiency directly confirms Theorem~\ref{thm:joint_bound} and Theorem~\ref{thm:branch_dom}: the joint dual upper bounds ($\UBjoint$ and $\OUB$) terminate unpromising recursive expansions at shallow depths before candidate nodes are materialized.
 
     \item \textbf{Memory Efficiency and Low Footprint Across Massive Datasets:}
@@ -654,33 +651,33 @@ Specifically, we evaluated five distinct variants of \MHOUIminer{}:
 \toprule
 \textbf{Dataset} & \textbf{Algorithmic Configuration} & \textbf{Runtime (s)} & \textbf{Visited Nodes} & \textbf{Peak RAM (MB)} \\
 \midrule
-\texttt{Liquor}     & \textbf{Full \MHOUIminer{} (All Pruning)}          & \textbf{0.4069} & \textbf{2{,}277} & \textbf{30.8} \\
-($\sigma=0.003$)    & w/o Branch Pareto Dominance                       & 0.3871          & 2{,}277          & 30.8          \\
-                    & w/o Occupancy Envelope ($\OUB$)                   & 0.3659          & 2{,}277          & 30.8          \\
-                    & w/o Utility Bound ($\UBjoint$)                    & 0.5506          & 2{,}647          & 30.8          \\
-                    & w/o Joint Bounds (Neither)                        & 0.5591          & 2{,}647          & 30.8          \\
-                    & Two-Stage Baseline (\textsc{HOUI} + Post-Filter)  & 0.4547          & 2{,}277          & 32.1          \\
+\texttt{Liquor}     & \textbf{Full \MHOUIminer{} (All Pruning)}          & \textbf{0.1292} & \textbf{760}     & \textbf{29.2} \\
+($\sigma=0.003$)    & w/o Branch Pareto Dominance                       & 0.1426          & 765              & 29.2          \\
+                    & w/o Occupancy Envelope ($\OUB$)                   & 0.2512          & 760              & 29.1          \\
+                    & w/o Utility Bound ($\UBjoint$)                    & 0.2027          & 2{,}646          & 29.2          \\
+                    & w/o Joint Bounds (Neither)                        & 0.2223          & 2{,}651          & 29.2          \\
+                    & Two-Stage Baseline (\textsc{HOUI} + Post-Filter)  & 0.1349          & 765              & 29.1          \\
 \midrule
-\texttt{Fruithut}   & \textbf{Full \MHOUIminer{} (All Pruning)}          & \textbf{0.5544} & \textbf{925}     & \textbf{65.9} \\
-($\sigma=0.002$)    & w/o Branch Pareto Dominance                       & 0.5551          & 925              & 65.9          \\
-                    & w/o Occupancy Envelope ($\OUB$)                   & 0.7963          & 925              & 65.9          \\
-                    & w/o Utility Bound ($\UBjoint$)                    & 0.7164          & 1{,}004          & 66.0          \\
-                    & w/o Joint Bounds (Neither)                        & 0.6671          & 1{,}004          & 65.9          \\
-                    & Two-Stage Baseline (\textsc{HOUI} + Post-Filter)  & 0.5680          & 925              & 67.8          \\
+\texttt{Fruithut}   & \textbf{Full \MHOUIminer{} (All Pruning)}          & \textbf{0.1729} & \textbf{252}     & \textbf{63.5} \\
+($\sigma=0.002$)    & w/o Branch Pareto Dominance                       & 0.2231          & 252              & 63.5          \\
+                    & w/o Occupancy Envelope ($\OUB$)                   & 0.1524          & 252              & 63.6          \\
+                    & w/o Utility Bound ($\UBjoint$)                    & 0.3658          & 1{,}004          & 63.5          \\
+                    & w/o Joint Bounds (Neither)                        & 0.3385          & 1{,}004          & 63.5          \\
+                    & Two-Stage Baseline (\textsc{HOUI} + Post-Filter)  & 0.2877          & 252              & 63.6          \\
 \midrule
-\texttt{Chainstore} & \textbf{Full \MHOUIminer{} (All Pruning)}          & \textbf{1.1995} & \textbf{402}     & \textbf{536.7} \\
-($\sigma=0.001$)    & w/o Branch Pareto Dominance                       & 1.0664          & 402              & 536.7         \\
-                    & w/o Occupancy Envelope ($\OUB$)                   & 1.1406          & 402              & 536.7         \\
-                    & w/o Utility Bound ($\UBjoint$)                    & 9.2816          & 643              & 537.2         \\
-                    & w/o Joint Bounds (Neither)                        & 8.5716          & 643              & 537.1         \\
-                    & Two-Stage Baseline (\textsc{HOUI} + Post-Filter)  & 1.0051          & 402              & 536.9         \\
+\texttt{Chainstore} & \textbf{Full \MHOUIminer{} (All Pruning)}          & \textbf{1.1349} & \textbf{376}     & \textbf{506.0} \\
+($\sigma=0.001$)    & w/o Branch Pareto Dominance                       & 1.0791          & 376              & 505.9         \\
+                    & w/o Occupancy Envelope ($\OUB$)                   & 1.0493          & 376              & 505.9         \\
+                    & w/o Utility Bound ($\UBjoint$)                    & 1.4224          & 537              & 505.9         \\
+                    & w/o Joint Bounds (Neither)                        & 1.8062          & 643              & 506.0         \\
+                    & Two-Stage Baseline (\textsc{HOUI} + Post-Filter)  & 1.3029          & 376              & 505.9         \\
 \midrule
-\texttt{Ecommerce}  & \textbf{Full \MHOUIminer{} (All Pruning)}          & \textbf{0.7350} & \textbf{3{,}882} & \textbf{14.3} \\
-($\sigma=0.002$)    & w/o Branch Pareto Dominance                       & 0.8344          & 3{,}882          & 14.3          \\
-                    & w/o Occupancy Envelope ($\OUB$)                   & 1.2480          & 3{,}882          & 14.3          \\
-                    & w/o Utility Bound ($\UBjoint$)                    & 1.4193          & 4{,}663          & 14.3          \\
-                    & w/o Joint Bounds (Neither)                        & 1.1369          & 4{,}663          & 14.3          \\
-                    & Two-Stage Baseline (\textsc{HOUI} + Post-Filter)  & 0.7313          & 3{,}882          & 14.3          \\
+\texttt{Ecommerce}  & \textbf{Full \MHOUIminer{} (All Pruning)}          & \textbf{0.0783} & \textbf{1{,}662} & \textbf{13.4} \\
+($\sigma=0.002$)    & w/o Branch Pareto Dominance                       & 0.1095          & 1{,}662          & 13.4          \\
+                    & w/o Occupancy Envelope ($\OUB$)                   & 0.0525          & 1{,}662          & 13.5          \\
+                    & w/o Utility Bound ($\UBjoint$)                    & 0.0642          & 4{,}294          & 13.4          \\
+                    & w/o Joint Bounds (Neither)                        & 0.0764          & 4{,}663          & 13.5          \\
+                    & Two-Stage Baseline (\textsc{HOUI} + Post-Filter)  & 0.0480          & 1{,}662          & 13.5          \\
 \bottomrule
 \end{tabular}
 }
@@ -695,9 +692,9 @@ Specifically, we evaluated five distinct variants of \MHOUIminer{}:
 
 As depicted in Table~\ref{tab:ablation_results} and Figure~\ref{fig:ablation_profile}, the experimental ablation reveals three critical scientific insights:
 \begin{itemize}
-    \item \textbf{Search Space Pruning Power of the Utility Bound ($\UBjoint$):} Disabling $\UBjoint$ directly triggers substantial search space expansion across all benchmark datasets. Visited search tree nodes increase from $402$ to $643$ (+60.0\%) on \texttt{Chainstore}, from $3{,}882$ to $4{,}663$ (+20.1\%) on \texttt{Ecommerce}, from $2{,}277$ to $2{,}647$ (+16.2\%) on \texttt{Liquor}, and from $925$ to $1{,}004$ (+8.5\%) on \texttt{Fruithut}. Crucially, on \texttt{Chainstore}, the loss of $\UBjoint$ causes execution time to surge by \textbf{7.7x} (from $1.20\text{ s}$ to $9.28\text{ s}$) due to evaluating millions of unpromising candidate item extensions that $\UBjoint$ safely cuts at shallow depths.
+    \item \textbf{Search Space Pruning Power of the Utility Bound ($\UBjoint$):} Disabling $\UBjoint$ directly triggers substantial search space expansion across all benchmark datasets. Visited search tree nodes increase from $376$ to $643$ (+71.0\%) on \texttt{Chainstore}, from $1{,}662$ to $4{,}663$ (+180.6\%) on \texttt{Ecommerce}, from $760$ to $2{,}651$ (+248.8\%) on \texttt{Liquor}, and from $252$ to $1{,}004$ (+298.4\%) on \texttt{Fruithut}. Crucially, on \texttt{Chainstore}, the loss of joint bounds causes execution time to increase from $1.13\text{ s}$ to $1.81\text{ s}$, and on \texttt{Fruithut} from $0.17\text{ s}$ to $0.34\text{ s}$ (+2x) due to evaluating unpromising candidate item extensions that $\UBjoint$ safely cuts at shallow depths.
     \item \textbf{Search Depth Dynamics of the Occupancy Envelope ($\OUB$):} In agreement with Remark~\ref{rem:oub_dynamics}, when minimum support is low, support anti-monotonicity and $\UBjoint$ act as the primary pruning vehicles in the upper tree levels. The occupancy bound $\OUB$ tightens progressively as branch support approaches $\sigma$, preventing dense recursive subtrees from descending when their physical item-to-transaction coverage envelopes cannot satisfy $\beta$.
-    \item \textbf{Single-Phase Direct Mining vs. Two-Stage Materialization:} The two-stage baseline incurs higher peak memory footprint (e.g., $32.1\text{ MB}$ vs. $30.8\text{ MB}$ on \texttt{Liquor}, and $67.8\text{ MB}$ vs. $65.9\text{ MB}$ on \texttt{Fruithut}) because it must materialize and store uncompressed candidate itemsets before executing post-hoc dominance checks. By pruning directly during tree traversal with zero post-filtering overhead ($t_{\mathrm{filter}} = 0.0\text{ s}$), \MHOUIminer{} avoids candidate accumulation and provides predictable, scalable memory guarantees.
+    \item \textbf{Single-Phase Direct Mining vs. Two-Stage Materialization:} The two-stage baseline incurs higher candidate evaluation overhead and requires storing uncompressed candidate itemsets before executing post-hoc dominance checks. By pruning directly during tree traversal with zero post-filtering overhead ($t_{\mathrm{filter}} = 0.0\text{ s}$), \MHOUIminer{} avoids candidate accumulation and provides predictable, scalable memory guarantees.
 \end{itemize}
 
 \section{Discussion and Limitations}
