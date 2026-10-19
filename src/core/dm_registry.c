@@ -1,14 +1,18 @@
 #include "core/dm_algorithm.h"
+#include <stdio.h>
 #include <string.h>
 
-#define MAX_ALGORITHMS 128
+#define MAX_ALGORITHMS 512
 
 static DM_Algorithm *registry[MAX_ALGORITHMS];
 static int algorithm_count = 0;
 
 DM_Status dm_register_algorithm(DM_Algorithm *algo) {
     if (!algo || !algo->id) return DM_ERROR_INVALID_PARAM;
-    if (algorithm_count >= MAX_ALGORITHMS) return DM_ERROR_MEMORY;
+    if (algorithm_count >= MAX_ALGORITHMS) {
+        fprintf(stderr, "dm: algorithm registry full (%d), '%s' not registered\n", MAX_ALGORITHMS, algo->id);
+        return DM_ERROR_MEMORY;
+    }
     
     // Check for duplicates
     for (int i = 0; i < algorithm_count; i++) {

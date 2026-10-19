@@ -220,7 +220,23 @@ typedef struct {
     uint32_t max_id;
     size_t total_mfi;
     size_t total_footprint;
+    FILE *out;  /* DM_MFI_OUT: one MFI per line, item identifiers in increasing order */
 } Context;
+
+static int cmp_u32_asc(const void *a, const void *b) {
+    uint32_t x = *(const uint32_t *)a, y = *(const uint32_t *)b;
+    return (x > y) - (x < y);
+}
+
+static void emit_mfi(Context *ctx, const uint32_t *S, uint32_t n) {
+    if (!ctx->out) return;
+    uint32_t *tmp = malloc((n ? n : 1) * sizeof(uint32_t));
+    memcpy(tmp, S, n * sizeof(uint32_t));
+    qsort(tmp, n, sizeof(uint32_t), cmp_u32_asc);
+    for (uint32_t i = 0; i < n; i++) fprintf(ctx->out, i ? " %u" : "%u", tmp[i]);
+    fputc('\n', ctx->out);
+    free(tmp);
+}
 
 static void fpmax_recursive(FPTree *tree, uint32_t *head, uint32_t head_len, MFITree *mfit, Context *ctx, Arena *fp_arena, Arena *mfi_arena) {
     if (is_single_path(tree)) {
@@ -240,6 +256,7 @@ static void fpmax_recursive(FPTree *tree, uint32_t *head, uint32_t head_len, MFI
             qsort(S, s_total, sizeof(uint32_t), cmp_freq_desc);
             if (!is_subset_mfi(mfit, S, s_total)) {
                 insert_mfitree(mfit, S, s_total, mfi_arena);
+                emit_mfi(ctx, S, s_total);
                 ctx->total_mfi++;
                 ctx->total_footprint += s_total;
             }
@@ -285,6 +302,7 @@ static void fpmax_recursive(FPTree *tree, uint32_t *head, uint32_t head_len, MFI
             if (tail_len == 0) {
                 // Maximality guaranteed by is_subset_mfi and order
                 insert_mfitree(mfit, S, s_len, mfi_arena);
+                emit_mfi(ctx, S, s_len);
                 ctx->total_mfi++;
                 ctx->total_footprint += s_len;
             } else {
@@ -427,10 +445,13 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     mfit.header = calloc(ds->max_id + 1, sizeof(MFIHeader));
 
     Context ctx = { .min_sup = min_sup, .max_id = ds->max_id, .total_mfi = 0, .total_footprint = 0 };
+    const char *outp = getenv("DM_MFI_OUT");
+    ctx.out = outp ? fopen(outp, "w") : NULL;
 
     // 5. Recursive Mining
     fpmax_recursive(&tree, NULL, 0, &mfit, &ctx, fp_arena, mfi_arena);
 
+    if (ctx.out) fclose(ctx.out);
     printf("[FPmax] Complete. MFIs found: %zu\n", ctx.total_mfi);
     dm_bench_record_results(ctx.total_mfi, ctx.total_footprint);
 

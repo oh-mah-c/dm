@@ -132,6 +132,7 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 35. **Apriori-Inverse** - Vertical mining of perfectly sporadic itemsets (low support) based on the inverted downward closure.
 36. **CORI** - Key correlation mining by simultaneous pushing of monotone (rarity) and anti-monotone (bond correlation) constraints.
 37. **RP-Tree** - Tree-based mining of rare-item itemsets using dual support thresholds.
+37. **Walky-G** - Depth-first mining of minimal rare itemsets over frequent generators, as in Algorithms 1-4 of Szathmary et al. (CLA 2012) [140].
 
 ### Maximal Frequent Itemset Mining (MFIM)
 38. **Max-Miner** - Breadth/Depth search applying look-ahead superset pruning for long patterns.
@@ -552,6 +553,22 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 **[138]** W. Gan, J. C.-W. Lin, P. Fournier-Viger, H.-C. Chao, and P. S. Yu, "HUOPM: High-Utility Occupancy Pattern Mining," *IEEE Transactions on Cybernetics*, vol. 50, no. 3, pp. 1195–1208, March 2020. DOI: 10.1109/TCYB.2019.2894367. *(HUOPM)*
 
 **[139]** H. Kim, T. Ryu, C. Lee, S. Kim, B. Vo, J. C.-W. Lin, and U. Yun, "Efficient Method for Mining High Utility Occupancy Patterns based on Indexed List Structure," *IEEE Access*, vol. 11, pp. 45053–45071, May 2023. DOI: 10.1109/ACCESS.2023.3271864. *(IL-HUOPM / HUOMIL)*
+
+**[140]** L. Szathmary, P. Valtchev, A. Napoli, and R. Godin, "Efficient Vertical Mining of Minimal Rare Itemsets," in *Proc. 9th Int. Conf. on Concept Lattices and Their Applications (CLA 2012)*, CEUR-WS vol. 972, 2012, pp. 269–280. https://ceur-ws.org/Vol-972/paper23.pdf *(Walky-G)*
+
+### Implementations verified against the original papers
+
+The implementations below were checked against an independent exact oracle (brute-force enumeration on randomized databases, set-level comparison of the outputs) and, where the original papers publish result counts, against those counts. Choices that the papers leave open are listed.
+
+| Algorithm | Paper | Verification | Choices not fixed by the paper |
+|---|---|---|---|
+| HEP (`hep`) | Deng 2020 [19] | Exact oracle: 8,073 cases (2,121 with an occupancy equal to the threshold), 0 mismatches. HOI counts equal Deng's Table 3 on retail, kosarak, T10I4D100K and accidents at 30% and 10%. | Exact (rational) comparison of occ(X) with the threshold; the early termination of the UBO scan (Section 3.2.3) is not implemented. |
+| DFHOI (`dfhoi`) | Nguyen et al. 2023 [20] | Same oracle, 0 mismatches. HOI counts equal Tables 7 and 8 of the paper (mushroom, retail, T10I4D100K, chess, pumsb). | Items ordered by increasing support (the paper does not state an order); exact comparison as above. |
+| Walky-G (`walky_g`) | Szathmary et al. 2012 [140] | Exact oracle: 5,294 cases on sparse, dense and equal-length random databases, 0 mismatches. MRI counts equal Hidouri et al. (IJCAI 2023), Table 2, on chess (λ = 2500, 1000) and pumsb (λ = 48000, 32000); on chess at λ = 500, its count (1,353,317) agrees with an independent computation (maximal frequent itemsets by LCM, then minimal transversals by SHD) and differs from the published 1,353,344. | Items placed in increasing identifier order; rare candidates of support 0 are kept, as in Algorithm 3. |
+
+Output of the verified miners can be written for checking: `DM_HOI_OUT` (HEP, DFHOI, AURA-HOI) and `DM_MRI_OUT` (Walky-G) name a file that receives one itemset per line. FPmax (`fpmax`) writes its maximal frequent itemsets to `DM_MFI_OUT`; its output matched a brute-force enumeration on 4,045 random cases, but its faithfulness to every step of the FPmax paper has not been reviewed.
+
+Known issue: the output of `apriori_rare` does not match the exact oracle (it misses minimal rare itemsets in most random cases); use `walky_g` for minimal rare itemsets.
 
 
 ---

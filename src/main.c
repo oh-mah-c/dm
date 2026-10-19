@@ -47,6 +47,7 @@
 #include "algorithms/pascal.h"
 #include "algorithms/zart.h"
 #include "algorithms/apriori_rare.h"
+#include "algorithms/walky_g.h"
 #include "algorithms/apriori_inverse.h"
 #include "algorithms/cori.h"
 #include "algorithms/rp_tree.h"
@@ -737,6 +738,7 @@ int main(int argc, char **argv) {
     DM_PASCAL_Params pascal_params;
     DM_ZART_Params zart_params;
     DM_APRIORI_RARE_Params apriori_rare_params;
+    DM_WALKY_G_Params walky_g_params;
     DM_APRIORI_INVERSE_Params apriori_inverse_params;
     DM_CORI_Params cori_params;
     DM_RP_TREE_Params rp_tree_params;
@@ -1109,6 +1111,9 @@ int main(int argc, char **argv) {
     } else if (strcmp(algo_id, "apriori_rare") == 0) {
         apriori_rare_params.min_support = min_support;
         params = &apriori_rare_params;
+    } else if (strcmp(algo_id, "walky_g") == 0) {
+        walky_g_params.min_support = min_support;
+        params = &walky_g_params;
     } else if (strcmp(algo_id, "apriori_inverse") == 0) {
         apriori_inverse_params.max_support = min_support; // use min_support flag for max_support
         apriori_inverse_params.min_abs_support = 5;
