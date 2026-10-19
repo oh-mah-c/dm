@@ -1,0 +1,126 @@
+dataset,algorithm,description,minsup,minocc,minutil_ratio,time_mine_s,time_filter_s,time_total_s,visited_nodes,candidates,patterns,peak_ram_mb
+foodmart,direct_strong_mhoui,MHOUI-Miner (Direct),0.002,0.1,0.0001,0.0084,0.0,0.0084,1296,1296,1296,5.02
+foodmart,houi_filter,HOUI + Post-Filter,0.002,0.1,0.0001,0.0063,0.0016,0.0079,1296,1296,1296,4.99
+foodmart,ocean_filter,OCEAN + Post-Filter,0.002,0.1,0.0001,0.5763,0.0016,0.5779,2592,1180,1180,4.61
+foodmart,huopm_filter,HUOPM + Post-Filter,0.002,0.1,0.0001,0.4608,0.0013,0.4621,2592,1180,1180,4.6
+foodmart,il_huopm_filter,IL-HUOPM + Post-Filter,0.002,0.1,0.0001,0.0258,0.0021,0.0278,33876,1180,1180,4.92
+foodmart,direct_strong_mhoui,MHOUI-Miner (Direct),0.005,0.1,0.0001,0.0007,0.0,0.0007,12,12,12,4.43
+foodmart,houi_filter,HOUI + Post-Filter,0.005,0.1,0.0001,0.0009,0.0,0.0009,12,12,12,4.42
+foodmart,ocean_filter,OCEAN + Post-Filter,0.005,0.1,0.0001,0.0004,0.0,0.0004,24,11,11,3.86
+foodmart,huopm_filter,HUOPM + Post-Filter,0.005,0.1,0.0001,0.0004,0.0,0.0005,24,11,11,3.82
+foodmart,il_huopm_filter,IL-HUOPM + Post-Filter,0.005,0.1,0.0001,0.0003,0.0,0.0003,27,11,11,3.86
+foodmart,direct_strong_mhoui,MHOUI-Miner (Direct),0.01,0.1,0.0001,0.0005,0.0,0.0005,0,0,0,4.22
+foodmart,houi_filter,HOUI + Post-Filter,0.01,0.1,0.0001,0.0007,0.0,0.0007,0,0,0,4.22
+foodmart,ocean_filter,OCEAN + Post-Filter,0.01,0.1,0.0001,0.0005,0.0,0.0005,0,0,0,3.84
+foodmart,huopm_filter,HUOPM + Post-Filter,0.01,0.1,0.0001,0.0001,0.0,0.0001,0,0,0,3.83
+foodmart,il_huopm_filter,IL-HUOPM + Post-Filter,0.01,0.1,0.0001,0.0001,0.0,0.0001,0,0,0,3.83
+foodmart,direct_strong_mhoui,MHOUI-Miner (Direct),0.015,0.1,0.0001,0.0007,0.0,0.0007,0,0,0,4.23
+foodmart,houi_filter,HOUI + Post-Filter,0.015,0.1,0.0001,0.0005,0.0,0.0005,0,0,0,4.23
+foodmart,ocean_filter,OCEAN + Post-Filter,0.015,0.1,0.0001,0.0002,0.0,0.0002,0,0,0,3.84
+foodmart,huopm_filter,HUOPM + Post-Filter,0.015,0.1,0.0001,0.0002,0.0,0.0002,0,0,0,3.84
+foodmart,il_huopm_filter,IL-HUOPM + Post-Filter,0.015,0.1,0.0001,0.0001,0.0,0.0001,0,0,0,3.83
+foodmart,direct_strong_mhoui,MHOUI-Miner (Direct),0.02,0.1,0.0001,0.0008,0.0,0.0008,0,0,0,4.22
+foodmart,houi_filter,HOUI + Post-Filter,0.02,0.1,0.0001,0.001,0.0,0.001,0,0,0,4.22
+foodmart,ocean_filter,OCEAN + Post-Filter,0.02,0.1,0.0001,0.0003,0.0,0.0003,0,0,0,3.85
+foodmart,huopm_filter,HUOPM + Post-Filter,0.02,0.1,0.0001,0.0001,0.0,0.0001,0,0,0,3.84
+foodmart,il_huopm_filter,IL-HUOPM + Post-Filter,0.02,0.1,0.0001,0.0002,0.0,0.0002,0,0,0,3.84
+liquor,direct_strong_mhoui,MHOUI-Miner (Direct),0.005,0.2,0.0005,0.1943,0.0,0.1943,1278,1024,936,29.15
+liquor,houi_filter,HOUI + Post-Filter,0.005,0.2,0.0005,0.1973,0.0017,0.199,1278,1024,936,29.23
+liquor,ocean_filter,OCEAN + Post-Filter,0.005,0.2,0.0005,0.9009,0.0007,0.9016,1524,835,789,24.38
+liquor,huopm_filter,HUOPM + Post-Filter,0.005,0.2,0.0005,0.8281,0.0008,0.8289,1524,835,789,24.3
+liquor,il_huopm_filter,IL-HUOPM + Post-Filter,0.005,0.2,0.0005,0.3619,0.0008,0.3627,32558,835,789,30.09
+liquor,direct_strong_mhoui,MHOUI-Miner (Direct),0.01,0.2,0.0005,0.1747,0.0,0.1747,453,298,275,28.79
+liquor,houi_filter,HOUI + Post-Filter,0.01,0.2,0.0005,0.12,0.0004,0.1204,453,298,275,28.75
+liquor,ocean_filter,OCEAN + Post-Filter,0.01,0.2,0.0005,0.8163,0.0003,0.8165,608,244,231,23.35
+liquor,huopm_filter,HUOPM + Post-Filter,0.01,0.2,0.0005,0.569,0.0003,0.5693,608,244,231,23.38
+liquor,il_huopm_filter,IL-HUOPM + Post-Filter,0.01,0.2,0.0005,0.2585,0.0001,0.2587,12771,244,231,28.48
+liquor,direct_strong_mhoui,MHOUI-Miner (Direct),0.015,0.2,0.0005,0.1169,0.0,0.1169,252,137,126,28.52
+liquor,houi_filter,HOUI + Post-Filter,0.015,0.2,0.0005,0.172,0.0001,0.1721,252,137,126,28.5
+liquor,ocean_filter,OCEAN + Post-Filter,0.015,0.2,0.0005,0.3497,0.0001,0.3498,367,117,111,22.56
+liquor,huopm_filter,HUOPM + Post-Filter,0.015,0.2,0.0005,0.2251,0.0001,0.2252,367,117,111,22.47
+liquor,il_huopm_filter,IL-HUOPM + Post-Filter,0.015,0.2,0.0005,0.2989,0.0001,0.299,7065,117,111,27.34
+liquor,direct_strong_mhoui,MHOUI-Miner (Direct),0.02,0.2,0.0005,0.1659,0.0,0.1659,173,79,71,28.39
+liquor,houi_filter,HOUI + Post-Filter,0.02,0.2,0.0005,0.0796,0.0001,0.0796,173,79,71,28.39
+liquor,ocean_filter,OCEAN + Post-Filter,0.02,0.2,0.0005,0.2821,0.0,0.2821,266,70,66,22.12
+liquor,huopm_filter,HUOPM + Post-Filter,0.02,0.2,0.0005,0.2165,0.0001,0.2165,266,70,66,22.02
+liquor,il_huopm_filter,IL-HUOPM + Post-Filter,0.02,0.2,0.0005,0.2042,0.0,0.2042,4695,70,66,26.66
+liquor,direct_strong_mhoui,MHOUI-Miner (Direct),0.03,0.2,0.0005,0.0655,0.0,0.0655,94,36,32,28.03
+liquor,houi_filter,HOUI + Post-Filter,0.03,0.2,0.0005,0.0667,0.0,0.0668,94,36,32,27.99
+liquor,ocean_filter,OCEAN + Post-Filter,0.03,0.2,0.0005,0.2014,0.0,0.2014,152,33,31,21.03
+liquor,huopm_filter,HUOPM + Post-Filter,0.03,0.2,0.0005,0.4058,0.0,0.4059,152,33,31,20.92
+liquor,il_huopm_filter,IL-HUOPM + Post-Filter,0.03,0.2,0.0005,0.1248,0.0,0.1248,1835,33,31,24.89
+fruithut,direct_strong_mhoui,MHOUI-Miner (Direct),0.005,0.2,0.001,0.1566,0.0,0.1566,281,261,261,63.3
+fruithut,houi_filter,HOUI + Post-Filter,0.005,0.2,0.001,0.1528,0.0004,0.1532,281,261,261,63.41
+fruithut,ocean_filter,OCEAN + Post-Filter,0.005,0.2,0.001,0.7412,0.0002,0.7414,430,234,228,49.98
+fruithut,huopm_filter,HUOPM + Post-Filter,0.005,0.2,0.001,0.4562,0.0001,0.4563,430,234,228,49.88
+fruithut,il_huopm_filter,IL-HUOPM + Post-Filter,0.005,0.2,0.001,0.6744,0.0002,0.6746,11571,234,228,59.24
+fruithut,direct_strong_mhoui,MHOUI-Miner (Direct),0.01,0.2,0.001,0.1367,0.0,0.1367,122,119,119,62.64
+fruithut,houi_filter,HOUI + Post-Filter,0.01,0.2,0.001,0.1063,0.0,0.1064,122,119,119,62.65
+fruithut,ocean_filter,OCEAN + Post-Filter,0.01,0.2,0.001,0.4066,0.0001,0.4066,211,101,101,47.59
+fruithut,huopm_filter,HUOPM + Post-Filter,0.01,0.2,0.001,0.6595,0.0001,0.6596,211,101,101,47.46
+fruithut,il_huopm_filter,IL-HUOPM + Post-Filter,0.01,0.2,0.001,0.2551,0.0001,0.2551,4101,101,101,56.23
+fruithut,direct_strong_mhoui,MHOUI-Miner (Direct),0.015,0.2,0.001,0.1629,0.0,0.1629,72,72,72,62.27
+fruithut,houi_filter,HOUI + Post-Filter,0.015,0.2,0.001,0.0899,0.0,0.09,72,72,72,62.24
+fruithut,ocean_filter,OCEAN + Post-Filter,0.015,0.2,0.001,0.2784,0.0,0.2785,135,61,61,46.21
+fruithut,huopm_filter,HUOPM + Post-Filter,0.015,0.2,0.001,0.1639,0.0,0.1639,135,61,61,46.18
+fruithut,il_huopm_filter,IL-HUOPM + Post-Filter,0.015,0.2,0.001,0.1789,0.0001,0.1789,2079,61,61,54.14
+fruithut,direct_strong_mhoui,MHOUI-Miner (Direct),0.02,0.2,0.001,0.0843,0.0,0.0843,51,51,51,61.91
+fruithut,houi_filter,HOUI + Post-Filter,0.02,0.2,0.001,0.0816,0.0,0.0816,51,51,51,61.92
+fruithut,ocean_filter,OCEAN + Post-Filter,0.02,0.2,0.001,0.1919,0.0,0.1919,100,43,43,45.18
+fruithut,huopm_filter,HUOPM + Post-Filter,0.02,0.2,0.001,0.1503,0.0001,0.1504,100,43,43,45.18
+fruithut,il_huopm_filter,IL-HUOPM + Post-Filter,0.02,0.2,0.001,0.2484,0.0,0.2485,1274,43,43,52.64
+fruithut,direct_strong_mhoui,MHOUI-Miner (Direct),0.03,0.2,0.001,0.0646,0.0,0.0646,33,33,33,61.39
+fruithut,houi_filter,HOUI + Post-Filter,0.03,0.2,0.001,0.0665,0.0,0.0665,33,33,33,61.37
+fruithut,ocean_filter,OCEAN + Post-Filter,0.03,0.2,0.001,0.1581,0.0,0.1581,65,27,27,43.43
+fruithut,huopm_filter,HUOPM + Post-Filter,0.03,0.2,0.001,0.1308,0.0,0.1308,65,27,27,43.35
+fruithut,il_huopm_filter,IL-HUOPM + Post-Filter,0.03,0.2,0.001,0.1364,0.0,0.1364,560,27,27,49.29
+chainstore,direct_strong_mhoui,MHOUI-Miner (Direct),0.005,0.2,0.002,0.6786,0.0,0.6786,128,3,3,499.63
+chainstore,houi_filter,HOUI + Post-Filter,0.005,0.2,0.002,0.7485,0.0,0.7485,128,3,3,499.6
+chainstore,ocean_filter,OCEAN + Post-Filter,0.005,0.2,0.002,2.4704,0.0,2.4705,257,22,10,311.37
+chainstore,huopm_filter,HUOPM + Post-Filter,0.005,0.2,0.002,1.1455,0.0,1.1455,257,22,10,310.82
+chainstore,il_huopm_filter,IL-HUOPM + Post-Filter,0.005,0.2,0.002,1.0695,0.0,1.0695,8382,22,10,335.32
+chainstore,direct_strong_mhoui,MHOUI-Miner (Direct),0.01,0.2,0.002,0.5253,0.0,0.5253,45,2,2,494.88
+chainstore,houi_filter,HOUI + Post-Filter,0.01,0.2,0.002,0.7256,0.0,0.7256,45,2,2,494.81
+chainstore,ocean_filter,OCEAN + Post-Filter,0.01,0.2,0.002,1.1948,0.0,1.1949,90,9,6,296.55
+chainstore,huopm_filter,HUOPM + Post-Filter,0.01,0.2,0.002,0.687,0.0,0.687,90,9,6,296.02
+chainstore,il_huopm_filter,IL-HUOPM + Post-Filter,0.01,0.2,0.002,0.3573,0.0,0.3573,777,9,6,311.3
+chainstore,direct_strong_mhoui,MHOUI-Miner (Direct),0.015,0.2,0.002,0.3059,0.0,0.3059,16,1,1,491.89
+chainstore,houi_filter,HOUI + Post-Filter,0.015,0.2,0.002,0.286,0.0,0.286,16,1,1,491.91
+chainstore,ocean_filter,OCEAN + Post-Filter,0.015,0.2,0.002,0.3011,0.0,0.3011,32,4,3,287.48
+chainstore,huopm_filter,HUOPM + Post-Filter,0.015,0.2,0.002,0.4021,0.0,0.4021,32,4,3,287.11
+chainstore,il_huopm_filter,IL-HUOPM + Post-Filter,0.015,0.2,0.002,0.244,0.0,0.244,122,4,3,296.46
+chainstore,direct_strong_mhoui,MHOUI-Miner (Direct),0.02,0.2,0.002,0.2994,0.0,0.2994,12,1,1,491.31
+chainstore,houi_filter,HOUI + Post-Filter,0.02,0.2,0.002,0.2738,0.0,0.2738,12,1,1,491.35
+chainstore,ocean_filter,OCEAN + Post-Filter,0.02,0.2,0.002,0.352,0.0,0.352,24,2,2,285.51
+chainstore,huopm_filter,HUOPM + Post-Filter,0.02,0.2,0.002,0.2338,0.0,0.2338,24,2,2,284.85
+chainstore,il_huopm_filter,IL-HUOPM + Post-Filter,0.02,0.2,0.002,0.2126,0.0,0.2126,57,2,2,292.8
+chainstore,direct_strong_mhoui,MHOUI-Miner (Direct),0.03,0.2,0.002,0.4413,0.0,0.4413,6,0,0,490.16
+chainstore,houi_filter,HOUI + Post-Filter,0.03,0.2,0.002,0.3469,0.0,0.3469,6,0,0,490.06
+chainstore,ocean_filter,OCEAN + Post-Filter,0.03,0.2,0.002,0.2563,0.0,0.2564,12,1,1,281.57
+chainstore,huopm_filter,HUOPM + Post-Filter,0.03,0.2,0.002,0.213,0.0,0.213,12,1,1,281.01
+chainstore,il_huopm_filter,IL-HUOPM + Post-Filter,0.03,0.2,0.002,0.2737,0.0,0.2737,17,1,1,286.18
+ecommerce,direct_strong_mhoui,MHOUI-Miner (Direct),0.002,0.1,0.0005,0.0805,0.0,0.0805,4830,2513,1606,14.25
+ecommerce,houi_filter,HOUI + Post-Filter,0.002,0.1,0.0005,0.0797,0.0032,0.0829,4843,2526,1606,14.13
+ecommerce,ocean_filter,OCEAN + Post-Filter,0.002,0.1,0.0005,3.1928,0.0049,3.1977,6416,3487,1665,13.63
+ecommerce,huopm_filter,HUOPM + Post-Filter,0.002,0.1,0.0005,1.9583,0.0058,1.9642,6416,3487,1665,13.46
+ecommerce,il_huopm_filter,IL-HUOPM + Post-Filter,0.002,0.1,0.0005,1.0775,0.0058,1.0833,575479,3487,1665,15.66
+ecommerce,direct_strong_mhoui,MHOUI-Miner (Direct),0.005,0.1,0.0005,0.0338,0.0,0.0338,1059,463,399,13.32
+ecommerce,houi_filter,HOUI + Post-Filter,0.005,0.1,0.0005,0.0347,0.0004,0.0351,1059,463,399,13.25
+ecommerce,ocean_filter,OCEAN + Post-Filter,0.005,0.1,0.0005,0.6702,0.0003,0.6705,1738,521,440,11.57
+ecommerce,huopm_filter,HUOPM + Post-Filter,0.005,0.1,0.0005,0.4302,0.0006,0.4308,1738,521,440,11.49
+ecommerce,il_huopm_filter,IL-HUOPM + Post-Filter,0.005,0.1,0.0005,0.2503,0.0003,0.2506,180164,521,440,13.38
+ecommerce,direct_strong_mhoui,MHOUI-Miner (Direct),0.008,0.1,0.0005,0.0247,0.0,0.0247,492,175,163,13.04
+ecommerce,houi_filter,HOUI + Post-Filter,0.008,0.1,0.0005,0.0234,0.0001,0.0235,493,176,163,13.0
+ecommerce,ocean_filter,OCEAN + Post-Filter,0.008,0.1,0.0005,0.5975,0.0001,0.5976,878,220,202,10.42
+ecommerce,huopm_filter,HUOPM + Post-Filter,0.008,0.1,0.0005,0.1382,0.0001,0.1383,878,220,202,10.39
+ecommerce,il_huopm_filter,IL-HUOPM + Post-Filter,0.008,0.1,0.0005,0.1102,0.0001,0.1103,67855,220,202,12.24
+ecommerce,direct_strong_mhoui,MHOUI-Miner (Direct),0.01,0.1,0.0005,0.031,0.0,0.031,326,103,97,12.89
+ecommerce,houi_filter,HOUI + Post-Filter,0.01,0.1,0.0005,0.0262,0.0,0.0263,326,103,97,12.84
+ecommerce,ocean_filter,OCEAN + Post-Filter,0.01,0.1,0.0005,0.199,0.0001,0.1991,598,139,130,9.9
+ecommerce,huopm_filter,HUOPM + Post-Filter,0.01,0.1,0.0005,0.1683,0.0001,0.1684,598,139,130,9.85
+ecommerce,il_huopm_filter,IL-HUOPM + Post-Filter,0.01,0.1,0.0005,0.0746,0.0001,0.0746,35684,139,130,11.5
+ecommerce,direct_strong_mhoui,MHOUI-Miner (Direct),0.02,0.1,0.0005,0.0105,0.0,0.0105,84,16,16,12.59
+ecommerce,houi_filter,HOUI + Post-Filter,0.02,0.1,0.0005,0.0189,0.0,0.0189,84,16,16,12.53
+ecommerce,ocean_filter,OCEAN + Post-Filter,0.02,0.1,0.0005,0.0386,0.0,0.0386,166,34,34,8.93
+ecommerce,huopm_filter,HUOPM + Post-Filter,0.02,0.1,0.0005,0.0749,0.0,0.0749,166,34,34,8.92
+ecommerce,il_huopm_filter,IL-HUOPM + Post-Filter,0.02,0.1,0.0005,0.0397,0.0,0.0398,3502,34,34,9.93

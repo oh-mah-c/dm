@@ -1,0 +1,61 @@
+dataset,config_id,minsup,minocc,minutil_ratio,algorithm,description,time_mine_s,time_filter_s,time_total_s,visited_nodes,candidates,maximal,peak_ram_mb
+foodmart,1,0.001,0.1,0.001,direct_strong_mhoui,Full MHOUI-Miner (All Pruning),0.0025,0.0,0.0025,1539,257,257,4.74
+foodmart,1,0.001,0.1,0.001,ablation_no_dom,w/o Branch Pareto Dominance,0.0043,0.0,0.0043,1539,257,257,4.73
+foodmart,1,0.001,0.1,0.001,ablation_no_oub,w/o Occupancy Envelope (OUB),0.0061,0.0,0.0061,1539,257,257,4.71
+foodmart,1,0.001,0.1,0.001,ablation_no_uub,w/o Utility Bound (UBjoint),0.0029,0.0,0.0029,1539,257,257,4.71
+foodmart,1,0.001,0.1,0.001,ablation_no_bounds,w/o Joint Bounds (Neither),0.0025,0.0,0.0025,1539,257,257,4.72
+foodmart,1,0.001,0.1,0.001,houi_filter,Two-Stage Baseline (HOUI + Post-Filter),0.0028,0.0001,0.0029,1539,257,257,4.73
+foodmart,2,0.002,0.2,0.002,direct_strong_mhoui,Full MHOUI-Miner (All Pruning),0.0022,0.0,0.0022,1285,3,3,4.66
+foodmart,2,0.002,0.2,0.002,ablation_no_dom,w/o Branch Pareto Dominance,0.0054,0.0,0.0054,1285,3,3,4.64
+foodmart,2,0.002,0.2,0.002,ablation_no_oub,w/o Occupancy Envelope (OUB),0.0053,0.0,0.0053,1285,3,3,4.63
+foodmart,2,0.002,0.2,0.002,ablation_no_uub,w/o Utility Bound (UBjoint),0.0027,0.0,0.0027,1285,3,3,4.63
+foodmart,2,0.002,0.2,0.002,ablation_no_bounds,w/o Joint Bounds (Neither),0.0027,0.0,0.0027,1285,3,3,4.62
+foodmart,2,0.002,0.2,0.002,houi_filter,Two-Stage Baseline (HOUI + Post-Filter),0.0026,0.0,0.0026,1285,3,3,4.65
+liquor,1,0.003,0.2,0.003,direct_strong_mhoui,Full MHOUI-Miner (All Pruning),0.1292,0.0,0.1292,760,231,200,29.17
+liquor,1,0.003,0.2,0.003,ablation_no_dom,w/o Branch Pareto Dominance,0.1426,0.0,0.1426,765,236,200,29.17
+liquor,1,0.003,0.2,0.003,ablation_no_oub,w/o Occupancy Envelope (OUB),0.2512,0.0,0.2512,760,231,200,29.12
+liquor,1,0.003,0.2,0.003,ablation_no_uub,w/o Utility Bound (UBjoint),0.2027,0.0,0.2027,2646,231,200,29.15
+liquor,1,0.003,0.2,0.003,ablation_no_bounds,w/o Joint Bounds (Neither),0.2223,0.0,0.2223,2651,236,200,29.17
+liquor,1,0.003,0.2,0.003,houi_filter,Two-Stage Baseline (HOUI + Post-Filter),0.1348,0.0001,0.1349,765,236,200,29.14
+liquor,2,0.005,0.2,0.005,direct_strong_mhoui,Full MHOUI-Miner (All Pruning),0.0948,0.0,0.0948,363,77,68,28.95
+liquor,2,0.005,0.2,0.005,ablation_no_dom,w/o Branch Pareto Dominance,0.1189,0.0,0.1189,363,77,68,29.0
+liquor,2,0.005,0.2,0.005,ablation_no_oub,w/o Occupancy Envelope (OUB),0.115,0.0,0.115,363,77,68,28.96
+liquor,2,0.005,0.2,0.005,ablation_no_uub,w/o Utility Bound (UBjoint),0.2028,0.0,0.2028,1268,77,68,28.98
+liquor,2,0.005,0.2,0.005,ablation_no_bounds,w/o Joint Bounds (Neither),0.1831,0.0,0.1831,1268,77,68,29.02
+liquor,2,0.005,0.2,0.005,houi_filter,Two-Stage Baseline (HOUI + Post-Filter),0.1079,0.0001,0.108,363,77,68,29.01
+fruithut,1,0.002,0.2,0.005,direct_strong_mhoui,Full MHOUI-Miner (All Pruning),0.1729,0.0,0.1729,252,86,86,63.53
+fruithut,1,0.002,0.2,0.005,ablation_no_dom,w/o Branch Pareto Dominance,0.2231,0.0,0.2231,252,86,86,63.52
+fruithut,1,0.002,0.2,0.005,ablation_no_oub,w/o Occupancy Envelope (OUB),0.1524,0.0,0.1524,252,86,86,63.56
+fruithut,1,0.002,0.2,0.005,ablation_no_uub,w/o Utility Bound (UBjoint),0.3658,0.0,0.3658,1004,86,86,63.49
+fruithut,1,0.002,0.2,0.005,ablation_no_bounds,w/o Joint Bounds (Neither),0.3385,0.0,0.3385,1004,86,86,63.5
+fruithut,1,0.002,0.2,0.005,houi_filter,Two-Stage Baseline (HOUI + Post-Filter),0.2877,0.0,0.2877,252,86,86,63.55
+fruithut,2,0.005,0.2,0.01,direct_strong_mhoui,Full MHOUI-Miner (All Pruning),0.1274,0.0,0.1274,133,22,22,63.13
+fruithut,2,0.005,0.2,0.01,ablation_no_dom,w/o Branch Pareto Dominance,0.1548,0.0,0.1548,133,22,22,63.12
+fruithut,2,0.005,0.2,0.01,ablation_no_oub,w/o Occupancy Envelope (OUB),0.119,0.0,0.119,133,22,22,63.17
+fruithut,2,0.005,0.2,0.01,ablation_no_uub,w/o Utility Bound (UBjoint),0.181,0.0,0.181,264,22,22,63.17
+fruithut,2,0.005,0.2,0.01,ablation_no_bounds,w/o Joint Bounds (Neither),0.1826,0.0,0.1826,264,22,22,63.12
+fruithut,2,0.005,0.2,0.01,houi_filter,Two-Stage Baseline (HOUI + Post-Filter),0.1526,0.0,0.1526,133,22,22,63.14
+chainstore,1,0.001,0.2,0.005,direct_strong_mhoui,Full MHOUI-Miner (All Pruning),1.1349,0.0,1.1349,376,2,2,505.95
+chainstore,1,0.001,0.2,0.005,ablation_no_dom,w/o Branch Pareto Dominance,1.0791,0.0,1.0791,376,2,2,505.93
+chainstore,1,0.001,0.2,0.005,ablation_no_oub,w/o Occupancy Envelope (OUB),1.0493,0.0,1.0493,376,2,2,505.93
+chainstore,1,0.001,0.2,0.005,ablation_no_uub,w/o Utility Bound (UBjoint),1.4224,0.0,1.4224,537,2,2,505.93
+chainstore,1,0.001,0.2,0.005,ablation_no_bounds,w/o Joint Bounds (Neither),1.8062,0.0,1.8062,643,2,2,505.95
+chainstore,1,0.001,0.2,0.005,houi_filter,Two-Stage Baseline (HOUI + Post-Filter),1.3029,0.0,1.3029,376,2,2,505.91
+chainstore,2,0.002,0.3,0.01,direct_strong_mhoui,Full MHOUI-Miner (All Pruning),1.2793,0.0,1.2793,155,2,2,500.3
+chainstore,2,0.002,0.3,0.01,ablation_no_dom,w/o Branch Pareto Dominance,0.9423,0.0,0.9423,155,2,2,500.36
+chainstore,2,0.002,0.3,0.01,ablation_no_oub,w/o Occupancy Envelope (OUB),1.2055,0.0,1.2055,155,2,2,500.36
+chainstore,2,0.002,0.3,0.01,ablation_no_uub,w/o Utility Bound (UBjoint),0.8146,0.0,0.8146,168,2,2,500.32
+chainstore,2,0.002,0.3,0.01,ablation_no_bounds,w/o Joint Bounds (Neither),1.2794,0.0,1.2794,204,2,2,500.36
+chainstore,2,0.002,0.3,0.01,houi_filter,Two-Stage Baseline (HOUI + Post-Filter),0.926,0.0,0.926,155,2,2,500.33
+ecommerce,1,0.002,0.2,0.003,direct_strong_mhoui,Full MHOUI-Miner (All Pruning),0.0783,0.0,0.0783,1662,19,13,13.43
+ecommerce,1,0.002,0.2,0.003,ablation_no_dom,w/o Branch Pareto Dominance,0.1095,0.0,0.1095,1662,19,13,13.43
+ecommerce,1,0.002,0.2,0.003,ablation_no_oub,w/o Occupancy Envelope (OUB),0.0525,0.0,0.0525,1662,19,13,13.45
+ecommerce,1,0.002,0.2,0.003,ablation_no_uub,w/o Utility Bound (UBjoint),0.0642,0.0,0.0642,4294,19,13,13.43
+ecommerce,1,0.002,0.2,0.003,ablation_no_bounds,w/o Joint Bounds (Neither),0.0764,0.0,0.0764,4663,19,13,13.45
+ecommerce,1,0.002,0.2,0.003,houi_filter,Two-Stage Baseline (HOUI + Post-Filter),0.048,0.0,0.048,1662,19,13,13.45
+ecommerce,2,0.005,0.2,0.005,direct_strong_mhoui,Full MHOUI-Miner (All Pruning),0.0302,0.0,0.0302,720,2,2,13.17
+ecommerce,2,0.005,0.2,0.005,ablation_no_dom,w/o Branch Pareto Dominance,0.0275,0.0,0.0275,720,2,2,13.18
+ecommerce,2,0.005,0.2,0.005,ablation_no_oub,w/o Occupancy Envelope (OUB),0.0412,0.0,0.0412,720,2,2,13.19
+ecommerce,2,0.005,0.2,0.005,ablation_no_uub,w/o Utility Bound (UBjoint),0.0389,0.0,0.0389,1000,3,3,13.18
+ecommerce,2,0.005,0.2,0.005,ablation_no_bounds,w/o Joint Bounds (Neither),0.0429,0.0,0.0429,1038,3,3,13.18
+ecommerce,2,0.005,0.2,0.005,houi_filter,Two-Stage Baseline (HOUI + Post-Filter),0.0315,0.0,0.0315,720,2,2,13.17

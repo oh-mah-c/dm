@@ -6,8 +6,8 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{hyperref}
 \usepackage{xcolor}
-\usepackage{microtype}
-\usepackage{parskip}
+\setlength{\parskip}{0.5em}
+\setlength{\parindent}{0pt}
 
 \hypersetup{
     colorlinks=true,
@@ -19,10 +19,10 @@
 
 \begin{flushleft}
     \textbf{Quan Van} \\
-    Corresponding Author \\
+    Independent Researcher, Ho Chi Minh City, Vietnam \\
     Email: \href{mailto:vanhaminhquan2406@gmail.com}{vanhaminhquan2406@gmail.com} \\
     ORCID: \href{https://orcid.org/0009-0002-8222-0076}{0009-0002-8222-0076} \\
-    Date: October 13, 2026
+    Date: October 15, 2026
 \end{flushleft}
 
 \vspace{0.5em}
@@ -30,55 +30,45 @@
 \vspace{1em}
 
 \begin{flushleft}
-    \textbf{To:} The Editor-in-Chief / Editorial Board \\
+    \textbf{To:} Editor-in-Chief and Editorial Board, \emph{Knowledge-Based Systems} \\
     \textbf{Subject:} Submission of Original Research Manuscript
 \end{flushleft}
 
-\vspace{1em}
+\vspace{0.5em}
 
-Dear Editor-in-Chief and Esteemed Members of the Editorial Board,
+Dear Editor-in-Chief and Editorial Board Members,
 
-I am pleased to submit our original research manuscript entitled:
+I am pleased to submit my original research manuscript entitled:
 
-\begin{quote}
-\textbf{``MFHOI-Miner: Direct In-Process Mining of Maximal Frequent High-Occupancy Itemsets via Closure Leaps and Dual-Boundary Geometry''}
-\end{quote}
+\begin{center}
+\textbf{``Mining maximal high occupancy itemsets with a size-coupled upper bound''}
+\end{center}
 
-for consideration for publication as a regular research article in your prestigious journal.
+for consideration for publication as a regular research paper in \emph{Knowledge-Based Systems}.
 
-\paragraph{Research Context and Problem Formulation}
-Frequent Itemset Mining (FIM) and Maximal Frequent Itemset (MFI) mining are foundational paradigms in data engineering, pattern discovery, and knowledge extraction. While MFI mining effectively addresses the combinatorial explosion of patterns by identifying the positive boundary of frequent itemsets, it ignores the internal transaction completeness. High-Occupancy Itemset (HOI) mining was introduced to identify patterns that dominate the volume of transactions in which they appear. However, because occupancy is strictly \emph{non-monotonic}---extending an itemset can arbitrarily increase or decrease its occupancy ratio---traditional Apriori/anti-monotonic pruning strategies fail completely.
+\paragraph{Motivation and Core Contributions}
+High-Occupancy Itemset (HOI) mining evaluates patterns that proportionally dominate the transactions containing them. However, since occupancy is not anti-monotone, HOIs can be overwhelmingly numerous, and existing miners (such as HEP and DFHOI) encounter severe scalability bottlenecks at low thresholds.
 
-Consequently, existing methodologies rely on either:
+While condensed representations are well-studied for frequent patterns, mining \emph{Maximal HOIs (MHOIs)} directly has remained an open problem. Naive post-filtering of all HOIs suffers from combinatorial explosion, while filtering maximal frequent itemsets (MFIs) is mathematically incorrect. In this manuscript, we present:
 \begin{enumerate}
-    \item Mining all MFIs first and applying post-hoc occupancy filtering, which we theoretically and empirically prove can discard up to \textbf{94.2\%} of valid maximal high-occupancy patterns due to non-monotonic occupancy dilution; or
-    \item Mining all frequent high-occupancy itemsets ($\mathcal{FHO}$) and executing a pairwise quadratic superset sweep, which suffers from catastrophic computational and memory overhead.
+    \item \textbf{Theoretical Foundations:} We prove that every MHOI is closed, demonstrate that an MHOI need not be an MFI, and establish that existing upper bounds (UBO) reduce trivially to support on databases with equal transaction lengths.
+    \item \textbf{A Novel Size-Coupled Upper Bound ($B$):} We introduce a tight upper bound that constrains candidate extension sizes across supporting transactions, proving theoretically that it never exceeds UBO nor per-transaction bounds.
+    \item \textbf{The MHOI-Miner Algorithm:} A depth-first search incorporating early child bounding, head-union-tail look-ahead, and subsumption pruning.
+    \item \textbf{Rigorous Empirical Validation:} MHOI-Miner is verified against an exact oracle across 8,100 randomized instances. On standard benchmarks, it evaluates a median of 60.6$\times$ and 125$\times$ fewer itemsets than HEP+FILTER and DFHOI+FILTER, runs substantially faster in most settings, and successfully completes all benchmark configurations where existing miners exceed time or memory limits.
 \end{enumerate}
 
-\paragraph{Core Contributions and Novelty}
-In this paper, we resolve this long-standing algorithmic dilemma by formulating the \textbf{Dual-Boundary Geometry} of high-occupancy patterns and introducing \textbf{MFHOI-Miner}, the first exact, direct in-process algorithm for mining Maximal Frequent High-Occupancy Itemsets ($\mathcal{MFHOI}$). Key technical contributions include:
-\begin{itemize}
-    \item \textbf{Galois Lattice Grounding (Theorem 1):} We prove that every maximal frequent high-occupancy itemset is strictly support-closed ($\mathcal{MFHOI} \subseteq \mathcal{FCI}$). This establishes that the true underlying search space is the compact Galois closure lattice rather than the exponential powerset.
-    \item \textbf{Occupancy Suffocation Point ($K^*$, Theorem 2):} We establish an a-priori global depth ceiling directly derived from the database transaction length distribution, effectively bounding the maximum cardinality of any potential candidate before search traversal begins.
-    \item \textbf{Closure Leap Pruning and Dual-Boundary Traversal:} Combining Head-Union-Tail (HUT) superset lookahead with Galois closure leaps, the algorithm skips entire subtrees and equivalence classes in $O(1)$ 64-bit bitset operations without generating intermediate unclosed subsets.
-    \item \textbf{Ternary State-Tracking and MFHO-Trie:} We devise a ternary state classification scheme to eliminate false-pruning anomalies during depth-first backtracking, coupled with an inverted rare-item prefix tree (\textsf{MFHO-Trie}) for ultra-fast superset containment tests.
-    \item \textbf{Comprehensive Empirical Validation:} Benchmarking across 13 diverse real-world and synthetic datasets demonstrates that MFHOI-Miner prunes up to \textbf{98.5\%} of search nodes directly in-process, accelerates mining throughput by several orders of magnitude over multi-stage baselines, and achieves extraordinary pattern compression ($\vert\mathcal{FI}\vert \gg \vert\mathcal{FHO}\vert \gg \vert\mathcal{FCI}\vert \gg \vert\mathcal{MFHOI}\vert$).
-\end{itemize}
-
-\paragraph{Significance and Relevance to the Journal}
-This work bridges the theoretical gap between Galois concept lattices, non-monotonic constraint optimization, and high-performance bitwise pattern mining. Given the journal's focus on scalable data mining algorithms, database theory, advanced pattern discovery, and knowledge engineering, we believe this manuscript will be of strong interest to your readership and will serve as a foundational benchmark for non-monotonic maximal pattern discovery.
+\paragraph{Relevance to Knowledge-Based Systems}
+Given that the state-of-the-art HOI miner, \textbf{DFHOI} (Nguyen et al., 2023), was published in \emph{Knowledge-Based Systems}, our paper directly advances this line of inquiry by proposing the first dedicated algorithm for maximal HOI discovery. We believe the theoretical insights and substantial performance gains will be of significant interest to your readership in pattern mining and knowledge discovery.
 
 \paragraph{Declarations}
-In accordance with ethical publishing standards, I confirm that:
+The author confirms that:
 \begin{itemize}
-    \item This manuscript represents entirely original research and has not been published previously.
-    \item It is not under consideration for publication elsewhere, in whole or in part.
-    \item All data sources and benchmarks utilized are standard, publicly available scientific repositories (FIMI and UCI).
-    \item The author has approved the final manuscript and agrees with its submission.
-    \item There are no conflicts of interest to disclose.
+    \item This manuscript is entirely original and has not been published or submitted elsewhere.
+    \item All benchmark datasets are publicly accessible (SPMF, FIMI, and UCI repositories).
+    \item There are no competing interests to declare.
 \end{itemize}
 
-Thank you very much for your time, consideration, and coordination of the peer-review process. I look forward to hearing from you.
+Thank you very much for your time and consideration of this submission.
 
 \vspace{1.5em}
 
@@ -86,7 +76,6 @@ Sincerely,
 
 \vspace{0.8em}
 \textbf{Quan Van} \\
-Corresponding Author \\
 \href{mailto:vanhaminhquan2406@gmail.com}{vanhaminhquan2406@gmail.com}
 
 \end{document}

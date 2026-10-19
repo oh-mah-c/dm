@@ -81,3 +81,11 @@ Release/
 
 bin
 bin_tools/
+
+# LaTeX build outputs
+*.aux
+*.log
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz

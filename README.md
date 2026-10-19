@@ -87,6 +87,9 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 52. **MEMU** - Mining High Average-Utility Patterns with Multiple Thresholds using compact AU-lists (Lin et al. 2018).
 53. **MHEINU** - Mining High-Efficiency Itemsets with Negative Utilities using ELNU lists, `uben`, and `ubeni` pruning (Yildirim 2025).
 54. **Closed-FHUIM-Kinana** - Closed frequent high-utility itemset mining with OSR, OWL, and MSU pruning (Sulanjari & Fatichah 2026).
+55. **OCEAN** - Fast discovery of high utility occupancy itemsets using utility-lists and top-$k$ upper bound pruning (Shen et al. 2016).
+56. **HUOPM** - High-Utility Occupancy Pattern Mining using compact UO-lists, FU-tables, early construction abandonment, and partial downward closure upper bound pruning (Gan et al. IEEE TCYB 2020).
+57. **IL-HUOPM / HUOMIL** - High Utility Occupancy Pattern Mining with Indexed List Structure using GUO-IL, CUO-IL, O(1) quadruple entry pointer chaining, and loose upper bound pruning (Kim et al. IEEE Access 2023).
 
 ### Sequential Utility Pattern Mining
 55. **USpan** - High utility sequential pattern mining using projected databases and sequence-weighted utility pruning.
@@ -214,12 +217,18 @@ gcc -Iinclude -Iinclude/core -Wall -Wextra -O2 -pthread src/main.c src/core/*.c 
 ```bash
 ./build/bin/dm.exe <algorithm> <dataset_path> <format> <min_support> [min_io] [ins_threshold] [prn_threshold] [decay_base] [decay_life]
 ```
-* **`<algorithm>` / direct subcommand**: `ais`, `apriori`, `eclat`, `fpgrowth`, `tree_projection`, `aclose`, `close`, `closet`, `closetplus`, `fpclose`, `charm`, `dci_closed`, `lcm`, `lcmver2`, `nafcp`, `fcfia`, `max_miner`, `genmax`, `fpmax`, `mafia`, `hep`, `fhoi`, `dfhoi`, `tkhoim`, `hoimto`, `mfhoi`, `fhoi_miner`, `weak_mfhoi_miner`, `strong_mfhoi_miner`, `mhoui`, `houi_miner`, `weak_mhoui_miner`, `strong_mhoui_miner`, `direct_mhoui_miner`, `regular_mine`, `negfin`, `prepost`, `prepostplus`, `dic`, `ltm`, `sam`, `carpenter`, `dbv_miner`, `defme`, `talky_g`, `pascal`, `zart`, `apriori_rare`, `apriori_inverse`, `cori`, `rp_tree`, `estdec`, `clostream`, `cfi_stream`, `uapriori`, `msapriori`, `ffiminer`, `ubmffp`, `dfigrowth`, `sum`, `mlhui_miner`, `fchm`, `vhuqi`, `fhuqi_miner`, `tkq`, `thue`, `mheinu`, `dphim`, `closed_fhuim_kinana`, `prefixspan`, `spade`, `uspan`, `hupspm`, `hup_miner`, `hiep`, `maximal_munch`, `bpe`, `bpe_dropout`, `unigram`, `sentencepiece`, `tokenizer_lab`, `gpe`, `parity_bpe`, `fast_wordpiece`, `resnet18`, `mobilenet_tiny`, `vit`, `swin`.
+* **`<algorithm>` / direct subcommand**: `ais`, `apriori`, `eclat`, `fpgrowth`, `tree_projection`, `aclose`, `close`, `closet`, `closetplus`, `fpclose`, `charm`, `dci_closed`, `lcm`, `lcmver2`, `nafcp`, `fcfia`, `max_miner`, `genmax`, `fpmax`, `mafia`, `hep`, `fhoi`, `dfhoi`, `tkhoim`, `hoimto`, `mfhoi`, `fhoi_miner`, `weak_mfhoi_miner`, `strong_mfhoi_miner`, `mhoui`, `houi_miner`, `weak_mhoui_miner`, `strong_mhoui_miner`, `direct_mhoui_miner`, `regular_mine`, `negfin`, `prepost`, `prepostplus`, `dic`, `ltm`, `sam`, `carpenter`, `dbv_miner`, `defme`, `talky_g`, `pascal`, `zart`, `apriori_rare`, `apriori_inverse`, `cori`, `rp_tree`, `estdec`, `clostream`, `cfi_stream`, `uapriori`, `msapriori`, `ffiminer`, `ubmffp`, `dfigrowth`, `sum`, `mlhui_miner`, `fchm`, `vhuqi`, `fhuqi_miner`, `tkq`, `thue`, `efim`, `efim_closed`, `ocean`, `huopm`, `il_huopm`, `huomil`, `mheinu`, `dphim`, `closed_fhuim_kinana`, `prefixspan`, `spade`, `uspan`, `hupspm`, `hup_miner`, `hiep`, `maximal_munch`, `bpe`, `bpe_dropout`, `unigram`, `sentencepiece`, `tokenizer_lab`, `gpe`, `parity_bpe`, `fast_wordpiece`, `resnet18`, `mobilenet_tiny`, `vit`, `swin`.
+* **`ocean`** requires utility format `1`: `./build/bin/dm.exe ocean <utility_dataset> 1 <min_occupancy> [min_support]`, or standalone `./build/bin/ocean_miner.exe --input <utility_dataset> --minocc <value> [--minsup <ratio|count>]`. Mines high utility occupancy itemsets based on utility-lists and top-$k$ upper-bound pruning (Shen et al., DASFAA 2016).
+* **`huopm`** requires utility format `1`: `./build/bin/dm.exe huopm <utility_dataset> 1 <min_occupancy> [min_support]`, or standalone `./build/bin/huopm_miner.exe --input <utility_dataset> --minocc <value> [--minsup <ratio|count>]`. Mines high-utility occupancy patterns using compact UO-lists, FU-tables, Strategy 3 early construction abandonment, and support-ascending FU-tree exploration (Gan et al., IEEE Transactions on Cybernetics 2020).
+* **`il_huopm`** (alias **`huomil`**) requires utility format `1`: `./build/bin/dm.exe il_huopm <utility_dataset> 1 <min_occupancy> [min_support]`, or standalone `./build/bin/il_huopm_miner.exe --input <utility_dataset> --minocc <value> [--minsup <ratio|count>]`. Mines high utility occupancy patterns using GUO-IL and CUO-IL indexed lists, O(1) quadruple entry pointer chaining, and loose upper bound (lubuo) pruning (Kim et al., IEEE Access 2023).
+* **`efim`** requires utility format `1`: `./build/bin/dm.exe efim <utility_dataset> 1 <min_utility>`. State-of-the-art HUIM using horizontal database projection, linear transaction merging, and Subtree Utility (SU) / Local Utility (LU) upper-bound pruning (Zida et al., KAIS 2017).
+* **`efim_closed`** requires utility format `1`: `./build/bin/dm.exe efim_closed <utility_dataset> 1 <min_utility>`. Fast closed high-utility itemset mining using closure jumping, forward/backward closure checking, and transaction merging (Fournier-Viger et al., MLDM 2016).
 * **`vhuqi`** uses `<min_support>` as the absolute minimum utility threshold and accepts optional `[qrc]`, defaulting to `3`.
 * **`fhuqi_miner`** requires quantity format `4`: `./build/bin/dm.exe fhuqi_miner <quantity_dataset> 4 <theta> <qrc> <all|min|max> <profit_file>`.
 * **`tkq`** requires quantity format `4`: `./build/bin/dm.exe tkq <quantity_dataset> 4 <k> <qrc> <all|min|max> <profit_file>`.
 * **`thue`** mines top-k high-utility episodes from utility event sequences: `./build/bin/dm.exe thue <utility_dataset> 1 <k> [MTD]`. With `MTD=0`, each timestamp is a simultaneous event set, so the output count and top-k threshold can be compared against top-k high-utility itemset miners such as TKU-Miner.
 * **`mheinu`** requires utility format `1`: `./build/bin/dm.exe mheinu <utility_dataset> 1 <min_efficiency> [investment_file]`. If no investment file is supplied, the implementation follows the paper's experimental setup by deterministically generating positive per-item investment values with seed `42`.
+
 * **`dphim`** requires utility format `1`: `./build/bin/dm.exe dphim <utility_dataset> 1 <min_utility> [threads]`. It parallelizes HUIM search with dynamic pthread task scheduling.
 * **`closed_fhuim_kinana`** requires utility format `1`: `./build/bin/dm.exe closed_fhuim_kinana <utility_dataset> 1 <min_utility> <min_support> [min_owl]`.
 * **`hup_miner`** requires sequence utility format `3`: `./build/bin/dm.exe hup_miner <sequence_utility_dataset> 3 <min_average_utility> [max_pattern_length] [max_candidates]`. The sequential files use SPMF notation such as `item[utility] -1 ... -2 SUtility:x`.
@@ -374,7 +383,7 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 
 **[55]** P. Fournier-Viger, C.-W. Wu, S. Zida, and V. S. Tseng, "FHM: Faster High-Utility Itemset Mining using Estimated Utility Co-occurrence Pruning," in *Proc. 21st Int. Symp. on Methodologies for Intelligent Systems (ISMIS)*, 2014, pp. 83–92. *(FHM)*
 
-**[56]** S. Zida, P. Fournier-Viger, J. C.-W. Lin, C.-W. Wu, and V. S. Tseng, "EFIM: A Highly Efficient Algorithm for High-Utility Itemset Mining," in *Proc. 14th Mexican Int. Conf. on Artificial Intelligence (MICAI)*, 2015, pp. 530–546. *(EFIM)*
+**[56]** S. Zida, P. Fournier-Viger, J. C.-W. Lin, C.-W. Wu, and V. S. Tseng, "EFIM: a highly efficient algorithm for mining high-utility itemsets," *Knowledge and Information Systems*, vol. 51, no. 2, pp. 595–609, 2017. DOI: 10.1007/s10115-016-0986-0. (Conference version: *Proc. 14th Mexican Int. Conf. on Artificial Intelligence (MICAI 2015)*, pp. 530–546). *(EFIM)*
 
 **[57]** M. Liu and J. Qu, "Mining High Utility Itemsets without Candidate Generation," in *Proc. 21st ACM Int. Conf. on Information and Knowledge Management (CIKM)*, 2012, pp. 55–64. *(HUI-Miner)*
 
@@ -410,7 +419,7 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 
 **[73]** J. C.-W. Lin, W. Gan, T.-P. Hong, and J.-S. Pan, "Incrementally Updating High-Utility Itemsets with Transaction Insertion," in *Proc. 10th International Conference on Advanced Data Mining and Applications (ADMA 2014)*, 2014, pp. 44–56. *(HUI-list-INS)*
 
-**[74]** P. Fournier-Viger, S. Zida, J. C.-W. Lin, C.-W. Wu, and V. S. Tseng, "EFIM-Closed: Fast and Memory Efficient Discovery of Closed High-Utility Itemsets," in *Proc. 21st International Symposium on Methodologies for Intelligent Systems (ISMIS 2014)*, 2014, pp. 83–92. *(EFIM-Closed)*
+**[74]** P. Fournier-Viger, S. Zida, J. C.-W. Lin, C.-W. Wu, and V. S. Tseng, "EFIM-Closed: Fast and Memory Efficient Discovery of Closed High-Utility Itemsets," in *Proc. 12th International Conference on Machine Learning and Data Mining in Pattern Recognition (MLDM 2016)*, Springer LNAI 9729, 2016, pp. 199–213. DOI: 10.1007/978-3-319-41920-6_16. *(EFIM-Closed)*
 
 **[75]** C.-W. Wu, P. Fournier-Viger, J.-Y. Gu, and V. S. Tseng, "Mining Closed High Utility Itemsets without Candidate Generation," in *Proc. IEEE International Conference on Systems, Man, and Cybernetics (SMC 2015)*, 2015, pp. 199–204. *(CHUI-Miner)*
 
@@ -537,6 +546,12 @@ The algorithms implemented in this framework strictly adhere to the logic and ma
 **[135]** I. Goodfellow, D. Warde-Farley, M. Mirza, A. Courville, and Y. Bengio, "Maxout Networks," in *Proc. International Conference on Machine Learning (ICML)*, 2013. *(Maxout)*
 
 **[136]** I. Sutskever, J. Martens, G. Dahl, and G. Hinton, "On the importance of initialization and momentum in deep learning," in *Proc. International Conference on Machine Learning (ICML)*, 2013. *(SGD Momentum / Nesterov)*
+
+**[137]** B. Shen, Z. Wen, Y. Zhao, D. Zhou, and W. Zheng, "OCEAN: Fast Discovery of High Utility Occupancy Itemsets," in *Proc. 21st International Conference on Database Systems for Advanced Applications (DASFAA 2016)*, Springer LNCS 9642, 2016, pp. 355–369. DOI: 10.1007/978-3-319-32025-0_22. *(OCEAN)*
+
+**[138]** W. Gan, J. C.-W. Lin, P. Fournier-Viger, H.-C. Chao, and P. S. Yu, "HUOPM: High-Utility Occupancy Pattern Mining," *IEEE Transactions on Cybernetics*, vol. 50, no. 3, pp. 1195–1208, March 2020. DOI: 10.1109/TCYB.2019.2894367. *(HUOPM)*
+
+**[139]** H. Kim, T. Ryu, C. Lee, S. Kim, B. Vo, J. C.-W. Lin, and U. Yun, "Efficient Method for Mining High Utility Occupancy Patterns based on Indexed List Structure," *IEEE Access*, vol. 11, pp. 45053–45071, May 2023. DOI: 10.1109/ACCESS.2023.3271864. *(IL-HUOPM / HUOMIL)*
 
 
 ---
