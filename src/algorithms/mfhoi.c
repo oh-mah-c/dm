@@ -42,6 +42,7 @@
 #include "algorithms/mfhoi.h"
 #include "core/dm_dataset_types.h"
 #include "core/dm_benchmark.h"
+#include "core/dm_exact_occ.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -60,6 +61,7 @@ typedef struct { int len, w, cap; } MUnit;
 
 typedef struct {
     double xi;
+    DmThreshold xit;            /* xi as an exact fraction */
     int minsup;                 /* ceil(xi) */
     int m;                      /* items with support >= minsup */
     int *occ, *pos, *touched, *keep;
@@ -67,7 +69,24 @@ typedef struct {
     long long nodes, hoi_nodes, pruned_bound, pruned_hut, pruned_sub, pruned_child;
 } MCtx;
 
-static int m_ge(double x, double t) { return x >= t - 1e-9 * (1.0 + fabs(t)); }
+static int m_ge(double x, double t) { return x >= t - DM_OCC_TOL(t); }
+
+/* exact test k * sum_r w_r / len_r >= xi over the rows (rows with cap == need_cap
+ * if need_cap >= 0); approx is the double value */
+static int m_rows_ge(const MCtx *c, double approx, int k, const MRow *rows, int nr, const MUnit *u, int need_cap) {
+    int res;
+    if (dm_occ_decided(approx, c->xit, &res)) return res;
+    uint32_t *len = malloc((nr > 0 ? nr : 1) * sizeof(uint32_t));
+    uint64_t *w = malloc((nr > 0 ? nr : 1) * sizeof(uint64_t));
+    size_t m = 0;
+    for (int r = 0; r < nr; r++) {
+        if (need_cap >= 0 && u[r].cap != need_cap) continue;
+        len[m] = (uint32_t)rows[r].len; w[m] = (uint64_t)rows[r].w; m++;
+    }
+    res = dm_occ_ge_exact((uint64_t)k, len, w, m, c->xit);
+    free(len); free(w);
+    return res;
+}
 
 static int m_cmp_int(const void *a, const void *b) {
     int x = *(const int *)a, y = *(const int *)b;
@@ -161,7 +180,7 @@ static int m_mine(MCtx *c, const int *C, int csize, MRow *rows, int nr, int core
             c->occ[it] += rows[r].w;
         }
     }
-    int is_hoi = csize > 0 && m_ge((double)csize * rsum, c->xi);
+    int is_hoi = csize > 0 && m_rows_ge(c, (double)csize * rsum, csize, rows, nr, NULL, -1);
     if (is_hoi) c->hoi_nodes++;
 
     int ntail = 0;
@@ -185,7 +204,7 @@ static int m_mine(MCtx *c, const int *C, int csize, MRow *rows, int nr, int core
 
     int result = 0, done = (ntail == 0);
     if (!done && !m_ge(m_bound(c, u, nr, csize, 1), c->xi)) { c->pruned_bound++; done = 1; }      /* P1 */
-    if (!done && full_w >= c->minsup && m_ge((double)(csize + ntail) * full_r, c->xi)) {          /* P2 */
+    if (!done && full_w >= c->minsup && m_rows_ge(c, (double)(csize + ntail) * full_r, csize + ntail, rows, nr, u, ntail)) {          /* P2 */
         int ncl = csize, nfull = 0;
         int *cl = malloc((csize + ntouch + 1) * sizeof(int));
         memcpy(cl, C, csize * sizeof(int));
@@ -328,8 +347,9 @@ static DM_Status mhoi_run(DM_Dataset *ds, void *params) {
     int n = (int)ds->count, maxid = (int)ds->max_id;
 
     MCtx c = {0};
-    c.xi = arg < 1.0 ? arg * n : arg;
-    c.minsup = (int)ceil(c.xi - 1e-9 * (1.0 + c.xi));
+    c.xit = dm_threshold_make(arg, (size_t)n, arg < 1.0);
+    c.xi = c.xit.value;
+    c.minsup = (int)dm_threshold_ceil(c.xit);
     if (c.minsup < 1) c.minsup = 1;
     printf("[MHOI] Starting on %d transactions. xi=%.6f (min support %d)\n", n, c.xi, c.minsup);
 

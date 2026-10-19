@@ -15,6 +15,8 @@
 \usepackage{manyfoot}
 \usepackage[title]{appendix}
 \usepackage{textcomp}
+\usepackage{tikz}
+\usepackage[edges]{forest}
 
 \theoremstyle{thmstyleone}
 \newtheorem{theorem}{Theorem}
@@ -40,19 +42,20 @@
 % Primitive \input, so that generated table rows can be included inside tabular environments.
 \makeatletter\newcommand{\inputrows}[1]{\@@input #1 }\makeatother
 
+\hypersetup{bookmarksdepth=2}% bookmarks for sections and subsections only
 \raggedbottom
 
 \begin{document}
 
-\title[AURA-HOI: Exact High-Occupancy Itemset Mining]{AURA-HOI: High-Occupancy Itemset Mining via Equivalence Classes and Residual Envelope Pruning}
+\title[High-Occupancy Itemset Mining on Dense Databases]{AURA-HOI: Exact High-Occupancy Itemset Mining on Dense Databases with a Length-Capped Residual Bound}
 
 \author*[1]{\fnm{Quan} \sur{Van}}\email{vanhaminhquan2406@gmail.com}
 
 \affil*[1]{\orgname{Independent Researcher}, \orgaddress{\city{Ho Chi Minh City}, \country{Vietnam}}}
 
-\abstract{Occupancy measures how much of its supporting transactions an itemset covers. Because occupancy is not anti-monotone, exact high-occupancy itemset (HOI) miners rely on upper bounds to prune the search space. The bound used by existing miners depends only on the lengths of the supporting transactions; on databases whose transactions all have the same length it degenerates to the support, so these miners must enumerate every frequent itemset. We present AURA-HOI, an exact depth-first miner over prefix equivalence classes of transaction-ID lists. Its central component is a length-capped residual bound that combines transaction lengths with the largest itemset that can still be generated in the current branch. We prove that the bound is safe, that it is never weaker than the transaction-length bound or the purely residual bound, and that the miner returns exactly the set of HOIs. The bound is computed in the same pass as the TID-list intersection, and in constant time when transaction lengths are uniform. We also show that a natural shortcut, taking the residual length from the later siblings only, loses results. In single-threaded experiments on \NumDatasets{} public benchmarks and \NumConfigs{} threshold settings, AURA-HOI returns exactly the same itemsets as two exact baselines, HEP and DFHOI, and agrees with an exact rational-arithmetic oracle on \NumOracleCases{} randomized test cases. It is faster than DFHOI in \WinsDFHOI{} of the \NumBothFinished{} settings, with a geometric-mean speedup of \GeoSpeedupDense{}$\times$ and a maximum of \MaxSpeedupDense{}$\times$ on dense data, where it also performs far fewer candidate intersections. On sparse data its speedup is small (geometric mean \GeoSpeedupSparse{}$\times$).}
+\abstract{Exact miners of high-occupancy itemsets (HOIs) prune with an upper bound, because occupancy is not anti-monotone. The bound used by HEP and DFHOI depends only on the lengths of the supporting transactions. On dense databases it is close to the support, and equal to it when all transactions have the same length, so these miners nearly enumerate the frequent itemsets even when few or no HOIs exist. We present AURA-HOI, an exact depth-first miner over prefix equivalence classes of TID-lists, built around a length-capped residual bound that combines transaction lengths with the largest itemset the current branch can still generate. We prove that the bound is safe, never weaker than the transaction-length bound, and equal to it exactly when the branch can still produce itemsets as long as the supporting transactions, and that the miner is correct and complete. On seven benchmark datasets with the thresholds of the studies that introduced HEP and DFHOI, all programs return identical itemsets and agree with an exact rational-arithmetic oracle on \NumOracleCases{} randomized cases. On the four dense datasets, AURA-HOI performs at least \NodeReductionMinDense{}\% fewer candidate intersections than DFHOI; where HOIs exist it is \MinSpeedupDenseNonEmpty{} to \MaxSpeedupDenseNonEmpty{} times faster and completes settings that DFHOI and HEP do not, and where none exists it establishes this in at most \AuraMaxTimeEmptyDense{}~s. On the three sparse datasets, as the analysis predicts, it runs \SparseVsBestMin{} to \SparseVsBestMax{} times as fast as the faster baseline.}
 
-\keywords{High-occupancy itemset mining, Pattern mining, Upper bound, Equivalence classes, Vertical mining, Search space pruning}
+\keywords{High-occupancy itemset mining, Dense databases, Upper bound, Equivalence classes, Vertical mining, Search space pruning}
 
 \maketitle
 
@@ -63,13 +66,13 @@ Frequent itemset mining finds the sets of items that co-occur in at least a give
 
 Tang et al.\ introduced \emph{occupancy} to capture this aspect: the occupancy of an itemset relates its size to the sizes of the transactions that contain it, and patterns with high occupancy are better candidates for recommendation \cite{tang2012occupancy}. Deng formulated the mining of high-occupancy itemsets (HOIs) and proposed the HEP algorithm \cite{deng2020hoi}, and Nguyen et al.\ proposed DFHOI, a depth-first algorithm over equivalence classes with early pruning \cite{nguyen2023dfhoi}. Occupancy has since been studied with transaction weights \cite{datta2022hoimto}, in incremental settings \cite{kim2022incremental}, with adaptive thresholds \cite{tran2025namhep}, as a top-$k$ problem \cite{yildirim2025topk}, and combined with utility \cite{gan2020huopm,kumar2024hauopm,cho2024incremental}.
 
-Occupancy is not anti-monotone: adding an item to an itemset increases its size but may shrink its set of supporting transactions, so the occupancy of the extension can be larger or smaller. Exact miners therefore prune with an \emph{upper bound} on the occupancy of all extensions. The bound used by HEP and DFHOI, which we call the transaction-length bound, exploits the fact that an itemset cannot be larger than any transaction that contains it. It depends only on the lengths of the supporting transactions. When all transactions have the same length, as in many categorical benchmarks, this bound equals the support (Proposition~\ref{prop:uniform}). It then prunes nothing beyond the support constraint, and the miner enumerates every frequent itemset even when none of them has high occupancy.
+Occupancy is not anti-monotone: adding an item to an itemset increases its size but may shrink its set of supporting transactions, so the occupancy of the extension can be larger or smaller. Exact miners therefore prune with an \emph{upper bound} on the occupancy of all extensions. The bound used by HEP and DFHOI, which we call the transaction-length bound, exploits the fact that an itemset cannot be larger than any transaction that contains it, and depends only on the lengths of the supporting transactions. It is effective when transactions are short compared with the itemsets one is looking for, which is the situation of sparse market-basket data. On dense databases it is weak. There, transactions are long and of similar length, and the bound is close to the support; when all transactions have the same length, as in many categorical benchmarks, it equals the support (Proposition~\ref{prop:uniform}). It then prunes nothing beyond the support constraint, and the miner enumerates every frequent itemset even when none of them has high occupancy. In our experiments, DFHOI performs about 1.6 million candidate intersections and runs for 298~s on the \texttt{accidents} dataset to find two HOIs, and HEP exceeds 20~GiB of memory; at the three larger thresholds, where no HOI exists, DFHOI needs up to 123~s to establish this.
 
-A depth-first search over prefix equivalence classes provides a second, independent limit: inside a branch, an itemset can only be extended with the items that remain in its class, so its descendants have bounded size. This is the same principle as the remaining-utility bounds of high-utility itemset mining \cite{liu2012huiminer,zida2017efim}. This paper combines the two limits in a single bound and builds an exact miner around it. The main contributions are the following.
+A depth-first search over prefix equivalence classes provides a second, independent limit: inside a branch, an itemset can only be extended with the items that remain in its class, so its descendants have bounded size. This is the same principle as the remaining-utility bounds of high-utility itemset mining \cite{liu2012huiminer,zida2017efim}. On dense data the limit is informative: the items that reach the support threshold are few compared with the length of the transactions, so the classes of the search quickly become shorter than the transactions that support them. This paper combines the two limits in a single bound, builds an exact miner around it, and identifies precisely when the combination improves on the transaction-length bound. The main contributions are the following.
 \begin{enumerate}
-\item A \emph{length-capped residual bound} on the occupancy of every itemset that can still be generated in a branch (Theorem~\ref{thm:capped}). We prove that it is never weaker than the transaction-length bound or the purely residual bound (Proposition~\ref{prop:dominance}), that it is computed in the same linear pass as the TID-list intersection, and that it reduces to a constant-time closed form when transaction lengths are uniform.
-\item \AURA{}, a depth-first miner over prefix equivalence classes of TID-lists that applies the bound at the level of nodes and of whole classes and allocates TID-lists from a stack-like arena. We prove that it returns exactly the set of HOIs (Theorem~\ref{thm:correct}), and we show with a two-transaction counterexample that taking the residual length from the later siblings only, a tempting shortcut, loses results (Remark~\ref{rem:pitfall}).
-\item An evaluation protocol for exact HOI miners: verification against an exact rational-arithmetic oracle on randomized databases, output parity across algorithms, repeated single-threaded runs without a time limit, memory measured as the increase attributable to the mining phase, an ablation study, a scalability study and a signed-rank test.
+\item A \emph{length-capped residual bound} on the occupancy of every itemset that can still be generated in a branch (Theorem~\ref{thm:capped}). We prove that it is never weaker than the transaction-length bound or the purely residual bound (Proposition~\ref{prop:dominance}), and that it coincides with the transaction-length bound exactly when the branch can still produce itemsets as long as every supporting transaction (Corollary~\ref{cor:scope}). This characterizes where the bound helps: on dense databases, and not on sparse ones. It is computed in one linear pass over the TID-list of a candidate, and in constant time when transaction lengths are uniform.
+\item \AURA{}, a depth-first miner over prefix equivalence classes of TID-lists that applies the bound to nodes and to whole classes and allocates TID-lists from a stack-like arena. We prove that it returns exactly the set of HOIs (Theorem~\ref{thm:correct}), and we show with a two-transaction counterexample that taking the residual length from the later siblings only, a tempting shortcut, loses results (Remark~\ref{rem:pitfall}).
+\item An experimental comparison with HEP and DFHOI on seven datasets, four dense and three sparse, with the thresholds of the studies that introduced the baselines: the five datasets of Deng \cite{deng2020hoi} and the two further dense datasets of the DFHOI evaluation \cite{nguyen2023dfhoi}. On the dense datasets \AURA{} reduces the candidate intersections by at least \NodeReductionMinDense{}\%; where HOIs exist it reduces the runtime by factors of \MinSpeedupDenseNonEmpty{} to \MaxSpeedupDenseNonEmpty{} and completes settings that the baselines do not, and where none exists it establishes this almost immediately; on the sparse datasets its runtime is close to that of the baselines, as Corollary~\ref{cor:scope} predicts. The itemsets returned by all programs are compared with each other and, on randomized databases, with an exact rational-arithmetic oracle, including cases in which an occupancy equals the threshold. These checks also reveal one HOI count in the literature that we could not reproduce (Section~\ref{sec:exp-correct}).
 \end{enumerate}
 
 Section~\ref{sec:related} reviews related work. Section~\ref{sec:prelim} defines the problem. Section~\ref{sec:bounds} develops the bounds and Section~\ref{sec:algo} the algorithm. Section~\ref{sec:exp} reports the experiments, and Section~\ref{sec:concl} concludes.
@@ -81,10 +84,10 @@ Section~\ref{sec:related} reviews related work. Section~\ref{sec:prelim} defines
 Apriori generates candidates level by level and prunes them with the anti-monotonicity of support \cite{agrawal1993mining,agrawal1994fast}. FP-growth avoids candidate generation by recursively projecting a prefix tree \cite{han2000mining}. Eclat represents each itemset by the sorted list of identifiers of its supporting transactions (its TID-list), groups itemsets that share a prefix into equivalence classes, and computes supports by intersecting TID-lists \cite{zaki1997new,zaki2000scalable}; diffsets reduce the size of these lists on dense data \cite{zaki2003diffsets}. PrePost and PrePost+ use N-lists built from a prefix tree \cite{deng2012nlist,deng2015prepost}. Condensed representations, such as closed \cite{pasquier1999closed,zaki2002charm,uno2004lcm} and maximal \cite{bayardo1998maxminer} itemsets, reduce the number of reported patterns. Surveys of the field are available in \cite{aggarwal2014frequent,fournier2017survey,luna2019review}.
 
 \paragraph{Occupancy.}
-Tang et al.\ introduced occupancy as a measure of pattern quality \cite{tang2012occupancy}. Deng studied the mining of high-occupancy itemsets and proposed HEP, which stores occupancy lists and prunes with an upper bound derived from transaction lengths \cite{deng2020hoi}. Nguyen et al.\ proposed DFHOI, which traverses equivalence classes depth-first and applies the bound early \cite{nguyen2023dfhoi}. Datta et al.\ weighted occupancy by transaction occupancy \cite{datta2022hoimto}; Kim et al.\ mined high-occupancy patterns incrementally \cite{kim2022incremental}; Tran et al.\ proposed a hierarchical set-enumeration tree with an adaptive occupancy threshold that changes from level to level \cite{tran2025namhep}; and Y{\i}ld{\i}r{\i}m addressed the top-$k$ problem \cite{yildirim2025topk}. Occupancy has also been combined with utility \cite{gan2020huopm,kumar2024hauopm,cho2024incremental}. The adaptive-threshold and top-$k$ formulations return different result sets from the fixed-threshold problem studied here, so we compare with HEP and DFHOI, which solve the same problem.
+Tang et al.\ introduced occupancy as a measure of pattern quality \cite{tang2012occupancy}. Deng studied the mining of high-occupancy itemsets and proposed HEP, which stores occupancy lists and prunes with an upper bound derived from transaction lengths \cite{deng2020hoi}. Nguyen et al.\ proposed DFHOI, which traverses equivalence classes depth-first and applies the bound early \cite{nguyen2023dfhoi}. Datta et al.\ weighted occupancy by transaction occupancy \cite{datta2022hoimto}; Kim et al.\ mined high-occupancy patterns incrementally \cite{kim2022incremental}; Tran et al.\ proposed a hierarchical set-enumeration tree with an adaptive occupancy threshold that changes from level to level \cite{tran2025namhep}; and Y{\i}ld{\i}r{\i}m addressed the top-$k$ problem \cite{yildirim2025topk}. Occupancy has also been combined with utility \cite{gan2020huopm,kumar2024hauopm,cho2024incremental}. NAM-HEP recomputes the occupancy threshold at every level of its search as the median occupancy of the candidates of that level \cite{tran2025namhep}, and the top-$k$ formulation returns the $k$ itemsets of largest occupancy \cite{yildirim2025topk}; both return result sets that differ from those of the fixed-threshold problem studied here, so we compare with HEP and DFHOI, which solve the same problem. When all transactions have the same length $L$, $X$ is an HOI if and only if $\supp(X) \ge \xi L / |X|$, a support threshold that decreases with the length of the itemset; Seno and Karypis studied frequent itemsets under such length-decreasing support constraints and pruned with the smallest length that an extension must reach \cite{seno2005ldsc}. Our bound exploits the same relation between size and support through the residual length of a branch.
 
 \paragraph{Bounds for measures that are not anti-monotone.}
-High-utility itemset mining faces the same difficulty, because utility is not anti-monotone either \cite{fournier2019survey,gan2021survey}. HUI-Miner bounds the utility of the extensions of an itemset by its utility plus the remaining utility of the items that can still be appended \cite{liu2012huiminer}; FHM adds co-occurrence pruning \cite{fournier2014fhm}; and EFIM uses sub-tree and local utility bounds \cite{zida2017efim}. The residual part of our bound follows the same principle: in a depth-first enumeration, the items that can still be appended are known, which limits what the descendants can achieve. For occupancy, the residual information is the \emph{number} of such items, which we combine with transaction lengths.
+High-utility itemset mining faces the same difficulty, because utility is not anti-monotone either \cite{fournier2019survey,gan2021survey}. HUI-Miner bounds the utility of the extensions of an itemset by its utility plus the remaining utility of the items that can still be appended \cite{liu2012huiminer}; FHM adds co-occurrence pruning \cite{fournier2014fhm}; and EFIM uses sub-tree and local utility bounds \cite{zida2017efim}. The residual part of our bound follows the same principle: in a depth-first enumeration, the items that can still be appended are known, which limits what the descendants can achieve. HUOPM transfers remaining utility to utility occupancy, per transaction \cite{gan2020huopm}; for occupancy, the corresponding bound lets each supporting transaction assume all of its remaining items, which requires the number of remaining items of every transaction. Our bound uses instead a single residual length for the whole branch, which a TID-list miner knows without inspecting the transactions, and combines it with transaction lengths. Neither bound is always smaller than the other. With $|X| = 1$, a single supporting transaction of length $10$ that contains $1$ of $r = 5$ remaining items gives $2/10$ for the per-transaction bound and $\Ucap_6 = 6/10$ for ours; with $|X| = 1$, $r = 9$ and two supporting transactions of lengths $2$ and $10$ that contain all their remaining items, the per-transaction bound is $1 + 1 = 2$ and $\Ucap_{10} = 2 \cdot (1/2 + 1/10) = 6/5$.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Problem definition}\label{sec:prelim}
@@ -105,7 +108,7 @@ The (summed) occupancy of an itemset $X$ is
 Each term $|X|/|t_q|$ is the fraction of transaction $t_q$ that $X$ occupies. We call $S(X)$ the reciprocal sum of $X$.
 
 \begin{definition}[High-occupancy itemset]\label{def:hoi}
-Given a relative threshold $\alpha \in (0,1]$, let $\xi = \alpha n$. An itemset $X \neq \emptyset$ is a high-occupancy itemset (HOI) if $\socc(X) \ge \xi$. The problem is to find the set $\mathcal{H}$ of all HOIs.
+Given a relative threshold $\alpha \in (0,1)$, let $\xi = \alpha n$. An itemset $X \neq \emptyset$ is a high-occupancy itemset (HOI) if $\socc(X) \ge \xi$. The problem is to find the set $\mathcal{H}$ of all HOIs.
 \end{definition}
 
 This is the fixed-threshold problem addressed by HEP \cite{deng2020hoi} and DFHOI \cite{nguyen2023dfhoi}. Our implementations of both baselines solve exactly this problem, which we verify against an exact oracle in Section~\ref{sec:exp-correct}.
@@ -192,10 +195,38 @@ For every itemset $X$ and integer $K \ge 1$, $\Ucap_K(X) \le \min\{\Ubo(X),\ K \
 For every $\lambda \in \Lambda(X)$, $\min(\lambda, K) \cdot W_\lambda(X) \le \lambda \cdot W_\lambda(X) \le \Ubo(X)$, and $\min(\lambda, K) \cdot W_\lambda(X) \le K \cdot W_\lambda(X) \le K \cdot S(X)$ because $W_\lambda(X) \le W_1(X) = S(X)$. Taking the maximum over $\lambda$ gives the first claim. Each term $\min(\lambda,K) \cdot W_\lambda(X)$ is non-decreasing in $K$, and so is their maximum.
 \end{proof}
 
-The bound is strictly tighter than both special cases in general.
+The bound can be strictly smaller than both special cases. If $T(X)$ consists of one transaction of length $2$ and two of length $10$, and $K = 3$, then $S(X) = 7/10$, $\Ubo(X) = \max(2 \cdot 7/10,\ 10 \cdot 2/10) = 2$, $K \cdot S(X) = 21/10$, and $\Ucap_3(X) = \max(2 \cdot 7/10,\ 3 \cdot 2/10) = 7/5$ (Figure~\ref{fig:bound}).
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[x=1cm, y=1.6cm, font=\scriptsize]
+  \draw[->] (0,0) -- (5.6,0);
+  \draw[->] (0,0) -- (0,2.45) node[above] {bound value};
+  \foreach \v in {0.5,1,1.5,2} \draw (0,\v) -- (-0.08,\v) node[left] {\v};
+  \fill[blue!25] (0.6,0) rectangle (1.3,1.4);   \draw (0.6,0) rectangle (1.3,1.4);
+  \fill[orange!45] (1.4,0) rectangle (2.1,1.4); \draw (1.4,0) rectangle (2.1,1.4);
+  \node[below] at (1.35,0) {$\lambda = 2$};
+  \fill[blue!25] (3.2,0) rectangle (3.9,2.0);   \draw (3.2,0) rectangle (3.9,2.0);
+  \fill[orange!45] (4.0,0) rectangle (4.7,0.6); \draw (4.0,0) rectangle (4.7,0.6);
+  \node[below] at (3.95,0) {$\lambda = 10$};
+  \draw[dashed, red!70!black] (0,2.1) -- (5.4,2.1);
+  \node[right, red!70!black] at (5.4,2.2) {$K \cdot S(X) = 21/10$};
+  \draw[blue!60!black, thick] (0,2.0) -- (5.4,2.0);
+  \node[right, blue!60!black] at (5.4,1.93) {$\Ubo(X) = 2$};
+  \draw[orange!80!black, thick] (0,1.4) -- (5.4,1.4);
+  \node[right, orange!80!black] at (5.4,1.4) {$\Ucap_3(X) = 7/5$};
+  \begin{scope}[shift={(0.4,-0.5)}]
+    \fill[blue!25] (0,0) rectangle (0.25,0.1); \draw (0,0) rectangle (0.25,0.1);
+    \node[right] at (0.25,0.05) {$\lambda \cdot W_\lambda(X)$, terms of $\Ubo$};
+    \fill[orange!45] (0,-0.18) rectangle (0.25,-0.08); \draw (0,-0.18) rectangle (0.25,-0.08);
+    \node[right] at (0.25,-0.13) {$\min(\lambda,3) \cdot W_\lambda(X)$, terms of $\Ucap_3$};
+  \end{scope}
+\end{tikzpicture}
+\caption{The bounds for an itemset $X$ supported by one transaction of length $2$ and two of length $10$, with $K = 3$: $W_2(X) = 7/10$ and $W_{10}(X) = 2/10$. The transaction-length bound $\Ubo$ is attained at $\lambda = 10$, a length that no itemset of the branch can reach; capping $\lambda$ at $K$ reduces that term from $2$ to $3/5$, and the maximum moves to $\lambda = 2$. The purely residual bound $K \cdot S(X)$ ignores transaction lengths. $\Ucap_3(X) = 7/5$ is below both.}\label{fig:bound}
+\end{figure}
 
 \begin{example}\label{ex:capped}
-In Example~\ref{ex:basic}, consider $X = \{C, E\}$ with $T(X) = \{4, 5\}$, so $\Lambda(X) = \{4\}$, $W_4(X) = 1/2$ and $\supp(X) = 2 \ge \sigma$. The transaction-length bound is $\Ubo(X) = 4 \cdot 1/2 = 2 \ge \xi = 7/4$, so it cannot prune $X$. In the search of Section~\ref{sec:algo}, $\{C,E\}$ is generated in the class of prefix $\{C\}$, whose other member is $\{C,D\}$; the largest itemset that can still contain $\{C,E\}$ there is $\{C,D,E\}$, so $K = 3$. Then $\Ucap_3(X) = \min(4,3) \cdot 1/2 = 3/2 < 7/4$, and $X$ is pruned safely: indeed $\socc(\{C,E\}) = 1$ and $\socc(\{C,D,E\}) = 3/2$.
+In Example~\ref{ex:basic}, consider $X = \{A, C, D\}$ with $T(X) = \{1, 4\}$, so $\Lambda(X) = \{4\}$, $W_4(X) = 1/2$ and $\supp(X) = 2 \ge \sigma$. The transaction-length bound is $\Ubo(X) = 4 \cdot 1/2 = 2 \ge \xi = 7/4$, so it cannot prune $X$. In the search of Section~\ref{sec:algo} (Example~\ref{ex:search}), $\{A,C,D\}$ is generated as a child of $\{A,C\}$, and the largest itemset that can still contain it in that subtree has $K = 3$ items. Then $\Ucap_3(X) = \min(4,3) \cdot 1/2 = 3/2 < 7/4$, and $X$ is pruned safely: indeed $\socc(\{A,C,D\}) = 3/2$, and every proper superset of $\{A,C,D\}$ has support $1 < \sigma$.
 \end{example}
 
 The next result explains why the transaction-length bound fails on databases whose transactions have equal length.
@@ -212,15 +243,26 @@ Here $\Lambda(X) = \{L\}$ and $W_L(X) = \supp(X)/L$, so the maximum in \eqref{eq
 
 Since every itemset reached by a miner already satisfies $\supp(X) \ge \sigma \ge \xi$, the transaction-length bound never prunes on such databases, whereas $\Ucap_K(X) < \xi$ holds as soon as $K < L \xi / \supp(X)$.
 
+The next corollary states, for any database, when the size limit adds nothing to the transaction-length bound.
+
+\begin{corollary}[Scope of the bound]\label{cor:scope}
+For every itemset $X$ with $T(X) \ne \emptyset$, $\Ucap_K(X) = \Ubo(X)$ if and only if $K \ge \lambda$ for some $\lambda \in \Lambda(X)$ that attains the maximum in \eqref{eq:ubo}. In particular, $\Ucap_K(X) = \Ubo(X)$ whenever $K \ge \max \Lambda(X)$.
+\end{corollary}
+\begin{proof}
+If $K \ge \lambda$ for a maximizer $\lambda$, then $\Ucap_K(X) \ge \min(\lambda, K) \cdot W_\lambda(X) = \lambda \cdot W_\lambda(X) = \Ubo(X)$, and $\Ucap_K(X) \le \Ubo(X)$ by Proposition~\ref{prop:dominance}. Conversely, if $K < \lambda$ for every maximizer $\lambda$, then each term of \eqref{eq:capped} is smaller than $\Ubo(X)$: for a maximizer $\lambda$, $\min(\lambda,K) \cdot W_\lambda(X) = K \cdot W_\lambda(X) < \lambda \cdot W_\lambda(X)$ because $W_\lambda(X) > 0$; for any other $\lambda$, $\min(\lambda,K) \cdot W_\lambda(X) \le \lambda \cdot W_\lambda(X) < \Ubo(X)$. Hence $\Ucap_K(X) < \Ubo(X)$.
+\end{proof}
+
+The size limit therefore improves on the transaction-length bound only in branches that cannot produce itemsets as long as the supporting transactions that determine $\Ubo$. In the search of Section~\ref{sec:algo}, the root class contains every item with support at least $\sigma$, and each level of the search shortens the classes. On a dense database, the frequent items are few compared with the length of the transactions, and this condition is met after few levels; on a sparse database, the classes remain much longer than the transactions, and the two bounds coincide in most of the search. Section~\ref{sec:exp} confirms both cases.
+
 \paragraph{Computation.}
-Before mining, we re-index the transactions in non-decreasing order of length, as DFHOI does \cite{nguyen2023dfhoi}, so that sorted TID-lists are also sorted by transaction length. For a TID-list sorted in this way, a single backward scan accumulates $W_\lambda(X)$ for all $\lambda \in \Lambda(X)$ in decreasing order of $\lambda$, and the maximum in \eqref{eq:capped} is updated at each change of length. The bound therefore costs $O(|T(X)|)$ and is computed in the pass that also produces $S(X)$. With uniform lengths, Proposition~\ref{prop:uniform} gives it in $O(1)$. The purely residual bound $K \cdot S(X)$ costs $O(1)$ once $S(X)$ is known.
+Before mining, we re-index the transactions in non-decreasing order of length, as DFHOI does \cite{nguyen2023dfhoi}, so that sorted TID-lists are also sorted by transaction length. For a TID-list sorted in this way, a single backward scan accumulates $W_\lambda(X)$ for all $\lambda \in \Lambda(X)$ in decreasing order of $\lambda$, and the maximum in \eqref{eq:capped} is updated at each change of length. The bound therefore costs $O(|T(X)|)$; \AURA{} computes it, together with $S(X)$, in one backward pass over the TID-list produced by the intersection. With uniform lengths, Proposition~\ref{prop:uniform} gives it in $O(1)$. The purely residual bound $K \cdot S(X)$ costs $O(1)$ once $S(X)$ is known.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{The \AURA{} algorithm}\label{sec:algo}
 
 \subsection{Search space}
 
-We fix a total order on the items. As in Eclat \cite{zaki2000scalable}, the search is organized in prefix equivalence classes. A class is an ordered list $E = \langle N_0, \dots, N_{k-1} \rangle$ of nodes that share a prefix $P$; node $N_i$ stores the itemset $X_i = P \cup \{x_i\}$, its TID-list $T(X_i)$ in increasing order and its reciprocal sum $S(X_i)$. The children of $N_i$ form the class of prefix $X_i$, whose candidates are $X_i \cup \{x_j\}$ for $j > i$, with $T(X_i \cup \{x_j\}) = T(X_i) \cap T(X_j)$. Without pruning, this enumeration generates every non-empty itemset exactly once \cite{zaki2000scalable}.
+The items with support at least $\sigma$ are ordered by increasing support, ties being broken by item identifier, as in HEP \cite[Section~3.2.3]{deng2020hoi}; the examples order items of equal support alphabetically. As in Eclat \cite{zaki2000scalable}, the search is organized in prefix equivalence classes. A class is an ordered list $E = \langle N_0, \dots, N_{k-1} \rangle$ of nodes that share a prefix $P$; node $N_i$ stores the itemset $X_i = P \cup \{x_i\}$, its TID-list $T(X_i)$ in increasing order and its reciprocal sum $S(X_i)$. The children of $N_i$ form the class of prefix $X_i$, whose candidates are $X_i \cup \{x_j\}$ for $j > i$, with $T(X_i \cup \{x_j\}) = T(X_i) \cap T(X_j)$. Without pruning, this enumeration generates every non-empty itemset exactly once \cite{zaki2000scalable}.
 
 For node $N_i$ we call $r_i = k - 1 - i$ its residual length: the number of items that can still be appended to $X_i$ in its own subtree. Every itemset generated in the subtree of $N_i$ has at most $|X_i| + r_i$ items.
 
@@ -238,13 +280,13 @@ Rules R1 and R3 cost $O(1)$. When all transactions have the same length $L$, \AU
 Rule R2 deserves care. A discarded child is removed from the class of prefix $X$ altogether. It is therefore lost not only as the root of its own subtree but also as an item that the \emph{earlier} children of $X$ could append. The itemsets that contain $Y$ and could still be generated in the subtree of $X$ have the form $X \cup \{x_j\} \cup Z$ with $Z \subseteq \{x_l : l > i,\ l \ne j\}$, and there are $r_i - 1$ such items $x_l$. This is why R2 uses $K = |Y| + r_i - 1$, which counts all other children of $X$, and not only the items after $x_j$.
 
 \begin{remark}[A tempting but unsound shortcut]\label{rem:pitfall}
-Using $K = |Y| + (k - 1 - j)$ in R2, that is, counting only the items that follow $x_j$, loses HOIs. Let $D = \langle \{A,B,C\}, \{A\} \rangle$ and $\alpha = 2/5$, so that $\xi = 4/5$ and $\sigma = 1$. The itemset $\{A,B,C\}$ is an HOI, since $\socc(\{A,B,C\}) = 3 \cdot 1/3 = 1$. In the class of prefix $\{A\}$, the candidate $Y = \{A,C\}$ comes last, so the shortcut uses $K = 2$ and obtains $\Ucap_2(Y) = \min(3,2) \cdot 1/3 = 2/3 < \xi$. It discards $\{A,C\}$, and $\{A,B,C\}$, which would be generated from $\{A,B\}$ and $\{A,C\}$, is never produced. Rule R2 uses $K = 3$ instead, obtains $\Ucap_3(Y) = 1 \ge \xi$, keeps $\{A,C\}$ and finds $\{A,B,C\}$.
+Using $K = |Y| + (k - 1 - j)$ in R2, that is, counting only the items that follow $x_j$, loses HOIs. Let $D = \langle \{A,B,C\}, \{A\} \rangle$ and $\alpha = 2/5$, so that $\xi = 4/5$ and $\sigma = 1$. The supports of $A$, $B$, $C$ are $2$, $1$, $1$, so the item order is $B \prec C \prec A$. The itemset $\{A,B,C\}$ is an HOI, since $\socc(\{A,B,C\}) = 3 \cdot 1/3 = 1$. In the class of prefix $\{B\}$, the candidate $Y = \{B,A\}$ comes last, so the shortcut uses $K = 2$ and obtains $\Ucap_2(Y) = \min(3,2) \cdot 1/3 = 2/3 < \xi$. It discards $\{B,A\}$, and $\{B,C,A\}$, which would be generated from $\{B,C\}$ and $\{B,A\}$, is never produced. Rule R2 uses $K = 3$ instead, obtains $\Ucap_3(Y) = 1 \ge \xi$, keeps $\{B,A\}$ and finds $\{A,B,C\}$.
 \end{remark}
 
 \begin{algorithm}[t]
 \caption{\AURA{}}\label{alg:aura}
 \begin{algorithmic}[1]
-\Require database $D$, threshold $\alpha \in (0,1]$
+\Require database $D$, threshold $\alpha \in (0,1)$
 \Ensure the set $\mathcal{H}$ of all HOIs
 \State $\xi \gets \alpha n$; $\sigma \gets \lceil \xi \rceil$; re-index transactions by non-decreasing length
 \State $E_0 \gets \langle$ nodes $\{x\}$ with $\supp(\{x\}) \ge \sigma$ and $\Ubo(\{x\}) \ge \xi \rangle$ \Comment{R1 and Theorem~\ref{thm:capped}}
@@ -274,6 +316,65 @@ Using $K = |Y| + (k - 1 - j)$ in R2, that is, counting only the items that follo
 \end{algorithmic}
 \end{algorithm}
 
+\begin{example}\label{ex:search}
+We run Algorithm~\ref{alg:aura} on Table~\ref{tab:example} with $\alpha = 0.35$ ($\xi = 7/4$, $\sigma = 2$). The supports of $E$, $A$, $B$, $C$, $D$ are $2, 4, 4, 4, 4$, so the item order is $E \prec A \prec B \prec C \prec D$. Every singleton passes R1 and the transaction-length bound, and none is an HOI (the largest occupancy of a singleton is $7/6$), so $E_0 = \langle E, A, B, C, D \rangle$. Figure~\ref{fig:search} shows the search.
+\begin{itemize}
+\item $\{E\}$, $r = 4$: R3 allows the expansion, since $(1 + 4) \cdot 1/2 = 5/2 \ge \xi$. The candidates $\{E,A\}$ and $\{E,B\}$ have support $1$ and fail R1; $\{E,C\}$ and $\{E,D\}$, with $T = \{4,5\}$, pass R2 ($K = 5$, $\Ucap_5 = 2$) but have occupancy $1$. With $c = 2$ surviving children, $(1 + 2) \cdot 1/2 = 3/2 < \xi$, so R3 does not recurse into them, and $\{E,C,D\}$ is never formed.
+\item $\{A\}$, $r = 3$: the children $\{A,B\}$ ($T = \{1,2,3\}$, $\socc = 11/6$), $\{A,C\}$ and $\{A,D\}$ ($\socc = 5/3$) pass R1 and R2 with $K = 4$; $\{A,B\}$ is emitted. In the class of $\{A,B\}$, the children $\{A,B,C\}$ ($T = \{1,2\}$) and $\{A,B,D\}$ ($T = \{1,3\}$) have occupancy $3 \cdot (1/4 + 1/3) = 7/4 = \xi$ and are emitted; their intersection $\{A,B,C,D\}$ has support $1$. In the class of $\{A,C\}$, the candidate $\{A,C,D\}$ is discarded by R2 (Example~\ref{ex:capped}).
+\item $\{B\}$, $r = 2$: $\{B,C\}$ and $\{B,D\}$ ($\socc = 5/3$) are kept; their child $\{B,C,D\}$ ($T = \{1,5\}$) has $\Ubo = 2 \ge \xi$ but $\Ucap_3 = 3/2 < \xi$ and is discarded by R2.
+\item $\{C\}$, $r = 1$: $\{C,D\}$ ($T = \{1,4,5\}$) has $\Ubo = 3$ but $\Ucap_2 = 2 \cdot 3/4 = 3/2 < \xi$, and is discarded by R2.
+\end{itemize}
+The output is $\{A,B\}$, $\{A,B,C\}$, $\{A,B,D\}$, which is the set of HOIs. Two of them have occupancy exactly $\xi$, so an inexact comparison could lose them. With the transaction-length bound alone, the nodes $\{C,D\}$, $\{A,C,D\}$ and $\{B,C,D\}$ would be kept, and $\{E\}$ would be expanded into the class of $\{E,C\}$, generating $\{E,C,D\}$.
+\end{example}
+
+\begin{figure}[t]
+\centering
+\begin{forest}
+for tree={draw, rounded corners=2pt, font=\scriptsize, inner sep=1.5pt, align=center,
+          s sep=5pt, l sep=12pt, parent anchor=south, child anchor=north, edge={gray!70!black}},
+kept/.style={draw=black, fill=white},
+hoi/.style={draw=green!40!black, fill=green!15, very thick},
+cut/.style={draw=gray, dashed, text=gray!80!black},
+[$\emptyset$, draw=none, font=\footnotesize
+  [{$E$\\$1/2$\\[-1pt]{\tiny R3 stops}}, kept
+    [{$EA$\\R1}, cut]
+    [{$EB$\\R1}, cut]
+    [{$EC$\\$1$}, kept]
+    [{$ED$\\$1$}, kept]
+  ]
+  [{$A$\\$7/6$}, kept
+    [{$AB$\\$11/6$}, hoi
+      [{$ABC$\\$7/4$}, hoi
+        [{$ABCD$\\R1}, cut]
+      ]
+      [{$ABD$\\$7/4$}, hoi]
+    ]
+    [{$AC$\\$5/3$}, kept
+      [{$ACD$\\R2\\$\Ucap_3{=}\frac{3}{2}$}, cut]
+    ]
+    [{$AD$\\$5/3$}, kept]
+  ]
+  [{$B$\\$7/6$}, kept
+    [{$BC$\\$5/3$}, kept
+      [{$BCD$\\R2\\$\Ucap_3{=}\frac{3}{2}$}, cut]
+    ]
+    [{$BD$\\$5/3$}, kept]
+  ]
+  [{$C$\\$13/12$}, kept
+    [{$CD$\\R2\\$\Ucap_2{=}\frac{3}{2}$}, cut]
+  ]
+  [{$D$\\$13/12$}, kept]
+]
+\end{forest}
+
+\smallskip
+\scriptsize
+\tikz\node[draw=green!40!black, fill=green!15, very thick, rounded corners=2pt, inner sep=2pt]{HOI}; emitted\quad
+\tikz\node[draw, rounded corners=2pt, inner sep=2pt]{$X$}; kept, not an HOI\quad
+\tikz\node[draw=gray, dashed, text=gray!80!black, rounded corners=2pt, inner sep=2pt]{$X$}; discarded (rule and value shown)
+\caption{Search tree of \AURA{} on the database of Table~\ref{tab:example} with $\alpha = 0.35$ ($\xi = 7/4$, $\sigma = 2$) and item order $E \prec A \prec B \prec C \prec D$ (Example~\ref{ex:search}). Itemsets are written without braces; the number in a kept node is its occupancy, and a discarded node shows the rule that discarded it. The discarded nodes $EA$, $EB$ and $ABCD$ have support $1 < \sigma$. The children of $\{E\}$ are generated, but rule R3 does not recurse into them, since $(|\{E\}| + 2) \cdot S(\{E\}) = 3/2 < \xi$. The nodes $ACD$, $BCD$ and $CD$ pass the transaction-length bound ($\Ubo = 2$, $2$ and $3$) but are discarded by the length-capped bound $\Ucap_K$ of rule R2. The search performs 15 candidate intersections and emits exactly the three HOIs, two of which have occupancy equal to $\xi$.}\label{fig:search}
+\end{figure}
+
 \subsection{Correctness}
 
 \begin{theorem}[Correctness and completeness]\label{thm:correct}
@@ -284,20 +385,21 @@ Algorithm~\ref{alg:aura} emits every HOI exactly once and emits nothing else.
 
 \emph{Uniqueness.} The prefix-class enumeration generates each itemset at most once \cite{zaki2000scalable}, and pruning only removes itemsets from it.
 
-\emph{Completeness.} Let $H$ be an HOI. Without pruning, the enumeration generates $H$ along a unique path of nodes $X^{(1)} \subset X^{(2)} \subset \dots \subset X^{(|H|)} = H$, where $X^{(s)}$ consists of the first $s$ items of $H$ in the item order. We show that no rule removes a node of this path or blocks the recursion along it. Every node on the path is a subset of $H$.
+\emph{Completeness.} Let $H$ be an HOI with items $h_1 \prec \dots \prec h_t$ in the item order, and let $P_s = \{h_1, \dots, h_s\}$ for $0 \le s \le t$. Every subset $Z$ of $H$ satisfies $\supp(Z) \ge \supp(H) \ge \sigma$ (Proposition~\ref{prop:occ-supp}, Lemma~\ref{lem:basic}) and $\Ucap_K(Z) \ge \socc(H) \ge \xi$ for every $K \ge |H|$ (Theorem~\ref{thm:capped}); in particular $\Ubo(Z) \ge \xi$. We prove by induction on $s = 0, \dots, t-1$ the following statement $I_s$: \textsc{Mine} is called on a class $E$ with prefix $P_s$ that contains the node $P_s \cup \{h\}$ for every $h \in H \setminus P_s$ (for $s = 0$, $E$ is the root class $E_0$, and the singletons of $E_0$ that are HOIs are emitted when $E_0$ is built).
+
+$I_0$ holds: for every $h \in H$, $\supp(\{h\}) \ge \sigma$ and $\Ubo(\{h\}) \ge \xi$, so $\{h\} \in E_0$.
+
+Assume $I_s$ for some $s < t$, and let $X = P_{s+1} = X_i$ be the node of $E$ that adds $h_{s+1}$. The nodes $P_s \cup \{h\}$, $h \in H \setminus P_{s+1}$, come after $X_i$ in $E$, because $h \succ h_{s+1}$; hence $r_i \ge t - s - 1$ and $|H| = |X| + (t - s - 1) \le |X| + r_i$.
 \begin{itemize}
-\item R1: by Proposition~\ref{prop:occ-supp} and Lemma~\ref{lem:basic}(i), $\supp(X^{(s)}) \ge \supp(H) \ge \sigma$.
-\item Root filter of Algorithm~\ref{alg:aura}: $X^{(1)} \subseteq H$, so $\Ubo(X^{(1)}) \ge \socc(H) \ge \xi$ by Theorem~\ref{thm:capped} with an unbounded $K$.
-\item R2: suppose $Y = X^{(s+1)}$ is generated as a child of $X = X^{(s)} = X_i$ in a class of size $k$. The itemset $H$ is generated in the subtree of $X$, so $H = X \cup Z'$ with $Z'$ made of $x_j$ and of other members $x_l$ ($l > i$) of the class, and hence $|H| \le |X| + r_i = |Y| + r_i - 1$. By Theorem~\ref{thm:capped}, $\Ucap_{|Y| + r_i - 1}(Y) \ge \socc(H) \ge \xi$, so R2 keeps $Y$. Rule R2 is also applied to the other members of the class that contain an item of $H$, that is, to the nodes $X \cup \{x_l\}$ with $x_l \in H$; each of them is a subset of $H$ and the same argument shows that it is kept, so all items of $H \setminus X$ remain available.
-\item R3, first test: when $X = X^{(s)}$ with $s < |H|$ is expanded, $H$ lies in its subtree, so $|H| \le |X| + r_i$. By Theorem~\ref{thm:capped}, $\Ucap_{|X| + r_i}(X) \ge \socc(H) \ge \xi$, and by Proposition~\ref{prop:dominance}, $(|X| + r_i) \cdot S(X) \ge \Ucap_{|X| + r_i}(X)$; so neither form of the test prunes $X$.
-\item R3, second test: when $s + 1 < |H|$, the items of $H \setminus X$ are among the $c$ surviving children of $X$, so $|H| \le |X| + c$, and the same argument gives $(|X| + c) \cdot S(X) \ge \xi$. If $s + 1 = |H|$, then $H$ is a child of $X$ and is emitted when it is generated, before this test.
+\item If $s + 1 = t$, then $X = H$ was emitted when its node was created, as a member of $E_0$ or as a child that passed the exact test.
+\item Otherwise, R3 does not skip $X$: $(|X| + r_i) \cdot S(X) \ge \Ucap_{|X|+r_i}(X) \ge \socc(H) \ge \xi$ by Proposition~\ref{prop:dominance} and Theorem~\ref{thm:capped}, and the closed form used for equal lengths is equal to $\Ucap_{|X|+r_i}(X)$ (Proposition~\ref{prop:uniform}). For every $h \in H \setminus P_{s+1}$, the candidate $Y = X \cup \{h\}$ is a subset of $H$, so R1 keeps it, and since $|H| \le |X| + r_i = |Y| + r_i - 1$, R2 keeps it as well. Hence the set $C$ of surviving children contains these $t - s - 1$ nodes. If $t - s - 1 = 1$, then $Y = H$ is one of them and is emitted when it is created. If $t - s - 1 \ge 2$, then $|C| \ge 2$ and, because $T(H) \subseteq T(X)$, $(|X| + |C|) \cdot S(X) \ge |H| \cdot S(H) = \socc(H) \ge \xi$, so \textsc{Mine} is called on $C$, whose prefix is $P_{s+1}$: this is $I_{s+1}$.
 \end{itemize}
-Hence $H$ is generated and, being an HOI, emitted.
+Since $s$ increases at each step, $H$ is emitted after at most $t$ steps.
 \end{proof}
 
 \subsection{Memory management and complexity}
 
-The TID-lists of the children of $X$ are needed only while the subtree of $X$ is mined. \AURA{} therefore allocates them from a contiguous arena: it records the current offset before generating the children (\textsc{ArenaMark}) and restores it afterwards (\textsc{ArenaRewind}). This replaces one heap allocation and one release per TID-list by a pointer increment. The small array of node headers of each class is still allocated on the heap. At any time the arena holds the TID-lists of the classes on the current path of the search, that is, at most $d \cdot k_{\max}$ lists of at most $n$ identifiers each, where $d$ is the depth of the path and $k_{\max}$ the largest class size. This is the same asymptotic space as any depth-first TID-list miner; the arena reduces allocation cost and fragmentation, not the asymptotic space.
+The TID-lists of the children of $X$ are needed only while the subtree of $X$ is mined. \AURA{} therefore allocates them from an arena used as a stack: it records the current top before generating the children (\textsc{ArenaMark}) and restores it afterwards (\textsc{ArenaRewind}). The arena is a sequence of chunks; when the current chunk is full, the next one is used, allocated on first use with at least twice the size of the previous one, so that pointers to earlier lists remain valid and chunks are reused after a rewind. This replaces one heap allocation and one release per TID-list by a pointer increment. The small array of node headers of each class is still allocated on the heap. At any time the arena holds the TID-lists of the classes on the current path of the search, that is, at most $d \cdot k_{\max}$ lists of at most $n$ identifiers each, where $d$ is the depth of the path and $k_{\max}$ the largest class size. This is the same asymptotic space as any depth-first TID-list miner; the arena reduces allocation cost and fragmentation, not the asymptotic space.
 
 Processing a candidate $Y = X \cup \{x_j\}$ costs $O(|T(X)| + |T(X_j)|)$ for the merge-based intersection plus $O(|T(Y)|)$ for $S(Y)$ and $\Ucap_K(Y)$, which are computed in one pass over the result. Rule R3 costs $O(1)$ per node. The number of candidates depends on the data and on how much the rules prune, which Section~\ref{sec:exp} measures.
 
@@ -307,10 +409,10 @@ Processing a candidate $Y = X \cup \{x_j\}$ costs $O(|T(X)| + |T(X_j)|)$ for the
 \subsection{Setup}\label{sec:exp-setup}
 
 \paragraph{Implementations.}
-HEP, DFHOI and \AURA{} are implemented in C in the same code base, share the same data loader and transaction re-indexing, and were compiled with GCC~13.3 at optimization level \texttt{-O2}. HEP and DFHOI are our implementations of the published algorithms \cite{deng2020hoi,nguyen2023dfhoi}: HEP generates candidates level by level and DFHOI depth-first, and both prune with the transaction-length bound \eqref{eq:ubo} and the support constraint. All three compare occupancies with the threshold using the same relative tolerance of $10^{-9}$, so that itemsets whose occupancy equals $\xi$ exactly are not lost to floating-point rounding (for instance, $0.1 \times 19$ evaluates to $1.9000000000000001$ in double precision). The threshold $\sigma = \lceil \alpha n \rceil$ is computed with rational arithmetic.
+HEP, DFHOI and \AURA{} are implemented in C in the same code base, share the same data loader, and were compiled with GCC~13.3.0 at optimization level \texttt{-O2}. HEP and DFHOI are our implementations of the published algorithms. HEP \cite{deng2020hoi} generates candidates level by level by joining $(k-1)$-itemsets that share their first $k-2$ items, sorts transactions by increasing length and items by increasing support \cite[Section~3.2.3]{deng2020hoi}, and keeps a candidate when its support and $\Ubo$ reach $\xi$. DFHOI \cite{nguyen2023dfhoi} searches prefix equivalence classes depth-first and applies its two pruning conditions: a candidate whose support is below $\xi$ is discarded before $\Ubo$ is computed, and when all transactions have the same length, $\Ubo$ is replaced by the support \cite[Theorem~3]{nguyen2023dfhoi}. The DFHOI paper does not state an item order, and its examples use alphabetical order; we use increasing support, as HEP does, and \AURA{} uses the same order. The early termination of the $\Ubo$ scan mentioned in \cite[Section~3.2.3]{deng2020hoi} is not implemented in any of the three programs. All three decide $\socc(X) \ge \xi$ exactly: $\xi = \alpha n$ is represented as a fraction, and when the double-precision value of $\socc(X)$ is within $10^{-7}(1 + \xi)$ of $\xi$, the comparison is repeated with arbitrary-precision integers over the common denominator of the lengths of the supporting transactions. Pruning tests compare bounds with $\xi - 10^{-7}(1 + \xi)$, which can only keep more candidates. Our implementations of HEP and DFHOI return the numbers of HOIs reported in the original papers, with one exception that we examine in Section~\ref{sec:exp-correct}.
 
 \paragraph{Platform and protocol.}
-All runs used one thread on an Intel Core i7-10700 (2.9~GHz base, 16~MB L3 cache) with 32~GB of RAM under Ubuntu Linux 24.04 (kernel 6.8). HEP and DFHOI are sequential algorithms, so a single-threaded comparison measures algorithmic efficiency rather than parallel hardware. Runtime is the duration of the mining phase; loading the data is excluded. No time limit was imposed: every run was allowed to complete. To protect the machine, each run was limited to \MemLimit{}~GB of address space; a run that exceeds this limit is reported as failed, and for that algorithm the smaller thresholds on the same dataset are not run, because every pruning rule of the three algorithms compares a bound with $\xi$, so a smaller threshold can only enlarge the search. A configuration was repeated five times if its first run took less than 10~s, three times if it took less than 120~s and once otherwise; we report the median.
+All experiments ran on one workstation: an Intel Core i7-10700 processor (8 cores, 16 hardware threads, base frequency 2.9~GHz, maximum turbo frequency 4.8~GHz; 32~KiB L1 data cache and 256~KiB L2 cache per core, 16~MiB shared L3 cache) on an ASUS ROG STRIX B460-H GAMING motherboard, with 32~GiB of DDR4 memory and an NVMe solid-state drive, running Ubuntu 24.04.5 LTS with Linux kernel 6.8. CPU frequency was managed by the \texttt{intel\_pstate} driver with the \texttt{powersave} governor and turbo enabled, the default settings of the system. Every run used one thread and was pinned to one core with \texttt{taskset}. Runtime is the duration of the mining phase, measured with a monotonic clock around the call of the algorithm; reading the input file is excluded, and the sorting of transactions and the construction of the initial TID-lists, which each algorithm performs itself, are included. Each run was limited to 600~s of wall-clock time and 20~GiB of address space. A configuration was repeated five times if its first run took less than 1~s, three times if it took less than 60~s, and once otherwise; we report the median, so runs longer than 60~s are single measurements. For each dataset the thresholds were run from the largest to the smallest, and an algorithm that exceeded a limit was not run at smaller thresholds, since every pruning rule of the three algorithms compares a bound with $\xi$, so a smaller threshold can only enlarge the search. The numbers of HOIs and of candidate intersections did not vary between repetitions.
 
 \paragraph{Memory.}
 All three programs share the same executable, whose resident size after loading the data is dominated by linked libraries and is identical for every algorithm. We therefore report the memory attributable to mining: just before the mining phase, we record the resident set size and reset the kernel's peak-resident-size counter (\texttt{VmHWM}) by writing \texttt{5} to \texttt{/proc/self/clear\_refs} \cite{linuxproc}; the reported value is the peak resident size during mining minus the recorded value.
@@ -320,7 +422,7 @@ We count candidate intersections, that is, the number of times an algorithm inte
 
 \subsection{Datasets}\label{sec:exp-data}
 
-Table~\ref{tab:datasets} lists the datasets, all of which are public benchmarks distributed by the FIMI repository \cite{fimi2004repository} and the SPMF library \cite{spmfdatasets,fournier2016spmf}. Four are dense and five are sparse. \texttt{mushrooms}, \texttt{chess} and \texttt{connect} have transactions of a single length, which is the case covered by Proposition~\ref{prop:uniform}. For each dataset we chose a grid of thresholds that ranges from settings with few or no HOIs to settings with many HOIs. On \texttt{chess} and \texttt{connect}, HOIs exist only at thresholds where HEP exceeds the memory limit, so we also include larger thresholds, as used in earlier evaluations, at which all three algorithms complete; \NonEmptyConfigs{} of the \NumConfigs{} configurations have at least one HOI. The dataset \texttt{pumsb} is discussed separately in Section~\ref{sec:exp-limits}.
+We use the datasets and threshold ranges of Deng \cite[Section~4]{deng2020hoi} (Table~\ref{tab:datasets}): \texttt{mushroom}, derived from the UCI Mushroom data \cite{uci1981mushroom}; \texttt{retail}, market baskets of a Belgian supermarket \cite{brijs1999retail}; \texttt{accidents}, traffic accident records \cite{geurts2003accidents}; \texttt{kosarak}, anonymized click-stream data of a Hungarian online news portal, provided by Ferenc Bodon to the FIMI repository \cite{fimi2004repository}; and \texttt{T10I4D100K}, a synthetic dataset generated with the IBM generator \cite{agrawal1994fast}. Deng also used \texttt{T40I10D100K}; it is not part of the dataset collection we used, and we did not include it. Because only two of these datasets are dense, we add the two dense datasets of the DFHOI evaluation that Deng did not use, \texttt{chess} and \texttt{pumsb}, both distributed by the FIMI repository \cite{fimi2004repository}, with the thresholds of \cite[Table~8]{nguyen2023dfhoi}: 48\% to 40\% for \texttt{chess} and 86\% to 78\% for \texttt{pumsb}. The files were obtained from the SPMF library \cite{spmfdatasets,fournier2016spmf}. Its version of \texttt{mushroom} has 8,416 transactions, whereas the FIMI version used by Deng has 8,124; it is the version used in the evaluation of DFHOI \cite[Table~8]{nguyen2023dfhoi}. Its longest \texttt{kosarak} transaction has 2,497 distinct items, against 2,498 in \cite[Table~2]{deng2020hoi}. As in \cite{deng2020hoi}, the threshold is given as a percentage $\alpha$ of the number of transactions. For each dataset we use five thresholds spanning the range of \cite[Table~3]{deng2020hoi}: 12\% to 4\% for \texttt{mushroom}, 0.05\% to 0.01\% for \texttt{retail}, 30\% to 10\% for \texttt{accidents}, 1\% to 0.2\% for \texttt{kosarak} and 0.1\% to 0.02\% for \texttt{T10I4D100K}. We call \texttt{mushroom}, \texttt{accidents}, \texttt{chess} and \texttt{pumsb} dense and the other three sparse, following their density in Table~\ref{tab:datasets}. The distinction that matters for Corollary~\ref{cor:scope} is the number of items that reach the support threshold compared with the length of the transactions. At the middle threshold of each dataset, 60 items of \texttt{mushroom}, 48 of \texttt{accidents}, 39 of \texttt{chess} and 25 of \texttt{pumsb} reach it, against average transaction lengths of 23, 33.8, 37 and 74; on the sparse datasets, 5,382 items of \texttt{retail}, 116 of \texttt{kosarak} and 830 of \texttt{T10I4D100K} reach it, against average lengths of 10.3, 8.1 and 10.1. All transactions of \texttt{mushroom}, \texttt{chess} and \texttt{pumsb} have the same length, which is the case covered by Proposition~\ref{prop:uniform}. \NonEmptyConfigs{} of the \NumConfigs{} configurations have at least one HOI. The \ZeroHoiConfigs{} exceptions are the three largest thresholds on \texttt{accidents} and all thresholds on \texttt{chess} and \texttt{pumsb}, where the DFHOI study also reports no HOI. On such configurations a miner must prove that no HOI exists, and we report them separately.
 
 \begin{table}[t]
 \caption{Datasets. Length gives the minimum and maximum transaction length (a single value means that all transactions have the same length); density is the average length divided by the number of items.}\label{tab:datasets}
@@ -337,7 +439,14 @@ Dataset & Type & $n$ & Items & Avg.\ len. & Length & Density (\%) & \#$\alpha$ &
 
 \subsection{Correctness}\label{sec:exp-correct}
 
-We verified the three implementations against an exact oracle. For \NumOracleDatabases{} random databases with 4 to 11 items and 5 to 30 transactions, half with transactions of varying length and half with transactions of a single length, and for $\alpha \in \{0.1, 0.2, 0.3, 0.4\}$, the oracle enumerates every itemset and evaluates its occupancy in rational arithmetic. In all \NumOracleCases{} cases, HEP, DFHOI, \AURA{} and each of its ablation variants (Section~\ref{sec:exp-ablation}) returned exactly the oracle's number of HOIs (mismatches: \OracleMismatches{}). On the benchmark datasets, whenever at least two algorithms completed a configuration (\ParityChecked{} configurations), they returned the same number of HOIs (mismatches: \ParityMismatches{}).
+\paragraph{Exact oracle.}
+We compared every program with an exact oracle on \NumOracleDatabases{} random databases in three suites of 300: transactions of varying length (4 to 11 items, 5 to 30 transactions), transactions of a single length, and a suite designed to produce exact ties, in which transaction lengths are taken from $\{1, 2, 4, 5, 8, 10\}$ and $n$ from $\{4, 5, 8, 10, 16, 20, 25\}$, so that $\socc(X)/n$ is a terminating decimal. For each database we used the thresholds $\alpha \in \{0.05, 0.1, 0.2, 0.3, 0.4, 0.5\}$ and three thresholds placed at the occupancy of a randomly chosen itemset $X$: $\alpha = \socc(X)/n$, written exactly in the third suite and rounded to 12 significant digits in the other two, so that $\xi$ lies within about $10^{-12} n$ of $\socc(X)$; values of $\alpha$ outside $(0,1)$ were discarded. This gives \NumOracleCases{} cases, in \NumOracleTies{} of which some itemset has occupancy exactly $\xi$. The oracle enumerates every itemset contained in a transaction and evaluates its occupancy in rational arithmetic. In every case, the set of itemsets written by each of \NumOraclePrograms{} programs (HEP, DFHOI, \AURA{} and its four ablation variants of Section~\ref{sec:exp-ablation}) is equal to the set returned by the oracle.
+
+\paragraph{Benchmarks.}
+For each of the \SetParityMain{} configurations of Table~\ref{tab:full} completed by at least two algorithms, and for the \SetParityAblation{} configurations of the ablation study, every completed program was run once more and wrote its HOIs. The sorted outputs have identical SHA-256 digests in every configuration.
+
+\paragraph{Published counts.}
+The numbers of HOIs returned by the three programs are equal to those reported by Deng \cite[Table~3]{deng2020hoi} for \texttt{retail} (0.05\%, 0.03\%, 0.01\%), \texttt{kosarak} (1\%, 0.6\%, 0.2\%) and \texttt{T10I4D100K} (0.1\%, 0.06\%, 0.02\%), and for \texttt{accidents} at 30\% (0) and 10\% (5,535). They are also equal to those reported for DFHOI \cite[Tables~7 and~8]{nguyen2023dfhoi} for \texttt{T10I4D100K} at all five thresholds of Table~\ref{tab:full}, for \texttt{retail} at 0.04\%, for \texttt{chess} and \texttt{pumsb} at all five thresholds (no HOI), and for \texttt{mushroom} at the thresholds used there (13\%, 11\%, 9\%, 7\%, 5\%: 5, 198, 3,266, 27,123 and 93,266 HOIs), which we ran separately. Deng's counts for \texttt{mushroom} refer to the FIMI version of the dataset and are not comparable. One count differs: for \texttt{accidents} at 20\%, Deng reports 15 HOIs, whereas the three programs return none (and two at 15\%). The numbers of frequent itemsets that Deng reports for \texttt{accidents} at 30\% and 20\% (149,545 and 889,883) are equal to those of our file, so the data are the same. A separate program that shares no code with the three implementations (\texttt{brute\_check.py}, distributed with our code) enumerates all 889,883 frequent itemsets at 20\% and evaluates their occupancy with integer arithmetic; it finds no HOI, and the largest occupancy is \AccidentsMaxOcc{}$\,n$. Run at 15\%, the same program enumerates 2,676,381 frequent itemsets and finds exactly the two HOIs returned by the three implementations. We could not determine the origin of the published value.
 
 \subsection{Runtime and search effort}\label{sec:exp-runtime}
 
@@ -361,7 +470,7 @@ Dataset & Configs & HEP & DFHOI & \AURA{} & Faster & Geo.\ mean & Max & (\%) \\
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/runtime.pdf}
-\caption{Runtime (seconds, logarithmic scale) as a function of the threshold $\alpha$. Missing points exceeded the memory limit.}\label{fig:runtime}
+\caption{Runtime (seconds, logarithmic scale) as a function of the threshold $\alpha$. Missing points: the run exceeded the memory or the time limit, or was not run because the same algorithm exceeded a limit at a larger threshold.}\label{fig:runtime}
 \end{figure}
 
 \begin{figure}[t]
@@ -370,11 +479,22 @@ Dataset & Configs & HEP & DFHOI & \AURA{} & Faster & Geo.\ mean & Max & (\%) \\
 \caption{Candidate intersections (logarithmic scale) as a function of the threshold $\alpha$.}\label{fig:nodes}
 \end{figure}
 
-\pending{Runtime discussion: to be written from the final results.}
+\paragraph{Dense datasets.}
+On \texttt{mushroom}, whose transactions all have length 23, the transaction-length bound equals the support (Proposition~\ref{prop:uniform}), and HEP and DFHOI perform exactly the same number of candidate intersections at every threshold (Table~\ref{tab:full}). \AURA{} performs 85\% to 98\% fewer and is 4.9 to 26 times faster than DFHOI. On \texttt{accidents}, transaction lengths vary from 18 to 51, but the transaction-length bound still prunes little: DFHOI performs between 68,644 and 1,559,815 intersections at the thresholds it completes, and \AURA{} between 387 and 8,244, a reduction of more than 99\%. At 30\%, 25\% and 20\% no itemset has high occupancy, yet DFHOI needs 28~s to 123~s to establish this, against 0.5~s to 1.5~s for \AURA{}. At 15\%, DFHOI needs 298~s and \AURA{} 4.6~s to find the two HOIs; at 10\%, DFHOI exceeds the 600~s limit and \AURA{} finds the 5,535 HOIs in 28~s. HEP exceeds the memory limit at 25\% (Section~\ref{sec:exp-memory}).
+
+On \texttt{chess} and \texttt{pumsb}, whose transactions also have a single length (37 and 74), no HOI exists at any of the thresholds of the DFHOI study. HEP and DFHOI again perform the same number of intersections, from 1,767,986 to 6,512,322 on \texttt{chess} and from 16,368 to 299,566 on \texttt{pumsb}, and DFHOI needs 2.9~s to 8.8~s and 1.1~s to 18.4~s to complete. \AURA{} performs between 366 and 644 intersections on \texttt{chess}, and none on \texttt{pumsb}: there, 22 to 26 items reach the support threshold, so no itemset of the search has more than 26 items, and the class bound of the root class, evaluated with the closed form of Proposition~\ref{prop:uniform}, is at most $26/74 \cdot \supp(\{x\}) \le 0.36\,n < \xi$ for every item $x$. Rule R3 therefore discards every node of the root class, and \AURA{} completes in less than 0.01~s. On both datasets \AURA{} runs in a few milliseconds, so the speedups of Table~\ref{tab:summary} (geometric means of 1,933 and 589 over DFHOI) mainly measure the time the baselines spend in their search, and we do not use them as the measure of the benefit of the bound.
+
+Over the \NumSpeedupDenseNonEmpty{} dense configurations completed by both programs that have at least one HOI, \AURA{} is \MinSpeedupDenseNonEmpty{} to \MaxSpeedupDenseNonEmpty{} times faster than DFHOI (geometric mean \GeoSpeedupDenseNonEmpty{}); over the \NumSpeedupDenseEmpty{} dense configurations without HOI, it is at least \MinSpeedupDenseEmpty{} times faster.
+
+\paragraph{Sparse datasets.}
+On \texttt{retail}, \texttt{kosarak} and \texttt{T10I4D100K}, \AURA{} performs \NodeReductionMinSparse{}\% to \NodeReductionMaxSparse{}\% fewer intersections than DFHOI. This is the behaviour predicted by Corollary~\ref{cor:scope}: when the size limit $K$ of rule R2 is at least the length of every supporting transaction, $\Ucap_K$ equals the transaction-length bound. On \texttt{retail} and \texttt{T10I4D100K}, 5,382 and 830 items reach the support threshold at the middle thresholds, against longest transactions of 76 and 29 items, so the classes near the root are much longer than any transaction and this is the usual case; rule R3 is weak for the same reason. On \texttt{kosarak} the search is small for all three programs (at most 5,769 intersections). The runtimes of the three programs are close. Compared with the faster of HEP and DFHOI in each configuration, \AURA{} is \SparseVsBestMin{} to \SparseVsBestMax{} times as fast, and slower in \SparseSlowerThanBest{} of \SparseVsBestN{} configurations (\texttt{kosarak} at 1\%, 0.30~s against 0.28~s). Separately, \AURA{} is \MinSpeedupSparse{} to \MaxSpeedupSparse{} times as fast as DFHOI (geometric mean \GeoSpeedupSparse{}) and \MinSpeedupSparseHEP{} to \MaxSpeedupSparseHEP{} times as fast as HEP (geometric mean \GeoSpeedupSparseHEP{}). On \texttt{retail} and \texttt{T10I4D100K}, \AURA{} takes about 15\% less time than DFHOI although both perform almost the same intersections; disabling the arena does not remove this difference (Table~\ref{tab:ablation}), so it comes from implementation details that we did not isolate, not from the bounds.
+
+\paragraph{Overall.}
+\AURA{} is faster than DFHOI in \WinsDFHOI{} of the \NumBothFinished{} configurations completed by both and faster than HEP in \WinsHEP{} of \NumBothFinishedHEP{}. A two-sided Wilcoxon signed-rank test \cite{wilcoxon1945,demsar2006statistical} on the logarithms of the paired runtimes gives $W = \WilcoxonDFHOIW{}$, $p = \WilcoxonDFHOIP{}$ ($N = \WilcoxonDFHOIN{}$) against DFHOI and $W = \WilcoxonHEPW{}$, $p = \WilcoxonHEPP{}$ ($N = \WilcoxonHEPN{}$) against HEP. These tests treat the configurations as independent, although the thresholds of one dataset are not; the per-dataset values of Table~\ref{tab:summary} show that the differences are large on the dense datasets and small on the sparse ones. Over the \NumRepeatedRuns{} measurements that were repeated, the median relative spread (largest minus smallest repetition, divided by the median) is \RepSpreadMedian{}\%. The largest spread, \RepSpreadMax{}\%, comes from a single slow repetition of a run of 0.12~s; this is why we report medians.
 
 \subsection{Memory}\label{sec:exp-memory}
 
-\pending{Memory discussion: to be written from the final results.}
+Figure~\ref{fig:memory} and Table~\ref{tab:full} report the peak memory attributable to mining. HEP stores the occupancy lists of a whole level of its breadth-first search; it uses up to 3.6~GB on \texttt{mushroom}, 14.1~GB on \texttt{chess}, 17.8~GB on \texttt{accidents} at 30\% and \HepMemMax{}~MB on \texttt{pumsb} at 78\%, close to the \MemLimit{}~GiB limit, which it exceeds on \texttt{accidents} at 25\%. The two depth-first programs keep only the TID-lists of the current path. \AURA{} uses at most \AuraMemMax{}~MB (median \AuraMemMedian{}~MB); its memory is between \MemRatioMin{} and \MemRatioMax{} times that of DFHOI, and lower in \MemLowerThanDfhoi{} of the \NumBothFinished{} configurations. The smallest ratios occur where \AURA{} prunes almost the whole search: 0.22 on \texttt{pumsb} and 0.56 on \texttt{accidents} at 30\%. As stated in Section~\ref{sec:algo}, the arena does not change the asymptotic space of the depth-first search.
 
 \begin{figure}[t]
 \centering
@@ -390,6 +510,7 @@ To measure the contribution of each component, we disabled them one at a time: \
 \caption{Ablation study: runtime in seconds and, in parentheses, candidate intersections. ML: memory limit exceeded.}\label{tab:ablation}
 \centering
 \footnotesize
+\setlength{\tabcolsep}{3pt}
 \begin{tabular}{@{}lrlllll@{}}
 \toprule
 Dataset & $\alpha$ & Full & No tail cap & No class bound & No residual & No arena \\
@@ -399,11 +520,11 @@ Dataset & $\alpha$ & Full & No tail cap & No class bound & No residual & No aren
 \end{tabular}
 \end{table}
 
-\pending{Ablation discussion: to be written from the final results.}
+On the dense datasets the components are complementary. Removing both residual rules (\emph{no residual}) leaves only the transaction-length bound, and \AURA{} then performs exactly as many intersections as DFHOI (657,947 on \texttt{mushroom}, 482,214 on \texttt{accidents}, 3,375,255 on \texttt{chess} and 77,654 on \texttt{pumsb}, Table~\ref{tab:full}) and becomes 7.2, 62, about 1,400 and about 300 times slower. Removing only one of the two rules costs much less, because each rule prunes most of what the other prunes: without the tail cap, intersections increase by 4.1\% on \texttt{mushroom} and 2.5\% on \texttt{accidents}; without the class bound they increase by 55\% and by a factor of 3.6, and the runtime by factors of 1.4 and 2.4. On \texttt{chess} and \texttt{pumsb}, removing the class bound raises the intersections from 551 to 2,985 and from 0 to 300, whereas removing the tail cap changes nothing: when all transactions have the same length, rule R3 is evaluated with the closed form of Proposition~\ref{prop:uniform}, which already caps the residual length at $L$, so on these datasets the class bound subsumes the node bound. The arena reduces the runtime by 22\% on \texttt{mushroom}, where TID-lists are short and allocations are frequent relative to the work per candidate, and by 4\% on \texttt{accidents}; on the sparse datasets, no variant changes the runtime by more than 3\%, consistently with the small reductions of Section~\ref{sec:exp-runtime}.
 
 \subsection{Scalability}\label{sec:exp-scal}
 
-\pending{Scalability discussion: to be written from the final results.}
+To measure how runtime grows with the number of transactions, we ran the three programs on the first 20\%, 40\%, 60\%, 80\% and 100\% of the transactions of \texttt{kosarak} and \texttt{T10I4D100K}, with the middle threshold of Table~\ref{tab:full} expressed as the same percentage of the prefix length (Figure~\ref{fig:scal}). The runtimes of the three programs grow almost linearly: from 20\% to 100\% of the data, the runtime of \AURA{} grows by a factor of \ScalRatiokosarak{} on \texttt{kosarak} and \ScalRatioTten{} on \texttt{T10I4D100K}, and the relative order of the three programs does not change. These two datasets are sparse, so the scalability study reflects the cost of building and intersecting TID-lists rather than the effect of the bounds.
 
 \begin{figure}[t]
 \centering
@@ -413,12 +534,19 @@ Dataset & $\alpha$ & Full & No tail cap & No class bound & No residual & No aren
 
 \subsection{Limitations}\label{sec:exp-limits}
 
-\pending{Limitations (pumsb, sparse data): to be written from the final results.}
+\begin{itemize}
+\item The bound helps only when the residual length of a branch is smaller than the lengths of the supporting transactions (Corollary~\ref{cor:scope}), which is the case on the dense datasets. On the sparse datasets, \AURA{} is not substantially faster than HEP. On the dense datasets, 13 of the 19 configurations completed by both \AURA{} and DFHOI have no HOI; the thresholds are those of the original studies, and the gains on configurations with HOIs rest on \texttt{mushroom} and \texttt{accidents}.
+\item The comparison uses our C implementations of HEP and DFHOI, not the authors' code. Their numbers of HOIs agree with the published ones, except for the value discussed in Section~\ref{sec:exp-correct}, but their runtimes depend on implementation choices, as the difference between DFHOI and \AURA{} on \texttt{retail} shows. The numbers of candidate intersections do not depend on the implementation or on the machine.
+\item We used five of the six datasets of Deng and two datasets of the DFHOI evaluation, the SPMF version of \texttt{mushroom}, and one machine. All runs used a single thread.
+\item The arena reduces allocation cost but not the asymptotic space of the search, and \AURA{} reports every HOI; on databases with very many HOIs, the size of the output dominates.
+\end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Conclusion}\label{sec:concl}
 
-\pending{Conclusion: to be written from the final results.}
+The transaction-length bound used by the existing exact miners of high-occupancy itemsets is weak on dense databases, where it is close to, or equal to, the support. We presented a length-capped residual bound that also uses the largest itemset that a branch of a depth-first search can still generate, proved that it is safe and never weaker than the transaction-length bound, and characterized exactly when it coincides with it: when the branch can still produce itemsets as long as the supporting transactions. Built on this bound, \AURA{} is an exact miner, and we showed that a natural shortcut in its residual length loses results. All programs agree with an exact oracle on \NumOracleCases{} randomized cases, including \NumOracleTies{} with exact ties, and with each other on every benchmark configuration. On the four dense datasets of the evaluations of HEP and DFHOI, \AURA{} performs at least \NodeReductionMinDense{}\% fewer candidate intersections than DFHOI. Where HOIs exist it is \MinSpeedupDenseNonEmpty{} to \MaxSpeedupDenseNonEmpty{} times faster, and it completes the smallest threshold on \texttt{accidents}, which DFHOI does not complete within 600~s and HEP cannot run within 20~GiB; where none exists, it establishes this in at most \AuraMaxTimeEmptyDense{}~s. On the sparse datasets, as the characterization predicts, the bound prunes little, and \AURA{} runs \SparseVsBestMin{} to \SparseVsBestMax{} times as fast as the faster of the two baselines.
+
+\AURA{} is therefore suited to dense data, and on sparse data its runtime stays close to that of the baselines. Two directions follow. First, the thresholds of the earlier studies leave \texttt{chess} and \texttt{pumsb} without HOIs; an evaluation at lower thresholds on these and further dense databases would measure the benefit of the bound where many HOIs exist. Second, sparse data call for a bound that does not rely on the size of the branch; a per-transaction residual bound, in the spirit of the remaining-utility bound of HUOPM \cite{gan2020huopm}, is a candidate, and Section~\ref{sec:related} shows that neither of the two bounds dominates the other, so their minimum can be used.
 
 \backmatter
 
@@ -432,7 +560,7 @@ Not applicable.
 \item \textbf{Competing interests:} The author declares no competing interests.
 \item \textbf{Ethics approval and consent to participate:} Not applicable.
 \item \textbf{Consent for publication:} Not applicable.
-\item \textbf{Data availability:} All datasets are publicly available from the FIMI repository \cite{fimi2004repository} and the SPMF library \cite{spmfdatasets}.
+\item \textbf{Data availability:} The benchmark datasets are publicly available from the SPMF library \cite{spmfdatasets,fournier2016spmf}; \texttt{retail}, \texttt{accidents}, \texttt{kosarak} and \texttt{T10I4D100K} are also distributed by the FIMI repository \cite{fimi2004repository}. The raw measurements (one file per experiment) are available from the corresponding author on request.
 \item \textbf{Materials availability:} Not applicable.
 \item \textbf{Code availability:} The source code of the three implementations and the scripts that reproduce every experiment are available from the corresponding author on reasonable request.
 \item \textbf{Author contribution:} Q.~Van conceived the method, proved the results, implemented the algorithms, performed the experiments and wrote the manuscript.
@@ -442,9 +570,9 @@ Not applicable.
 \section{Results for every configuration}\label{app:full}
 
 \begin{footnotesize}
-\setlength{\tabcolsep}{3pt}
+\setlength{\tabcolsep}{3pt}\setlength{\LTcapwidth}{\textwidth}\setlength{\LTleft}{0pt}\setlength{\LTright}{0pt plus 1fill}
 \begin{longtable}{@{}lrrrrrrrrrr@{}}
-\caption{Runtime (s; median of the repetitions; fastest in bold), candidate intersections and peak memory attributable to mining (MB) for every configuration. ML: memory limit exceeded; ML$^*$: not run because the same algorithm exceeded the memory limit at a larger threshold.}\label{tab:full}\\
+\caption{Runtime (s; median of the repetitions; fastest in bold), candidate intersections and peak memory attributable to mining (MB) for every configuration. ML: memory limit exceeded; TL: time limit exceeded; ML$^*$: not run because the same algorithm exceeded the memory limit at a larger threshold.}\label{tab:full}\\
 \toprule
  & & & \multicolumn{3}{c}{Runtime (s)} & \multicolumn{2}{c}{Intersections} & \multicolumn{3}{c}{Memory (MB)} \\
 \cmidrule{4-6}\cmidrule{7-8}\cmidrule{9-11}

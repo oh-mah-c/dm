@@ -44,6 +44,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "core/dm_exact_occ.h"
 
 typedef struct {
     int len;        /* full length of the original transaction */
@@ -269,6 +270,25 @@ static double simple_bound(const Unit *u, int nu, int csize) {
     return res;
 }
 
+static DmThreshold xit;   /* sum mode: xi as an exact fraction */
+
+/* Exact test k * sum_r w_r / len_r >= t over the rows (all rows if need_cap < 0,
+ * otherwise the rows whose capacity equals need_cap); approx is the double value. */
+static int rows_occ_ge(double approx, int k, const Row *rows, int nr, const Unit *u, int need_cap, DmThreshold t) {
+    int res;
+    if (dm_occ_decided(approx, t, &res)) return res;
+    uint32_t *len = malloc((nr > 0 ? nr : 1) * sizeof(uint32_t));
+    uint64_t *w = malloc((nr > 0 ? nr : 1) * sizeof(uint64_t));
+    size_t m = 0;
+    for (int r = 0; r < nr; r++) {
+        if (need_cap >= 0 && u[r].cap != need_cap) continue;
+        len[m] = (uint32_t)rows[r].len; w[m] = (uint64_t)rows[r].w; m++;
+    }
+    res = dm_occ_ge_exact((uint64_t)k, len, w, m, t);
+    free(len); free(w);
+    return res;
+}
+
 /* ── Search ────────────────────────────────────────────────────────────── */
 /* C: closed itemset (size csize); rows: cover of C projected on items not in C
  * that are frequent in the cover; core: last item added (prefix order).
@@ -289,8 +309,10 @@ static int mine(const int *C, int csize, Row *rows, int nr, int core) {
             occ[it] += rows[r].w;
         }
     }
-    int is_fho = csize > 0 && (cfg.sum_mode ? ge_tol((double)csize * rsum, cfg.xi)
-                                            : ge_tol((double)csize * rsum / s, cfg.beta));
+    /* occupancy test, exact: occ >= xi, or (two thresholds) csize * rsum >= beta * supp */
+    int is_fho = csize > 0 && (cfg.sum_mode ? rows_occ_ge((double)csize * rsum, csize, rows, nr, NULL, -1, xit)
+                                            : rows_occ_ge((double)csize * rsum, csize, rows, nr, NULL, -1,
+                                                          dm_threshold_make(cfg.beta, (size_t)s, 1)));
     if (is_fho) st.fho_nodes++;
 
     /* tail: frequent items after the core */
@@ -327,8 +349,9 @@ static int mine(const int *C, int csize, Row *rows, int nr, int core) {
         if (!ge_tol(b, target())) { st.pruned_tail++; done = 1; }
     }
     if (!done && cfg.use_hut && full_w >= cfg.sigma &&
-        (cfg.sum_mode ? ge_tol((double)(csize + ntail) * full_r, cfg.xi)
-                      : ge_tol((double)(csize + ntail) * full_r / full_w, cfg.beta))) {
+        (cfg.sum_mode ? rows_occ_ge((double)(csize + ntail) * full_r, csize + ntail, rows, nr, u, ntail, xit)
+                      : rows_occ_ge((double)(csize + ntail) * full_r, csize + ntail, rows, nr, u, ntail,
+                                    dm_threshold_make(cfg.beta, (size_t)full_w, 1)))) {
         /* closure of HUT = C + items present in every row that holds all tail items */
         int ncl = 0, nfull = 0;
         int *cl = malloc((csize + ntouch + 1) * sizeof(int));
@@ -576,10 +599,11 @@ int main(int argc, char **argv) {
         /* argv[2] is the occupancy threshold xi, absolute or (if < 1) a fraction of
          * the number of transactions as in Deng (2020). occ(X) <= supp(X), so every
          * high occupancy itemset has support >= ceil(xi). */
-        cfg.xi = minsup_arg < 1.0 ? minsup_arg * n : minsup_arg;
-        cfg.sigma = (int)ceil(cfg.xi - 1e-9 * (1.0 + cfg.xi));
+        xit = dm_threshold_make(minsup_arg, (size_t)n, minsup_arg < 1.0);
+        cfg.xi = xit.value;
+        cfg.sigma = (int)dm_threshold_ceil(xit);
     } else
-        cfg.sigma = minsup_arg < 1.0 ? (int)ceil(minsup_arg * n - 1e-9) : (int)minsup_arg;
+        cfg.sigma = (int)dm_threshold_ceil(dm_threshold_make(minsup_arg, (size_t)n, minsup_arg < 1.0));
     if (cfg.sigma < 1) cfg.sigma = 1;
 
     int *sup = calloc(maxid + 1, sizeof(int));

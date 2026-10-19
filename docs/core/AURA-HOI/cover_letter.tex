@@ -19,25 +19,26 @@ Email: \href{mailto:vanhaminhquan2406@gmail.com}{vanhaminhquan2406@gmail.com} \q
 \hrule
 \vspace{0.4em}
 
+\newcommand{\journal}{Journal of Intelligent Information Systems}
 To the Editors-in-Chief \\
-\textit{Journal of Intelligent Information Systems}
+\textit{\journal}
 
 Dear Editors,
 
-I submit the manuscript \textbf{``AURA-HOI: High-Occupancy Itemset Mining via Equivalence Classes and Residual Envelope Pruning''} for consideration as a research article in the \textit{Journal of Intelligent Information Systems}.
+I submit the manuscript \textbf{``AURA-HOI: Exact High-Occupancy Itemset Mining on Dense Databases with a Length-Capped Residual Bound''} for consideration as a research article in the \textit{\journal}.
 
-\textbf{Problem.} Occupancy measures how much of its supporting transactions an itemset covers. It is not anti-monotone, so exact miners of high-occupancy itemsets prune the search with upper bounds. The manuscript shows that the bound used by the existing exact miners depends only on transaction lengths and reduces to the support when all transactions have the same length, a common situation in categorical data; these miners then enumerate every frequent itemset.
+\textbf{Problem.} Occupancy measures how much of its supporting transactions an itemset covers. It is not anti-monotone, so exact miners of high-occupancy itemsets prune the search with an upper bound. The bound used by the existing exact miners, HEP and DFHOI, depends only on transaction lengths. On dense databases it is close to the support, and equal to it when all transactions have the same length; the search of these miners then approaches an enumeration of the frequent itemsets, even when few or no high-occupancy itemsets exist.
 
 \textbf{Contributions.}
 \begin{itemize}\setlength{\itemsep}{2pt}
-\item A length-capped residual bound that combines transaction lengths with the largest itemset that can still be generated in a branch, with proofs that it is safe and never weaker than the two bounds it combines.
-\item AURA-HOI, a depth-first miner over equivalence classes of transaction-ID lists, with a proof that it returns exactly the set of high-occupancy itemsets, and a minimal counterexample showing that a natural shortcut in the residual computation loses results.
-\item A reproducible evaluation: verification against an exact rational-arithmetic oracle, output parity with two exact baselines (HEP and DFHOI) on nine public benchmarks, repeated single-threaded runs without a time limit, memory measured as the increase attributable to mining, an ablation study, a scalability study and a signed-rank test. The results also report where the method does not help.
+\item A length-capped residual bound that combines transaction lengths with the largest itemset that a branch of the search can still generate, with proofs that it is safe and never weaker than the transaction-length bound, and an exact characterization of when the two coincide, which predicts on which databases the method helps.
+\item AURA-HOI, a depth-first miner over equivalence classes of transaction-ID lists, with a proof that it returns exactly the set of high-occupancy itemsets, and a counterexample showing that a natural shortcut in the residual length loses results.
+\item An evaluation on the seven datasets used by the studies that introduced HEP and DFHOI, with their thresholds. All programs return identical itemsets, agree with an exact rational-arithmetic oracle on 8,073 randomized cases (2,121 with an occupancy equal to the threshold), and reproduce the published counts, except one value that an independent brute-force check shows to be unattainable. On the dense datasets, AURA-HOI is 4.9 to 64 times faster than DFHOI where high-occupancy itemsets exist and completes settings that the baselines do not; on the sparse datasets its runtime stays within 9\% of the faster baseline, as the characterization predicts.
 \end{itemize}
 
-\textbf{Fit with the journal.} JIIS publishes work at the intersection of artificial intelligence and data management, including data mining and knowledge discovery. The manuscript contributes an exact, provably correct pattern-mining algorithm and a verification protocol for comparing exact miners.
+\textbf{Fit with the journal.} The journal publishes work at the intersection of artificial intelligence and data management, including data mining and knowledge discovery. The manuscript contributes an exact, provably correct pattern-mining algorithm, a characterization of its scope, and a verification protocol for exact miners.
 
-\textbf{Prior submission.} This manuscript is a revised version of a manuscript submitted to JIIS earlier this year (Manuscript ID 8f0df156-2539-436c-8fc5-f7878f5b3403), which I withdrew before peer review after finding errors in it. The method has since been corrected and proved, and all experiments have been repeated under the protocol described in the manuscript.
+\textbf{Prior submission.} This manuscript is a revised version of a manuscript submitted to the Journal of Intelligent Information Systems earlier this year (Manuscript ID 8f0df156-2539-436c-8fc5-f7878f5b3403), which I withdrew before peer review after finding errors in it. The method has since been corrected and proved, and all experiments have been repeated under the protocol described in the manuscript.
 
 \textbf{Declarations.} The manuscript is original, has not been published, and is not under consideration elsewhere. The research received no funding, and the author declares no competing interests.
 

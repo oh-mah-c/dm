@@ -2,7 +2,7 @@
 
 Run from the repository root (needs numpy, scipy, matplotlib):
   python3 docs/core/AURA-HOI/make_results.py
-Inputs : docs/core/AURA-HOI/results/{main,ablation,scalability,pumsb,oracle}.csv
+Inputs : docs/core/AURA-HOI/results/{main,ablation,scalability,oracle,parity}.csv
 Outputs: docs/core/AURA-HOI/results_macros.tex, docs/core/AURA-HOI/tables/*.tex,
          docs/core/AURA-HOI/figures/*.pdf
 """
@@ -26,13 +26,10 @@ DATA = Path("datasets/itemsets")
 TAB.mkdir(exist_ok=True)
 FIG.mkdir(exist_ok=True)
 
-ORDER = ["mushrooms", "chess", "connect", "accidents", "retail", "T10I4D100K", "T20I6D100K", "kosarak", "foodmart"]
-FILES = {"mushrooms": "mushrooms.txt", "chess": "chess.txt", "connect": "connect.txt", "accidents": "accidents.txt",
-         "retail": "retail.txt", "T10I4D100K": "T10I4D100K.txt", "T20I6D100K": "t20i6d100k.txt",
-         "kosarak": "kosarak.dat", "foodmart": "foodmartFIM.txt", "pumsb": "pumsb.txt"}
-KIND = {"mushrooms": "dense", "chess": "dense", "connect": "dense", "accidents": "dense", "pumsb": "dense",
-        "retail": "sparse", "T10I4D100K": "sparse", "T20I6D100K": "sparse", "kosarak": "sparse", "foodmart": "sparse"}
-SOURCE = {"foodmart": "SPMF", "pumsb": "FIMI"}
+ORDER = ["mushroom", "accidents", "chess", "pumsb", "retail", "kosarak", "T10I4D100K"]
+FILES = {"mushroom": "mushrooms.txt", "accidents": "accidents.txt", "retail": "retail.txt",
+         "kosarak": "kosarak.dat", "T10I4D100K": "T10I4D100K.txt", "chess": "chess.txt", "pumsb": "pumsb.txt"}
+KIND = {"mushroom": "dense", "accidents": "dense", "chess": "dense", "pumsb": "dense", "retail": "sparse", "kosarak": "sparse", "T10I4D100K": "sparse"}
 ALGOS = ["hep", "dfhoi", "aura_hoi"]
 LABEL = {"hep": "HEP", "dfhoi": "DFHOI", "aura_hoi": "AURA-HOI"}
 COLOR = {"hep": "#e05c5c", "dfhoi": "#5c8de0", "aura_hoi": "#3dba6b"}
@@ -94,7 +91,7 @@ for r in main:
 used = [d for d in ORDER if d in alphas_of]
 
 rows = []
-for d in used + ["pumsb"]:
+for d in used:
     s = dataset_stats(d)
     a = sorted(alphas_of.get(d, [0.05, 0.07, 0.09]))
     rng = f"{a[0]:g}--{a[-1]:g}" if len(a) > 1 else f"{a[0]:g}"
@@ -144,13 +141,59 @@ macro("HepFinished", str(sum(ok(c, "hep") for c in configs)))
 macro("AuraFailed", str(sum(not ok(c, "aura_hoi") for c in configs)))
 macro("NonEmptyConfigs", str(sum(ok(c, "aura_hoi") and int(R[(c[0], c[1], "aura_hoi")]["items"]) > 0 for c in configs)))
 
-dense_sp = [t(c, "dfhoi") / t(c, "aura_hoi") for c in both_df if KIND[c[0]] == "dense"]
-sparse_sp = [t(c, "dfhoi") / t(c, "aura_hoi") for c in both_df if KIND[c[0]] == "sparse"]
-macro("MaxSpeedupDense", fmt_x(max(dense_sp)) if dense_sp else "--")
-macro("GeoSpeedupDense", fmt_x(float(np.exp(np.mean(np.log(dense_sp))))) if dense_sp else "--")
-macro("GeoSpeedupSparse", fmt_x(float(np.exp(np.mean(np.log(sparse_sp))))) if sparse_sp else "--")
-macro("MinSpeedupSparse", fmt_x(min(sparse_sp)) if sparse_sp else "--")
-macro("MaxSpeedupSparse", fmt_x(max(sparse_sp)) if sparse_sp else "--")
+def hois(c):
+    return int(R[(c[0], c[1], "aura_hoi")]["items"])
+
+
+def geo(xs):
+    return fmt_x(float(np.exp(np.mean(np.log(xs))))) if xs else "--"
+
+
+def pct(xs):  # geometric-mean speedup expressed as a runtime reduction in percent
+    return f"{100 * (1 - float(np.exp(-np.mean(np.log(xs))))):.0f}" if xs else "--"
+
+
+for name, base, sel in (("", "dfhoi", both_df), ("HEP", "hep", both_hep)):
+    for kind in ("dense", "sparse"):
+        sp = [t(c, base) / t(c, "aura_hoi") for c in sel if KIND[c[0]] == kind]
+        spn = [t(c, base) / t(c, "aura_hoi") for c in sel if KIND[c[0]] == kind and hois(c) > 0]
+        K = kind.capitalize()
+        macro(f"GeoSpeedup{K}{name}", geo(sp))
+        macro(f"MaxSpeedup{K}{name}", fmt_x(max(sp)) if sp else "--")
+        macro(f"MinSpeedup{K}{name}", fmt_x(min(sp)) if sp else "--")
+        macro(f"NumSpeedup{K}{name}", str(len(sp)))
+        macro(f"GeoSpeedup{K}NonEmpty{name}", geo(spn))
+        macro(f"MinSpeedup{K}NonEmpty{name}", fmt_x(min(spn)) if spn else "--")
+        macro(f"MaxSpeedup{K}NonEmpty{name}", fmt_x(max(spn)) if spn else "--")
+        spz = [t(c, base) / t(c, "aura_hoi") for c in sel if KIND[c[0]] == kind and hois(c) == 0]
+        macro(f"MinSpeedup{K}Empty{name}", fmt_x(min(spz)) if spz else "--")
+        macro(f"NumSpeedup{K}Empty{name}", str(len(spz)))
+        macro(f"NumSpeedup{K}NonEmpty{name}", str(len(spn)))
+        macro(f"TimeReduction{K}{name}", pct(sp))
+best_sp = [min(t(c, "hep"), t(c, "dfhoi")) / t(c, "aura_hoi") for c in configs
+           if KIND[c[0]] == "sparse" and ok(c, "aura_hoi") and ok(c, "hep") and ok(c, "dfhoi")]
+macro("SparseVsBestMin", fmt_x(min(best_sp)))
+macro("SparseVsBestMax", fmt_x(max(best_sp)))
+macro("SparseSlowerThanBest", str(sum(x < 1 for x in best_sp)))
+macro("SparseVsBestN", str(len(best_sp)))
+macro("DfhoiTimeouts", str(sum(R[(c[0], c[1], "dfhoi")]["status"] == "timeout" for c in configs)))
+macro("AuraMaxTimeEmptyDense", f"{max(t(c, 'aura_hoi') for c in configs if KIND[c[0]] == 'dense' and ok(c, 'aura_hoi') and hois(c) == 0):.2f}")
+macro("ZeroHoiConfigs", str(sum(ok(c, "aura_hoi") and hois(c) == 0 for c in configs)))
+
+# spread of the repetitions: (max - min) / median over every repeated run
+spread = [(float(r["time_max"]) - float(r["time_min"])) / float(r["time"])
+          for r in main if r["status"] == "ok" and int(r["reps"]) > 1]
+macro("RepSpreadMedian", f"{100 * np.median(spread):.1f}")
+macro("RepSpreadMax", f"{100 * max(spread):.0f}")
+macro("NumRepeatedRuns", str(len(spread)))
+macro("NumSingleRuns", str(sum(r["status"] == "ok" and int(r["reps"]) == 1 for r in main)))
+
+# reduction of candidate intersections relative to DFHOI, per dataset kind
+for kind in ("dense", "sparse"):
+    red = [100 * (1 - int(R[(c[0], c[1], "aura_hoi")]["nodes"]) / int(R[(c[0], c[1], "dfhoi")]["nodes"]))
+           for c in both_df if KIND[c[0]] == kind]
+    macro(f"NodeReductionMin{kind.capitalize()}", f"{min(red):.1f}")
+    macro(f"NodeReductionMax{kind.capitalize()}", f"{max(red):.1f}")
 
 
 def wilcoxon(pairs):
@@ -175,7 +218,10 @@ def cell(c, a):
         return "--"
     if r["status"] == "ok":
         return fmt_time(float(r["time"]))
-    return {"timeout": "TL", "skipped": "ML$^*$", "memory": "ML", "failed": "F"}.get(r["status"], "F")
+    if r["status"] == "skipped":  # marked after the failure of the same algorithm at a larger threshold
+        prev = [R[(c[0], cc[1], a)]["status"] for cc in configs if cc[0] == c[0] and cc[1] > c[1]]
+        return "TL$^*$" if "timeout" in prev else "ML$^*$"
+    return {"timeout": "TL", "memory": "ML", "failed": "F"}.get(r["status"], "F")
 
 
 # per-dataset summary
@@ -232,6 +278,10 @@ hep_mem = [float(R[(c[0], c[1], "hep")]["mem"]) for c in configs if ok(c, "hep")
 macro("AuraMemMax", f"{max(aura_mem):.1f}")
 macro("AuraMemMedian", f"{np.median(aura_mem):.1f}")
 macro("HepMemMax", f"{max(hep_mem):,.0f}")
+mem_ratio = [float(R[(c[0], c[1], "aura_hoi")]["mem"]) / float(R[(c[0], c[1], "dfhoi")]["mem"]) for c in both_df]
+macro("MemRatioMin", f"{min(mem_ratio):.2f}")
+macro("MemRatioMax", f"{max(mem_ratio):.2f}")
+macro("MemLowerThanDfhoi", str(sum(x < 1 for x in mem_ratio)))
 macro("HepMemoryFailures", str(sum(R[(c[0], c[1], "hep")]["status"] == "memory" for c in configs)))
 
 # ── Figures: runtime, visited nodes and memory per dataset ─────────────────
@@ -307,19 +357,42 @@ if sc:
     fig.savefig(FIG / "scalability.pdf", bbox_inches="tight")
     plt.close(fig)
 
-# ── pumsb ──────────────────────────────────────────────────────────────────
-pu = read("pumsb")
-if pu:
-    finished = sum(r["status"] == "ok" for r in pu)
-    macro("PumsbRuns", str(len(pu)))
-    macro("PumsbFinished", str(finished))
+    for d in dsets:
+        a = S[(d, 1.0, "aura_hoi")]
+        b = S[(d, 0.2, "aura_hoi")]
+        macro(f"ScalRatio{d.replace('T10I4D100K', 'Tten')}", f"{float(a['time']) / float(b['time']):.1f}")
 
 # ── Oracle tests ───────────────────────────────────────────────────────────
 orc = read("oracle")
 if orc:
     macro("NumOracleCases", num(sum(int(r["cases"]) for r in orc)))
+    macro("NumOracleTies", num(sum(int(r["cases_with_exact_tie"]) for r in orc)))
     macro("NumOracleDatabases", num(sum(int(r["databases"]) for r in orc)))
+    macro("NumOraclePrograms", orc[0]["programs"])
     macro("OracleMismatches", str(sum(int(r["mismatches"]) for r in orc)))
+
+# ── Independent brute-force check of accidents (brute_check.py) ────────────
+bp = RES / "brute_accidents.txt"
+if bp.exists():
+    runs = {}
+    for line in open(bp):
+        if line.startswith("n="):
+            cur = line.split()[1].split("=")[1]
+        elif line.startswith("frequent itemsets="):
+            runs[cur] = dict(kv.split("=") for kv in line.replace("frequent ", "").replace("max occ/n", "maxocc").split())
+    if "0.2" in runs:
+        macro("AccidentsMaxOcc", f"{float(runs['0.2']['maxocc']):.4f}")
+        macro("AccidentsBruteFrequent", num(int(runs["0.2"]["itemsets"])))
+        macro("AccidentsBruteHois", runs["0.2"]["HOIs"])
+
+# ── Set-level agreement on the benchmarks ──────────────────────────────────
+par = read("parity")
+if par:
+    pm = [r for r in par if r["experiment"] == "main"]
+    macro("SetParityMain", str(len(pm)))
+    macro("SetParityAblation", str(len(par) - len(pm)))
+    macro("SetParityDisagree", str(sum(1 - int(r["agree"]) for r in par)))
+    assert all(int(r["agree"]) for r in par), "set-level disagreement"
 
 with open(ROOT / "results_macros.tex", "w") as f:
     f.write("% Generated by make_results.py from results/*.csv -- do not edit by hand.\n")

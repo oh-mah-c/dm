@@ -4,16 +4,21 @@ Experiments (run from the repository root):
   python3 docs/core/AURA-HOI/run_benchmarks.py main         -> results/main.csv
   python3 docs/core/AURA-HOI/run_benchmarks.py ablation     -> results/ablation.csv
   python3 docs/core/AURA-HOI/run_benchmarks.py scalability  -> results/scalability.csv
-  python3 docs/core/AURA-HOI/run_benchmarks.py pumsb        -> results/pumsb.csv
 
-Protocol
-  * every run uses one thread (-t 1);
+Datasets and thresholds: those of Deng (2020), Table 3, the same as in the MFHOI
+experiments: mushroom 12-4%, retail 0.05-0.01%, accidents 30-10%, kosarak 1-0.2%,
+T10I4D100K 0.1-0.02% of the number of transactions (five values each), and the
+additional dense datasets of the DFHOI evaluation (Nguyen et al. 2023, Table 8):
+chess 48-40% and pumsb 86-78%.
+
+Protocol (identical to docs/core/MFHOI/run_benchmarks.py)
+  * every run uses one thread (-t 1) and is pinned with taskset to core PIN_CORE;
   * sigma = ceil(alpha * n) is computed exactly with rational arithmetic;
   * runtime is the mining phase reported by the binary (data loading excluded);
   * memory is the peak RSS increase during the mining phase ("Algo Peak Extra");
-  * no time limit by default (set AURA_TIMEOUT_S=<seconds> to impose one);
+  * wall-clock limit of 600 s per run (AURA_TIMEOUT_S);
   * an address-space limit protects the machine (AURA_MEM_LIMIT_GB, default 20; 0 disables it);
-  * repetitions: 5 if the first run takes < 10 s, 3 if < 120 s, otherwise 1; the median is reported;
+  * repetitions: 5 if the first run takes < 1 s, 3 if < 60 s, otherwise 1; the median is reported;
   * thresholds are processed from the largest to the smallest; once an algorithm fails on a
     dataset, smaller thresholds are recorded as "skipped": every pruning rule of the three
     algorithms compares a bound with xi, so lowering alpha can only enlarge the search;
@@ -33,22 +38,22 @@ from pathlib import Path
 
 BIN = "./build/bin/dm.exe"
 OUT = Path("docs/core/AURA-HOI/results")
-TIMEOUT_S = float(os.environ["AURA_TIMEOUT_S"]) if os.environ.get("AURA_TIMEOUT_S") else None
+TIMEOUT_S = float(os.environ.get("AURA_TIMEOUT_S", "600"))
+PIN_CORE = os.environ.get("AURA_PIN_CORE", "3")
 MEM_LIMIT_GB = float(os.environ.get("AURA_MEM_LIMIT_GB", "20"))
 ALGOS = ("hep", "dfhoi", "aura_hoi")
 
 DATA = Path("datasets/itemsets")
 DATASETS = {
-    # name: (file, alphas)
-    "mushrooms":  ("mushrooms.txt",   [0.02, 0.03, 0.04, 0.05, 0.075, 0.1, 0.125, 0.15]),
-    "chess":      ("chess.txt",       [0.15, 0.17, 0.19, 0.2, 0.21, 0.22, 0.23, 0.24, 0.3, 0.35, 0.4, 0.45, 0.5]),
-    "connect":    ("connect.txt",     [0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8]),
-    "accidents":  ("accidents.txt",   [0.15, 0.2, 0.25, 0.3, 0.35, 0.4]),
-    "retail":     ("retail.txt",      [0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01]),
-    "T10I4D100K": ("T10I4D100K.txt",  [0.0002, 0.0005, 0.001, 0.002, 0.003, 0.005]),
-    "T20I6D100K": ("t20i6d100k.txt",  [0.0005, 0.001, 0.002, 0.003, 0.005, 0.01]),
-    "kosarak":    ("kosarak.dat",     [0.0005, 0.001, 0.002, 0.005, 0.01]),
-    "foodmart":   ("foodmartFIM.txt", [0.0005, 0.001, 0.002, 0.003]),
+    # name: (file, alphas); the thresholds of Deng (2020), Table 3
+    "mushroom":   ("mushrooms.txt",  [0.12, 0.10, 0.08, 0.06, 0.04]),
+    "retail":     ("retail.txt",     [0.0005, 0.0004, 0.0003, 0.0002, 0.0001]),
+    "accidents":  ("accidents.txt",  [0.30, 0.25, 0.20, 0.15, 0.10]),
+    "kosarak":    ("kosarak.dat",    [0.01, 0.008, 0.006, 0.004, 0.002]),
+    "T10I4D100K": ("T10I4D100K.txt", [0.001, 0.0008, 0.0006, 0.0004, 0.0002]),
+    # additional dense datasets; the thresholds of Nguyen et al. (2023), Table 8
+    "chess":      ("chess.txt",      [0.48, 0.46, 0.44, 0.42, 0.40]),
+    "pumsb":      ("pumsb.txt",      [0.86, 0.84, 0.82, 0.80, 0.78]),
 }
 
 RE = {
@@ -72,9 +77,9 @@ def limit_memory():
 
 
 def run_once(algo, path, alpha, sigma, env_extra=None):
-    cmd = [BIN, algo, str(path), "0", str(alpha), str(sigma)]
+    cmd = ["taskset", "-c", PIN_CORE, BIN, algo, str(path), "0", str(alpha)]
     if algo == "aura_hoi":
-        cmd += ["0", "sum", "raw"]
+        cmd += [str(sigma), "0", "sum", "raw"]
     cmd += ["-t", "1"]
     env = dict(os.environ)
     env.pop("AURA_ABLATION", None)
@@ -100,7 +105,7 @@ def measure(algo, path, alpha, sigma, env_extra=None):
     first = run_once(algo, path, alpha, sigma, env_extra)
     if first["status"] != "ok":
         return dict(first, reps=1)
-    reps = 5 if first["time"] < 10 else (3 if first["time"] < 120 else 1)
+    reps = 5 if first["time"] < 1 else (3 if first["time"] < 60 else 1)
     runs = [first] + [run_once(algo, path, alpha, sigma, env_extra) for _ in range(reps - 1)]
     if any(r["status"] != "ok" for r in runs):
         return {"status": "unstable", "reps": reps}
@@ -181,8 +186,8 @@ ABLATION = {
     "no_residual": "no_tail_cap,no_class_bound",
     "no_arena": "no_arena",
 }
-ABLATION_CONFIGS = [("mushrooms", 0.05), ("chess", 0.2), ("connect", 0.35), ("accidents", 0.3),
-                    ("retail", 0.001), ("T20I6D100K", 0.002), ("kosarak", 0.001)]
+# middle threshold of each dataset
+ABLATION_CONFIGS = [(ds, alphas[2]) for ds, (fn, alphas) in DATASETS.items()]
 
 
 def ablation_experiment():
@@ -194,7 +199,7 @@ def ablation_experiment():
                   env_for=lambda a, fl=flags: {"AURA_ABLATION": fl} if fl else None)
 
 
-SCALABILITY = {"accidents": 0.3, "kosarak": 0.001}
+SCALABILITY = {"kosarak": DATASETS["kosarak"][1][2], "T10I4D100K": DATASETS["T10I4D100K"][1][2]}
 FRACTIONS = [0.2, 0.4, 0.6, 0.8, 1.0]
 
 
@@ -212,11 +217,6 @@ def scalability_experiment():
             sweep(f, w, "scalability", ds, path, [alpha], ALGOS, fraction=frac)
 
 
-def pumsb_experiment():
-    f, w = writer("pumsb")
-    sweep(f, w, "pumsb", "pumsb", DATA / "pumsb.txt", [0.09, 0.07, 0.05], ALGOS)
-
-
 if __name__ == "__main__":
     {"main": main_experiment, "ablation": ablation_experiment,
-     "scalability": scalability_experiment, "pumsb": pumsb_experiment}[sys.argv[1]]()
+     "scalability": scalability_experiment}[sys.argv[1]]()

@@ -42,6 +42,10 @@ for a in sys.argv:
 XIS = ("0.05", "0.1", "0.15", "0.2", "0.3", "0.5", "0.7", "0.9", "1.5")   # fractions of n (>= 1: absolute)
 SUPPORTS = ("0.1", "0.2", "0.3")
 BETAS = ("0.3", "0.5", "0.7")
+# --sum: each database also gets three near-tie thresholds (alpha = occ(X)/n of a
+# random itemset X rounded to 12 significant digits), and the suite "ties" uses
+# lengths in {1, 2, 4, 5, 8, 10} and n in {4, 5, 8, 10, 16, 20, 25}, so that
+# occ(X)/n is a terminating decimal and alpha = occ(X)/n gives occ(X) = xi exactly.
 SUITES = [  # (name, seed, databases, uniform lengths, items in [lo, hi], noise items)
     ("mixed", 11, 300, False, (4, 10), 0),
     ("uniform", 22, 300, True, (4, 10), 0),
@@ -92,24 +96,42 @@ def main():
     OUT.parent.mkdir(parents=True, exist_ok=True)
     rows = []
     with tempfile.TemporaryDirectory() as tmp:
-        for name, seed, databases, uniform, (lo, hi), noise in SUITES:
+        suites = list(SUITES) + ([("ties", 44, 300, None, (4, 10), 0)] if SUM else [])
+        for name, seed, databases, uniform, (lo, hi), noise in suites:
             rng = random.Random(seed)
             cases = mismatches = 0
             for d in range(databases):
                 m = rng.randint(lo, hi)
-                n = rng.randint(4, 24)
-                L = rng.randint(2, m)
-                trans = []
-                for _ in range(n):
-                    k = L if uniform else rng.randint(1, m)
-                    t = set(rng.sample(range(1, m + 1), k))
-                    # items that occur once: they lengthen transactions without being frequent
-                    t |= {100 + rng.randint(0, 1000) for _ in range(rng.randint(0, noise))}
-                    trans.append(frozenset(t))
+                if name == "ties":
+                    n = rng.choice([4, 5, 8, 10, 16, 20, 25])
+                    trans = [frozenset(rng.sample(range(1, m + 1), rng.choice([L for L in (1, 2, 4, 5, 8, 10) if L <= m])))
+                             for _ in range(n)]
+                else:
+                    n = rng.randint(4, 24)
+                    L = rng.randint(2, m)
+                    trans = []
+                    for _ in range(n):
+                        k = L if uniform else rng.randint(1, m)
+                        t = set(rng.sample(range(1, m + 1), k))
+                        # items that occur once: they lengthen transactions without being frequent
+                        t |= {100 + rng.randint(0, 1000) for _ in range(rng.randint(0, noise))}
+                        trans.append(frozenset(t))
                 path = os.path.join(tmp, "db.txt")
                 with open(path, "w") as f:
                     f.writelines(" ".join(map(str, sorted(t))) + "\n" for t in trans)
                 grid = [(x, "0") for x in XIS] if SUM else [(a, b) for a in SUPPORTS for b in BETAS]
+                if SUM:   # near-tie / exact-tie thresholds
+                    for _ in range(3):
+                        t = rng.choice(trans)
+                        X = frozenset(rng.sample(sorted(t), rng.randint(1, len(t))))
+                        a = len(X) * sum(Fraction(1, len(u)) for u in trans if X <= u) / n
+                        if name == "ties":
+                            from decimal import Decimal
+                            alpha = format((Decimal(a.numerator) / Decimal(a.denominator)).normalize(), "f")
+                        else:
+                            alpha = f"{float(a):.12g}"
+                        if 0 < Fraction(alpha) < 1:
+                            grid.append((alpha, "0"))
                 for alpha, beta in grid:
                     if True:
                         exp = oracle_sum(trans, alpha) if SUM else oracle(trans, alpha, beta)

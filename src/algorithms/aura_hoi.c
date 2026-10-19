@@ -2,6 +2,7 @@
 #include "core/dm_benchmark.h"
 #include "core/dm_dataset_types.h"
 #include "core/dm_threadpool.h"
+#include "core/dm_exact_occ.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -33,42 +34,72 @@ typedef struct {
     double recip_sum;       /* pre-calculated \sum_{q \in T(X)} 1 / |t_q| */
 } AURATidNode;
 
-/* ── Memory Pool for TID arrays (Avoid per-node malloc/free in DFS) ──────── */
+/* ── Arena for TID arrays ──────────────────────────────────────────────────
+ * A stack of chunks. Allocation takes space at the top; a mark records the
+ * top, and rewinding to a mark releases everything allocated after it. When
+ * the current chunk is full, the next chunk is used (allocated on first use,
+ * at least twice as large as the previous one), so earlier pointers stay valid
+ * and no request falls back to malloc. Chunks are kept for reuse. */
 typedef struct {
-    uint32_t *pool;
-    size_t capacity;
-    size_t used;
-    size_t high_water;
+    uint32_t **chunk;
+    size_t *chunk_cap;
+    size_t nchunks, maxchunks;
+    size_t cur, used;          /* current chunk and offset in it */
+    size_t total_cap;          /* elements in all chunks */
 } AURAMemPool;
 
+typedef struct { size_t cur, used; } AURAMark;
+
 static int mempool_init(AURAMemPool *p, size_t cap_elements) {
-    p->pool = (uint32_t *)malloc(cap_elements * sizeof(uint32_t));
-    if (!p->pool) return -1;
-    p->capacity = cap_elements;
-    p->used = 0;
-    p->high_water = 0;
+    memset(p, 0, sizeof(*p));
+    p->maxchunks = 64;
+    p->chunk = (uint32_t **)calloc(p->maxchunks, sizeof(uint32_t *));
+    p->chunk_cap = (size_t *)calloc(p->maxchunks, sizeof(size_t));
+    if (!p->chunk || !p->chunk_cap) return -1;
+    p->chunk[0] = (uint32_t *)malloc(cap_elements * sizeof(uint32_t));
+    if (!p->chunk[0]) return -1;
+    p->chunk_cap[0] = cap_elements;
+    p->nchunks = 1;
+    p->total_cap = cap_elements;
     return 0;
 }
 
 static void mempool_free(AURAMemPool *p) {
-    if (p->pool) free(p->pool);
+    for (size_t c = 0; c < p->nchunks; c++) free(p->chunk[c]);
+    free(p->chunk);
+    free(p->chunk_cap);
     memset(p, 0, sizeof(*p));
 }
 
-static inline size_t mempool_mark(AURAMemPool *p) {
-    return p->used;
+static inline AURAMark mempool_mark(AURAMemPool *p) {
+    AURAMark m = { p->cur, p->used };
+    return m;
 }
 
-static inline uint32_t *mempool_alloc(AURAMemPool *p, size_t count) {
-    if (p->used + count > p->capacity) return NULL;
-    uint32_t *ptr = p->pool + p->used;
+static uint32_t *mempool_alloc(AURAMemPool *p, size_t count) {
+    if (count == 0) count = 1;
+    while (p->used + count > p->chunk_cap[p->cur]) {
+        if (p->cur + 1 == p->nchunks) {
+            if (p->nchunks == p->maxchunks) return NULL;
+            size_t cap = 2 * p->chunk_cap[p->cur];
+            if (cap < count) cap = count;
+            p->chunk[p->nchunks] = (uint32_t *)malloc(cap * sizeof(uint32_t));
+            if (!p->chunk[p->nchunks]) return NULL;
+            p->chunk_cap[p->nchunks] = cap;
+            p->total_cap += cap;
+            p->nchunks++;
+        }
+        p->cur++;
+        p->used = 0;
+    }
+    uint32_t *ptr = p->chunk[p->cur] + p->used;
     p->used += count;
-    if (p->used > p->high_water) p->high_water = p->used;
     return ptr;
 }
 
-static inline void mempool_rewind(AURAMemPool *p, size_t mark) {
-    if (mark <= p->used) p->used = mark;
+static inline void mempool_rewind(AURAMemPool *p, AURAMark m) {
+    p->cur = m.cur;
+    p->used = m.used;
 }
 
 /* ── Auditable Closed Ledger with 64-bit Hash Fingerprint & TID-List Verification */
@@ -240,6 +271,10 @@ typedef struct {
     /* Thresholds */
     double min_occupancy;
     double threshold_value;   /* xi threshold */
+    DmThreshold xi;           /* xi as an exact fraction */
+    FILE *out;                /* DM_HOI_OUT: reported itemsets (raw view, one thread) */
+    uint32_t *out_scratch;
+    uint32_t *len_scratch;
     size_t min_support;
     int summed_occupancy_mode;
     int emit_raw_view;
@@ -296,7 +331,34 @@ static inline int should_stop(AURACtx *ctx) {
  * occupancy equals the threshold exactly are not lost to floating-point
  * rounding (e.g. 0.1 * 19 evaluates to 1.9000000000000001). */
 static inline int hoi_ge(double x, double threshold) {
-    return x >= threshold - 1e-9 * (1.0 + fabs(threshold));
+    return x >= threshold - DM_OCC_TOL(threshold);
+}
+
+/* exact test occ(X) >= xi for |X| = k with supporting transactions tids */
+static int aura_is_ho(const AURACtx *ctx, const uint32_t *tids, size_t count, size_t k, double recip_sum) {
+    int res;
+    if (ctx->uniform_length) {
+        double o_val = ((double)k * (double)count) / (double)ctx->first_len;
+        if (dm_occ_decided(o_val, ctx->xi, &res)) return res;
+        return dm_occ_ge_uniform(k, count, ctx->first_len, ctx->xi);
+    }
+    if (dm_occ_decided((double)k * recip_sum, ctx->xi, &res)) return res;
+    for (size_t i = 0; i < count; i++) ctx->len_scratch[i] = ctx->g_tsize[tids[i]];
+    return dm_occ_ge_exact(k, ctx->len_scratch, NULL, count, ctx->xi);
+}
+
+static int cmp_u32_out(const void *a, const void *b) {
+    uint32_t x = *(const uint32_t *)a, y = *(const uint32_t *)b;
+    return (x > y) - (x < y);
+}
+
+/* writes the itemset prefix_items[0..k-1] (active indices) as original ids */
+static void aura_emit(AURACtx *ctx, size_t k) {
+    if (!ctx->out) return;
+    for (size_t i = 0; i < k; i++) ctx->out_scratch[i] = ctx->active_items[ctx->prefix_items[i]];
+    qsort(ctx->out_scratch, k, sizeof(uint32_t), cmp_u32_out);
+    for (size_t i = 0; i < k; i++) fprintf(ctx->out, i ? " %u" : "%u", ctx->out_scratch[i]);
+    fputc('\n', ctx->out);
 }
 
 /* ── Simultaneous TID Intersection with Cumulative UBO & Score ───────────── */
@@ -338,8 +400,7 @@ static inline int intersect_tids_and_check(const AURACtx *ctx,
         if (cap > L) cap = L;
         *out_size = count;
         if (!hoi_ge(cap * (double)count / L, ctx->threshold_value)) return 0;
-        double o_val = ((double)new_k * (double)count) / L;
-        *is_ho = hoi_ge(o_val, ctx->threshold_value);
+        *is_ho = aura_is_ho(ctx, out_tids, count, new_k, 0.0);
         *out_recip_sum = (double)count / L;
         return 1;
     }
@@ -366,7 +427,7 @@ static inline int intersect_tids_and_check(const AURACtx *ctx,
     }
     
     if (hoi_ge(max_ubo, ctx->threshold_value)) {
-        *is_ho = hoi_ge((double)new_k * current_sum, ctx->threshold_value);
+        *is_ho = aura_is_ho(ctx, out_tids, count, new_k, current_sum);
         *out_recip_sum = current_sum;
         return 1;
     }
@@ -381,6 +442,7 @@ static void aura_dfs_tid_closed_engine(AURACtx *ctx, size_t depth, AURATidNode *
 static void aura_process_root_item_raw(AURACtx *ctx, AURATidNode *classes, size_t class_size, size_t i) {
     if (should_stop(ctx)) return;
     AURATidNode *P1 = &classes[i];
+    ctx->prefix_items[P1->length - 1] = P1->item;
     size_t remaining = class_size - i - 1;
     if (remaining == 0) return;
     
@@ -404,13 +466,13 @@ static void aura_process_root_item_raw(AURACtx *ctx, AURATidNode *classes, size_
         }
     } else {
         double max_desc_score = max_possible_k * P1->recip_sum;
-        if (!hoi_ge(max_desc_score, ctx->threshold_value) || !hoi_ge((double)P1->num_tids, ctx->threshold_value)) {
+        if (!hoi_ge(max_desc_score, ctx->threshold_value)) {
             ctx->pruned_envelope += remaining;
             return;
         }
     }
     
-    size_t mem_mark = mempool_mark(&ctx->pool);
+    AURAMark mem_mark = mempool_mark(&ctx->pool);
     
     /* Allocate child headers on stack / pool */
     AURATidNode *children = (AURATidNode *)malloc(remaining * sizeof(AURATidNode));
@@ -435,11 +497,9 @@ static void aura_process_root_item_raw(AURACtx *ctx, AURATidNode *classes, size_
         if (intersect_tids_and_check(ctx, P1, P2, ctx->tid_scratch, &new_size,
                                      new_k, R_count, &is_ho, &recip_sum)) {
             /* Allocate TID array from pool */
-            uint32_t *tids_copy = ctx->abl_no_arena ? NULL : mempool_alloc(&ctx->pool, new_size);
-            int pool_alloc_ok = (tids_copy != NULL);
-            if (!pool_alloc_ok) {
-                tids_copy = (uint32_t *)malloc(new_size * sizeof(uint32_t));
-            }
+            uint32_t *tids_copy = ctx->abl_no_arena ? (uint32_t *)malloc((new_size ? new_size : 1) * sizeof(uint32_t))
+                                                    : mempool_alloc(&ctx->pool, new_size);
+            if (!tids_copy) { fprintf(stderr, "[AURA-HOI] out of memory\n"); abort(); }
             memcpy(tids_copy, ctx->tid_scratch, new_size * sizeof(uint32_t));
             
             AURATidNode *ch = &children[child_count++];
@@ -452,6 +512,8 @@ static void aura_process_root_item_raw(AURACtx *ctx, AURATidNode *classes, size_
             if (is_ho) {
                 ctx->raw_hoi_count++;
                 ctx->raw_total_output_items += new_k;
+                ctx->prefix_items[new_k - 1] = P2->item;
+                aura_emit(ctx, new_k);
             }
         } else {
             if (new_size < ctx->min_support) ctx->pruned_support++;
@@ -484,14 +546,9 @@ static void aura_process_root_item_raw(AURACtx *ctx, AURATidNode *classes, size_
         ctx->pruned_envelope += 1;
     }
     
-    /* If any child had to use standard malloc, free it */
-    if (ctx->abl_no_arena || ctx->pool.used + ctx->ntrans > ctx->pool.capacity) {
-        for (size_t c = 0; c < child_count; c++) {
-            if (children[c].tids < ctx->pool.pool ||
-                children[c].tids >= ctx->pool.pool + ctx->pool.capacity) {
-                free(children[c].tids);
-            }
-        }
+    /* children allocated on the heap (ablation "no arena") */
+    if (ctx->abl_no_arena) {
+        for (size_t c = 0; c < child_count; c++) free(children[c].tids);
     }
     
     free(children);
@@ -550,7 +607,7 @@ static void aura_process_root_item_closed(AURACtx *ctx, size_t depth,
     size_t current_len = depth + 1;
     
     /* Identify absorbed items (Closure Jump): items that appear in 100% of P1's transactions */
-    size_t mem_mark = mempool_mark(&ctx->pool);
+    AURAMark mem_mark = mempool_mark(&ctx->pool);
     size_t remaining = class_size - i - 1;
     AURATidNode *children = NULL;
     if (remaining > 0) {
@@ -589,7 +646,7 @@ static void aura_process_root_item_closed(AURACtx *ctx, size_t depth,
             } else {
                 /* Genuine branching child */
                 uint32_t *tids_copy = mempool_alloc(&ctx->pool, new_size);
-                if (!tids_copy) tids_copy = (uint32_t *)malloc(new_size * sizeof(uint32_t));
+                if (!tids_copy) { fprintf(stderr, "[AURA-HOI] out of memory\n"); abort(); }
                 memcpy(tids_copy, ctx->tid_scratch, new_size * sizeof(uint32_t));
                 
                 AURATidNode *ch = &children[child_count++];
@@ -639,15 +696,7 @@ static void aura_process_root_item_closed(AURACtx *ctx, size_t depth,
         }
     }
     
-    /* Cleanup */
-    if (ctx->pool.used + ctx->ntrans > ctx->pool.capacity) {
-        for (size_t c = 0; c < child_count; c++) {
-            if (children[c].tids < ctx->pool.pool ||
-                children[c].tids >= ctx->pool.pool + ctx->pool.capacity) {
-                free(children[c].tids);
-            }
-        }
-    }
+    /* Cleanup (child TID lists live in the arena) */
     if (children) free(children);
     mempool_rewind(&ctx->pool, mem_mark);
 }
@@ -783,7 +832,16 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     ctx.threshold_value = ctx.summed_occupancy_mode
         ? ((ctx.min_occupancy < 1.0) ? ctx.min_occupancy * (double)ctx.ntrans : ctx.min_occupancy)
         : ctx.min_occupancy;
-    ctx.min_support = (p && p->min_support) ? p->min_support : (size_t)ceil(ctx.min_occupancy * (double)ctx.ntrans);
+    if (ctx.summed_occupancy_mode) {
+        /* xi as an exact fraction; sigma = ceil(xi) (an HOI has support >= xi) */
+        ctx.xi = dm_threshold_make(ctx.min_occupancy, ctx.ntrans, ctx.min_occupancy < 1.0);
+        ctx.min_support = dm_threshold_ceil(ctx.xi);
+        if (p && p->min_support && p->min_support != ctx.min_support)
+            fprintf(stderr, "[AURA-HOI] warning: given min_support %zu replaced by ceil(xi) = %zu\n",
+                    p->min_support, ctx.min_support);
+    } else {
+        ctx.min_support = (p && p->min_support) ? p->min_support : (size_t)ceil(ctx.min_occupancy * (double)ctx.ntrans);
+    }
     if (ctx.min_support < 1) ctx.min_support = 1;
     ctx.max_patterns = p ? p->max_patterns : 0;
     ctx.max_seconds = p ? p->max_seconds : 0.0;
@@ -869,14 +927,24 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     uint32_t *id_to_active = (uint32_t *)malloc(((size_t)ctx.max_id + 1) * sizeof(uint32_t));
     for (uint32_t i = 0; i <= ctx.max_id; i++) id_to_active[i] = UINT32_MAX;
 
+    /* active items in increasing order of support (ties: item identifier) */
     size_t idx = 0;
     for (uint32_t i = 0; i <= ctx.max_id; i++) {
-        if (counts[i] >= ctx.min_support) {
-            id_to_active[i] = (uint32_t)idx;
-            ctx.active_items[idx] = i;
-            ctx.item_counts[idx] = counts[i];
-            idx++;
+        if (counts[i] >= ctx.min_support) ctx.active_items[idx++] = i;
+    }
+    for (size_t a = 1; a < ctx.active_count; a++) {          /* insertion sort by (count, id) */
+        uint32_t v = ctx.active_items[a];
+        size_t b = a;
+        while (b > 0 && (counts[ctx.active_items[b - 1]] > counts[v] ||
+                         (counts[ctx.active_items[b - 1]] == counts[v] && ctx.active_items[b - 1] > v))) {
+            ctx.active_items[b] = ctx.active_items[b - 1];
+            b--;
         }
+        ctx.active_items[b] = v;
+    }
+    for (size_t a = 0; a < ctx.active_count; a++) {
+        id_to_active[ctx.active_items[a]] = (uint32_t)a;
+        ctx.item_counts[a] = counts[ctx.active_items[a]];
     }
 
     /* ── Step 3: Populate 1-Item TID Lists ───────────────────────────────── */
@@ -923,6 +991,12 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     }
     ctx.tid_scratch = (uint32_t *)malloc((max_item_supp + 1) * sizeof(uint32_t));
     ctx.prefix_items = (uint32_t *)malloc((ctx.active_count + 1) * sizeof(uint32_t));
+    ctx.out_scratch = (uint32_t *)malloc((ctx.active_count + 1) * sizeof(uint32_t));
+    ctx.len_scratch = (uint32_t *)malloc((ctx.ntrans + 1) * sizeof(uint32_t));
+    {
+        const char *outp = getenv("DM_HOI_OUT");
+        if (outp && ctx.emit_raw_view) ctx.out = fopen(outp, "w");
+    }
     
     /* Pool capacity: dynamic linear arena */
     size_t pool_elements = max_item_supp > 500000 ? max_item_supp * 2 : 1000000;
@@ -949,9 +1023,9 @@ static DM_Status run(DM_Dataset *ds, void *params) {
         
         /* Check 1-item status */
         if (ctx.uniform_length) {
-            double o_val = (double)dummy_size / (double)ctx.first_len;
-            is_ho = hoi_ge(o_val, ctx.threshold_value);
             recip_sum = ctx.item_recip_sums[i];
+            is_ho = ctx.summed_occupancy_mode ? aura_is_ho(&ctx, ctx.item_tids[i], dummy_size, 1, recip_sum)
+                                              : hoi_ge((double)dummy_size / (double)ctx.first_len, ctx.threshold_value);
         } else {
             /* compute 1-item UBO check */
             double current_sum = 0.0;
@@ -966,8 +1040,9 @@ static DM_Status run(DM_Dataset *ds, void *params) {
                 }
             }
             if (!hoi_ge(max_ubo, ctx.threshold_value)) continue;
-            is_ho = hoi_ge(current_sum, ctx.threshold_value);
             recip_sum = current_sum;
+            is_ho = ctx.summed_occupancy_mode ? aura_is_ho(&ctx, ctx.item_tids[i], dummy_size, 1, recip_sum)
+                                              : hoi_ge(current_sum, ctx.threshold_value);
         }
 
         AURATidNode *node = &C1[c1_count++];
@@ -980,6 +1055,8 @@ static DM_Status run(DM_Dataset *ds, void *params) {
         if (is_ho) {
             ctx.raw_hoi_count++;
             ctx.raw_total_output_items += 1;
+            ctx.prefix_items[0] = (uint32_t)i;
+            aura_emit(&ctx, 1);
             if (!ctx.emit_raw_view) {
                 uint32_t single_item = ctx.active_items[i];
                 double avg_occ = recip_sum / (double)dummy_size;
@@ -989,7 +1066,9 @@ static DM_Status run(DM_Dataset *ds, void *params) {
         }
     }
 
-    int num_threads = (p && p->threads > 0) ? p->threads : dm_get_num_threads();
+    /* one thread unless more are requested explicitly */
+    int num_threads = (p && p->threads > 0) ? p->threads : 1;
+    if (ctx.out && num_threads > 1) num_threads = 1;   /* the output file is written by one thread */
     if (num_threads < 1) num_threads = 1;
     if (num_threads > (int)c1_count && c1_count > 0) num_threads = (int)c1_count;
 
@@ -1055,6 +1134,10 @@ static DM_Status run(DM_Dataset *ds, void *params) {
     free(ctx.recip_table);
     free(ctx.tid_scratch);
     free(ctx.prefix_items);
+    free(ctx.out_scratch);
+    free(ctx.len_scratch);
+    if (ctx.out) fclose(ctx.out);
+    printf("[AURA-HOI] arena: chunks=%zu elements=%zu\n", ctx.pool.nchunks, ctx.pool.total_cap);
     mempool_free(&ctx.pool);
 
     if (!ctx.emit_raw_view) {
@@ -1067,7 +1150,7 @@ static DM_Status run(DM_Dataset *ds, void *params) {
 DM_Algorithm aura_hoi_algo = {
     .id = "aura_hoi",
     .name = "AURA-HOI",
-    .description = "Auditable representative high-occupancy itemset mining via Pure TID-List Equivalence Classes and Cumulative Bounding.",
+    .description = "High-occupancy itemset mining over prefix equivalence classes of TID lists with a length-capped residual bound.",
     .supported_types = (1 << DM_TYPE_TRANSACTIONAL),
     .run = run
 };

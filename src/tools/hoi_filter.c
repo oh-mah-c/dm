@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "core/dm_exact_occ.h"
 
 /* allocation failure (address-space limit) ends the run with SIGABRT, which
  * the benchmark script records as a memory failure */
@@ -39,7 +40,6 @@ static void *xmalloc(size_t n) { void *p = malloc(n ? n : 1); if (!p) { fputs("o
 static void *xcalloc(size_t n, size_t m) { void *p = calloc(n ? n : 1, m); if (!p) { fputs("out of memory\n", stderr); abort(); } return p; }
 static void *xrealloc(void *q, size_t n) { void *p = realloc(q, n ? n : 1); if (!p) { fputs("out of memory\n", stderr); abort(); } return p; }
 
-static int ge_tol(double x, double t) { return x >= t - 1e-9 * (1.0 + fabs(t)); }
 
 static double now_sec(void) {
     struct timespec ts;
@@ -72,6 +72,18 @@ static int cmp_int(const void *a, const void *b) {
 static int sigma;
 static double beta, xi;
 static int sum_mode;               /* --sum: maximal HOIs of Deng (2020), no phase-2 test */
+static uint32_t *g_tsize;          /* (declared again below) */
+static DmThreshold xit;            /* xi as an exact fraction */
+static size_t sig_xi;              /* ceil(xi): smallest support of an HOI */
+static uint32_t *len_scratch;
+
+/* exact test k * sum_{tids} 1/|T| >= t, given the double value approx */
+static int exact_ge(double approx, const uint32_t *tids, size_t size, size_t k, DmThreshold t) {
+    int res;
+    if (dm_occ_decided(approx, t, &res)) return res;
+    for (size_t i = 0; i < size; i++) len_scratch[i] = g_tsize[tids[i]];
+    return dm_occ_ge_exact(k, len_scratch, NULL, size, t);
+}
 static uint32_t *g_tsize;          /* tid (ascending length order) -> |T| */
 static long long n_nodes, n_hoi, n_fho;
 
@@ -107,15 +119,18 @@ static int is_fho(const uint32_t *tids, size_t size, size_t k) {
     if ((long long)size < sigma) return 0;
     double s = 0;
     for (size_t i = 0; i < size; i++) s += 1.0 / g_tsize[tids[i]];
-    return ge_tol((double)k * s / (double)size, beta);
+    /* aocc >= beta  <=>  k * s >= beta * size, decided exactly */
+    return exact_ge((double)k * s, tids, size, k, dm_threshold_make(beta, size, 1));
 }
 
 /* UBO test of HEP/DFHOI (unchanged): returns whether X may be extended, and
  * sets *is_ho to whether X itself is an HOI. */
 static int check_ubo_and_o(const uint32_t *tids, size_t size, size_t k, int *is_ho, int same_len, uint32_t first_len) {
-    if (!ge_tol((double)size, xi)) return 0;
+    if (size < sig_xi) return 0;
     if (same_len) {
-        *is_ho = ge_tol((double)(k * size) / (double)first_len, xi);
+        int res;
+        *is_ho = dm_occ_decided((double)(k * size) / (double)first_len, xit, &res) ? res
+                 : dm_occ_ge_uniform(k, size, first_len, xit);
         return 1;
     }
     double cur = 0.0, max_ubo = 0.0;
@@ -127,7 +142,7 @@ static int check_ubo_and_o(const uint32_t *tids, size_t size, size_t k, int *is_
             if (u > max_ubo) max_ubo = u;
         }
     }
-    if (ge_tol(max_ubo, xi)) { *is_ho = ge_tol(k * cur, xi); return 1; }
+    if (dm_bound_ge(max_ubo, xit)) { *is_ho = exact_ge(k * cur, tids, size, k, xit); return 1; }
     return 0;
 }
 
@@ -163,7 +178,7 @@ static void hep_flush(HList *l) {
 static void run_hep(int nitems, uint32_t **item_tids, size_t *counts, size_t ntrans) {
     HList prev = {0};
     for (int i = 0; i < nitems; i++) {
-        if (!ge_tol((double)counts[i], xi)) continue;
+        if (counts[i] < sig_xi) continue;
         n_nodes++;
         int is_ho = 0;
         if (check_ubo_and_o(item_tids[i], counts[i], 1, &is_ho, 0, 0)) {
@@ -187,7 +202,7 @@ static void run_hep(int nitems, uint32_t **item_tids, size_t *counts, size_t ntr
                 if (!match) break;
                 n_nodes++;
                 size_t nn = intersect(P1->tids, P1->num_tids, P2->tids, P2->num_tids, buf);
-                if (!ge_tol((double)nn, xi)) continue;
+                if (nn < sig_xi) continue;
                 int is_ho = 0;
                 if (!check_ubo_and_o(buf, nn, k, &is_ho, 0, 0)) continue;
                 HItem P = {xmalloc(k * sizeof(int)), k, xmalloc(nn * sizeof(uint32_t)), nn, 0, 0};
@@ -228,7 +243,7 @@ static int dfhoi_mine(DItem *cls, size_t ncls, uint32_t *buffer) {
             DItem *P2 = &cls[j];
             n_nodes++;
             size_t nn = intersect(P1->tids, P1->num_tids, P2->tids, P2->num_tids, buffer);
-            if (!ge_tol((double)nn, xi)) continue;
+            if (nn < sig_xi) continue;
             size_t nk = P1->length + 1;
             int is_ho = 0;
             if (!check_ubo_and_o(buffer, nn, nk, &is_ho, same_len_flag, first_len)) continue;
@@ -309,13 +324,17 @@ int main(int argc, char **argv) {
     free(line); free(b); fclose(f);
     if (sum_mode) {
         /* argv[2] is xi itself (absolute, or a fraction of n as in Deng 2020) */
-        xi = minsup_arg < 1.0 ? minsup_arg * n : minsup_arg;
+        xit = dm_threshold_make(minsup_arg, n, minsup_arg < 1.0);
         sigma = 1;
     } else {
-        sigma = minsup_arg < 1.0 ? (int)ceil(minsup_arg * n - 1e-9) : (int)minsup_arg;
+        DmThreshold st = dm_threshold_make(minsup_arg, n, minsup_arg < 1.0);
+        sigma = (int)dm_threshold_ceil(st);
         if (sigma < 1) sigma = 1;
-        xi = sigma * beta;
+        xit = dm_threshold_make(beta, (size_t)sigma, 1);   /* xi = sigma * beta */
     }
+    xi = xit.value;
+    sig_xi = dm_threshold_ceil(xit);
+    len_scratch = xmalloc((n > 0 ? n : 1) * sizeof(uint32_t));
 
     /* initial database representation, as in hep.c/dfhoi.c: transactions
      * renumbered by ascending length, tidsets of the items with count >= xi */
@@ -341,7 +360,7 @@ int main(int argc, char **argv) {
     for (int t = 0; t < n; t++) for (int i = 0; i < rawc[t]; i++) counts[raw[t][i]]++;
     uint32_t **item_tids = xcalloc(maxid + 1, sizeof(uint32_t *));
     size_t *fill = xcalloc(maxid + 1, sizeof(size_t));
-    for (int i = 0; i <= maxid; i++) if (ge_tol((double)counts[i], xi)) item_tids[i] = xmalloc(counts[i] * sizeof(uint32_t));
+    for (int i = 0; i <= maxid; i++) if (counts[i] >= sig_xi) item_tids[i] = xmalloc(counts[i] * sizeof(uint32_t));
     for (int t = 0; t < n; t++) {
         int o = order[t];
         for (int i = 0; i < rawc[o]; i++) {
@@ -354,9 +373,9 @@ int main(int argc, char **argv) {
     long rss_loaded = peak_rss_kb();
     double t1 = now_sec();
 
-    int *id_of = NULL;   /* HEP: rank -> item id */
-    if (!strcmp(mode, "hep")) {
-        /* Deng (2020), Sec. 3.2.3: items sorted in support-ascending order */
+    /* items in support-ascending order (Deng 2020, Sec. 3.2.3), for HEP and DFHOI */
+    int *id_of = NULL;   /* rank -> item id */
+    {
         id_of = xmalloc((maxid + 1) * sizeof(int));
         for (int i = 0; i <= maxid; i++) id_of[i] = i;
         g_counts = counts;
@@ -366,12 +385,14 @@ int main(int argc, char **argv) {
         for (int r = 0; r <= maxid; r++) { rt[r] = item_tids[id_of[r]]; rc[r] = counts[id_of[r]]; }
         free(item_tids); free(counts);
         item_tids = rt; counts = rc;
+    }
+    if (!strcmp(mode, "hep")) {
         run_hep(maxid + 1, item_tids, counts, n);
     } else {
         DItem *C1 = xmalloc((maxid + 1) * sizeof(DItem));
         size_t c1 = 0;
         for (int i = 0; i <= maxid; i++) {
-            if (!ge_tol((double)counts[i], xi)) continue;
+            if (counts[i] < sig_xi) continue;
             n_nodes++;
             int is_ho = 0;
             if (check_ubo_and_o(item_tids[i], counts[i], 1, &is_ho, same_len_flag, first_len)) {
