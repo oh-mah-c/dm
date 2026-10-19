@@ -1,0 +1,751 @@
+%% BioMed_Central_Bib_Style_v1.01
+
+\begin{thebibliography}{44}
+% BibTex style file: bmc-mathphys.bst (version 2.1), 2014-07-24
+\ifx \bisbn   \undefined \def \bisbn  #1{ISBN #1}\fi
+\ifx \binits  \undefined \def \binits#1{#1}\fi
+\ifx \bauthor  \undefined \def \bauthor#1{#1}\fi
+\ifx \batitle  \undefined \def \batitle#1{#1}\fi
+\ifx \bjtitle  \undefined \def \bjtitle#1{#1}\fi
+\ifx \bvolume  \undefined \def \bvolume#1{\textbf{#1}}\fi
+\ifx \byear  \undefined \def \byear#1{#1}\fi
+\ifx \bissue  \undefined \def \bissue#1{#1}\fi
+\ifx \bfpage  \undefined \def \bfpage#1{#1}\fi
+\ifx \blpage  \undefined \def \blpage #1{#1}\fi
+\ifx \burl  \undefined \def \burl#1{\textsf{#1}}\fi
+\ifx \doiurl  \undefined \def \doiurl#1{\url{https://doi.org/#1}}\fi
+\ifx \betal  \undefined \def \betal{\textit{et al.}}\fi
+\ifx \binstitute  \undefined \def \binstitute#1{#1}\fi
+\ifx \binstitutionaled  \undefined \def \binstitutionaled#1{#1}\fi
+\ifx \bctitle  \undefined \def \bctitle#1{#1}\fi
+\ifx \beditor  \undefined \def \beditor#1{#1}\fi
+\ifx \bpublisher  \undefined \def \bpublisher#1{#1}\fi
+\ifx \bbtitle  \undefined \def \bbtitle#1{#1}\fi
+\ifx \bedition  \undefined \def \bedition#1{#1}\fi
+\ifx \bseriesno  \undefined \def \bseriesno#1{#1}\fi
+\ifx \blocation  \undefined \def \blocation#1{#1}\fi
+\ifx \bsertitle  \undefined \def \bsertitle#1{#1}\fi
+\ifx \bsnm \undefined \def \bsnm#1{#1}\fi
+\ifx \bsuffix \undefined \def \bsuffix#1{#1}\fi
+\ifx \bparticle \undefined \def \bparticle#1{#1}\fi
+\ifx \barticle \undefined \def \barticle#1{#1}\fi
+\bibcommenthead
+\ifx \bconfdate \undefined \def \bconfdate #1{#1}\fi
+\ifx \botherref \undefined \def \botherref #1{#1}\fi
+\ifx \url \undefined \def \url#1{\textsf{#1}}\fi
+\ifx \bchapter \undefined \def \bchapter#1{#1}\fi
+\ifx \bbook \undefined \def \bbook#1{#1}\fi
+\ifx \bcomment \undefined \def \bcomment#1{#1}\fi
+\ifx \oauthor \undefined \def \oauthor#1{#1}\fi
+\ifx \citeauthoryear \undefined \def \citeauthoryear#1{#1}\fi
+\ifx \endbibitem  \undefined \def \endbibitem {}\fi
+\ifx \bconflocation  \undefined \def \bconflocation#1{#1}\fi
+\ifx \arxivurl  \undefined \def \arxivurl#1{\textsf{#1}}\fi
+\csname PreBibitemsHook\endcsname
+
+%%% 1
+\bibitem[\protect\citeauthoryear{Agrawal et~al.}{1993}]{agrawal1993mining}
+\begin{bchapter}
+\bauthor{\bsnm{Agrawal}, \binits{R.}},
+\bauthor{\bsnm{Imieli{\'n}ski}, \binits{T.}},
+\bauthor{\bsnm{Swami}, \binits{A.}}:
+\bctitle{Mining association rules between sets of items in large databases}.
+In: \bbtitle{Proceedings of the 1993 ACM SIGMOD International Conference on
+  Management of Data},
+pp. \bfpage{207}--\blpage{216}.
+\bpublisher{ACM},
+\blocation{New York, NY, USA}
+(\byear{1993}).
+\doiurl{10.1145/170035.170072}
+\end{bchapter}
+\endbibitem
+
+%%% 2
+\bibitem[\protect\citeauthoryear{Tang et~al.}{2012}]{tang2012occupancy}
+\begin{bchapter}
+\bauthor{\bsnm{Tang}, \binits{L.}},
+\bauthor{\bsnm{Zhang}, \binits{L.}},
+\bauthor{\bsnm{Luo}, \binits{P.}},
+\bauthor{\bsnm{Wang}, \binits{M.}}:
+\bctitle{Incorporating occupancy into frequent pattern mining for high quality
+  pattern recommendation}.
+In: \bbtitle{Proceedings of the 21st ACM International Conference on
+  Information and Knowledge Management (CIKM)},
+pp. \bfpage{75}--\blpage{84}.
+\bpublisher{ACM},
+\blocation{New York, NY, USA}
+(\byear{2012}).
+\doiurl{10.1145/2396761.2396775}
+\end{bchapter}
+\endbibitem
+
+%%% 3
+\bibitem[\protect\citeauthoryear{Zhang et~al.}{2015}]{zhang2015occupancy}
+\begin{barticle}
+\bauthor{\bsnm{Zhang}, \binits{L.}},
+\bauthor{\bsnm{Luo}, \binits{P.}},
+\bauthor{\bsnm{Tang}, \binits{L.}},
+\bauthor{\bsnm{Chen}, \binits{E.}},
+\bauthor{\bsnm{Liu}, \binits{Q.}},
+\bauthor{\bsnm{Wang}, \binits{M.}},
+\bauthor{\bsnm{Xiong}, \binits{H.}}:
+\batitle{Occupancy-based frequent pattern mining}.
+\bjtitle{ACM Transactions on Knowledge Discovery from Data}
+\bvolume{10}(\bissue{2}),
+\bfpage{1}--\blpage{33}
+(\byear{2015})
+\doiurl{10.1145/2753765}
+\end{barticle}
+\endbibitem
+
+%%% 4
+\bibitem[\protect\citeauthoryear{Deng}{2020}]{deng2020hoi}
+\begin{barticle}
+\bauthor{\bsnm{Deng}, \binits{Z.-H.}}:
+\batitle{Mining high occupancy itemsets}.
+\bjtitle{Future Generation Computer Systems}
+\bvolume{102},
+\bfpage{222}--\blpage{229}
+(\byear{2020})
+\doiurl{10.1016/j.future.2019.07.039}
+\end{barticle}
+\endbibitem
+
+%%% 5
+\bibitem[\protect\citeauthoryear{Nguyen et~al.}{2023}]{nguyen2023dfhoi}
+\begin{barticle}
+\bauthor{\bsnm{Nguyen}, \binits{L.T.T.}},
+\bauthor{\bsnm{Mai}, \binits{T.}},
+\bauthor{\bsnm{Pham}, \binits{G.-H.}},
+\bauthor{\bsnm{Yun}, \binits{U.}},
+\bauthor{\bsnm{Vo}, \binits{B.}}:
+\batitle{An efficient method for mining high occupancy itemsets based on
+  equivalence class and early pruning}.
+\bjtitle{Knowledge-Based Systems}
+\bvolume{267},
+\bfpage{110441}
+(\byear{2023})
+\doiurl{10.1016/j.knosys.2023.110441}
+\end{barticle}
+\endbibitem
+
+%%% 6
+\bibitem[\protect\citeauthoryear{Datta et~al.}{2022}]{datta2022hoimto}
+\begin{barticle}
+\bauthor{\bsnm{Datta}, \binits{S.}},
+\bauthor{\bsnm{Mali}, \binits{K.}},
+\bauthor{\bsnm{Ghosh}, \binits{U.}}:
+\batitle{High occupancy itemset mining with consideration of transaction
+  occupancy}.
+\bjtitle{Arabian Journal for Science and Engineering}
+\bvolume{47}(\bissue{2}),
+\bfpage{2061}--\blpage{2075}
+(\byear{2022})
+\doiurl{10.1007/s13369-021-06075-8}
+\end{barticle}
+\endbibitem
+
+%%% 7
+\bibitem[\protect\citeauthoryear{Kim et~al.}{2022}]{kim2022incremental}
+\begin{barticle}
+\bauthor{\bsnm{Kim}, \binits{H.}},
+\bauthor{\bsnm{Ryu}, \binits{T.}},
+\bauthor{\bsnm{Lee}, \binits{C.}},
+\bauthor{\bsnm{Kim}, \binits{H.}},
+\bauthor{\bsnm{Truong}, \binits{T.}},
+\bauthor{\bsnm{Fournier-Viger}, \binits{P.}},
+\bauthor{\bsnm{Pedrycz}, \binits{W.}},
+\bauthor{\bsnm{Yun}, \binits{U.}}:
+\batitle{Mining high occupancy patterns to analyze incremental data in
+  intelligent systems}.
+\bjtitle{ISA Transactions}
+\bvolume{131},
+\bfpage{460}--\blpage{475}
+(\byear{2022})
+\doiurl{10.1016/j.isatra.2022.05.003}
+\end{barticle}
+\endbibitem
+
+%%% 8
+\bibitem[\protect\citeauthoryear{Tran et~al.}{2025}]{tran2025namhep}
+\begin{barticle}
+\bauthor{\bsnm{Tran}, \binits{T.-N.}},
+\bauthor{\bsnm{Truong~Hoang}, \binits{V.}},
+\bauthor{\bsnm{Truong}, \binits{T.-C.}},
+\bauthor{\bsnm{Voznak}, \binits{M.}}:
+\batitle{A hierarchical set-enumeration tree enabling high occupancy item set
+  mining and the use of an adaptive occupancy threshold}.
+\bjtitle{Applied Intelligence}
+\bvolume{55}(\bissue{3}),
+\bfpage{205}
+(\byear{2025})
+\doiurl{10.1007/s10489-024-06166-7}
+\end{barticle}
+\endbibitem
+
+%%% 9
+\bibitem[\protect\citeauthoryear{Y{\i}ld{\i}r{\i}m}{2025}]{yildirim2025topk}
+\begin{barticle}
+\bauthor{\bsnm{Y{\i}ld{\i}r{\i}m}, \binits{{\. I}.}}:
+\batitle{Mining top-k high occupancy itemsets}.
+\bjtitle{Black Sea Journal of Engineering and Science}
+\bvolume{8}(\bissue{6}),
+\bfpage{1723}--\blpage{1730}
+(\byear{2025})
+\doiurl{10.34248/bsengineering.1744061}
+\end{barticle}
+\endbibitem
+
+%%% 10
+\bibitem[\protect\citeauthoryear{Ngo et~al.}{2026}]{ngo2026topk}
+\begin{barticle}
+\bauthor{\bsnm{Ngo}, \binits{T.-K.}},
+\bauthor{\bsnm{Nguyen}, \binits{H.-S.}},
+\bauthor{\bsnm{Pedrycz}, \binits{W.}},
+\bauthor{\bsnm{Vo}, \binits{B.}}:
+\batitle{Efficient algorithms for mining top-k high occupancy itemsets}.
+\bjtitle{Information Sciences}
+\bvolume{741},
+\bfpage{123226}
+(\byear{2026})
+\doiurl{10.1016/j.ins.2026.123226}
+\end{barticle}
+\endbibitem
+
+%%% 11
+\bibitem[\protect\citeauthoryear{Cho et~al.}{2026}]{cho2026damped}
+\begin{barticle}
+\bauthor{\bsnm{Cho}, \binits{M.}},
+\bauthor{\bsnm{Kim}, \binits{H.}},
+\bauthor{\bsnm{Kim}, \binits{H.}},
+\bauthor{\bsnm{Ryu}, \binits{T.}},
+\bauthor{\bsnm{Lee}, \binits{C.}},
+\bauthor{\bsnm{Kim}, \binits{H.}},
+\bauthor{\bsnm{Vo}, \binits{B.}},
+\bauthor{\bsnm{Lin}, \binits{J.C.-W.}},
+\bauthor{\bsnm{Yun}, \binits{U.}}:
+\batitle{Damped window based high occupancy pattern mining with one scanning of
+  data streams}.
+\bjtitle{Engineering Applications of Artificial Intelligence}
+\bvolume{174},
+\bfpage{114511}
+(\byear{2026})
+\doiurl{10.1016/j.engappai.2026.114511}
+\end{barticle}
+\endbibitem
+
+%%% 12
+\bibitem[\protect\citeauthoryear{Bayardo}{1998}]{bayardo1998maxminer}
+\begin{barticle}
+\bauthor{\bsnm{Bayardo}, \binits{R.J.}}:
+\batitle{Efficiently mining long patterns from databases}.
+\bjtitle{ACM SIGMOD Record}
+\bvolume{27}(\bissue{2}),
+\bfpage{85}--\blpage{93}
+(\byear{1998})
+\doiurl{10.1145/276305.276313}
+\end{barticle}
+\endbibitem
+
+%%% 13
+\bibitem[\protect\citeauthoryear{Seno and Karypis}{2005}]{seno2005ldsc}
+\begin{barticle}
+\bauthor{\bsnm{Seno}, \binits{M.}},
+\bauthor{\bsnm{Karypis}, \binits{G.}}:
+\batitle{Finding frequent patterns using length-decreasing support
+  constraints}.
+\bjtitle{Data Mining and Knowledge Discovery}
+\bvolume{10}(\bissue{3}),
+\bfpage{197}--\blpage{228}
+(\byear{2005})
+\doiurl{10.1007/s10618-005-0364-0}
+\end{barticle}
+\endbibitem
+
+%%% 14
+\bibitem[\protect\citeauthoryear{Agrawal and Srikant}{1994}]{agrawal1994fast}
+\begin{bchapter}
+\bauthor{\bsnm{Agrawal}, \binits{R.}},
+\bauthor{\bsnm{Srikant}, \binits{R.}}:
+\bctitle{Fast algorithms for mining association rules}.
+In: \bbtitle{Proceedings of the 20th International Conference on Very Large
+  Data Bases (VLDB)},
+pp. \bfpage{487}--\blpage{499}
+(\byear{1994}).
+\burl{https://www.vldb.org/conf/1994/P487.PDF}
+\end{bchapter}
+\endbibitem
+
+%%% 15
+\bibitem[\protect\citeauthoryear{Han et~al.}{2000}]{han2000mining}
+\begin{bchapter}
+\bauthor{\bsnm{Han}, \binits{J.}},
+\bauthor{\bsnm{Pei}, \binits{J.}},
+\bauthor{\bsnm{Yin}, \binits{Y.}}:
+\bctitle{Mining frequent patterns without candidate generation}.
+In: \bbtitle{Proceedings of the 2000 ACM SIGMOD International Conference on
+  Management of Data},
+pp. \bfpage{1}--\blpage{12}.
+\bpublisher{ACM},
+\blocation{New York, NY, USA}
+(\byear{2000}).
+\doiurl{10.1145/342009.335372}
+\end{bchapter}
+\endbibitem
+
+%%% 16
+\bibitem[\protect\citeauthoryear{Zaki}{2000}]{zaki2000scalable}
+\begin{barticle}
+\bauthor{\bsnm{Zaki}, \binits{M.J.}}:
+\batitle{Scalable algorithms for association mining}.
+\bjtitle{IEEE Transactions on Knowledge and Data Engineering}
+\bvolume{12}(\bissue{3}),
+\bfpage{372}--\blpage{390}
+(\byear{2000})
+\doiurl{10.1109/69.846291}
+\end{barticle}
+\endbibitem
+
+%%% 17
+\bibitem[\protect\citeauthoryear{Pasquier et~al.}{1999}]{pasquier1999closed}
+\begin{bchapter}
+\bauthor{\bsnm{Pasquier}, \binits{N.}},
+\bauthor{\bsnm{Bastide}, \binits{Y.}},
+\bauthor{\bsnm{Taouil}, \binits{R.}},
+\bauthor{\bsnm{Lakhal}, \binits{L.}}:
+\bctitle{Discovering frequent closed itemsets for association rules}.
+In: \bbtitle{Database Theory -- ICDT'99}.
+\bsertitle{Lecture Notes in Computer Science},
+vol. \bseriesno{1540},
+pp. \bfpage{398}--\blpage{416}.
+\bpublisher{Springer},
+\blocation{Berlin, Heidelberg}
+(\byear{1999}).
+\doiurl{10.1007/3-540-49257-7_25}
+\end{bchapter}
+\endbibitem
+
+%%% 18
+\bibitem[\protect\citeauthoryear{Zaki and Hsiao}{2002}]{zaki2002charm}
+\begin{bchapter}
+\bauthor{\bsnm{Zaki}, \binits{M.J.}},
+\bauthor{\bsnm{Hsiao}, \binits{C.-J.}}:
+\bctitle{{CHARM}: An efficient algorithm for closed itemset mining}.
+In: \bbtitle{Proceedings of the 2002 SIAM International Conference on Data
+  Mining},
+pp. \bfpage{457}--\blpage{473}.
+\bpublisher{SIAM},
+\blocation{Philadelphia, PA, USA}
+(\byear{2002}).
+\doiurl{10.1137/1.9781611972726.27}
+\end{bchapter}
+\endbibitem
+
+%%% 19
+\bibitem[\protect\citeauthoryear{Uno et~al.}{2004}]{uno2004lcm}
+\begin{bchapter}
+\bauthor{\bsnm{Uno}, \binits{T.}},
+\bauthor{\bsnm{Kiyomi}, \binits{M.}},
+\bauthor{\bsnm{Arimura}, \binits{H.}}:
+\bctitle{{LCM} ver. 2: Efficient mining algorithms for frequent/closed/maximal
+  itemsets}.
+In: \bbtitle{Proceedings of the IEEE ICDM Workshop on Frequent Itemset Mining
+  Implementations (FIMI'04)}.
+\bsertitle{CEUR Workshop Proceedings},
+vol. \bseriesno{126}
+(\byear{2004}).
+\burl{https://ceur-ws.org/Vol-126/uno.pdf}
+\end{bchapter}
+\endbibitem
+
+%%% 20
+\bibitem[\protect\citeauthoryear{Uno et~al.}{2005}]{uno2005lcm3}
+\begin{bchapter}
+\bauthor{\bsnm{Uno}, \binits{T.}},
+\bauthor{\bsnm{Kiyomi}, \binits{M.}},
+\bauthor{\bsnm{Arimura}, \binits{H.}}:
+\bctitle{{LCM} ver.3: Collaboration of array, bitmap and prefix tree for
+  frequent itemset mining}.
+In: \bbtitle{Proceedings of the 1st International Workshop on Open Source Data
+  Mining (OSDM'05)},
+pp. \bfpage{77}--\blpage{86}.
+\bpublisher{ACM},
+\blocation{New York, NY, USA}
+(\byear{2005}).
+\doiurl{10.1145/1133905.1133916}
+\end{bchapter}
+\endbibitem
+
+%%% 21
+\bibitem[\protect\citeauthoryear{Burdick et~al.}{2005}]{burdick2005mafia}
+\begin{barticle}
+\bauthor{\bsnm{Burdick}, \binits{D.}},
+\bauthor{\bsnm{Calimlim}, \binits{M.}},
+\bauthor{\bsnm{Flannick}, \binits{J.}},
+\bauthor{\bsnm{Gehrke}, \binits{J.}},
+\bauthor{\bsnm{Yiu}, \binits{T.}}:
+\batitle{{MAFIA}: A maximal frequent itemset algorithm}.
+\bjtitle{IEEE Transactions on Knowledge and Data Engineering}
+\bvolume{17}(\bissue{11}),
+\bfpage{1490}--\blpage{1504}
+(\byear{2005})
+\doiurl{10.1109/TKDE.2005.183}
+\end{barticle}
+\endbibitem
+
+%%% 22
+\bibitem[\protect\citeauthoryear{Gouda and Zaki}{2005}]{gouda2005genmax}
+\begin{barticle}
+\bauthor{\bsnm{Gouda}, \binits{K.}},
+\bauthor{\bsnm{Zaki}, \binits{M.J.}}:
+\batitle{{GenMax}: An efficient algorithm for mining maximal frequent
+  itemsets}.
+\bjtitle{Data Mining and Knowledge Discovery}
+\bvolume{11}(\bissue{3}),
+\bfpage{223}--\blpage{242}
+(\byear{2005})
+\doiurl{10.1007/s10618-005-0002-x}
+\end{barticle}
+\endbibitem
+
+%%% 23
+\bibitem[\protect\citeauthoryear{Grahne and Zhu}{2005}]{grahne2005fast}
+\begin{barticle}
+\bauthor{\bsnm{Grahne}, \binits{G.}},
+\bauthor{\bsnm{Zhu}, \binits{J.}}:
+\batitle{Fast algorithms for frequent itemset mining using {FP}-trees}.
+\bjtitle{IEEE Transactions on Knowledge and Data Engineering}
+\bvolume{17}(\bissue{10}),
+\bfpage{1347}--\blpage{1362}
+(\byear{2005})
+\doiurl{10.1109/TKDE.2005.166}
+\end{barticle}
+\endbibitem
+
+%%% 24
+\bibitem[\protect\citeauthoryear{Pei et~al.}{2004}]{pei2004convertible}
+\begin{barticle}
+\bauthor{\bsnm{Pei}, \binits{J.}},
+\bauthor{\bsnm{Han}, \binits{J.}},
+\bauthor{\bsnm{Lakshmanan}, \binits{L.V.S.}}:
+\batitle{Pushing convertible constraints in frequent itemset mining}.
+\bjtitle{Data Mining and Knowledge Discovery}
+\bvolume{8}(\bissue{3}),
+\bfpage{227}--\blpage{252}
+(\byear{2004})
+\doiurl{10.1023/B:DAMI.0000023674.74932.4c}
+\end{barticle}
+\endbibitem
+
+%%% 25
+\bibitem[\protect\citeauthoryear{Bonchi and
+  Lucchese}{2004}]{bonchi2004closedconstrained}
+\begin{bchapter}
+\bauthor{\bsnm{Bonchi}, \binits{F.}},
+\bauthor{\bsnm{Lucchese}, \binits{C.}}:
+\bctitle{On closed constrained frequent pattern mining}.
+In: \bbtitle{Proceedings of the Fourth IEEE International Conference on Data
+  Mining (ICDM'04)},
+pp. \bfpage{35}--\blpage{42}.
+\bpublisher{IEEE},
+\blocation{Los Alamitos, CA, USA}
+(\byear{2004}).
+\doiurl{10.1109/ICDM.2004.10093}
+\end{bchapter}
+\endbibitem
+
+%%% 26
+\bibitem[\protect\citeauthoryear{Aggarwal and Han}{2014}]{aggarwal2014frequent}
+\begin{bbook}
+\beditor{\bsnm{Aggarwal}, \binits{C.C.}},
+\beditor{\bsnm{Han}, \binits{J.}} (eds.):
+\bbtitle{Frequent Pattern Mining}.
+\bpublisher{Springer},
+\blocation{Cham}
+(\byear{2014}).
+\doiurl{10.1007/978-3-319-07821-2}
+\end{bbook}
+\endbibitem
+
+%%% 27
+\bibitem[\protect\citeauthoryear{Luna et~al.}{2019}]{luna2019review}
+\begin{barticle}
+\bauthor{\bsnm{Luna}, \binits{J.M.}},
+\bauthor{\bsnm{Fournier-Viger}, \binits{P.}},
+\bauthor{\bsnm{Ventura}, \binits{S.}}:
+\batitle{Frequent itemset mining: A 25 years review}.
+\bjtitle{WIREs Data Mining and Knowledge Discovery}
+\bvolume{9}(\bissue{6}),
+\bfpage{1329}
+(\byear{2019})
+\doiurl{10.1002/widm.1329}
+\end{barticle}
+\endbibitem
+
+%%% 28
+\bibitem[\protect\citeauthoryear{Shen et~al.}{2016}]{shen2016ocean}
+\begin{bchapter}
+\bauthor{\bsnm{Shen}, \binits{B.}},
+\bauthor{\bsnm{Wen}, \binits{Z.}},
+\bauthor{\bsnm{Zhao}, \binits{Y.}},
+\bauthor{\bsnm{Zhou}, \binits{D.}},
+\bauthor{\bsnm{Zheng}, \binits{W.}}:
+\bctitle{{OCEAN}: Fast discovery of high utility occupancy itemsets}.
+In: \bbtitle{Advances in Knowledge Discovery and Data Mining (PAKDD 2016)}.
+\bsertitle{Lecture Notes in Computer Science},
+vol. \bseriesno{9651},
+pp. \bfpage{354}--\blpage{365}.
+\bpublisher{Springer},
+\blocation{Cham}
+(\byear{2016}).
+\doiurl{10.1007/978-3-319-31753-3_29}
+\end{bchapter}
+\endbibitem
+
+%%% 29
+\bibitem[\protect\citeauthoryear{Gan et~al.}{2020}]{gan2020huopm}
+\begin{barticle}
+\bauthor{\bsnm{Gan}, \binits{W.}},
+\bauthor{\bsnm{Lin}, \binits{J.C.-W.}},
+\bauthor{\bsnm{Fournier-Viger}, \binits{P.}},
+\bauthor{\bsnm{Chao}, \binits{H.-C.}},
+\bauthor{\bsnm{Yu}, \binits{P.S.}}:
+\batitle{{HUOPM}: High-utility occupancy pattern mining}.
+\bjtitle{IEEE Transactions on Cybernetics}
+\bvolume{50}(\bissue{3}),
+\bfpage{1195}--\blpage{1208}
+(\byear{2020})
+\doiurl{10.1109/TCYB.2019.2896267}
+\end{barticle}
+\endbibitem
+
+%%% 30
+\bibitem[\protect\citeauthoryear{Duong et~al.}{2024}]{duong2024concise}
+\begin{barticle}
+\bauthor{\bsnm{Duong}, \binits{H.}},
+\bauthor{\bsnm{Pham}, \binits{H.}},
+\bauthor{\bsnm{Truong}, \binits{T.}},
+\bauthor{\bsnm{Fournier-Viger}, \binits{P.}}:
+\batitle{Efficient algorithms to mine concise representations of frequent high
+  utility occupancy patterns}.
+\bjtitle{Applied Intelligence}
+\bvolume{54}(\bissue{5}),
+\bfpage{4012}--\blpage{4042}
+(\byear{2024})
+\doiurl{10.1007/s10489-024-05296-2}
+\end{barticle}
+\endbibitem
+
+%%% 31
+\bibitem[\protect\citeauthoryear{Hoang et~al.}{2025}]{hoang2025maxfhuoi}
+\begin{barticle}
+\bauthor{\bsnm{Hoang}, \binits{T.}},
+\bauthor{\bsnm{Huynh}, \binits{L.}},
+\bauthor{\bsnm{Duong}, \binits{H.}},
+\bauthor{\bsnm{Truong}, \binits{T.}}:
+\batitle{Efficient mining of concise patterns for frequent high-utility
+  occupancy itemsets using extended pruning strategies}.
+\bjtitle{Journal on Information Technologies \& Communications}
+\bvolume{2025}(\bissue{2}),
+\bfpage{108}--\blpage{128}
+(\byear{2025})
+\doiurl{10.32913/mic-ict-research.v2025.n2.1360}
+\end{barticle}
+\endbibitem
+
+%%% 32
+\bibitem[\protect\citeauthoryear{Liu and Qu}{2012}]{liu2012huiminer}
+\begin{bchapter}
+\bauthor{\bsnm{Liu}, \binits{M.}},
+\bauthor{\bsnm{Qu}, \binits{J.}}:
+\bctitle{Mining high utility itemsets without candidate generation}.
+In: \bbtitle{Proceedings of the 21st ACM International Conference on
+  Information and Knowledge Management (CIKM)},
+pp. \bfpage{55}--\blpage{64}.
+\bpublisher{ACM},
+\blocation{New York, NY, USA}
+(\byear{2012}).
+\doiurl{10.1145/2396761.2396773}
+\end{bchapter}
+\endbibitem
+
+%%% 33
+\bibitem[\protect\citeauthoryear{Zida et~al.}{2017}]{zida2017efim}
+\begin{barticle}
+\bauthor{\bsnm{Zida}, \binits{S.}},
+\bauthor{\bsnm{Fournier-Viger}, \binits{P.}},
+\bauthor{\bsnm{Lin}, \binits{J.C.-W.}},
+\bauthor{\bsnm{Wu}, \binits{C.-W.}},
+\bauthor{\bsnm{Tseng}, \binits{V.S.}}:
+\batitle{{EFIM}: A fast and memory efficient algorithm for high-utility itemset
+  mining}.
+\bjtitle{Knowledge and Information Systems}
+\bvolume{51}(\bissue{2}),
+\bfpage{595}--\blpage{625}
+(\byear{2017})
+\doiurl{10.1007/s10115-016-0986-0}
+\end{barticle}
+\endbibitem
+
+%%% 34
+\bibitem[\protect\citeauthoryear{Gan et~al.}{2021}]{gan2021survey}
+\begin{barticle}
+\bauthor{\bsnm{Gan}, \binits{W.}},
+\bauthor{\bsnm{Lin}, \binits{J.C.-W.}},
+\bauthor{\bsnm{Fournier-Viger}, \binits{P.}},
+\bauthor{\bsnm{Chao}, \binits{H.-C.}},
+\bauthor{\bsnm{Tseng}, \binits{V.S.}},
+\bauthor{\bsnm{Yu}, \binits{P.S.}}:
+\batitle{A survey of utility-oriented pattern mining}.
+\bjtitle{IEEE Transactions on Knowledge and Data Engineering}
+\bvolume{33}(\bissue{4}),
+\bfpage{1306}--\blpage{1327}
+(\byear{2021})
+\doiurl{10.1109/TKDE.2019.2942594}
+\end{barticle}
+\endbibitem
+
+%%% 35
+\bibitem[\protect\citeauthoryear{{The Linux Kernel
+  Documentation}}{}]{linuxproc}
+\begin{botherref}
+\oauthor{\bsnm{{The Linux Kernel Documentation}}}:
+The /proc Filesystem.
+\url{https://www.kernel.org/doc/html/latest/filesystems/proc.html}.
+Accessed 15 October 2026
+\end{botherref}
+\endbibitem
+
+%%% 36
+\bibitem[\protect\citeauthoryear{}{1981}]{uci1981mushroom}
+\begin{botherref}
+Mushroom.
+UCI Machine Learning Repository
+(1981).
+\doiurl{10.24432/C5959T}
+\end{botherref}
+\endbibitem
+
+%%% 37
+\bibitem[\protect\citeauthoryear{Brijs et~al.}{1999}]{brijs1999retail}
+\begin{bchapter}
+\bauthor{\bsnm{Brijs}, \binits{T.}},
+\bauthor{\bsnm{Swinnen}, \binits{G.}},
+\bauthor{\bsnm{Vanhoof}, \binits{K.}},
+\bauthor{\bsnm{Wets}, \binits{G.}}:
+\bctitle{Using association rules for product assortment decisions}.
+In: \bbtitle{Proceedings of the Fifth ACM SIGKDD International Conference on
+  Knowledge Discovery and Data Mining},
+pp. \bfpage{254}--\blpage{260}.
+\bpublisher{ACM},
+\blocation{New York, NY, USA}
+(\byear{1999}).
+\doiurl{10.1145/312129.312241}
+\end{bchapter}
+\endbibitem
+
+%%% 38
+\bibitem[\protect\citeauthoryear{Geurts et~al.}{2003}]{geurts2003accidents}
+\begin{barticle}
+\bauthor{\bsnm{Geurts}, \binits{K.}},
+\bauthor{\bsnm{Wets}, \binits{G.}},
+\bauthor{\bsnm{Brijs}, \binits{T.}},
+\bauthor{\bsnm{Vanhoof}, \binits{K.}}:
+\batitle{Profiling of high-frequency accident locations by use of association
+  rules}.
+\bjtitle{Transportation Research Record}
+\bvolume{1840}(\bissue{1}),
+\bfpage{123}--\blpage{130}
+(\byear{2003})
+\doiurl{10.3141/1840-14}
+\end{barticle}
+\endbibitem
+
+%%% 39
+\bibitem[\protect\citeauthoryear{Goethals and Zaki}{}]{fimirepository}
+\begin{botherref}
+\oauthor{\bsnm{Goethals}, \binits{B.}},
+\oauthor{\bsnm{Zaki}, \binits{M.J.}}:
+Frequent Itemset Mining Dataset Repository.
+\url{http://fimi.uantwerpen.be/}.
+Accessed 15 October 2026
+\end{botherref}
+\endbibitem
+
+%%% 40
+\bibitem[\protect\citeauthoryear{Fournier-Viger}{}]{spmfdatasets}
+\begin{botherref}
+\oauthor{\bsnm{Fournier-Viger}, \binits{P.}}:
+{SPMF}: An Open-Source Data Mining Library -- Datasets.
+\url{https://www.philippe-fournier-viger.com/spmf/index.php?link=datasets.php}.
+Accessed 15 October 2026
+\end{botherref}
+\endbibitem
+
+%%% 41
+\bibitem[\protect\citeauthoryear{Fournier-Viger
+  et~al.}{2016}]{fournier2016spmf}
+\begin{bchapter}
+\bauthor{\bsnm{Fournier-Viger}, \binits{P.}},
+\bauthor{\bsnm{Lin}, \binits{J.C.-W.}},
+\bauthor{\bsnm{Gomariz}, \binits{A.}},
+\bauthor{\bsnm{Gueniche}, \binits{T.}},
+\bauthor{\bsnm{Soltani}, \binits{A.}},
+\bauthor{\bsnm{Deng}, \binits{Z.}},
+\bauthor{\bsnm{Lam}, \binits{H.T.}}:
+\bctitle{The {SPMF} open-source data mining library version 2}.
+In: \bbtitle{Machine Learning and Knowledge Discovery in Databases (ECML PKDD
+  2016)}.
+\bsertitle{Lecture Notes in Computer Science},
+vol. \bseriesno{9853},
+pp. \bfpage{36}--\blpage{40}.
+\bpublisher{Springer},
+\blocation{Cham}
+(\byear{2016}).
+\doiurl{10.1007/978-3-319-46131-1_8}
+\end{bchapter}
+\endbibitem
+
+%%% 42
+\bibitem[\protect\citeauthoryear{Chen}{2015}]{chen2015onlineretail}
+\begin{botherref}
+\oauthor{\bsnm{Chen}, \binits{D.}}:
+Online Retail.
+UCI Machine Learning Repository
+(2015).
+\doiurl{10.24432/C5BW33}
+\end{botherref}
+\endbibitem
+
+%%% 43
+\bibitem[\protect\citeauthoryear{Chen et~al.}{2012}]{chen2012rfm}
+\begin{barticle}
+\bauthor{\bsnm{Chen}, \binits{D.}},
+\bauthor{\bsnm{Sain}, \binits{S.L.}},
+\bauthor{\bsnm{Guo}, \binits{K.}}:
+\batitle{Data mining for the online retail industry: A case study of {RFM}
+  model-based customer segmentation using data mining}.
+\bjtitle{Journal of Database Marketing \& Customer Strategy Management}
+\bvolume{19}(\bissue{3}),
+\bfpage{197}--\blpage{208}
+(\byear{2012})
+\doiurl{10.1057/dbm.2012.17}
+\end{barticle}
+\endbibitem
+
+%%% 44
+\bibitem[\protect\citeauthoryear{Goethals and Zaki}{2004}]{goethals2004fimi}
+\begin{barticle}
+\bauthor{\bsnm{Goethals}, \binits{B.}},
+\bauthor{\bsnm{Zaki}, \binits{M.J.}}:
+\batitle{Advances in frequent itemset mining implementations: report on
+  {FIMI}'03}.
+\bjtitle{ACM SIGKDD Explorations Newsletter}
+\bvolume{6}(\bissue{1}),
+\bfpage{109}--\blpage{117}
+(\byear{2004})
+\doiurl{10.1145/1007730.1007744}
+\end{barticle}
+\endbibitem
+
+\end{thebibliography}

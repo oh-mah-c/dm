@@ -43,7 +43,7 @@
 \newcommand{\Algo}{MHOI-Miner}
 
 \input{results_macros}
-\input{../case_study/case_study_macros}
+\input{case_study_macros}
 \makeatletter\newcommand{\inputrows}[1]{\@@input #1 }\makeatother
 
 \raggedbottom
@@ -571,7 +571,7 @@ We use the datasets and threshold ranges of Deng \cite[Section~4]{deng2020hoi} (
 \toprule
 Dataset & Type & Transactions & Items & Avg.\ length & Length \\
 \midrule
-\inputrows{tables/datasets.tex}
+\inputrows{datasets.tex}
 \botrule
 \end{tabular}
 \end{table}
@@ -589,7 +589,7 @@ Fig.~\ref{fig:counts} compares the number of HOIs with the number of MHOIs. On \
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/xi_counts.pdf}
+\includegraphics[width=\linewidth]{xi_counts.png}
 \caption{Number of HOIs (reported by HEP or DFHOI) and of MHOIs as functions of $\xi$. On \texttt{accidents}, there are no HOIs at the thresholds completed by HEP or DFHOI, and only the MHOIs at 15\% and 10\% are shown.}\label{fig:counts}
 \end{figure}
 
@@ -619,14 +619,14 @@ On \texttt{mushroom} and \texttt{accidents}, the peak memory of \textsc{HEP+filt
 \cmidrule(lr){4-6}\cmidrule(lr){7-9}\cmidrule(l){10-12}
 $\xi$ & MHOIs & HOIs & M & H & D & M & H & D & M & H & D \\
 \midrule
-\inputrows{tables/results.tex}
+\inputrows{results.tex}
 \botrule
 \end{tabular}
 \end{table}
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/xi_results.pdf}
+\includegraphics[width=\linewidth]{xi_results.png}
 \caption{Evaluated itemsets (top), runtime (middle) and peak memory (bottom) as functions of the occupancy threshold $\xi$. Missing points: the method exceeded a limit (Table~\ref{tab:results}).}\label{fig:results}
 \end{figure}
 
@@ -650,7 +650,7 @@ Table~\ref{tab:ablation} reports, at the middle threshold of each dataset, the v
 \toprule
 Dataset & $\xi$ & \Algo{} & no P4 & $W$ & $\ubo$ & no P2 & no P3 & closed \\
 \midrule
-\inputrows{tables/ablation.tex}
+\inputrows{ablation.tex}
 \botrule
 \end{tabular}
 \end{table}
@@ -672,7 +672,7 @@ Of the MHOIs, \CsMHOISingle{} are single products and \CsMHOIMulti{} have two or
 \toprule
 Products & Size & Support & Length & occ \\
 \midrule
-\inputrows{../case_study/case_study_table.tex}
+\inputrows{case_study_table.tex}
 \botrule
 \end{tabularx}
 \end{table}
