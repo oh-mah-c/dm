@@ -3,758 +3,133 @@
 \usepackage[a4paper,top=1in,bottom=1in,left=1in,right=1in]{geometry}
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{booktabs}
-\usepackage{algorithm}
-\usepackage{algpseudocode}
 \usepackage{microtype}
 \usepackage{url}
-\usepackage{graphicx}
-\usepackage{setspace}
-\usepackage{tikz}
-\usetikzlibrary{arrows.meta}
+\usepackage{xcolor}
 \usepackage{hyperref}
 
-\onehalfspacing
+\hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
 
-\hypersetup{
-    colorlinks=true,
-    linkcolor=blue,
-    citecolor=blue,
-    urlcolor=blue
-}
-
-% Theorem Environments
 \newtheorem{definition}{Definition}
-\newtheorem{lemma}{Lemma}
-\newtheorem{theorem}{Theorem}
-\newtheorem{example}{Running Example}
-\newtheorem{property}{Property}
-
-\newcommand{\minocc}{\operatorname{min\_occ}}
-\newcommand{\remdur}{\operatorname{rem\_dur}}
-\newcommand{\RDUB}{\operatorname{RDUB}}
+\newtheorem{example}{Example}
+\newtheorem{proposition}{Proposition}
 \newcommand{\EWU}{\operatorname{EWU}}
-\newcommand{\FastHUEM}{\textsf{FastHUEM}}
+\newcommand{\ERU}{\operatorname{ERU}}
+\newcommand{\RDUB}{\operatorname{RDUB}}
 \newcommand{\HUESpan}{\textsf{HUE-Span}}
 \newcommand{\UMEpi}{\textsf{UMEpi}}
 \newcommand{\UPSpan}{\textsf{UP-Span}}
 \newcommand{\TSpan}{\textsf{TSpan}}
+\newcommand{\open}[1]{\textcolor{red}{[Open: #1]}}
 
-\title{\textbf{\LARGE Fast High-Utility Episode Mining under Maximum Duration Constraints with Remaining-Duration Utility Bounds and Zero-Heap Flat Buffers}}
-
-\author{
-    \textbf{Research Blueprint \& Comprehensive Algorithmic Specification}\\[0.5em]
-    \textit{Advanced Data Mining and Symbolic Knowledge Discovery Laboratory}\\
-    \textit{Reference Framework: Fournier-Viger Methodology}
-}
-\date{}
+\title{\textbf{Upper Bounds for High-Utility Episode Mining under a Maximum Duration Constraint:\\ Problem Analysis, Verified Baseline and Research Plan}\\[0.3em]
+\large Working draft --- not a manuscript; contains no experimental results}
+\author{Quan Van\\ Independent Researcher}
+\date{Draft of 20 October 2026}
 
 \begin{document}
-
 \maketitle
 
-\begin{abstract}
-High-Utility Episode Mining (HUEM) in complex event sequences is a fundamental data mining paradigm that discovers temporally ordered event combinations yielding high collective utility (e.g., revenue, operational importance, or risk). However, practical applications impose a strict Maximum Duration constraint ($\textit{win\_len}$), creating a formidable \textit{dual non-monotonicity challenge}: neither statistical support anti-monotonicity nor traditional transaction-level utility upper bounds hold over non-contiguous, duration-bounded episode occurrences. Existing state-of-the-art algorithms, specifically \HUESpan{} (ADMA 2019) and \UMEpi{} (IEEE TAI 2023), suffer from two critical architectural bottlenecks: (1) loose utility upper bounds that overestimate remaining utility by aggregating events far beyond the valid duration horizon, causing combinatorial search space explosion; and (2) pointer-linked, dynamic object allocations on managed runtimes (JVM) that induce severe memory thrashing and garbage collection pauses. 
+\section*{Status of this document}
 
-To overcome these foundational limitations, this paper introduces \FastHUEM{}, an ultra-efficient algorithmic engine. First, we formulate the \textit{Remaining-Duration Utility Bound} ($\RDUB$), which mathematically proves that event utilities occurring beyond the temporal horizon $t_s + \textit{win\_len} - 1$ are strictly inadmissible for sequential extensions. By coupling $\RDUB$ with an $O(1)$ prefix-sum envelope of maximum timestamp utilities, the proposed bound eliminates all surplus utility in constant time. Second, we prove the mathematical soundness, strict pruning superiority ($\RDUB \le \EWU$), and zero false-dismissal completeness of the framework. Third, we design a zero-heap flat buffer memory architecture in ANSI C that completely eliminates dynamic memory allocation during recursive traversal, organizing occurrences into cache-aligned contiguous structures. A comprehensive running example accompanied by full visual diagrams demonstrates why \FastHUEM{} prunes unpromising subtrees that \HUESpan{} and \UMEpi{} are forced to explore. Extensive empirical evaluation on five standard SPMF benchmark datasets demonstrates that \FastHUEM{} achieves up to two orders of magnitude speedup, slashes peak memory consumption by up to $85\%$, and prunes up to $64\%$ of search tree nodes compared to state-of-the-art baselines.
-\end{abstract}
+This draft replaces an earlier version (repository commit \texttt{037d41f61}) that is withdrawn. The earlier version
+(i) reported speedups, memory reductions and pruning ratios for which no implementation or experiment existed;
+(ii) described a hardware platform that was not used;
+(iii) stated that the authors' code of \UMEpi{} was used, although no such code was found;
+(iv) misstated the upper bound of \HUESpan{} (it summed utilities to the end of the sequence, whereas Definition~16 of \cite{fournier2019huespan} stops at $t_s + \mathit{maxDur} - 1$), so that its running example did not show what it claimed;
+(v) proposed a bound ($\RDUB$) that is not valid for the episodes mined by \HUESpan{} (Section~\ref{sec:rdub});
+(vi) contained four references whose DOIs point to other works and two references that could not be found (Section~\ref{sec:corrections}).
+Everything below is either taken from a cited source that was read, verified by a stated procedure, or explicitly marked as open.
 
-\noindent\textbf{Keywords:} Data mining, Complex event sequences, High-utility episode mining, Maximum duration constraint, Upper-bound pruning, Flat buffer memory architecture.
+\section{Problem definition}\label{sec:problem}
 
-\newpage
+We adopt the redefined problem of \HUESpan{} \cite{fournier2019huespan} without change. A complex event sequence is
+$\mathit{CES} = \langle (\mathit{tSE}_{t_1}, t_1), \dots, (\mathit{tSE}_{t_n}, t_n)\rangle$ with $t_1 < \dots < t_n$, where each
+$\mathit{tSE}_{t_i}$ is a set of events. Each event $e$ has an external utility $p(e) > 0$ and, at time $t_i$, an internal utility
+$q(e, t_i) > 0$; $u(e, t_i) = p(e)\, q(e, t_i)$ and $u(SE, t_i) = \sum_{e \in SE} u(e, t_i)$.
 
-% =========================================================================
-% SECTION 1: INTRODUCTION & LITERATURE REVIEW
-% =========================================================================
-\section{Introduction \& Literature Review}
-\label{sec:intro}
-
-The continuous collection of timestamped event logs represents one of the most ubiquitous data generation paradigms in modern cyber-physical and enterprise systems \cite{mannila1997discovery, fournier2021survey}. Complex event sequence analysis plays a pivotal role across high-impact domains, including vehicular telematics \cite{laxman2007fast}, industrial Internet of Things (IoT) sensor monitoring \cite{wu2025oer}, e-commerce user journey analytics \cite{gan2021survey, gan2023discovering}, and financial stock ticker tracking \cite{agrawal1995mining}. In these operational environments, observations arrive as a continuous stream of events characterized by discrete temporal coordinates, symbolic event categories, and quantitative metrics such as operational latency, monetary expenditure, purchase quantity, or sensor signal intensity. 
-
-Classical Frequent Episode Mining (FEM), pioneered by Mannila et al. \cite{mannila1997discovery}, and conventional Frequent Itemset Mining (FIM) \cite{agrawal1995mining, han2000freespan, pei2004mining} operate under the fundamental assumption that pattern frequency directly correlates with operational significance. However, this assumption fails catastrophically in enterprise valuation \cite{yao2004foundational, gan2021survey}. Highly frequent episode patterns in telematics or clickstream logs often reflect trivial background noise (e.g., automated heartbeat pings, DNS handshakes, or repetitive homepage reloads), whereas rare or moderately recurring episode combinations frequently account for catastrophic mechanical faults, advanced persistent threats, or high-margin business transactions. To reconcile algorithmic pattern discovery with actual domain utility, Utility-Driven Pattern Mining (UDPM) has been developed \cite{liu2012directed, tseng2013efficient, fournier2014fhm, zida2017efim}.
-
-Despite its profound analytical utility, High-Utility Episode Mining under Maximum Duration Constraints (HUEM-MD) presents an exceptionally difficult combinatorial challenge termed the \textit{dual non-monotonicity dilemma} \cite{wu2013mining, guo2014high, gan2023discovering}. In classical frequent pattern mining, the Apriori downward-closure property ensures that all super-patterns of an infrequent pattern are unconditionally infrequent \cite{mannila1997discovery, pei2004mining}. In contrast, when external utility (e.g., unit price) and internal utility (e.g., observed quantity) are incorporated into complex event sequences, cumulative utility is non-monotonic: an episode $\alpha$ may possess low utility, yet its sequential extension $\alpha \diamond \langle e \rangle$ can accumulate substantial utility that exceeds the user-defined minimum utility threshold $\mu$. Compounding this difficulty, real-world temporal analysis mandates a strict Maximum Duration constraint ($\textit{win\_len}$), which dictates that all constituent events of an episode occurrence $[t_s, t_e]$ must satisfy $t_e - t_s + 1 \le \textit{win\_len}$ \cite{cule2009mining, tatti2012mining}. Consequently, the temporal admissibility of future events is strictly constrained by the start timestamp $t_s$ of the initial event. This invalidates standard sequence-level upper bounds (such as Sequence-Weighted Utilization or Transaction-Weighted Utilization) \cite{yin2012uspan, truong2020survey, wu2017multithreshold}, because events appearing late in the sequence cannot legally extend an active occurrence without violating the maximum duration threshold.
-
-To tackle this challenge, prior literature introduced foundational algorithms including \UPSpan{} \cite{wu2013mining} and \TSpan{} \cite{guo2014high}, followed by contemporary state-of-the-art algorithms: \HUESpan{} \cite{fournier2019huespan} and \UMEpi{} \cite{gan2023discovering}. Nevertheless, rigorous algorithmic analysis reveals that both contemporary baselines suffer from two fatal bottlenecks:
-\begin{enumerate}
-    \item \textbf{Theoretical Looseness in Upper-Bound Pruning:} \HUESpan{} \cite{fournier2019huespan} relies on Episode-Weighted Utilization ($\EWU$), which overestimates remaining utility by accumulating the total utility of all future events in the database sequence regardless of whether those events can physically satisfy the duration budget of the current prefix. \UMEpi{} \cite{gan2023discovering} identified that \UPSpan{} and \TSpan{} suffered from an incompleteness flaw (incorrectly pruning valid patterns) and proposed an enhanced remaining utility bound; however, \UMEpi{} still aggregates remaining events that fall outside the active occurrence's remaining lifespan. This loose overestimation inflates the upper bound, generating tens of thousands of unpromising candidate nodes that must be needlessly expanded in the depth-first search tree.
-    \item \textbf{Systems-Level Bottlenecks in Managed Runtimes:} Both \HUESpan{} (implemented in SPMF \cite{fournier2016spmf}) and \UMEpi{} are authored in Java and executed on the Java Virtual Machine (JVM). Each recursive pattern extension allocates numerous small heap objects (e.g., utility lists, occurrence objects, ArrayList containers, and candidate wrappers) \cite{fournier2021poerm, chen2024towards}. Under deep search trees on large-scale event sequences, this design induces severe heap fragmentation, cache-line thrashing, and prolonged Garbage Collection (GC) pauses that consume up to $70\%$ of total execution time.
-\end{enumerate}
-
-To definitively resolve both the theoretical upper-bound looseness and the systems-level memory overhead, this paper introduces \FastHUEM{}, an end-to-end high-performance C mining engine. The core contributions of this work are summarized as follows:
-\begin{itemize}
-    \item \textbf{A Strictly Tighter Upper Bound ($\RDUB$):} We mathematically formulate the \textit{Remaining-Duration Utility Bound} ($\RDUB$). By explicitly computing the remaining duration budget $\remdur(occ) = \textit{win\_len} - (t_e - t_s + 1)$ for every minimal occurrence, $\RDUB$ strictly confines the reachable utility horizon to $t \le t_s + \textit{win\_len} - 1$. By leveraging an $O(1)$ precomputed prefix-sum array of maximum timestamp utilities, $\RDUB$ is evaluated in constant time per occurrence.
-    \item \textbf{Formal Proofs of Soundness, Superiority, and Completeness:} We prove by induction that $\RDUB(\alpha)$ is a sound upper bound for any arbitrary sequential extension ($u(\beta) \le \RDUB(\alpha)$). We formally prove that $\RDUB(\alpha) \le \EWU(\alpha)$ universally, with strict inequality whenever events exist beyond the duration horizon. Furthermore, we establish the complete correctness of \FastHUEM{} with zero false dismissals.
-    \item \textbf{Zero-Heap Contiguous Flat Buffer Architecture:} We eliminate heap object churn by implementing a linear scratchpad memory arena in ANSI C. Occurrence intervals, timestamps, and utility values are stored in 16-byte packed contiguous structs that perfectly align with CPU cache lines. Subtree recursions reuse memory through stack-like arena offsets without calling \texttt{malloc()} or \texttt{free()} during traversal.
-    \item \textbf{Comprehensive Visual and Numerical Running Example:} We provide an explicit numerical running example accompanied by full architectural diagrams (Figure~\ref{fig:pruning_trace} and Figure~\ref{fig:flat_arena}) complete with a sequence table, unit profit table, and step-by-step trace showing why $\EWU$ fails to prune an unpromising branch while $\RDUB$ eliminates it immediately.
-    \item \textbf{Empirical Evaluation Protocol:} We outline a rigorous benchmarking protocol on five standard datasets from the SPMF repository (\textsf{Sign}, \textsf{FIFA}, \textsf{BIBLE}, \textsf{Leviathan}, \textsf{Kosarak}), addressing four core Research Questions (RQs) regarding execution time, memory usage, pruning power, and scalability.
-\end{itemize}
-
-The remainder of this paper is structured as follows. Section~\ref{sec:prelim} provides preliminaries, formal problem definitions, and the running example. Section~\ref{sec:algo} details the $\RDUB$ upper bound, theoretical proofs, the flat memory architecture, and the complete algorithms. Section~\ref{sec:experiments} presents the experimental evaluation protocol. Section~\ref{sec:conclusion} concludes the paper.
-
-% =========================================================================
-% SECTION 2: PRELIMINARIES & FORMAL PROBLEM DEFINITION
-% =========================================================================
-\section{Preliminaries \& Formal Problem Definition}
-\label{sec:prelim}
-
-\subsection{Mathematical Foundations}
-Let $I = \{i_1, i_2, \dots, i_m\}$ be a finite alphabet of distinct event types. Each event type $e \in I$ is associated with a positive external utility $p(e) \in \mathbb{R}^+$, representing its static unit profit, weight, or priority.
-
-\begin{definition}[Complex Event Sequence]
-A complex event sequence $S$ is an ordered sequence of event sets:
-\begin{equation}
-S = \langle (E_1, t_1), (E_2, t_2), \dots, (E_n, t_n) \rangle
-\end{equation}
-where each $E_k \subseteq I$ is an event set occurring at discrete integer timestamp $t_k \in \mathbb{N}^+$, with $t_1 < t_2 < \dots < t_n$. Each event $e \in E_k$ is associated with an internal utility (e.g., purchase count, duration, or sensor intensity) denoted by $q(e, t_k) \in \mathbb{R}^+$. The utility of event $e$ at timestamp $t_k$ is:
-\begin{equation}
-u(e, t_k) = p(e) \times q(e, t_k)
-\end{equation}
+\begin{definition}[Episode, occurrence, minimal occurrence {\cite[Defs.~2--4]{fournier2019huespan}}]
+An episode is $\alpha = \langle SE_1, \dots, SE_k\rangle$ with non-empty event sets $SE_i$. An interval $[t_s, t_e]$ is an occurrence of $\alpha$ if $\alpha$ occurs in it with $SE_1$ at $t_s$ and $SE_k$ at $t_e$; it is minimal if no other occurrence of $\alpha$ is a sub-interval of it. $\mathit{moSet}(\alpha)$ denotes the set of minimal occurrences.
 \end{definition}
 
-\begin{definition}[Serial Episode and Occurrence]
-A serial episode $\alpha$ of length $l$ is an ordered sequence of event types, denoted by $\alpha = \langle e_1, e_2, \dots, e_l \rangle$, where $e_j \in I$ for $1 \le j \le l$. A time interval $[t_s, t_e]$ ($t_s \le t_e$) is an occurrence of $\alpha$ in $S$ if there exist distinct timestamps $t_{k_1} < t_{k_2} < \dots < t_{k_l}$ such that:
-\begin{enumerate}
-    \item $t_{k_1} = t_s$ and $t_{k_l} = t_e$;
-    \item $e_j \in E_{k_j}$ for all $1 \le j \le l$.
-\end{enumerate}
-The occurrence is denoted by $occ = [t_s, t_e]$.
+\begin{definition}[Redefined utility {\cite[Def.~12]{fournier2019huespan}}]
+For a minimal occurrence $[t_s, t_e]$ of $\alpha = \langle SE_1, \dots, SE_k\rangle$,
+$u(\alpha, [t_s, t_e]) = u(SE_1, t_s) + \sum_{i=2}^{k-1} \max_x u(SE_i, t_{g(i)_x}) + u(SE_k, t_e)$,
+where the maximum ranges over the time points at which $SE_i$ can be matched in the occurrence; $u(\alpha) = \sum_{mo \in \mathit{moSet}(\alpha)} u(\alpha, mo)$.
 \end{definition}
 
-\begin{definition}[Maximum Duration Validity]
-Given a user-specified maximum duration threshold $\textit{win\_len} \in \mathbb{N}^+$, an occurrence $occ = [t_s, t_e]$ of episode $\alpha$ is valid under the maximum duration constraint if and only if:
-\begin{equation}
-\textit{dur}(occ) = t_e - t_s + 1 \le \textit{win\_len}
-\end{equation}
-An occurrence spanning a temporal duration strictly exceeding $\textit{win\_len}$ is invalid and disregarded.
+\begin{definition}[Maximum duration and problem {\cite[Defs.~13--14]{fournier2019huespan}}]
+A minimal occurrence satisfies the maximum duration if $t_e - t_s + 1 \le \mathit{maxDur}$ (the printed Definition~13 reads $t_e - t_e + 1$, an evident typo; the reference implementation uses $t_s + \mathit{maxDur} - 1$ as the last admissible time point). Given $\mathit{minUtil}$ and $\mathit{maxDur}$, the task is to find every episode with $u(\alpha) \ge \mathit{minUtil}$, counting only minimal occurrences that satisfy $\mathit{maxDur}$. In \cite{fournier2019huespan} and in its implementation, $\mathit{minUtil}$ is a fraction of the total utility of the sequence.
 \end{definition}
 
-\begin{definition}[Minimal Non-Overlapping Occurrence Set]
-An occurrence $occ_1 = [t_{s_1}, t_{e_1}]$ of $\alpha$ is minimal if there is no valid occurrence $occ_2 = [t_{s_2}, t_{e_2}]$ of $\alpha$ such that $[t_{s_2}, t_{e_2}] \subset [t_{s_1}, t_{e_1}]$. Two occurrences $occ_1 = [t_{s_1}, t_{e_1}]$ and $occ_2 = [t_{s_2}, t_{e_2}]$ are non-overlapping if $t_{e_1} < t_{s_2}$ or $t_{e_2} < t_{s_1}$.
+\noindent\open{Definition 12 does not state how the candidate time points $t_{g(i)_x}$ of the middle event sets are restricted (e.g. whether the choices for different $i$ must respect the order of the episode). The reference implementation computes the maximum with a finite-state procedure (\texttt{ComplexSequence.getMaximalUtility}) and only during serial extensions. A brute-force oracle following the text of Definition~12 is needed before the reference implementation can be called correct with respect to the paper (Section~\ref{sec:plan}).}
 
-The minimal non-overlapping occurrence set of $\alpha$ in $S$, denoted as $\minocc(\alpha)$, is the unique maximal set of valid, non-overlapping minimal occurrences of $\alpha$ selected greedily in ascending order of start timestamps.
-\end{definition}
-
-\begin{definition}[Episode Utility]
-Let $occ = [t_s, t_e]$ be an occurrence of episode $\alpha = \langle e_1, e_2, \dots, e_l \rangle$ supported by timestamps $t_{k_1}, \dots, t_{k_l}$. The utility of $\alpha$ with respect to $occ$ is:
-\begin{equation}
-u(\alpha, occ) = \sum_{j=1}^l u(e_j, t_{k_j}) = \sum_{j=1}^l p(e_j) \times q(e_j, t_{k_j})
-\end{equation}
-The total utility of episode $\alpha$ in sequence $S$ is the sum of its utilities over all minimal non-overlapping occurrences:
-\begin{equation}
-u(\alpha) = \sum_{occ \in \minocc(\alpha)} u(\alpha, occ)
-\end{equation}
-\end{definition}
-
-\begin{definition}[Problem Statement: HUEM-MD]
-Given a complex event sequence $S$, an external utility table $p$, a maximum duration threshold $\textit{win\_len}$, and a minimum utility threshold $\mu \in \mathbb{R}^+$, the problem of High-Utility Episode Mining under Maximum Duration Constraints (HUEM-MD) consists of discovering the complete set of high-utility episodes $\mathcal{H}$, defined as:
-\begin{equation}
-\mathcal{H} = \{ \alpha \mid u(\alpha) \ge \mu \text{ and } \minocc(\alpha) \neq \emptyset \}
-\end{equation}
-without generating false dismissals or retaining spurious candidates.
-\end{definition}
-
-% -------------------------------------------------------------------------
-% SECTION 2.2: RUNNING TOY EXAMPLE & VISUALIZATIONS
-% -------------------------------------------------------------------------
-\subsection{Running Toy Example \& Algorithmic Pruning Visualization}
-\label{sec:toy}
-
-To illustrate the mathematical concepts and establish a concrete trace, consider a complex event sequence $S$ consisting of 10 timestamps, an alphabet of five events $I = \{A, B, C, D, E\}$, an external utility table $p$, a maximum duration threshold $\textit{win\_len} = 4$, and a minimum utility threshold $\mu = 35$.
+\section{Baselines that solve the same problem}\label{sec:baselines}
 
 \begin{table}[h]
-\centering
-\caption{Complex Event Sequence $S$ with Internal Quantities $q(e, t_k)$.}
-\label{tab:seq}
-\begin{tabular}{ccl}
+\centering\small
+\caption{Candidate baselines and their status (checked on 20 October 2026).}
+\begin{tabular}{p{2.6cm}p{3.6cm}p{7.6cm}}
 \toprule
-\textbf{Timestamp ($t_k$)} & \textbf{Event Set ($E_k$)} & \textbf{Internal Quantities ($q$)} \\
+Algorithm & Problem solved & Status \\
 \midrule
-1  & $\{A, C\}$    & $q(A, 1) = 2, q(C, 1) = 1$ \\
-2  & $\{B, D\}$    & $q(B, 2) = 1, q(D, 2) = 3$ \\
-3  & $\{C, E\}$    & $q(C, 3) = 2, q(E, 3) = 1$ \\
-4  & $\{A, B\}$    & $q(A, 4) = 1, q(B, 4) = 2$ \\
-5  & $\{D\}$       & $q(D, 5) = 2$ \\
-6  & $\{B, C\}$    & $q(B, 6) = 1, q(C, 6) = 2$ \\
-7  & $\{A, E\}$    & $q(A, 7) = 3, q(E, 7) = 2$ \\
-8  & $\{B, D\}$    & $q(B, 8) = 2, q(D, 8) = 1$ \\
-9  & $\{C\}$       & $q(C, 9) = 3$ \\
-10 & $\{E\}$       & $q(E, 10) = 4$ \\
+\HUESpan{} \cite{fournier2019huespan} & this problem (redefined utility) & Authors' Java code in SPMF \cite{fournier2016spmf}. Ported to C in the \texttt{dm} framework (\texttt{hue\_span}). On the running example of \cite{fournier2019huespan} (minUtil $=0.3$, maxDur $=3$) the port and the Java code return the same 66 episodes with the same utilities and the same six counters printed by \texttt{printStats}; a randomized parity test over six flag configurations is under way. \\
+\HUESpan{} variants & same & ERU only, EEUCP only, EWU: obtained from the same code by its flags, as in \cite[Fig.~3]{fournier2019huespan}. \\
+\UPSpan{} \cite{wu2013mining} & traditional utility (no maximum) & In SPMF. Comparable only for the traditional problem; \cite{fournier2019huespan} reports that it misses up to 65\% of the episodes of the redefined problem. \\
+\UMEpi{} \cite{gan2023discovering} & a different definition (no maximum over time points; duration $T_e - T_s \le \mathit{MTD}$) & No public code found. The copy in the repository is the arXiv preprint 1912.11670v1, not the published version; the computation of $\mathit{moSet}(\beta)$ after a concatenation and the choice of time points within a minimal occurrence are not specified. Not usable as a baseline for this problem. \\
+\TSpan{} \cite{guo2014high} & traditional utility & No public code; \cite{fournier2019huespan} describes it as appearing incomplete. \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{table}[h]
-\centering
-\caption{External Unit Profit Table $p(e)$ for Event Types.}
-\label{tab:profit}
-\begin{tabular}{lccccc}
-\toprule
-\textbf{Event Type ($e$)} & $A$ & $B$ & $C$ & $D$ & $E$ \\
-\midrule
-\textbf{Unit Profit $p(e)$} & \$5 & \$3 & \$2 & \$4 & \$6 \\
-\bottomrule
-\end{tabular}
-\end{table}
+\section{Existing upper bounds}\label{sec:bounds}
 
-Using the external unit profits from Table~\ref{tab:profit}, Table~\ref{tab:util_pre} details the exact utility of each event at every timestamp, along with the maximum timestamp utility $MaxUtil[t] = \max_{e \in E_t} u(e, t)$ and its cumulative prefix sum $PrefixMax[t] = \sum_{j=1}^t MaxUtil[j]$.
+For a minimal occurrence $[t_s, t_e]$ of $\alpha = \langle SE_1, \dots, SE_k\rangle$ satisfying $\mathit{maxDur}$, with $\mathit{tu}(t)$ the total utility of the events at $t$:
+\begin{align}
+\EWU(\alpha, [t_s, t_e]) &= \sum_{i=1}^{k-1} u(SE_i, t_{g(i)}) + \sum_{j=t_e}^{t_s + \mathit{maxDur} - 1} \mathit{tu}(j) && \text{\cite[Def.~16]{fournier2019huespan}}\\
+\ERU(\alpha, [t_s, t_e]) &= \sum_{i=1}^{k} u(SE_i, t_{g(i)}) + u(\mathit{rSE}_{t_e}, t_e) + \sum_{j=t_e+1}^{t_s + \mathit{maxDur} - 1} \mathit{tu}(j) && \text{\cite[Def.~18]{fournier2019huespan}}
+\end{align}
+where $u(\mathit{rSE}_{t_e}, t_e)$ is the utility of the events at $t_e$ that follow the last event of $SE_k$ in the processing order. Both bounds are already restricted to the duration horizon $t_s + \mathit{maxDur} - 1$; summed over $\mathit{moSet}(\alpha)$ they bound the utility of every super-episode obtained by concatenations \cite[Lemma~1]{fournier2019huespan}. The reference implementation computes ERU exactly in this form (utility of the occurrence, \texttt{getIrutil} at $t_e$, and the total utility of $[t_e + 1, t_s + \mathit{maxDur} - 1]$).
 
-\begin{table}[h]
-\centering
-\caption{Event Utilities $u(e, t_k)$, $MaxUtil[t_k]$, and Cumulative Prefix Sum $PrefixMax[t_k]$.}
-\label{tab:util_pre}
-\small
-\begin{tabular}{clcc}
-\toprule
-\textbf{$t_k$} & \textbf{Event Utilities $u(e, t_k) = p(e) \times q(e, t_k)$} & \textbf{$MaxUtil[t_k]$} & \textbf{$PrefixMax[t_k]$} \\
-\midrule
-1  & $u(A, 1) = 5 \times 2 = 10, u(C, 1) = 2 \times 1 = 2$ & 10 & 10 \\
-2  & $u(B, 2) = 3 \times 1 = 3, u(D, 2) = 4 \times 3 = 12$  & 12 & 22 \\
-3  & $u(C, 3) = 2 \times 2 = 4, u(E, 3) = 6 \times 1 = 6$   & 6  & 28 \\
-4  & $u(A, 4) = 5 \times 1 = 5, u(B, 4) = 3 \times 2 = 6$   & 6  & 34 \\
-5  & $u(D, 5) = 4 \times 2 = 8$                             & 8  & 42 \\
-6  & $u(B, 6) = 3 \times 1 = 3, u(C, 6) = 2 \times 2 = 4$   & 4  & 46 \\
-7  & $u(A, 7) = 5 \times 3 = 15, u(E, 7) = 6 \times 2 = 12$ & 15 & 61 \\
-8  & $u(B, 8) = 3 \times 2 = 6, u(D, 8) = 4 \times 1 = 4$   & 6  & 67 \\
-9  & $u(C, 9) = 2 \times 3 = 6$                             & 6  & 73 \\
-10 & $u(E, 10) = 6 \times 4 = 24$                           & 24 & 97 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{example}[Occurrences of 1-Episodes]
-Consider episode $\alpha = \langle A \rangle$. Event $A$ occurs at timestamps $t = 1$, $t = 4$, and $t = 7$.
-\begin{itemize}
-    \item $occ_1 = [1, 1]$: $u(A, occ_1) = 10$. Duration is $1 - 1 + 1 = 1 \le 4$.
-    \item $occ_2 = [4, 4]$: $u(A, occ_2) = 5$. Duration is $4 - 4 + 1 = 1 \le 4$.
-    \item $occ_3 = [7, 7]$: $u(A, occ_3) = 15$. Duration is $7 - 7 + 1 = 1 \le 4$.
-\end{itemize}
-All three occurrences are mutually non-overlapping. Thus, $\minocc(\langle A \rangle) = \{[1, 1], [4, 4], [7, 7]\}$, and its cumulative utility is:
-\begin{equation}
-u(\langle A \rangle) = 10 + 5 + 15 = 30
-\end{equation}
-Because $\mu = 35$, episode $\langle A \rangle$ is not high-utility. However, we must test whether its sequential extensions can satisfy the threshold.
+\begin{example}[Correction of the earlier running example]
+In the sequence of the earlier draft ($A$ at $t=1,4,7$ with utilities 10, 5, 15; $B$ at $t=2,4,6,8$; $\mathit{maxDur} = 4$; $\mu = 35$), the episode $\gamma = \langle A, B, B\rangle$ has the single valid minimal occurrence $[1,4]$ ($A$ at 1, $B$ at 2 and 4). Definition~16 gives $\EWU(\gamma) = u(A,1) + u(B,2) + \mathit{tu}(4) = 10 + 3 + 11 = 24 < 35$, so \HUESpan{} also prunes $\gamma$. The earlier value 101 summed $\mathit{tu}(5), \dots, \mathit{tu}(10)$, which lie beyond the horizon $1 + 4 - 1 = 4$ and are not part of EWU.
 \end{example}
 
-\begin{example}[Extension to 2-Episode $\beta = \langle A, B \rangle$ and Bound Comparison]
-Now consider extending $\langle A \rangle$ with event $B$ to form $\beta = \langle A, B \rangle$, subject to $\textit{win\_len} = 4$.
-We search for valid occurrences of $B$ following each minimal occurrence of $A$:
+\section{The proposed bound RDUB is not valid for this problem}\label{sec:rdub}
+
+The earlier draft replaced, for each future time point in the horizon, the total utility $\mathit{tu}(t)$ by the largest single-event utility $\max_{e} u(e, t)$. This is not an upper bound when an extension may contain several events at the same time point, which the episodes of \HUESpan{} allow (simultaneous concatenation).
+
+\begin{proposition}
+The bound $\RDUB(\alpha) = \sum_{mo} [u(\alpha, mo) + \sum_{t \in (t_e,\, t_s + \mathit{maxDur} - 1]} \max_e u(e,t)]$ can be smaller than the utility of a super-episode of $\alpha$.
+\end{proposition}
+\begin{proof}
+Let $\mathit{CES} = \langle (\{A\}, 1), (\{B, C\}, 2)\rangle$ with $u(A,1) = 1$, $u(B,2) = u(C,2) = 5$, $\mathit{maxDur} = 2$ and $\mu = 10$. Then $\RDUB(\langle A\rangle) = 1 + 5 = 6 < \mu$, so $\langle A\rangle$ and its super-episodes would be pruned, but $\langle (A), (B C)\rangle$ has the minimal occurrence $[1,2]$ and utility $1 + 10 = 11 \ge \mu$.
+\end{proof}
+
+\noindent For serial episodes with one event per position, the per-time-point maximum is a plausible bound, but that is a different (restricted) problem, for which \HUESpan{} is not the natural baseline, and the earlier proof relied on the unproven claim that every minimal occurrence of an extension extends a minimal occurrence of the prefix with the same prefix utility. \open{whether any tightening of ERU remains valid for complex episodes, and by how much it can reduce the search; the slack of ERU (ERU minus the utility actually reached by extensions) has not been measured.}
+
+\section{Research plan}\label{sec:plan}
+
 \begin{enumerate}
-    \item For $occ_1 = [1, 1]$: Event $B$ occurs at timestamp $t = 2$. The extended occurrence is $occ'_1 = [1, 2]$ with duration $2 - 1 + 1 = 2 \le 4$. Utility: $u(\beta, occ'_1) = u(A, 1) + u(B, 2) = 10 + 3 = 13$.
-    \item For $occ_2 = [4, 4]$: Event $B$ occurs at timestamp $t = 6$. The extended occurrence is $occ'_2 = [4, 6]$ with duration $6 - 4 + 1 = 3 \le 4$. (Note: $B$ also occurs at $t = 4$, but serial episode semantics require strict temporal precedence $t_A < t_B$). Utility: $u(\beta, occ'_2) = u(A, 4) + u(B, 6) = 5 + 3 = 8$.
-    \item For $occ_3 = [7, 7]$: Event $B$ occurs at timestamp $t = 8$. The extended occurrence is $occ'_3 = [7, 8]$ with duration $8 - 7 + 1 = 2 \le 4$. Utility: $u(\beta, occ'_3) = u(A, 7) + u(B, 8) = 15 + 6 = 21$.
-\end{enumerate}
-All occurrences are non-overlapping: $[1, 2]$, $[4, 6]$, $[7, 8]$. Thus, $\minocc(\beta) = \{[1, 2], [4, 6], [7, 8]\}$. The exact utility of $\beta$ is:
-\begin{equation}
-u(\beta) = 13 + 8 + 21 = 42 \ge 35 \implies \beta \in \mathcal{H}
-\end{equation}
-Thus, $\langle A, B \rangle$ is a confirmed High-Utility Episode.
-\end{example}
-
-\begin{example}[The Core Breakthrough: Pruning on $\gamma = \langle A, B, B \rangle$]
-Now consider extending $\beta = \langle A, B \rangle$ by appending another event $B$ to form $\gamma = \langle A, B, B \rangle$:
-\begin{itemize}
-    \item For $occ'_1 = [1, 2]$: The reachable horizon is $t \le t_s + \textit{win\_len} - 1 = 1 + 4 - 1 = 4$. Event $B$ appears at $t = 4$. Valid occurrence $occ''_1 = [1, 4]$ with duration $4 \le 4$. Utility: $u(\gamma, occ''_1) = 13 + u(B, 4) = 13 + 6 = 19$. Remaining duration is $4 - 4 = 0$, so no further events can follow this occurrence within duration 4.
-    \item For $occ'_2 = [4, 6]$: The reachable horizon is $t \le 4 + 4 - 1 = 7$. No event $B$ appears in $(6, 7]$. Thus, no extension exists for $occ'_2$.
-    \item For $occ'_3 = [7, 8]$: The reachable horizon is $t \le 7 + 4 - 1 = 10$. No event $B$ appears in $(8, 10]$ (events at $t=9$ are $C$, at $t=10$ are $E$). Thus, no extension exists for $occ'_3$.
-\end{itemize}
-Hence, $\minocc(\gamma) = \{[1, 4]\}$, and the exact utility of $\gamma$ is $u(\gamma) = 19 < 35$.
-
-Now, let us calculate the upper bound for any further extension of $\gamma$:
-\begin{itemize}
-    \item \textbf{Under \HUESpan{} / \UMEpi{} ($\EWU$):}
-    \begin{equation}
-    \EWU(\gamma) = u(\gamma, [1, 4]) + \sum_{t=5}^{10} \sum_{e \in E_t} u(e, t) = 19 + (8 + 7 + 27 + 10 + 6 + 24) = 19 + 82 = 101
-    \end{equation}
-    Since $\EWU(\gamma) = 101 \ge 35$, \textbf{\HUESpan{} and \UMEpi{} CANNOT PRUNE $\gamma$!} Both algorithms are forced to generate candidates and recursively explore subtrees rooted at $\gamma$, wasting CPU cycles and memory allocations!
-    \item \textbf{Under \FastHUEM{} ($\RDUB$):}
-    For $occ''_1 = [1, 4]$, the remaining duration is $\remdur = 4 - (4 - 1 + 1) = 0$. The reachable window $\mathcal{W}(occ''_1) = (4, 4] = \emptyset$.
-    Therefore, $\textit{ru}(occ''_1) = 0$, which yields:
-    \begin{equation}
-    \RDUB(\gamma) = u(\gamma, [1, 4]) + \textit{ru}(occ''_1) = 19 + 0 = 19
-    \end{equation}
-    Since $\RDUB(\gamma) = 19 < 35 = \mu$, \textbf{\FastHUEM{} PRUNES $\gamma$ AND ITS ENTIRE SUBTREE IMMEDIATELY!}
-\end{itemize}
-This running example provides concrete numerical proof of why $\RDUB$ achieves strict pruning superiority over $\EWU$.
-\end{example}
-
-% -------------------------------------------------------------------------
-% FIGURE 1: TIKZ VISUALIZATION OF PRUNING TRACE
-% -------------------------------------------------------------------------
-\begin{figure*}[t]
-\centering
-\begin{tikzpicture}[
-    xscale=1.1, yscale=1.0,
-    timebox/.style={draw, minimum width=1.0cm, minimum height=0.6cm, rounded corners=2pt, font=\small, fill=blue!5},
-    eventtext/.style={font=\scriptsize, align=center},
-    occbar/.style={draw=blue!80!black, line width=1.8pt, -{Stealth[length=2mm]}},
-    reachwin/.style={draw=green!60!black, line width=1.5pt, fill=green!10, fill opacity=0.35},
-    outwin/.style={draw=red!70!black, line width=1.5pt, fill=red!15, fill opacity=0.35, dashed},
-    treebox/.style={draw, rectangle, rounded corners=3pt, font=\footnotesize, inner sep=3pt, fill=gray!10},
-    prunedbox/.style={draw=red, rectangle, rounded corners=3pt, font=\footnotesize\bfseries, inner sep=3pt, fill=red!15, text=red!80!black}
-]
-
-% Panel (a) Header
-\node[anchor=west, font=\bfseries\normalsize] at (0.3, 4.0) {(a) Complex Event Sequence Timeline and Bounded Duration Horizon ($\textit{win\_len} = 4$)};
-
-% Timestamps 1 to 10
-\node[timebox] (t1) at (1.2, 2.5) {$t_1$};
-\node[eventtext] at (1.2, 1.85) {$\{A, C\}$};
-\node[eventtext, gray!80!black] at (1.2, 1.45) {$u_A{=}10$};
-
-\node[timebox] (t2) at (2.4, 2.5) {$t_2$};
-\node[eventtext] at (2.4, 1.85) {$\{B, D\}$};
-\node[eventtext, gray!80!black] at (2.4, 1.45) {$u_B{=}3$};
-
-\node[timebox] (t3) at (3.6, 2.5) {$t_3$};
-\node[eventtext] at (3.6, 1.85) {$\{C, E\}$};
-\node[eventtext, gray!80!black] at (3.6, 1.45) {$u_E{=}6$};
-
-\node[timebox] (t4) at (4.8, 2.5) {$t_4$};
-\node[eventtext] at (4.8, 1.85) {$\{A, B\}$};
-\node[eventtext, gray!80!black] at (4.8, 1.45) {$u_B{=}6$};
-
-\node[timebox] (t5) at (6.0, 2.5) {$t_5$};
-\node[eventtext] at (6.0, 1.85) {$\{D\}$};
-\node[eventtext, gray!80!black] at (6.0, 1.45) {$u_D{=}8$};
-
-\node[timebox] (t6) at (7.2, 2.5) {$t_6$};
-\node[eventtext] at (7.2, 1.85) {$\{B, C\}$};
-\node[eventtext, gray!80!black] at (7.2, 1.45) {$u_C{=}4$};
-
-\node[timebox] (t7) at (8.4, 2.5) {$t_7$};
-\node[eventtext] at (8.4, 1.85) {$\{A, E\}$};
-\node[eventtext, gray!80!black] at (8.4, 1.45) {$u_A{=}15$};
-
-\node[timebox] (t8) at (9.6, 2.5) {$t_8$};
-\node[eventtext] at (9.6, 1.85) {$\{B, D\}$};
-\node[eventtext, gray!80!black] at (9.6, 1.45) {$u_B{=}6$};
-
-\node[timebox] (t9) at (10.8, 2.5) {$t_9$};
-\node[eventtext] at (10.8, 1.85) {$\{C\}$};
-\node[eventtext, gray!80!black] at (10.8, 1.45) {$u_C{=}6$};
-
-\node[timebox] (t10) at (12.0, 2.5) {$t_{10}$};
-\node[eventtext] at (12.0, 1.85) {$\{E\}$};
-\node[eventtext, gray!80!black] at (12.0, 1.45) {$u_E{=}24$};
-
-% Axis line
-\draw[->, thick, gray!60] (0.5, 2.5) -- (12.8, 2.5) node[right, font=\scriptsize] {Time};
-
-% Episode gamma occurrence [1, 4]
-\draw[occbar, color=blue!70!black] (1.2, 0.9) -- (4.8, 0.9);
-\node[anchor=west, font=\scriptsize\bfseries, color=blue!80!black] at (5.0, 0.9) {Occurrence $occ''_1 = [1, 4]$ of $\gamma = \langle A, B, B \rangle$ ($\textit{dur} = 4 \le \textit{win\_len}$)};
-
-% Valid Duration Window [1, 4]
-\draw[reachwin] (0.6, 0.4) rectangle (5.4, 3.2);
-\node[font=\scriptsize\bfseries, color=green!50!black] at (3.0, 0.15) {Reachable Window: $t \in [1, 4]$ ($PrefixMax = 34$)};
-
-% Inadmissible / Out-of-budget Window [5, 10]
-\draw[outwin] (5.5, 0.4) rectangle (12.6, 3.2);
-\node[font=\scriptsize\bfseries, color=red!70!black] at (9.0, 0.15) {Out-of-Budget Region: $t \in [5, 10]$ (Surplus Utility: $+82$)};
-
-% Annotations of Bound Differences
-\node[anchor=west, font=\scriptsize, align=left, draw=black!40, fill=white, rounded corners=2pt] at (0.6, -0.8) {
-    \begin{tabular}{l}
-    \textbf{Under HUE-Span / UMEpi (EWU):} $\EWU(\gamma) = u(\gamma) + \sum_{t=5}^{10} u(E_t) = 19 + 82 = \mathbf{101 \ge 35} \implies$ \textcolor{red}{\textbf{FAILED TO PRUNE! Subtree expanded}}\\
-    \textbf{Under FastHUEM (RDUB):} $\remdur([1, 4]) = 4 - 4 = 0 \implies \mathcal{W} = \emptyset \implies \RDUB(\gamma) = 19 + 0 = \mathbf{19 < 35} \implies$ \textcolor{green!60!black}{\textbf{PRUNED IMMEDIATELY!}}
-    \end{tabular}
-};
-
-% Panel (b) Header
-\node[anchor=west, font=\bfseries\normalsize] at (0.3, -1.8) {(b) Search Tree Traversal and Pruning Comparison};
-
-% Search Tree nodes
-\node[treebox] (root) at (1.5, -2.6) {Root $\emptyset$};
-\node[treebox] (A) at (4.0, -2.6) {\begin{tabular}{c} $\langle A \rangle$ \\ ($u=30$) \end{tabular}};
-\node[treebox] (AB) at (6.8, -2.6) {\begin{tabular}{c} $\langle A, B \rangle$ \\ ($u=42 \ge \mu$) \end{tabular}};
-\node[treebox] (ABB) at (10.0, -2.6) {\begin{tabular}{c} $\gamma = \langle A, B, B \rangle$ \\ ($u=19 < \mu$) \end{tabular}};
-
-\draw[->, thick] (root) -- (A);
-\draw[->, thick] (A) -- (AB);
-\draw[->, thick] (AB) -- (ABB);
-
-% HUE-Span expansion path
-\node[treebox, dashed, draw=red!70!black, fill=red!5] (child1) at (12.2, -3.8) {\begin{tabular}{c} $\langle A,B,B,C \rangle$ \\ $\EWU \ge \mu$ \end{tabular}};
-\draw[->, thick, dashed, red!70!black] (ABB) -- (child1);
-\node[font=\tiny, color=red!80!black, align=center] at (12.2, -4.5) {HUE-Span / UMEpi\\Traverse Subtree};
-
-% FastHUEM cutoff
-\draw[line width=2.5pt, red!80!black] (9.6, -3.3) -- (10.4, -2.1);
-\draw[line width=2.5pt, red!80!black] (9.6, -2.1) -- (10.4, -3.3);
-\node[prunedbox] at (10.0, -3.8) {\begin{tabular}{c} PRUNED by RDUB \\ ($\RDUB = 19 < 35$) \\ Zero Allocations \end{tabular}};
-
-\end{tikzpicture}
-\caption{Visual trace of the Remaining-Duration Utility Bound ($\RDUB$) vs. Episode-Weighted Utilization ($\EWU$) on the running example: (a) Sequence timeline illustrating the strict truncation of out-of-budget surplus utility beyond $t_s + \textit{win\_len} - 1$; (b) Comparison of depth-first search tree exploration: \HUESpan{} and \UMEpi{} erroneously expand the unpromising subtree rooted at $\gamma = \langle A, B, B \rangle$, whereas \FastHUEM{} prunes the entire subtree immediately.}
-\label{fig:pruning_trace}
-\end{figure*}
-
-% =========================================================================
-% SECTION 3: PROPOSED ALGORITHM & THEORETICAL PROOFS
-% =========================================================================
-\section{Proposed Algorithm \& Theoretical Proofs}
-\label{sec:algo}
-
-\subsection{The Remaining-Duration Utility Bound (\texorpdfstring{$\RDUB$}{RDUB})}
-For an occurrence $occ = [t_s, t_e] \in \minocc(\alpha)$, the remaining duration budget available for any future sequential extension is:
-\begin{equation}
-\remdur(occ) = \textit{win\_len} - (t_e - t_s + 1)
-\end{equation}
-Any valid sequential extension $\beta = \alpha \diamond \langle e' \rangle$ extending $occ$ must observe $e'$ at a timestamp $t'$ satisfying:
-\begin{equation}
-t_e < t' \le t_s + \textit{win\_len} - 1
-\end{equation}
-Let $\mathcal{W}(occ) = (t_e, t_s + \textit{win\_len} - 1] \cap \{t_1, \dots, t_n\}$ be the set of valid future timestamps within the temporal duration budget of $occ$. The maximum potential remaining utility achievable from $occ$ is:
-\begin{equation}
-\textit{ru}(occ) = \sum_{t_k \in \mathcal{W}(occ)} \max_{e \in E_k} u(e, t_k)
-\end{equation}
-Using the cumulative prefix sum array $PrefixMax[t] = \sum_{j=1}^t MaxUtil[j]$ (where $MaxUtil[j] = \max_{e \in E_j} u(e, j)$ if timestamp $j$ exists in $S$, and 0 otherwise), $\textit{ru}(occ)$ is computed in strictly $O(1)$ time:
-\begin{equation}
-\label{eq:ru_o1}
-\textit{ru}(occ) = PrefixMax[t_s + \textit{win\_len} - 1] - PrefixMax[t_e]
-\end{equation}
-The Remaining-Duration Utility Bound of episode $\alpha$, denoted by $\RDUB(\alpha)$, is:
-\begin{equation}
-\label{eq:rdub}
-\RDUB(\alpha) = \sum_{occ \in \minocc(\alpha)} \left[ u(\alpha, occ) + \textit{ru}(occ) \right]
-\end{equation}
-
-\subsection{Theoretical Foundations \& Proofs}
-
-\begin{lemma}[Soundness / Overestimation Guarantee]
-\label{lem:soundness}
-Let $\alpha$ be a serial episode and $\beta = \alpha \diamond \gamma$ be any arbitrary valid sequential extension of $\alpha$ where $\gamma = \langle g_1, \dots, g_k \rangle$. Then,
-\begin{equation}
-u(\beta) \le \RDUB(\alpha)
-\end{equation}
-\end{lemma}
-
-\begin{proof}
-Let $\minocc(\beta)$ be the minimal non-overlapping occurrence set of $\beta$. By the prefix-monotonicity of occurrences, every occurrence $occ' = [t'_s, t'_e] \in \minocc(\beta)$ must be an extension of some occurrence $occ = [t_s, t_e]$ of $\alpha$, where $t_s = t'_s$ and $t_e < t'_e$. Furthermore, since $\beta$ is valid under $\textit{win\_len}$, we have $t'_e - t'_s + 1 \le \textit{win\_len}$, which implies:
-\begin{equation}
-t'_e \le t_s + \textit{win\_len} - 1
-\end{equation}
-Thus, all timestamps $t_{k_1}, \dots, t_{k_k}$ supporting the extension events $g_1, \dots, g_k$ satisfy $t_{k_j} \in \mathcal{W}(occ)$.
-
-By Definition~\ref{eq:rdub}, the utility accumulated by $\beta$ across $occ'$ satisfies:
-\begin{align}
-u(\beta, occ') &= u(\alpha, occ) + \sum_{j=1}^k u(g_j, t_{k_j}) \nonumber \\
-&\le u(\alpha, occ) + \sum_{t \in \mathcal{W}(occ)} \max_{e \in E_t} u(e, t) \nonumber \\
-&= u(\alpha, occ) + \textit{ru}(occ)
-\end{align}
-Because occurrences in $\minocc(\beta)$ are mutually non-overlapping, each $occ' \in \minocc(\beta)$ maps to a distinct disjoint temporal interval in $S$. Summing over all $occ' \in \minocc(\beta)$:
-\begin{align}
-u(\beta) &= \sum_{occ' \in \minocc(\beta)} u(\beta, occ') \nonumber \\
-&\le \sum_{occ \in \minocc(\alpha)} [u(\alpha, occ) + \textit{ru}(occ)] = \RDUB(\alpha)
-\end{align}
-This completes the proof.
-\end{proof}
-
-\begin{lemma}[Pruning Superiority over \texorpdfstring{$\EWU$}{EWU}]
-\label{lem:superiority}
-For any episode $\alpha$ and sequence $S$ under maximum duration $\textit{win\_len}$,
-\begin{equation}
-\RDUB(\alpha) \le \EWU(\alpha)
-\end{equation}
-Moreover, whenever there exists at least one timestamp $t_k > t_s + \textit{win\_len} - 1$ within the sequence window, the inequality is strictly tight: $\RDUB(\alpha) < \EWU(\alpha)$.
-\end{lemma}
-
-\begin{proof}
-In \HUESpan{} and \UMEpi{}, the Episode-Weighted Utilization is formulated as:
-\begin{equation}
-\EWU(\alpha) = \sum_{occ \in \minocc(\alpha)} \left[ u(\alpha, occ) + \sum_{t_k > t_e}^{t_n} \sum_{e \in E_k} u(e, t_k) \right]
-\end{equation}
-Subtracting $\RDUB(\alpha)$ from $\EWU(\alpha)$:
-\begin{align}
-\EWU(\alpha) - \RDUB(\alpha) &= \sum_{occ \in \minocc(\alpha)} \Bigg[ \sum_{t_k \in \mathcal{W}(occ)} \Big(\sum_{e \in E_k} u(e, t_k) - \max_{e \in E_k} u(e, t_k)\Big) \nonumber \\
-&\quad + \sum_{t_k > t_s + \textit{win\_len} - 1}^{t_n} \sum_{e \in E_k} u(e, t_k) \Bigg] \ge 0
-\end{align}
-The surplus term $\sum_{t_k > t_s + \textit{win\_len} - 1}^{t_n} \sum_{e \in E_k} u(e, t_k)$ consists strictly of event utilities occurring beyond the temporal reach of $\alpha$. Because $u(e, t_k) > 0$, this difference is strictly positive whenever the sequence extends past $t_s + \textit{win\_len} - 1$. Thus, $\RDUB(\alpha)$ cuts off all out-of-budget utility, establishing strict pruning superiority.
-\end{proof}
-
-\begin{theorem}[Completeness and Correctness]
-\label{thm:correctness}
-The \FastHUEM{} algorithm discovers all high-utility episodes in $S$ satisfying $u(\alpha) \ge \mu$ without false dismissals.
-\end{theorem}
-
-\begin{proof}
-The proof follows directly from Lemma~\ref{lem:soundness} and Lemma~\ref{lem:superiority}. If $\RDUB(\alpha) < \mu$, then for any arbitrary extension $\beta = \alpha \diamond \gamma$, we have $u(\beta) \le \RDUB(\alpha) < \mu$. Hence, no extension of $\alpha$ can ever be a high-utility episode. Pruning the subtree rooted at $\alpha$ guarantees zero false dismissals. Conversely, every generated episode $\alpha$ has its exact utility $u(\alpha)$ evaluated against $\mu$ prior to output, ensuring zero false positives.
-\end{proof}
-
-\subsection{Zero-Heap Flat Buffer Memory Architecture}
-To eliminate the severe JVM memory allocations identified in prior baselines, \FastHUEM{} is implemented in ANSI C using a flat, contiguous memory layout:
-\begin{enumerate}
-    \item \textbf{Linear Scratchpad Arena:} Memory is pre-allocated as a single contiguous arena block at startup. Each recursion depth $d$ in the depth-first search tree accesses a dedicated offset slice $\mathcal{A}[d \times \textit{STRIDE}]$. When backtracking from depth $d+1$ to $d$, the arena pointer simply rewinds. No runtime calls to \texttt{malloc()} or \texttt{free()} occur during search space traversal.
-    \item \textbf{Contiguous Occurrence Buffers:} An occurrence $occ$ is stored as a 16-byte packed structure:
-    \begin{equation}
-    \texttt{struct Occ } \{ \texttt{uint32\_t } t_s; \texttt{uint32\_t } t_e; \texttt{float } util; \texttt{float } ru; \}
-    \end{equation}
-    Occurrences of an episode are stored sequentially in array memory. Forward extension evaluations scan memory linearly, perfectly matching CPU L1/L2 prefetching hardware cache lines.
+\item \textbf{Oracle.} Brute-force enumeration of episodes and minimal occurrences on small random sequences, with the utility of Definition~12 computed by exhaustive search over the admissible time points; compare with the \HUESpan{} reference implementation. Any difference must be reported with a minimal counterexample.
+\item \textbf{Parity.} Complete the randomized parity test of the C port against the Java code (all six flag configurations).
+\item \textbf{Slack measurement.} Instrument the port to record, per expanded episode, ERU and the largest utility reached in its subtree, to determine whether a tighter bound can matter before designing one.
+\item \textbf{Fair comparison.} Any new algorithm is compared with the C port of \HUESpan{} in the same framework (same language, same input parsing), on the datasets of \cite{fournier2019huespan} (Retail, Kosarak, T25I10N1KD10KQ10F5 with synthetic utilities); the generation procedure and seeds of the utilities must be documented. Platform: Intel Core i7-10700, 32~GiB RAM, Ubuntu 24.04, GCC 13.3, single thread.
 \end{enumerate}
 
-% -------------------------------------------------------------------------
-% FIGURE 2: TIKZ VISUALIZATION OF MEMORY ARCHITECTURE
-% -------------------------------------------------------------------------
-\begin{figure*}[t]
-\centering
-\begin{tikzpicture}[
-    xscale=1.0, yscale=0.9,
-    boxjvm/.style={draw=red!70!black, rectangle, rounded corners=2pt, font=\scriptsize, align=center, fill=red!5},
-    boxc/.style={draw=blue!70!black, rectangle, rounded corners=2pt, font=\scriptsize, align=center, fill=blue!5},
-    cacheline/.style={draw=green!60!black, line width=1.2pt, fill=green!10, rounded corners=3pt}
-]
+\section{Corrections to the reference list}\label{sec:corrections}
 
-% Panel (a) JVM Pointer-Heavy Architecture
-\node[anchor=west, font=\bfseries\normalsize] at (0.0, 3.5) {(a) Baseline JVM Architecture (HUE-Span / UMEpi): Pointer Churn \& GC Fragmentation};
+Each DOI of the earlier list was resolved with the Crossref API on 20 October 2026. Removed: ``Mining closed episodes with overlap'' (Tatti and Cule, TKDD 2012) and ``Mining episodes with a threshold on duration'' (Cule, Goethals and Tatti, ICDM 2009): their DOIs resolve to unrelated papers and no record with these titles was found in OpenAlex. Corrected: USpan (DOI 10.1145/2339530.2339636), FHM (DOI 10.1007/978-3-319-08326-1\_9, pp.~83--92), \HUESpan{} (pp.~169--184), MaxFEM (pp.~86--98), TKE (pp.~832--845), Wu et al.\ 2017 (pp.~215--229).
 
-\node[boxjvm, minimum width=2.5cm, minimum height=0.9cm] (arr1) at (1.8, 2.2) {Episode Object\\(16B Header + Refs)};
-\node[boxjvm, minimum width=2.5cm, minimum height=0.9cm] (arr2) at (5.5, 2.2) {ArrayList$\langle$Occ$\rangle$\\(24B Object Header)};
-\node[boxjvm, minimum width=2.0cm, minimum height=0.8cm] (o1) at (9.0, 2.7) {Occ Node 1\\(24B + 8B Ptr)};
-\node[boxjvm, minimum width=2.0cm, minimum height=0.8cm] (o2) at (9.0, 1.5) {Occ Node 2\\(24B + 8B Ptr)};
-
-\draw[->, thick, red!80!black] (arr1) -- (arr2);
-\draw[->, thick, red!80!black] (arr2.east) -- (o1.west);
-\draw[->, thick, red!80!black] (arr2.east) -- (o2.west);
-
-\node[anchor=west, font=\scriptsize, color=red!80!black] at (11.0, 2.1) {
-    \begin{tabular}{l}
-    $\bullet$ Dispersed heap addresses\\
-    $\bullet$ L1/L2 Cache misses\\
-    $\bullet$ 32B--48B per occurrence\\
-    $\bullet$ Heavy GC pause penalties
-    \end{tabular}
-};
-
-% Divider
-\draw[gray!40, thick, dashed] (0.0, 0.5) -- (14.0, 0.5);
-
-% Panel (b) FastHUEM Zero-Heap Flat Arena
-\node[anchor=west, font=\bfseries\normalsize] at (0.0, -0.2) {(b) Proposed FastHUEM Zero-Heap Flat Buffer Architecture in C};
-
-% Pre-allocated Arena
-\draw[draw=black!70, fill=gray!10, rounded corners=3pt] (0.5, -2.2) rectangle (13.5, -1.0);
-\node[font=\footnotesize\bfseries] at (7.0, -0.7) {Pre-Allocated Contiguous Linear Memory Arena $\mathcal{A}$ ($MAX\_DEPTH \times STRIDE$)};
-
-% Slices per depth
-\node[boxc, minimum width=3.8cm, minimum height=0.8cm] (d0) at (2.6, -1.6) {Depth 0 Slice\\($\minocc$ Prefix $\alpha$)};
-\node[boxc, minimum width=3.8cm, minimum height=0.8cm] (d1) at (6.8, -1.6) {Depth 1 Slice\\($\minocc$ Extension $\beta$)};
-\node[boxc, minimum width=2.5cm, minimum height=0.8cm, dashed] (d2) at (10.5, -1.6) {Depth 2 Slice\\(Rewound upon backtrack)};
-
-% Packed 16B Occ Struct within cache line
-\draw[cacheline] (1.0, -3.8) rectangle (13.0, -2.6);
-\node[font=\scriptsize\bfseries, color=green!50!black] at (7.0, -2.85) {CPU 64-Byte Cache Line: Perfectly Packed Contiguous Array of 16-Byte Occurrence Structs};
-
-\node[draw=blue!80!black, fill=white, font=\tiny, minimum width=2.7cm, minimum height=0.6cm] at (2.5, -3.35) {\texttt{Occ 0: [ts, te, util, ru]}};
-\node[draw=blue!80!black, fill=white, font=\tiny, minimum width=2.7cm, minimum height=0.6cm] at (5.5, -3.35) {\texttt{Occ 1: [ts, te, util, ru]}};
-\node[draw=blue!80!black, fill=white, font=\tiny, minimum width=2.7cm, minimum height=0.6cm] at (8.5, -3.35) {\texttt{Occ 2: [ts, te, util, ru]}};
-\node[draw=blue!80!black, fill=white, font=\tiny, minimum width=2.7cm, minimum height=0.6cm] at (11.5, -3.35) {\texttt{Occ 3: [ts, te, util, ru]}};
-
-\end{tikzpicture}
-\caption{Memory architecture comparison: (a) JVM baseline model suffering from object header overhead, pointer indirection, and garbage collection churn; (b) \FastHUEM{} zero-heap linear scratchpad arena in C storing 16-byte packed occurrences in contiguous, cache-aligned arrays.}
-\label{fig:flat_arena}
-\end{figure*}
-
-\subsection{Formal Algorithm Specification}
-
-The operational workflow of \FastHUEM{} is formalized in Algorithm~\ref{alg:main} and Algorithm~\ref{alg:extend}.
-
-\begin{algorithm}[h]
-\caption{\FastHUEM{} Main Procedure}
-\label{alg:main}
-\begin{algorithmic}[1]
-\Require Complex sequence $S$, external utility table $p$, window $\textit{win\_len}$, threshold $\mu$
-\Ensure The complete set of high-utility episodes $\mathcal{H}$
-\State $\mathcal{H} \gets \emptyset$
-\State Allocate contiguous memory arena $\mathcal{A}$ of size $MAX\_DEPTH \times STRIDE$
-\State Scan $S$ to compute event utilities $u(e, t_k) \gets p(e) \times q(e, t_k)$
-\State Compute $MaxUtil[t_k] \gets \max_{e \in E_k} u(e, t_k)$ for each $t_k \in S$
-\State Compute prefix sum array $PrefixMax[t] \gets \sum_{j=1}^t MaxUtil[j]$ for all $1 \le t \le t_n$
-\State Identify all distinct event types appearing in $S$: $\mathcal{C} \gets \{ e \in I \mid \exists t_k, e \in E_k \}$
-\State Sort $\mathcal{C}$ in ascending order of unit profit $p(e)$
-\For{\textbf{each} $e \in \mathcal{C}$}
-    \State Extract minimal occurrences of 1-episode $\langle e \rangle$: $\minocc(\langle e \rangle) \gets \{ [t_k, t_k] \mid e \in E_k \}$
-    \State $u(\langle e \rangle) \gets \sum_{[t, t] \in \minocc(\langle e \rangle)} u(e, t)$
-    \State $\RDUB(\langle e \rangle) \gets \sum_{[t, t] \in \minocc(\langle e \rangle)} [ u(e, t) + PrefixMax[t + \textit{win\_len} - 1] - PrefixMax[t] ]$
-    \If{$u(\langle e \rangle) \ge \mu$}
-        \State $\mathcal{H} \gets \mathcal{H} \cup \{ \langle e \rangle \}$
-    \EndIf
-    \If{$\RDUB(\langle e \rangle) \ge \mu$}
-        \State \Call{FastHUEM-Extend}{$\langle e \rangle, \minocc(\langle e \rangle), \mathcal{C}, 1, \mathcal{A}, \mu, \textit{win\_len}, PrefixMax, \mathcal{H}$}
-    \EndIf
-\EndFor
-\State Free memory arena $\mathcal{A}$
-\State \Return $\mathcal{H}$
-\end{algorithmic}
-\end{algorithm}
-
-\begin{algorithm}[h]
-\caption{Recursive Depth-First Traversal (\texttt{FastHUEM-Extend})}
-\label{alg:extend}
-\begin{algorithmic}[1]
-\Require Prefix episode $\alpha$, occurrence buffer $\minocc(\alpha)$, candidate set $\mathcal{C}$, recursion depth $d$, arena $\mathcal{A}$, threshold $\mu$, window $\textit{win\_len}$, prefix table $PrefixMax$, output set $\mathcal{H}$
-\For{\textbf{each} extension event $e \in \mathcal{C}$}
-    \State $\beta \gets \alpha \diamond \langle e \rangle$
-    \State Point $\textit{buf}_\beta$ to arena buffer slice at offset $\mathcal{A}[d]$
-    \State $\textit{count} \gets 0$; $u(\beta) \gets 0$; $\RDUB(\beta) \gets 0$; $\textit{last\_end} \gets 0$
-    \For{\textbf{each} $occ_\alpha = [t_s, t_e] \in \minocc(\alpha)$}
-        \If{$t_s \le \textit{last\_end}$}
-            \State \textbf{continue} \Comment{Enforce greedy minimal non-overlapping semantics}
-        \EndIf
-        \State Search earliest $t_k \in (t_e, t_s + \textit{win\_len} - 1]$ such that $e \in E_k$
-        \If{$t_k$ exists}
-            \State $occ_\beta.t_s \gets t_s$; $occ_\beta.t_e \gets t_k$
-            \State $occ_\beta.util \gets u(\alpha, occ_\alpha) + u(e, t_k)$
-            \State $occ_\beta.ru \gets PrefixMax[\min(t_n, t_s + \textit{win\_len} - 1)] - PrefixMax[t_k]$
-            \State Append $occ_\beta$ to $\textit{buf}_\beta[\textit{count}++]$
-            \State $u(\beta) \gets u(\beta) + occ_\beta.util$
-            \State $\RDUB(\beta) \gets \RDUB(\beta) + occ_\beta.util + occ_\beta.ru$
-            \State $\textit{last\_end} \gets t_k$ \Comment{Advance non-overlapping boundary}
-        \EndIf
-    \EndFor
-    \If{$u(\beta) \ge \mu$}
-        \State $\mathcal{H} \gets \mathcal{H} \cup \{ \beta \}$
-    \EndIf
-    \If{$\RDUB(\beta) \ge \mu$ \textbf{and} $\textit{count} > 0$}
-        \State \Call{FastHUEM-Extend}{$\beta, \textit{buf}_\beta[0 \dots \textit{count}-1], \mathcal{C}, d+1, \mathcal{A}, \mu, \textit{win\_len}, PrefixMax, \mathcal{H}$}
-    \EndIf
-\EndFor
-\end{algorithmic}
-\end{algorithm}
-
-% =========================================================================
-% SECTION 4: EXPERIMENTAL EVALUATION PROTOCOL
-% =========================================================================
-\section{Experimental Evaluation Protocol}
-\label{sec:experiments}
-
-\subsection{Experimental Setup \& Baselines}
-All experiments are designed to execute on an isolated bare-metal server powered by an Intel Xeon E5-2680 v4 CPU (14 cores, 2.40 GHz, 35 MB L3 Cache) with 64 GB ECC DDR4 RAM running Ubuntu Linux 22.04 LTS. 
-\begin{itemize}
-    \item \textbf{C Implementation:} \FastHUEM{} is compiled using \texttt{gcc 11.4.0} with compiler optimization flags: \texttt{-O3 -march=native -flto -DNDEBUG}.
-    \item \textbf{JVM Baselines:} \HUESpan{} \cite{fournier2019huespan} (obtained directly from the SPMF repository v2.60 \cite{fournier2016spmf}) and \UMEpi{} \cite{gan2023discovering} (obtained from authors' official repository) are executed on OpenJDK 64-Bit Server VM (build 17.0.10) with heap parameters locked to \texttt{-Xms32G -Xmx32G -XX:+UseG1GC}.
-\end{itemize}
-
-\subsection{Benchmark Datasets}
-To evaluate algorithmic performance across diverse sequential properties, five standard public benchmark datasets from the open-source SPMF data mining repository are selected. Their physical characteristics are summarized in Table~\ref{tab:datasets}.
-
-\begin{table}[h]
-\centering
-\caption{Characteristics of standard benchmark datasets from the SPMF repository.}
-\label{tab:datasets}
-\begin{tabular}{lrrrr}
-\toprule
-\textbf{Dataset} & \textbf{$|S|$ (Events)} & \textbf{$|I|$ (Distinct)} & \textbf{Avg. $|E_k|$} & \textbf{Domain Type} \\
-\midrule
-\textsf{Sign}       & 730       & 267    & 51.2 & Sign Language \\
-\textsf{FIFA}       & 20,450    & 2,990  & 1.8  & Web Clickstream \\
-\textsf{BIBLE}      & 36,369    & 13,905 & 1.0  & Natural Language \\
-\textsf{Leviathan}  & 58,345    & 9,025  & 1.0  & Dense Literary \\
-\textsf{Kosarak}    & 990,000   & 41,270 & 1.2  & Massive Clickstream \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Core Research Questions \& Metrics}
-The empirical investigation is structured around four definitive research questions (RQs):
-\begin{itemize}
-    \item \textbf{RQ1: Runtime Efficiency vs. Threshold $\mu$.} How does the execution runtime of \FastHUEM{} scale against \HUESpan{} and \UMEpi{} as $\mu$ is systematically decreased down to boundary saturation limits?
-    \item \textbf{RQ2: Peak Memory Footprint.} What is the precise peak RAM consumption (MB) measured via \texttt{getrusage(RUSAGE\_CHILDREN)} and JVM JMX instrumentation across varying parameter settings?
-    \item \textbf{RQ3: Pruning Efficacy (Search Space Nodes).} In a runtime-independent and language-agnostic comparison, how many candidate nodes are generated and visited by $\RDUB$ compared against $\EWU$?
-    \item \textbf{RQ4: Scalability with Sequence Length and Duration.} How gracefully does \FastHUEM{} scale when sequence length $|S|$ is scaled from $20\%$ to $100\%$, and when $\textit{win\_len}$ is widened from 5 to 50 timestamps?
-\end{itemize}
-
-% =========================================================================
-% SECTION 5: CONCLUSION
-% =========================================================================
-\section{Conclusion}
-\label{sec:conclusion}
-This research blueprint presents \FastHUEM{}, an ultra-low latency algorithmic framework for High-Utility Episode Mining under Maximum Duration constraints. By formulating the mathematically proven Remaining-Duration Utility Bound ($\RDUB$), the proposed approach cuts off out-of-budget candidate utility in $O(1)$ time per occurrence, establishing provable pruning superiority over classic $\EWU$. Coupled with a zero-heap flat buffer memory architecture in C, \FastHUEM{} systematically eliminates JVM garbage collection overhead, delivering up to two orders of magnitude runtime reduction, drastic memory savings, and superior search space pruning.
-
-% =========================================================================
-% REFERENCES (100% AUTHENTIC, CROSSREF-VERIFIED WITH DOIs)
-% =========================================================================
 \begin{thebibliography}{99}
-
-\bibitem{mannila1997discovery}
-H.~Mannila, H.~Toivonen, and A.~I. Verkamo, ``Discovery of frequent episodes in event sequences,'' \emph{Data Mining and Knowledge Discovery}, vol.~1, no.~3, pp. 259--289, 1997. \url{https://doi.org/10.1023/A:1009748302351}
-
-\bibitem{agrawal1995mining}
-R.~Agrawal and R.~Srikant, ``Mining sequential patterns,'' in \emph{Proc. 11th Int. Conf. Data Eng. (ICDE)}, pp. 3--14, 1995. \url{https://doi.org/10.1109/ICDE.1995.380415}
-
-\bibitem{han2000freespan}
-J.~Han, J.~Pei, B.~Mortazavi-Asl, Q.~Chen, U.~Dayal, and M.-C. Hsu, ``FreeSpan: frequent pattern-projected sequential pattern mining,'' in \emph{Proc. 6th ACM SIGKDD Int. Conf. Knowl. Discov. Data Min. (KDD)}, pp. 355--359, 2000. \url{https://doi.org/10.1145/347090.347167}
-
-\bibitem{pei2004mining}
-J.~Pei, J.~Han, B.~Mortazavi-Asl, J.~Wang, H.~Pinto, Q.~Chen, U.~Dayal, and M.-C. Hsu, ``Mining sequential patterns by pattern-growth: The PrefixSpan approach,'' \emph{IEEE Transactions on Knowledge and Data Engineering}, vol.~16, no.~11, pp. 1424--1440, 2004. \url{https://doi.org/10.1109/TKDE.2004.77}
-
-\bibitem{wu2013mining}
-C.-W. Wu, Y.-F. Lin, P.~S. Yu, and V.~S. Tseng, ``Mining high utility episodes in complex event sequences,'' in \emph{Proc. 19th ACM SIGKDD Int. Conf. Knowl. Discov. Data Min. (KDD)}, pp. 536--544, 2013. \url{https://doi.org/10.1145/2487575.2487654}
-
-\bibitem{guo2014high}
-G.~Guo, L.~Zhang, Q.~Liu, E.~Chen, F.~Zhu, and C.~Guan, ``High utility episode mining made practical and fast,'' in \emph{Proc. 10th Int. Conf. Adv. Data Min. Appl. (ADMA)}, LNCS 8933, pp. 71--84, 2014. \url{https://doi.org/10.1007/978-3-319-14717-8_6}
-
-\bibitem{fournier2019huespan}
-P.~Fournier-Viger, P.~Yang, J.~C.-W. Lin, and U.~Yun, ``{HUE-Span}: Fast high utility episode mining,'' in \emph{Proc. 15th Int. Conf. Adv. Data Min. Appl. (ADMA)}, LNCS 11887, pp. 169--181, 2019. \url{https://doi.org/10.1007/978-3-030-35231-8_12}
-
-\bibitem{gan2023discovering}
-W.~Gan, J.~C.-W. Lin, H.-C. Chao, and P.~S. Yu, ``Discovering high utility episodes in sequences,'' \emph{IEEE Transactions on Artificial Intelligence}, vol.~4, no.~3, pp. 473--486, 2023. \url{https://doi.org/10.1109/TAI.2022.3223965}
-
-\bibitem{fournier2021survey}
-O.~Ouarem, F.~Nouioua, and P.~Fournier-Viger, ``A survey of episode mining,'' \emph{WIREs Data Mining and Knowledge Discovery}, vol.~14, no.~1, p. e1524, 2024. \url{https://doi.org/10.1002/widm.1524}
-
-\bibitem{gan2021survey}
-W.~Gan, J.~C.-W. Lin, P.~Fournier-Viger, H.-C. Chao, and P.~S. Yu, ``A survey of utility-oriented pattern mining,'' \emph{IEEE Transactions on Knowledge and Data Engineering}, vol.~33, no.~4, pp. 1306--1327, 2021. \url{https://doi.org/10.1109/TKDE.2019.2942594}
-
-\bibitem{yao2004foundational}
-H.~Yao, H.~J. Hamilton, and C.~J. Butz, ``A foundational approach to mining itemset utilities from data,'' in \emph{Proc. 4th SIAM Int. Conf. Data Min. (SDM)}, pp. 482--486, 2004. \url{https://doi.org/10.1137/1.9781611972740.51}
-
-\bibitem{liu2012directed}
-M.~Liu, J.~Wang, and B.~C. Fung, ``Direct discovery of high utility itemsets without candidate generation,'' in \emph{Proc. IEEE 12th Int. Conf. Data Min. (ICDM)}, pp. 984--989, 2012. \url{https://doi.org/10.1109/ICDM.2012.20}
-
-\bibitem{zida2017efim}
-S.~Zida, P.~Fournier-Viger, J.~C.-W. Lin, C.-W. Wu, and V.~S. Tseng, ``{EFIM}: a fast and memory efficient algorithm for high-utility itemset mining,'' \emph{Knowledge and Information Systems}, vol.~51, no.~2, pp. 595--625, 2017. \url{https://doi.org/10.1007/s10115-016-0986-0}
-
-\bibitem{fournier2016spmf}
-P.~Fournier-Viger, A.~Gomariz, T.~Gueniche, A.~Soltani, C.-W. Wu, and V.~S. Tseng, ``The {SPMF} open-source data mining library version 2,'' in \emph{Proc. 27th Eur. Conf. Mach. Learn. Knowl. Discov. Databases (ECML PKDD)}, LNCS 9853, pp. 36--40, 2016. \url{https://doi.org/10.1007/978-3-319-46131-1_8}
-
-\bibitem{fournier2021poerm}
-P.~Fournier-Viger, Y.~Chen, F.~Nouioua, and J.~C.-W. Lin, ``Mining partially-ordered episode rules in an event sequence,'' in \emph{Proc. 25th Pac.-Asia Conf. Knowl. Discov. Data Min. (PAKDD)}, LNCS 12712, pp. 3--15, 2021. \url{https://doi.org/10.1007/978-3-030-73280-6_1}
-
-\bibitem{chen2024towards}
-Z.~Chen and W.~Gan, ``Towards episode rules with non-overlapping frequency and targeted mining,'' \emph{Information Sciences}, vol.~678, p. 121028, 2024. \url{https://doi.org/10.1016/j.ins.2024.121028}
-
-\bibitem{wu2025oer}
-Y.~Wu, Z.~Dong, J.~Liu, Y.~Li, C.~Liu, L.~Wen, and X.~Wu, ``{OER-Miner}: One-off episode rule mining for process event logs,'' \emph{IEEE Transactions on Emerging Topics in Computing}, vol.~13, no.~4, pp. 1497--1509, 2025. \url{https://doi.org/10.1109/TETC.2025.3607892}
-
-\bibitem{yin2012uspan}
-J.~Yin, Z.~Zheng, and L.~Cao, ``{USpan}: An efficient algorithm for mining high utility sequential patterns,'' in \emph{Proc. 18th ACM SIGKDD Int. Conf. Knowl. Discov. Data Min. (KDD)}, pp. 660--668, 2012. \url{https://doi.org/10.1145/2339530.2339660}
-
-\bibitem{truong2020survey}
-T.~Truong-Chi and P.~Fournier-Viger, ``A survey of high utility sequential pattern mining,'' in \emph{High-Utility Pattern Mining}, Studies in Big Data, vol.~51, pp. 97--129, 2019. \url{https://doi.org/10.1007/978-3-030-04921-8_4}
-
-\bibitem{fournier2022maxfem}
-P.~Fournier-Viger, M.~S. Nawaz, Y.~He, Y.~Wu, and F.~Nouioua, ``{MaxFEM}: Mining maximal frequent episodes in complex event sequences,'' in \emph{Proc. 18th Int. Conf. Adv. Data Min. Appl. (ADMA)}, LNCS 13725, pp. 97--111, 2022. \url{https://doi.org/10.1007/978-3-031-20992-5_8}
-
-\bibitem{laxman2007fast}
-S.~Laxman, P.~S. Sastry, and K.~P. Unnikrishnan, ``A fast algorithm for finding frequent episodes in event streams,'' in \emph{Proc. 13th ACM SIGKDD Int. Conf. Knowl. Discov. Data Min. (KDD)}, pp. 410--419, 2007. \url{https://doi.org/10.1145/1281192.1281238}
-
-\bibitem{tatti2012mining}
-N.~Tatti and B.~Cule, ``Mining closed episodes with overlap,'' \emph{ACM Transactions on Knowledge Discovery from Data}, vol.~6, no.~1, pp. 1--39, 2012. \url{https://doi.org/10.1145/2133360.2133361}
-
-\bibitem{cule2009mining}
-B.~Cule, B.~Goethals, and N.~Tatti, ``Mining episodes with a threshold on duration,'' in \emph{Proc. IEEE 9th Int. Conf. Data Min. (ICDM)}, pp. 746--751, 2009. \url{https://doi.org/10.1109/ICDM.2009.64}
-
-\bibitem{fournier2020tke}
-P.~Fournier-Viger, Y.~Yang, P.~Yang, J.~C.-W. Lin, and U.~Yun, ``{TKE}: Mining top-k frequent episodes,'' in \emph{Proc. 24th Pac.-Asia Conf. Knowl. Discov. Data Min. (PAKDD)}, LNCS 12084, pp. 367--379, 2020. \url{https://doi.org/10.1007/978-3-030-55789-8_71}
-
-\bibitem{wu2017multithreshold}
-J.-M. Wu, P.~Fournier-Viger, P.~S. Yu, and J.~C.-W. Lin, ``High-utility sequential pattern mining with multiple minimum utility thresholds,'' in \emph{Proc. 13th Int. Conf. Adv. Data Min. Appl. (ADMA)}, LNCS 10604, pp. 222--236, 2017. \url{https://doi.org/10.1007/978-3-319-63579-8_17}
-
-\bibitem{tseng2013efficient}
-V.~S. Tseng, B.-E. Shie, C.-W. Wu, and P.~S. Yu, ``Efficient algorithms for mining high utility itemsets from transactional databases,'' \emph{IEEE Transactions on Knowledge and Data Engineering}, vol.~25, no.~8, pp. 1772--1786, 2013. \url{https://doi.org/10.1109/TKDE.2012.59}
-
-\bibitem{fournier2014fhm}
-P.~Fournier-Viger, C.-W. Wu, S.~Zida, and V.~S. Tseng, ``{FHM}: Faster high-utility itemset mining using estimated utility co-occurrence pruning,'' in \emph{Proc. 21st Int. Symp. Methodol. Intell. Syst. (ISMIS)}, LNCS 8502, pp. 435--444, 2014. \url{https://doi.org/10.1007/978-3-319-08323-0_44}
-
+\bibitem{mannila1997discovery} H.~Mannila, H.~Toivonen, A.~I. Verkamo, ``Discovery of frequent episodes in event sequences,'' \emph{Data Min. Knowl. Discov.}, 1(3):259--289, 1997. doi:10.1023/A:1009748302351
+\bibitem{wu2013mining} C.-W. Wu, Y.-F. Lin, P.~S. Yu, V.~S. Tseng, ``Mining high utility episodes in complex event sequences,'' \emph{Proc. KDD}, pp.~536--544, 2013. doi:10.1145/2487575.2487654
+\bibitem{guo2014high} G.~Guo, L.~Zhang, Q.~Liu, E.~Chen, F.~Zhu, C.~Guan, ``High utility episode mining made practical and fast,'' \emph{Proc. ADMA}, LNCS 8933, pp.~71--84, 2014. doi:10.1007/978-3-319-14717-8\_6
+\bibitem{fournier2019huespan} P.~Fournier-Viger, P.~Yang, J.~C.-W. Lin, U.~Yun, ``HUE-Span: Fast high utility episode mining,'' \emph{Proc. ADMA 2019}, Springer LNAI, pp.~169--184, 2019. doi:10.1007/978-3-030-35231-8\_12
+\bibitem{gan2023discovering} W.~Gan, J.~C.-W. Lin, H.-C. Chao, P.~S. Yu, ``Discovering high utility episodes in sequences,'' \emph{IEEE Trans. Artif. Intell.}, 4(3):473--486, 2023. doi:10.1109/TAI.2022.3223965
+\bibitem{fournier2016spmf} P.~Fournier-Viger et al., ``The SPMF open-source data mining library version 2,'' \emph{Proc. ECML PKDD}, LNCS 9853, pp.~36--40, 2016. doi:10.1007/978-3-319-46131-1\_8
+\bibitem{yin2012uspan} J.~Yin, Z.~Zheng, L.~Cao, ``USpan: an efficient algorithm for mining high utility sequential patterns,'' \emph{Proc. KDD}, pp.~660--668, 2012. doi:10.1145/2339530.2339636
+\bibitem{fournier2014fhm} P.~Fournier-Viger, C.-W. Wu, S.~Zida, V.~S. Tseng, ``FHM: Faster high-utility itemset mining using estimated utility co-occurrence pruning,'' \emph{Proc. ISMIS}, LNCS 8502, pp.~83--92, 2014. doi:10.1007/978-3-319-08326-1\_9
 \end{thebibliography}
 
 \end{document}

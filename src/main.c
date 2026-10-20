@@ -48,6 +48,7 @@
 #include "algorithms/zart.h"
 #include "algorithms/apriori_rare.h"
 #include "algorithms/walky_g.h"
+#include "algorithms/hue_span.h"
 #include "algorithms/apriori_inverse.h"
 #include "algorithms/cori.h"
 #include "algorithms/rp_tree.h"
@@ -739,6 +740,7 @@ int main(int argc, char **argv) {
     DM_ZART_Params zart_params;
     DM_APRIORI_RARE_Params apriori_rare_params;
     DM_WALKY_G_Params walky_g_params;
+    DM_HUE_SPAN_Params hue_span_params;
     DM_APRIORI_INVERSE_Params apriori_inverse_params;
     DM_CORI_Params cori_params;
     DM_RP_TREE_Params rp_tree_params;
@@ -1114,6 +1116,24 @@ int main(int argc, char **argv) {
     } else if (strcmp(algo_id, "walky_g") == 0) {
         walky_g_params.min_support = min_support;
         params = &walky_g_params;
+    } else if (strcmp(algo_id, "hue_span") == 0) {
+        /* SPMF parameter order: minutil (ratio), max time duration, output single events,
+           use traditional utility (default false) */
+        hue_span_params.input_path = path;
+        hue_span_params.min_utility_ratio = min_support;
+        hue_span_params.max_duration = (argc >= 6) ? atoi(argv[5]) : 2;
+        hue_span_params.output_single_events = (argc >= 7) ? (strcmp(argv[6], "true") == 0 || strcmp(argv[6], "1") == 0) : 1;
+        int traditional = (argc >= 8) ? (strcmp(argv[7], "true") == 0 || strcmp(argv[7], "1") == 0) : 0;
+        hue_span_params.check_maximum_utility = !traditional;
+        hue_span_params.use_tighter_upper_bound = 1;
+        hue_span_params.use_cooc_matrix = 1;
+        hue_span_params.pruning_prefix = 1;
+        { const char *v = getenv("HUE_SPAN_ERU"); if (v) hue_span_params.use_tighter_upper_bound = atoi(v); }
+        { const char *v = getenv("HUE_SPAN_EEUCP"); if (v) hue_span_params.use_cooc_matrix = atoi(v); }
+        { const char *v = getenv("HUE_SPAN_PREFIX"); if (v) hue_span_params.pruning_prefix = atoi(v); }
+        hue_span_params.fixed_utility = 0;
+        { const char *v = getenv("HUE_SPAN_FIXED"); if (v) hue_span_params.fixed_utility = atoi(v); }
+        params = &hue_span_params;
     } else if (strcmp(algo_id, "apriori_inverse") == 0) {
         apriori_inverse_params.max_support = min_support; // use min_support flag for max_support
         apriori_inverse_params.min_abs_support = 5;
