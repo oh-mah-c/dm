@@ -49,6 +49,8 @@
 #include "algorithms/apriori_rare.h"
 #include "algorithms/walky_g.h"
 #include "algorithms/hue_span.h"
+#include "algorithms/flchuspm.h"
+#include "algorithms/flchus_x.h"
 #include "algorithms/apriori_inverse.h"
 #include "algorithms/cori.h"
 #include "algorithms/rp_tree.h"
@@ -654,6 +656,49 @@ int main(int argc, char **argv) {
 
     if (strcmp(algo_id, "hiep") == 0) {
         return run_hiep_cli(algo, argc, argv);
+    }
+
+    if (strcmp(algo_id, "flchus_x") == 0) {
+        /* proposed FLCHUSM miner, same CLI as flchuspm; env FLCHUSX_COSTW / FLCHUSX_FIX / FLCHUSX_SEL = 0|1 */
+        if (argc < 7) { printf("usage: %s flchus_x <file> 0 <mins> <minu> <maxc> [pct]\n", argv[0]); return 1; }
+        DM_FLCHUS_X_Params xp;
+        xp.input_path = path;
+        xp.mins = atof(argv[4]); xp.minu = atof(argv[5]); xp.maxc = atof(argv[6]);
+        xp.percent = (argc >= 8) && strcmp(argv[7], "pct") == 0;
+        xp.cost_width = 1; xp.reds_fixpoint = 1; xp.fast_select = 1; xp.desc_bound = 1;
+        { const char *v = getenv("FLCHUSX_COSTW"); if (v) xp.cost_width = atoi(v); }
+        { const char *v = getenv("FLCHUSX_FIX"); if (v) xp.reds_fixpoint = atoi(v); }
+        { const char *v = getenv("FLCHUSX_SEL"); if (v) xp.fast_select = atoi(v); }
+        { const char *v = getenv("FLCHUSX_DESC"); if (v) xp.desc_bound = atoi(v); }
+        dm_bench_reset();
+        dm_bench_start(DM_PHASE_TOTAL);
+        dm_bench_start(DM_PHASE_ALGO);
+        DM_Status st = algo->run(NULL, &xp);
+        dm_bench_stop(DM_PHASE_ALGO);
+        dm_bench_stop(DM_PHASE_TOTAL);
+        dm_bench_print_report(algo->name, path);
+        return st == DM_SUCCESS ? 0 : 1;
+    }
+
+    if (strcmp(algo_id, "flchuspm") == 0) {
+        /* reads its own q-sequence file (item:cost:utility, -1, -2):
+           dm.exe flchuspm <file> 0 <mins> <minu> <maxc> [pct]; env FLCHUS_DPS / FLCHUS_WPS = 0|1 */
+        if (argc < 7) { printf("usage: %s flchuspm <file> 0 <mins> <minu> <maxc> [pct]\n", argv[0]); return 1; }
+        DM_FLCHUSPM_Params fp;
+        fp.input_path = path;
+        fp.mins = atof(argv[4]); fp.minu = atof(argv[5]); fp.maxc = atof(argv[6]);
+        fp.percent = (argc >= 8) && strcmp(argv[7], "pct") == 0;
+        fp.use_dps = 1; fp.use_wps = 1;
+        { const char *v = getenv("FLCHUS_DPS"); if (v) fp.use_dps = atoi(v); }
+        { const char *v = getenv("FLCHUS_WPS"); if (v) fp.use_wps = atoi(v); }
+        dm_bench_reset();
+        dm_bench_start(DM_PHASE_TOTAL);
+        dm_bench_start(DM_PHASE_ALGO);
+        DM_Status st = algo->run(NULL, &fp);
+        dm_bench_stop(DM_PHASE_ALGO);
+        dm_bench_stop(DM_PHASE_TOTAL);
+        dm_bench_print_report(algo->name, path);
+        return st == DM_SUCCESS ? 0 : 1;
     }
 
     dm_bench_reset();

@@ -394,3 +394,17 @@ report: experiments
 	@echo "Report generated at results/reports/experiment_report.txt"
 
 .PHONY: all clean experiments plots report vulkan shaders libdm
+
+# Local web interface for dm.exe (gui/index.html), standalone POSIX C, no extra libraries
+DM_GUI_TARGET = $(BIN_DIR)/dm_gui
+gui: $(DM_GUI_TARGET)
+$(DM_GUI_TARGET): $(SRC_DIR)/tools/dm_gui.c
+	@mkdir -p $(BIN_DIR)
+	$(CC) -O2 -Wall -Wextra -o $@ $<
+
+# Standalone FLCHUSM driver (flchuspm, flchus_x) for benchmarks, without the dm.exe libraries
+FLCHUS_MINER_TARGET = $(BIN_DIR)/flchus_miner
+flchus: $(FLCHUS_MINER_TARGET)
+$(FLCHUS_MINER_TARGET): $(SRC_DIR)/tools/flchus_miner.c $(SRC_DIR)/algorithms/flchuspm.c $(SRC_DIR)/algorithms/flchus_x.c $(SRC_DIR)/core/dm_registry.c
+	@mkdir -p $(BIN_DIR)
+	$(CC) -O2 -Wall -Wextra -D_POSIX_C_SOURCE=200809L -Iinclude -Iinclude/core -o $@ $^ -lm

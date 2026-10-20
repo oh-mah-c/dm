@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DM Workbench</title>
+<style>
+:root {
+  --bg: #f4f5f7; --panel: #ffffff; --text: #1d2330; --muted: #5d6676; --line: #d9dde4;
+  --accent: #2a62c9; --accent-text: #ffffff; --danger: #b3261e; --ok: #1d7a3a; --code-bg: #0f1420; --code-text: #d6e1f2;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #12151b; --panel: #1b2029; --text: #e6e9ef; --muted: #9aa3b2; --line: #2d3442;
+          --accent: #6b9cff; --accent-text: #0d1220; --danger: #ff8a80; --ok: #7dd892; --code-bg: #0b0e14; --code-text: #d6e1f2; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; align-items: baseline; gap: 12px; }
+header h1 { font-size: 17px; margin: 0; }
+header span { color: var(--muted); font-size: 13px; }
+main { display: grid; grid-template-columns: minmax(320px, 440px) 1fr; gap: 16px; padding: 16px 20px; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 12px 16px; } }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 10px; }
+label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+input[type=text], input[type=number], select, textarea {
+  width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
+textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; min-height: 54px; }
+.row { display: flex; gap: 8px; } .row > * { flex: 1; } .row > button { flex: 0 0 auto; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+button { padding: 7px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+button.danger { color: var(--danger); }
+button:disabled { opacity: .5; cursor: default; }
+.desc { color: var(--muted); font-size: 13px; margin-top: 6px; min-height: 18px; }
+.checks label { display: flex; gap: 6px; align-items: center; color: var(--text); margin: 4px 0; }
+.actions { display: flex; gap: 8px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+#status { font-size: 13px; color: var(--muted); }
+#status.ok { color: var(--ok); } #status.err { color: var(--danger); }
+pre { margin: 0; background: var(--code-bg); color: var(--code-text); border-radius: 6px; padding: 10px 12px; overflow: auto;
+      font: 12.5px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+#log { height: 300px; } #outputPre { height: 340px; }
+.right { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.outhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.outhead small { color: var(--muted); }
+dialog { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); width: min(640px, 92vw); padding: 0; }
+dialog .dh { padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 13px; word-break: break-all; }
+dialog ul { list-style: none; margin: 0; padding: 4px 0; max-height: 55vh; overflow: auto; }
+dialog li { padding: 5px 14px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; }
+dialog li:hover { background: var(--bg); }
+dialog li small { color: var(--muted); }
+dialog .df { padding: 10px 14px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
+</style>
+</head>
+<body>
+<header><h1>DM Workbench</h1><span>local interface for dm.exe (127.0.0.1 only)</span></header>
+<main>
+  <div>
+    <section>
+      <h2>Algorithm</h2>
+      <input type="text" id="filter" placeholder="Filter algorithms (id, name, description)">
+      <select id="algo" size="8" style="margin-top:8px"></select>
+      <div class="desc" id="desc"></div>
+    </section>
+    <section style="margin-top:16px">
+      <h2>Files</h2>
+      <label for="input">Input file</label>
+      <div class="row"><input type="text" id="input" placeholder="datasets/..."><button id="browseIn">Browse</button></div>
+      <div id="outBox">
+        <label for="output">Output file</label>
+        <div class="row"><input type="text" id="output" placeholder="results/patterns.txt"><button id="browseOut">Browse</button></div>
+      </div>
+    </section>
+    <section style="margin-top:16px">
+      <h2>Parameters</h2>
+      <div id="params"></div>
+      <div class="checks" id="flags"></div>
+      <label for="env">Extra environment variables (KEY=VALUE per line)</label>
+      <textarea id="env"></textarea>
+      <div class="actions">
+        <button class="primary" id="run">Run algorithm</button>
+        <button class="danger" id="stop" disabled>Stop</button>
+        <span id="status"></span>
+      </div>
+    </section>
+  </div>
+  <div class="right">
+    <section>
+      <h2>Console</h2>
+      <pre id="log"></pre>
+    </section>
+    <section>
+      <div class="outhead"><h2 style="margin:0">Output file</h2><small id="outInfo"></small><button id="refresh">Open</button></div>
+      <pre id="outputPre" style="margin-top:10px"></pre>
+    </section>
+  </div>
+</main>
+<dialog id="dlg">
+  <div class="dh" id="dlgPath"></div>
+  <ul id="dlgList"></ul>
+  <div class="df"><button id="dlgPick">Use this folder</button><button id="dlgClose">Cancel</button></div>
+</dialog>
+<script>
+/* Parameter forms for algorithms with a specific command line (positional arguments after the
+   dataset type). Other algorithms get the generic form: dataset type, min support, extra args. */
+const SPEC = {
+  flchuspm: { outEnv: "DM_FLCHUS_OUT", params: [
+      { k: "mins", label: "Minimum support (mins)", v: "3" },
+      { k: "minu", label: "Minimum average utility (minu)", v: "40" },
+      { k: "maxc", label: "Maximum average cost (maxc)", v: "6.6" }],
+    pct: true,
+    flags: [{ env: "FLCHUS_DPS", label: "Depth pruning DPS (FUB, Flb)", on: true },
+            { env: "FLCHUS_WPS", label: "Width pruning WPS (AMUB)", on: true },
+            { env: "FLCHUS_FLB", label: "Use Flb (as in the paper; can miss patterns)", on: true }] },
+  flchus_x: { outEnv: "DM_FLCHUS_OUT", params: [
+      { k: "mins", label: "Minimum support (mins)", v: "3" },
+      { k: "minu", label: "Minimum average utility (minu)", v: "40" },
+      { k: "maxc", label: "Maximum average cost (maxc)", v: "6.6" }],
+    pct: true,
+    flags: [{ env: "FLCHUSX_COSTW", label: "Cost-aware width pruning (MLB)", on: true },
+            { env: "FLCHUSX_FIX", label: "RedS until fixpoint", on: true },
+            { env: "FLCHUSX_SEL", label: "O(n) selection and early abandon", on: true }] },
+  hue_span: { outEnv: "DM_HUE_OUT", params: [
+      { k: "ratio", label: "Minimum utility (ratio of total utility)", v: "0.02" },
+      { k: "maxdur", label: "Maximum duration", v: "5" },
+      { k: "single", label: "Output single events (true/false)", v: "true" },
+      { k: "trad", label: "Traditional utility (true/false)", v: "false" }],
+    flags: [{ env: "HUE_SPAN_FIXED", label: "Corrected maximal utility (not in SPMF)", on: false }] },
+};
+const $ = id => document.getElementById(id);
+let algos = [], job = null, offset = 0, timer = null, dlgMode = "in", dlgDir = "";
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const ct = r.headers.get("content-type") || "";
+  const body = ct.includes("json") ? await r.json() : await r.text();
+  if (!r.ok) throw new Error(body.error || body);
+  return body;
+}
+
+function renderList() {
+  const f = $("filter").value.toLowerCase(), sel = $("algo"), cur = sel.value;
+  sel.innerHTML = "";
+  for (const a of algos) {
+    if (f && !(a.id + " " + a.name + " " + a.desc).toLowerCase().includes(f)) continue;
+    const o = document.createElement("option");
+    o.value = a.id; o.textContent = `${a.name}  [${a.id}]`;
+    sel.appendChild(o);
+  }
+  if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+}
+
+function field(id, label, value) {
+  return `<label for="p_${id}">${label}</label><input type="text" id="p_${id}" value="${value}">`;
+}
+
+function renderParams() {
+  const id = $("algo").value, a = algos.find(x => x.id === id), spec = SPEC[id];
+  $("desc").textContent = a ? a.desc : "";
+  let h = "";
+  if (spec) {
+    h = spec.params.map(p => field(p.k, p.label, p.v)).join("");
+    if (spec.pct) h += `<div class="checks"><label><input type="checkbox" id="p_pct"> Thresholds in percent (paper's percentage form)</label></div>`;
+  } else {
+    h = `<div class="grid2"><div><label for="p_type">Dataset type</label><select id="p_type">
+      <option value="0">0 Transactional</option><option value="1">1 Utility</option><option value="2">2 Matrix</option>
+      <option value="3">3 Sequence utility</option><option value="4">4 Quantity</option></select></div>
+      <div>${field("minsup", "Min support / threshold", "0.01")}</div></div>` + field("extra", "Extra arguments (space separated)", "");
+  }
+  $("params").innerHTML = h;
+  $("flags").innerHTML = (spec && spec.flags || []).map(f =>
+    `<label><input type="checkbox" data-env="${f.env}" ${f.on ? "checked" : ""}> ${f.label}</label>`).join("");
+  $("outBox").style.display = spec && spec.outEnv ? "" : "none";
+}
+
+function buildRun() {
+  const id = $("algo").value, spec = SPEC[id];
+  let type = "0", args = [], env = $("env").value.trim().split("\n").filter(Boolean);
+  if (spec) {
+    args = spec.params.map(p => $("p_" + p.k).value.trim());
+    if (spec.pct && $("p_pct").checked) args.push("pct");
+    document.querySelectorAll("#flags input").forEach(c => env.push(`${c.dataset.env}=${c.checked ? 1 : 0}`));
+    const out = $("output").value.trim();
+    if (spec.outEnv && out) env.push(`${spec.outEnv}=${out}`);
+  } else {
+    type = $("p_type").value;
+    args = [$("p_minsup").value.trim(), ...$("p_extra").value.trim().split(/\s+/).filter(Boolean)];
+  }
+  return new URLSearchParams({ algo: id, input: $("input").value.trim(), type, args: args.join(" "), env: env.join("\n") });
+}
+
+async function run() {
+  if (!$("algo").value) { status("Choose an algorithm.", "err"); return; }
+  $("log").textContent = ""; offset = 0;
+  try {
+    const r = await api("/api/run", { method: "POST", body: buildRun() });
+    job = r.id; $("run").disabled = true; $("stop").disabled = false;
+    status("Running…"); timer = setInterval(poll, 400);
+  } catch (e) { status(e.message, "err"); }
+}
+
+async function poll() {
+  try {
+    const r = await api(`/api/job?id=${job}&offset=${offset}`);
+    if (r.log) { const l = $("log"); l.textContent += r.log; l.scrollTop = l.scrollHeight; }
+    offset = r.offset;
+    if (r.running) { status(`Running… ${r.elapsed.toFixed(1)} s`); return; }
+    clearInterval(timer); $("run").disabled = false; $("stop").disabled = true;
+    status(`Finished in ${r.elapsed.toFixed(2)} s, exit code ${r.exit}`, r.exit === 0 ? "ok" : "err");
+    if (r.exit === 0 && $("outBox").style.display !== "none" && $("output").value.trim()) openOutput();
+  } catch (e) { clearInterval(timer); status(e.message, "err"); }
+}
+
+async function stop() { if (job !== null) await api(`/api/stop?id=${job}`, { method: "POST" }); }
+
+async function openOutput() {
+  const p = $("output").value.trim();
+  if (!p) { $("outInfo").textContent = "no output file set"; return; }
+  try {
+    const t = await api(`/api/file?path=${encodeURIComponent(p)}`);
+    $("outputPre").textContent = t;
+    const n = t ? t.split("\n").filter(x => x && !x.startsWith("@")).length : 0;
+    $("outInfo").textContent = `${n} lines`;
+  } catch (e) { $("outInfo").textContent = e.message; $("outputPre").textContent = ""; }
+}
+
+function status(msg, cls) { const s = $("status"); s.textContent = msg; s.className = cls || ""; }
+
+async function browse(mode) {
+  dlgMode = mode;
+  const start = mode === "in" ? $("input").value : $("output").value;
+  await listDir(start ? start.replace(/\/[^/]*$/, "") || "." : ".");
+  $("dlgPick").style.display = mode === "out" ? "" : "none";
+  $("dlg").showModal();
+}
+
+async function listDir(dir) {
+  let r;
+  try { r = await api(`/api/ls?dir=${encodeURIComponent(dir)}`); }
+  catch (e) { r = await api(`/api/ls?dir=.`); }
+  dlgDir = r.dir; $("dlgPath").textContent = r.dir;
+  const ul = $("dlgList"); ul.innerHTML = "";
+  const add = (name, dir, size, fn) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<span>${dir ? "▸ " : ""}${name}</span><small>${dir ? "" : size.toLocaleString() + " B"}</small>`;
+    li.onclick = fn; ul.appendChild(li);
+  };
+  if (r.parent) add("..", true, 0, () => listDir(r.parent));
+  for (const e of r.entries) {
+    const full = r.dir + "/" + e.name;
+    add(e.name, e.dir, e.size, e.dir ? () => listDir(full) : () => {
+      $(dlgMode === "in" ? "input" : "output").value = full; $("dlg").close();
+    });
+  }
+}
+
+$("filter").oninput = renderList;
+$("algo").onchange = renderParams;
+$("run").onclick = run;
+$("stop").onclick = stop;
+$("refresh").onclick = openOutput;
+$("browseIn").onclick = () => browse("in");
+$("browseOut").onclick = () => browse("out");
+$("dlgClose").onclick = () => $("dlg").close();
+$("dlgPick").onclick = () => { $("output").value = dlgDir + "/output.txt"; $("dlg").close(); };
+
+api("/api/algorithms").then(list => {
+  algos = list.sort((a, b) => a.name.localeCompare(b.name));
+  renderList();
+  const pre = algos.find(a => a.id === "flchus_x") ? "flchus_x" : (algos[0] || {}).id;
+  $("algo").value = pre; renderParams();
+  if (pre === "flchus_x") $("input").value = "docs/core/FLCHUS/data/running_example.txt";
+}).catch(e => status("Cannot list algorithms: " + e.message, "err"));
+</script>
+</body>
+</html>
