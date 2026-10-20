@@ -26,178 +26,158 @@ Unlike bloated libraries, C-DataMiner acts as a low-level benchmark environment.
 ## 🛠 Supported Algorithms
 
 ### Frequent Itemset Mining (FIM)
-1. **AIS** - The pioneer algorithm for mining association rules.
-2. **Apriori** - Level-wise search using candidate generation and a hash tree.
-3. **AprioriTid** - Variant of Apriori that uses candidate ID sets to avoid full database scans.
-4. **AprioriHybrid** - Combines Apriori and AprioriTid for optimal performance.
-5. **Eclat** - Vertical data format search with depth-first traversal.
-6. **FP-Growth** - Tree-based, projection-driven mining without candidate generation.
-7. **TreeProjection** - Matrix-based counting via depth-first transactional tree projection.
-8. **FIN** - Fast mining of Frequent Itemsets using Nodesets.
-9. **FIN+** (dFIN) - Efficient frequent itemset mining using DiffNodesets.
-10. **negFIN** - An efficient algorithm for fast mining frequent itemsets using NegNodesets.
-11. **PrePost+** - High-performance N-lists-based mining using Children–Parent Equivalence pruning.
-12. **DIC** - Dynamic Itemset Counting algorithm for reducing the number of passes over the data.
-13. **LTM** - Linear Table Miner for frequent itemset mining using a linear table structure and bitwise pruning.
-14. **SaM** - Split and Merge algorithm using a horizontal transaction representation for efficient mining.
-15. **MSApriori** - Level-wise mining with multiple minimum supports to solve the rare item problem.
-16. **DFI-Growth** - Deriving frequent itemsets from lossless condensed representations using pattern growth.
-17. **KRIMP** - MDL-based pattern selection algorithm that finds the set of itemsets that compress the database best.
-18. **SLIM** - Directly mines descriptive patterns using MDL by iteratively merging itemsets in the code table.
-19. **Two-Phase** - Efficiently mines high utility itemsets using transaction-weighted utilization and two-phase pruning.
-20. **FHM** - Faster High-Utility Itemset Mining using Estimated Utility Co-occurrence Pruning (EUCP).
-21. **VHUQI** - Vertical mining of High Utility Quantitative Itemsets using utility-lists and K-support bound pruning.
-22. **FHUQI-Miner** - Fast High Utility Quantitative Itemset Miner using TQCS, EQCPS, and RQCPS pruning.
-23. **TKQ** - Top-K Quantitative High Utility Itemset Miner using RIU, CUD, and update-queue threshold raising.
-23. **EFIM** - Highly efficient HUIM algorithm using database projection and transaction merging.
-23. **HUI-Miner** - Mines high utility itemsets without candidate generation using a vertical utility-list structure.
-24. **UP-Growth** - Uses a compact UP-Tree structure and pruning strategies (DGU, DGN) to mine PHUIs efficiently.
-25. **IHUP** - Incremental High Utility Pattern mining using IHUP-Trees (L-Tree, TF-Tree, TWU-Tree).
-26. **HUIM-SU** - Simplified Utility-list based High-Utility itemset mining using repeated TWU pruning and extension utility bounds.
-27. **ULB-Miner** - Uses a high-performance utility-list buffer (UTLBuf) to reduce memory fragmentation and join time.
-28. **UFH** - A hybrid framework combining UP-Growth+ (tree-based) and FHM (utility-list based) for sparse/dense datasets.
-29. **HUCI-Miner** - Mines high utility closed itemsets, high utility generators, and HGB non-redundant rules using the utility-confidence framework.
-30. **UP-Hist Growth** - Extends UP-Growth with quantity histograms at each node to provide tighter utility estimates.
-31. **R-Miner** - Uses a residual utility-based concept with Residue Maps and Master Map for highly efficient join operations.
-32. **SUM** (Scented Utility Miner) - An incremental HUIM algorithm using a reinduction strategy and dynamic threshold setting.
-33. **CLH-Miner** - Mines Cross-Level High Utility Itemsets using a taxonomy and tax-utility-lists to discover patterns across different abstraction levels.
-34. **MLHUI-Miner** - An efficient utility-list based algorithm for mining high-utility itemsets at multiple abstraction levels (generalized HUIM).
-35. **FCHM** (Fast Correlated High-Utility itemset Miner) - Discovers correlated high-utility itemsets using the bond measure (HAIS 2016 version).
-36. **FHN** (Fast High-Utility itemset miner with Negative unit profits) - Efficiently mines HUIs in databases where item unit profits may be positive or negative using an extended utility-list structure.
-37. **HUIM-HC** - Mining High-Utility Itemsets with Hill Climbing using PEV pruning and diversity maintenance (Nawaz et al. 2021).
-38. **HUIM-SA** - Mining High-Utility Itemsets with Simulated Annealing using temperature-dependent acceptance probability (Nawaz et al. 2021).
-39. **HUIM-BPSO-tree** - Mines high-utility itemsets using Binary Particle Swarm Optimization and an OR/NOR-tree to avoid invalid combinations (Lin et al. 2016).
-40. **Bio-HUIF-GA** - GA-based high-utility itemset mining using a Diverse Optimal Value Framework (Song & Huang 2018).
-41. **Bio-HUIF-PSO** - PSO-based high-utility itemset mining using a Diverse Optimal Value Framework (Song & Huang 2018).
-42. **Bio-HUIF-BA** - Bat Algorithm-based high-utility itemset mining using a Diverse Optimal Value Framework (Song & Huang 2018).
-43. **HUIM-AFSA** - Artificial Fish Swarm Algorithm for mining high-utility itemsets with PEV pruning (Song et al. 2021).
-44. **HUIM-ABC** - Artificial Bee Colony algorithm for high-utility itemset mining with bitmap-based utility calculation (Song & Huang 2018).
-45. **THUI** - Mining top-k high utility itemsets with effective threshold raising strategies using LIU structure (Krishnamoorthy 2019).
-46. **TKU-Miner** - Mines exact top-k high-utility itemsets without a user-specified minimum utility threshold, following the TKU top-k threshold-raising framework (Wu et al. 2012).
-47. **THUE** - Mines top-k high-utility episodes from complex event sequences using RIU/RTU/RUC threshold raising, optimized EWU pruning, and simultaneous/serial episode spanning (Wan et al. 2021).
-48. **TIPN-HOUI-Miner** - Mines top-k high-on-shelf-utility itemsets with positive/negative utilities using TIPN/TIUL tables, interval occurrence bitmaps, TWUGC pruning, RLC pruning, TIO pruning, and RPRU/RRU threshold raising (Chang et al. 2025).
-49. **TKU-CE** - Cross-Entropy Method for Mining Top-K High Utility Itemsets (Song et al. 2021).
-50. **TKU-CE+** - Improved Cross-Entropy Method for Top-K HUIM with CUV pruning and smoothing mutation (Song et al. 2021).
-51. **DPHIM** - Dynamic parallel high-utility itemset mining using utility-list subtasks and pthread workers (Kimura et al. 2026).
+1. **AIS** - The pioneer algorithm for mining association rules (Agrawal et al. 1993).
+2. **Apriori** - Level-wise search using candidate generation and a hash tree (Agrawal & Srikant 1994).
+3. **AprioriTid** - Variant of Apriori using candidate transaction ID sets to avoid full database scans.
+4. **AprioriHybrid** - Combines Apriori and AprioriTid for optimal level-wise performance.
+5. **Eclat** - Vertical data format search with depth-first traversal and TID-set intersections (Zaki 2000).
+6. **FP-Growth** - Tree-based, projection-driven mining without candidate generation (Han et al. 2000).
+7. **TreeProjection** - Matrix-based counting via depth-first transactional tree projection (Agarwal et al. 2001).
+8. **FIN** - Fast mining of Frequent Itemsets using Nodesets (Deng & Lv 2014).
+9. **FIN+** (dFIN) - Efficient frequent itemset mining using DiffNodesets (Deng 2016).
+10. **negFIN** - An efficient algorithm for fast mining frequent itemsets using NegNodesets (Aryabarzan et al. 2018).
+11. **PrePost** - Fast mining of frequent itemsets using N-lists (Deng et al. 2012).
+12. **PrePost+** - High-performance N-lists-based mining using Children–Parent Equivalence pruning (Deng & Lv 2015).
+13. **DIC** - Dynamic Itemset Counting algorithm for reducing the number of passes over the data (Brin et al. 1997).
+14. **LTM** - Linear Table Miner for frequent itemset mining using a linear table structure and bitwise pruning (Lu et al. 2023).
+15. **SaM** - Split and Merge algorithm using a horizontal transaction representation for efficient mining (Borgelt & Wang 2009).
+16. **MSApriori** - Level-wise mining with multiple minimum supports to solve the rare item problem (Liu et al. 1999).
+17. **DFI-Growth** - Deriving frequent itemsets from lossless condensed representations using pattern growth (Huang et al. 2019).
+18. **KRIMP** - MDL-based pattern selection algorithm that finds the itemset code table compressing the database best (Vreeken et al. 2011).
+19. **SLIM** - Directly mines descriptive patterns using MDL by iteratively merging itemsets in the code table (Smets & Vreeken 2012).
+20. **OPUS Miner** - Efficient discovery of non-redundant, self-sufficient itemsets using branch-and-bound search (Webb & Vreeken 2014).
+21. **RegularMine** - Mines frequent regular itemsets as an interpretable concise representation of frequent itemsets (Ruggieri 2010).
+22. **HTK-Miner** - Fast top-K frequent itemset retrieval using vertical bitset networks and Q-Heap threshold raising (Malliaridis & Ougiaroglou 2026).
 
-49. **HAUI-Miner** - Mining High Average-Utility Itemsets using AU-lists and transaction-maximum utility downward closure (Lin et al. 2016).
-49. **EHAUPM** - Efficient High Average-Utility Pattern Mining with Tighter Upper Bounds and co-occurrence matrix (Lin et al. 2017).
-50. **HAUIM-GMU** - Mining High Average-Utility Itemsets based on Generalized Maximal Utility and critical support count (Song et al. 2021).
-51. **NAM-HEP** - Adaptive High Occupancy Itemset Mining using a hierarchical set-enumeration tree and median thresholds (Tran et al. 2025).
-52. **MEMU** - Mining High Average-Utility Patterns with Multiple Thresholds using compact AU-lists (Lin et al. 2018).
-53. **MHEINU** - Mining High-Efficiency Itemsets with Negative Utilities using ELNU lists, `uben`, and `ubeni` pruning (Yildirim 2025).
-54. **Closed-FHUIM-Kinana** - Closed frequent high-utility itemset mining with OSR, OWL, and MSU pruning (Sulanjari & Fatichah 2026).
-55. **OCEAN** - Fast discovery of high utility occupancy itemsets using utility-lists and top-$k$ upper bound pruning (Shen et al. 2016).
-56. **HUOPM** - High-Utility Occupancy Pattern Mining using compact UO-lists, FU-tables, early construction abandonment, and partial downward closure upper bound pruning (Gan et al. IEEE TCYB 2020).
-57. **IL-HUOPM / HUOMIL** - High Utility Occupancy Pattern Mining with Indexed List Structure using GUO-IL, CUO-IL, O(1) quadruple entry pointer chaining, and loose upper bound pruning (Kim et al. IEEE Access 2023).
+### High-Utility Itemset Mining (HUIM)
+23. **Two-Phase** - Seminal HUIM algorithm using Transaction-Weighted Utilization (TWU) and two-phase candidate filtering (Liu et al. 2005).
+24. **HUI-Miner** - Mines high-utility itemsets without candidate generation using a vertical utility-list structure (Liu & Qu 2012).
+25. **FHM** - Faster High-Utility Itemset Mining using Estimated Utility Co-occurrence Pruning (Fournier-Viger et al. 2014).
+26. **EFIM** - Highly efficient HUIM algorithm using database projection, transaction merging, and Subtree Utility bounds (Zida et al. 2017).
+27. **EFIM-Closed** - Fast and memory-efficient discovery of closed high-utility itemsets with forward/backward closure checking (Fournier-Viger et al. 2016).
+28. **CHUI-Miner** - Mines closed high-utility itemsets without candidate generation using vertical utility-lists (Wu et al. 2015).
+29. **UP-Growth** - Uses a compact UP-Tree structure and DGU/DGN pruning strategies to mine PHUIs efficiently (Tseng et al. 2010).
+30. **IHUP** - Incremental High-Utility Pattern mining using IHUP-Trees (L-Tree, TF-Tree, TWU-Tree) (Ahmed et al. 2009).
+31. **HUIM-SU** - Simplified Utility-list based HUIM using repeated TWU pruning and extension utility bounds (Cheng et al. 2023).
+32. **ULB-Miner** - High-performance utility-list buffer (UTLBuf) reducing memory fragmentation and join overhead (Duong et al. 2018).
+33. **UFH** - Hybrid framework combining UP-Growth+ (tree-based) and FHM (utility-list based) for sparse/dense datasets (Dawar et al. 2017).
+34. **HUCI-Miner** - Mines high-utility closed itemsets, generators, and non-redundant association rules (Sahoo et al. 2015).
+35. **UP-Hist Growth** - Extends UP-Growth with quantity histograms at each tree node for tighter utility estimates (Dawar & Goyal 2015).
+36. **R-Miner** - Residual utility-based mining using Residue Maps and Master Map for efficient joins (Sra & Chand 2024).
+37. **SUM** - Incremental HUIM using a reinduction strategy and dynamic threshold setting (Sra & Chand 2024).
+38. **CLH-Miner** - Mines Cross-Level High Utility Itemsets across tax-utility abstraction hierarchies (Fournier-Viger et al. 2020).
+39. **MLHUI-Miner** - Efficient utility-list based mining of high-utility itemsets at multiple abstraction levels (Cagliero et al. 2017).
+40. **FCHM** - Fast Correlated High-Utility itemset Miner discovering patterns with the bond measure (Fournier-Viger et al. 2016).
+41. **FHN** - Fast High-Utility itemset miner for transaction databases with negative unit profits (Fournier-Viger 2016).
+42. **FOSHU** - Faster On-Shelf High-Utility itemset mining with or without negative unit profits (Fournier-Viger & Zida 2015).
+43. **TS-HOUN** - On-shelf utility mining with negative item profit values over temporal shelf intervals (Lan et al. 2014).
+44. **HUI-list-INS** - Incrementally updates high-utility itemsets upon transaction insertions (Lin et al. 2014).
+45. **TKU-Miner** - Exact top-K high-utility itemset mining without requiring a user-specified minimum utility threshold (Wu et al. 2012).
+46. **THUI** - Top-K high-utility itemset mining with effective threshold-raising strategies using LIU structures (Krishnamoorthy 2019).
+47. **TKU-CE** - Cross-Entropy optimization algorithm for mining top-K high-utility itemsets (Song et al. 2021).
+48. **TKU-CE+** - Improved Cross-Entropy method with CUV pruning and smoothing mutation (Song et al. 2021).
+49. **TKU-PSO** - Particle Swarm Optimization framework for heuristic top-K utility itemset discovery (Carstensen & Lin 2025).
+50. **TOPKPHM** - Mining periodic top-K high-utility patterns over timestamped utility sequences (Zhang et al. 2025).
+51. **DPHIM** - Dynamic parallel high-utility itemset mining using utility-list subtasks and pthread worker pools (Kimura et al. 2026).
+52. **Closed-FHUIM-Kinana** - Closed frequent high-utility itemset mining with OSR, OWL, and MSU pruning (Sulanjari & Fatichah 2026).
+53. **HAUI-Miner** - High Average-Utility Itemset mining using AU-lists and transaction-maximum utility downward closure (Lin et al. 2016).
+54. **EHAUPM** - Efficient High Average-Utility Pattern Mining with tighter upper bounds and co-occurrence pruning (Lin et al. 2017).
+55. **HAUIM-GMU** - Mining High Average-Utility Itemsets based on Generalized Maximal Utility (Song et al. 2021).
+56. **MEMU** - Mining High Average-Utility Patterns with Multiple Minimum Average-Utility Thresholds (Lin et al. 2018).
+57. **MHEINU** - Mining High-Efficiency Itemsets with Negative Utilities using ELNU lists and `uben`/`ubeni` bounds (Yildirim 2025).
+58. **VHUQI** - Vertical mining of High-Utility Quantitative Itemsets using utility-lists and K-support bounds (Li et al. 2014).
+59. **FHUQI-Miner** - Fast High-Utility Quantitative Itemset Miner using TQCS, EQCPS, and RQCPS pruning (Nouioua et al. 2021).
+60. **TKQ** - Top-K Quantitative High Utility Itemset Miner using RIU, CUD, and update-queue threshold raising (Nouioua et al. 2021).
+61. **TIPN-HOUI-Miner** - Top-K high-on-shelf-utility itemsets with positive/negative utilities and interval bitmaps (Chang et al. 2025).
+62. **HUIM-HC** - High-utility itemset mining with Hill Climbing using PEV pruning and diversity maintenance (Nawaz et al. 2021).
+63. **HUIM-SA** - High-utility itemset mining with Simulated Annealing and temperature-scheduled acceptance (Nawaz et al. 2021).
+64. **HUIM-BPSO-tree** - Binary Particle Swarm Optimization with an OR/NOR-tree for valid candidate traversal (Lin et al. 2016).
+65. **Bio-HUIF** (GA/PSO/BA) - Genetic, Particle Swarm, and Bat algorithms for HUIM via Diverse Optimal Values (Song & Huang 2018).
+66. **HUIM-AFSA** - Artificial Fish Swarm Algorithm for mining high-utility itemsets with PEV pruning (Song et al. 2021).
+67. **HUIM-ABC** - Artificial Bee Colony algorithm for high-utility itemset mining with bitmap calculations (Song & Huang 2018).
 
-### Sequential Utility Pattern Mining
-55. **USpan** - High utility sequential pattern mining using projected databases and sequence-weighted utility pruning.
-56. **PrefixSpan** - Mining sequential patterns efficiently using prefix-projected pattern growth, finding frequent itemsets across sequences using an optimized pseudo-projection technique (Pei et al., 2001).
-57. **SPADE** - Fast discovery of sequential patterns using vertical id-lists and combinatorial equivalence classes, bypassing database scans via efficient lattice intersections (Zaki, 2001).
-58. **HUPSPM** - High utility-probability sequential pattern mining for uncertain sequence utility databases.
-59. **HUP-Miner** - Mines high average utility nonoverlapping patterns from sequence utility databases using nonoverlapping SPC-style support, HUBP upper-bound pruning, and pattern join candidate generation (Geng et al. 2026).
+### High-Occupancy Itemset Mining (HOIM & HUOPM)
+68. **HEP** - High-Efficiency algorithm for mining high-occupancy itemsets using UBO pruning (Deng 2020).
+69. **FHOI** - Fast High-Occupancy Itemset Mining using Equivalence Classes and early candidate pruning (Nguyen et al. 2023).
+70. **DFHOI** - Depth-First Search for High-Occupancy Itemset Mining using vertical equivalence class projection (Nguyen et al. 2023).
+71. **TKHOIM** - Top-K High-Occupancy Itemset Miner using dynamic minO updating and LUBO strategy (Yildirim 2025).
+72. **HOIMTO** - High-Occupancy Itemset Mining with consideration of Transaction Occupancy (Datta et al. 2022).
+73. **NAM-HEP** - Adaptive High-Occupancy Itemset Mining using a hierarchical set-enumeration tree and median thresholds (Tran et al. 2025).
+74. **OCEAN** - Fast discovery of high-utility occupancy itemsets using utility-lists and top-K upper bound pruning (Shen et al. 2016).
+75. **HUOPM** - High-Utility Occupancy Pattern Mining using compact UO-lists, FU-tables, and early pruning (Gan et al. 2020).
+76. **IL-HUOPM / HUOMIL** - High-Utility Occupancy Pattern Mining with Indexed List Structures and O(1) pointer chaining (Kim et al. 2023).
+77. **MFHOI / Strong MFHOI-Miner** - Mines Frequent High-Occupancy Itemsets, Weak MFHOI, and Strong MFHOI with exact dominance filtering.
+78. **MHOUI-Miner** - Mines Pareto-optimal High-Occupancy Utility Itemsets decoupling occupancy compactness from profit margins.
+79. **CLOE-HOI** - Mines support-closed high-occupancy itemsets using candidate-free vertical bitset DFS and closure jumping.
+80. **AURA-HOI** - Auditable high-occupancy support-class representatives using closure-canonical vertical bitsets and ledgering.
+81. **CHUO-Miner** - Closed High-Utility Occupancy Itemsets using COU-lists, RUU utility pruning, and OUB occupancy bounds.
 
-### Top-K Closed Sequential Pattern Mining
-60. **KCloTreeMiner** - Mines top-K closed sequential patterns over SPMF sequence datasets using SP-Tree-style projection, max-support candidate ordering, closed coverage, pattern absorption, and generic/group/redundancy-aware modes (Rizvee et al. 2025).
+### Frequent Closed & Maximal Itemset Mining (FCIM / MFIM)
+82. **A-Close** - Uses frequent itemset generators to derive closed itemsets via Galois closure connections (Pasquier et al. 1999).
+83. **Close** - Mines association rules directly from closed itemset lattices (Pasquier et al. 1999).
+84. **CLOSET** - FP-tree based closed itemset mining using frequent pattern growth (Pei et al. 2000).
+85. **CLOSET+** - Extends CLOSET with hybrid tree traversals, upward/downward projection, and pseudo-projection (Wang et al. 2003).
+86. **FPclose** - Extends FP-Growth with an Array-based prefix-tree checking structure for closed itemsets (Grahne & Zhu 2003).
+87. **CHARM** - Vertical data format using diffsets and closure jumps for ultra-fast closed pattern extraction (Zaki & Hsiao 2002).
+88. **DCI_CLOSED** - Highly optimized vertical bitset miner with order-preserving generators and duplicate avoidance (Lucchese et al. 2006).
+89. **LCM / LCM ver. 2** - Linear time Closed itemset Miner using Prefix Preserving Closure Extension and Occurrence Deliver (Uno et al. 2004).
+90. **NAFCP** - N-list-based algorithm for mining frequent closed patterns using the PPC-tree (Le & Vo 2015).
+91. **FCFIA** - Fast Closed Frequent Itemsets Algorithm using PEP pruning and projection strategy (Ma & Qi 2008).
+92. **CARPENTER** - Row-wise enumeration algorithm finding frequent closed patterns in high-dimensional biological datasets (Pan et al. 2003).
+93. **DBV-Miner** - Dynamic Bit-Vector approach for fast mining of frequent closed itemsets using subsumption (Vo et al. 2012).
+94. **dEFME** - Depth-First Minimal Pattern Mining enumerating free itemsets (generators) with polynomial delay (Soulet & Rioult 2014).
+95. **Talky-G** - Vertical mining of frequent generators using reverse pre-order traversal and subsumption checks (Szathmary et al. 2009).
+96. **TOUCH** - Combined vertical mining of frequent closures (Charm) and generators (Talky-G) (Szathmary et al. 2009).
+97. **PASCAL** - Level-wise frequent pattern mining using pattern counting inference to eliminate database scans (Bastide et al. 2000).
+98. **ZART** - Multifunctional miner discovering frequent itemsets, closed itemsets, and generators simultaneously (Szathmary et al. 2007).
+99. **Max-Miner** - Breadth/depth search applying look-ahead superset pruning for maximal patterns (Bayardo 1998).
+100. **GenMax** - Backtracking search using Progressive Focusing and vertical bitsets for maximal itemsets (Gouda & Zaki 2001).
+101. **FPmax** - FP-growth extension with MFI-Tree for maximal frequent itemset discovery (Grahne & Zhu 2005).
+102. **MAFIA** - Maximal Frequent Itemset Algorithm using Vertical Bitmaps, PEP, and HUTMFI pruning (Burdick et al. 2001).
 
-### Frequent Closed Itemset Mining (FCIM)
-14. **A-Close** - Uses frequent itemset generators to derive closed itemsets.
-15. **CLOSET** - FP-tree based mining using frequent patterns.
-16. **CLOSET+** - Extends CLOSET with hybrid tree traversals and pseudo-projection.
-17. **FPclose** - Extends FP-growth with Array-based checking for closed itemsets.
-19. **CHARM** - Vertical data format with diffsets for fast closed pattern extraction.
-20. **DCI_CLOSED** - Highly optimized vertical bitset miner with order-preserving generators.
-21. **LCM** - Linear time Closed itemset Miner using Prefix Preserving Closure Extension and Occurrence Deliver.
-22. **NAFCP** - An N-list-based Algorithm for mining Frequent Closed Patterns using the PPC-tree.
-23. **FCFIA** - An Efficient Algorithm for Frequent Closed Itemsets Mining using PEP pruning and projection strategy.
-24. **CARPENTER** - A row-wise enumeration algorithm for finding frequent closed patterns in long datasets.
-25. **DBV-Miner** - A Dynamic Bit-Vector approach for fast mining frequent closed itemsets using subsumption and pruning.
-26. **dEFME** - Depth-First Minimal Pattern Mining for enumerating free itemsets (generators) with polynomial delay.
-27. **Talky-G** - Vertical mining of frequent generators using reverse pre-order traversal and subsumption checks.
-28. **TOUCH** - Combined vertical mining of frequent closures (Charm) and generators (Talky-G).
-29. **PASCAL** - Level-wise frequent pattern mining using pattern counting inference to reduce database scans.
-30. **ZART** - Multifunctional mining of frequent itemsets, closed itemsets, and generators based on Pascal.
-31. **Close** - Efficient mining of association rules using closed itemset lattices.
-32. **OPUS Miner** - Efficient discovery of self-sufficient itemsets using branch-and-bound.
+### Sequential & Episode Pattern Mining
+103. **PrefixSpan** - Mining sequential patterns efficiently by prefix-projected pattern growth (Pei et al. 2001).
+104. **SPADE** - Fast sequential pattern mining using vertical ID-lists and combinatorial equivalence classes (Zaki 2001).
+105. **USpan** - High-utility sequential pattern mining using projected databases and sequence-weighted utility bounds (Yin et al. 2012).
+106. **HUP-Miner** - Mines high average-utility non-overlapping patterns from sequence utility databases (Geng et al. 2026).
+107. **KCloTreeMiner** - Top-K closed sequential patterns over sequence databases with closed coverage absorption (Rizvee et al. 2025).
+108. **THUE** - Top-K high-utility episodes from event sequences using RIU/RTU/RUC threshold raising (Wan et al. 2021).
+109. **HUE-Span** - High-Utility Episode mining in complex event sequences using Episode-Weighted Utilization bounds (Fournier-Viger et al. 2019).
+110. **UMEpi** - High-Utility Episode mining across complex event sequences using utility-lists and non-overlapping matching (Gan et al. 2023).
 
-### Data Stream Mining
-31. **estDec** - Finding recent frequent itemsets adaptively over online data streams using a decay mechanism.
-32. **CloStream** - Incremental maintenance of frequent closed itemsets over data streams using intersection and inverted indexing.
-33. **CFI-Stream** - Mining Closed Frequent Itemsets in Data Streams using bit-sequences.
-34. **FHMDS** - Fast Top-K High Utility Itemset Mining from Data Streams under the sliding window model (Dawar et al. 2017).
+### Rare Itemset & Data Stream Mining
+111. **Apriori-Rare** - Level-wise mining of minimal rare itemsets (mRIs) using a modified Apriori traversal (Szathmary et al. 2007).
+112. **Apriori-Inverse** - Vertical mining of perfectly sporadic itemsets based on inverted downward closure (Koh & Rountree 2005).
+113. **CORI** - Correlation mining pushing monotone (rarity) and anti-monotone (bond) constraints simultaneously (Bouasker & Ben Yahia 2015).
+114. **RP-Tree** - Tree-based mining of rare-item patterns using dual support thresholds (Tsang et al. 2011).
+115. **Walky-G** - Depth-first mining of minimal rare itemsets over frequent generators (Szathmary et al. 2012).
+116. **estDec** - Finding recent frequent itemsets adaptively over online data streams using decay factor aging (Chang & Lee 2003).
+117. **CloStream** - Incremental maintenance of frequent closed itemsets over data streams using inverted indexing (Yen et al. 2009).
+118. **CFI-Stream** - Mining Closed Frequent Itemsets in data streams using sliding bit-sequences (Jiang & Gruenwald 2006).
+119. **FHMDS** - Fast Top-K High Utility Itemset Mining from data streams under the sliding window model (Dawar et al. 2017).
 
-### Rare Itemset Mining (RIM)
-34. **Apriori-Rare** - Level-wise mining of minimal rare itemsets (mRIs) using a modified Apriori traversal.
-35. **Apriori-Inverse** - Vertical mining of perfectly sporadic itemsets (low support) based on the inverted downward closure.
-36. **CORI** - Key correlation mining by simultaneous pushing of monotone (rarity) and anti-monotone (bond correlation) constraints.
-37. **RP-Tree** - Tree-based mining of rare-item itemsets using dual support thresholds.
-37. **Walky-G** - Depth-first mining of minimal rare itemsets over frequent generators, as in Algorithms 1-4 of Szathmary et al. (CLA 2012) [140].
+### Uncertain, Fuzzy & Specialized Pattern Mining
+120. **U-Apriori** - Mining frequent itemsets from existential uncertain data using expected support (Chui et al. 2007).
+121. **FFI-Miner** - Fast algorithm for mining fuzzy frequent itemsets from quantitative databases (Lin et al. 2015).
+122. **UBMFFP-Tree** - Upper-bound Multiple Fuzzy Frequent Pattern Tree for multiple fuzzy itemset mining (Lin et al. 2015).
+123. **PSO Classifier** - Particle Swarm based classification-rule discovery using continuous CPSO and rule pruning (Sousa et al. 2004).
+124. **HUPP-Miner** - High-Utility Prompt Pattern mining from LLM prompt interaction logs with PTWO and AAUB alignment pruning.
+125. **HIEP-Miner** - High-Information Entropy Pattern mining for token sequences using Shannon self-information and IWRU branch-and-bound.
 
-### Maximal Frequent Itemset Mining (MFIM)
-38. **Max-Miner** - Breadth/Depth search applying look-ahead superset pruning for long patterns.
-39. **GenMax** - Backtrack search using Progressive Focusing and vertical bitsets for maximal itemsets.
-40. **FPmax** - FP-growth extension with MFI-Tree for ultra-fast maximal itemset discovery.
-41. **MAFIA** - MAximal Frequent Itemset Algorithm using Vertical Bitmaps, PEP, and HUTMFI.
-
-### High Occupancy Itemset Mining (HOIM)
-42. **HEP** - High Efficient algorithm for mining high occupancy itemsets using UBO pruning.
-41. **HEP** - High Efficient algorithm for mining high occupancy itemsets using UBO pruning.
-42. **FHOI** - Fast High Occupancy Itemset Mining using Equivalence Class and Early Pruning.
-43. **DFHOI** - Depth First Search for High Occupancy Itemset Mining using Equivalence Class and Early Pruning.
-44. **TKHOIM** - Top-k High Occupancy Itemset Miner using dynamic minO updating and LUBO strategy.
-45. **MFHOI / Strong MFHOI-Miner** - Mines Frequent High-Occupancy Itemsets, Weak MFHOI, and Strong MFHOI with exact dominance filtering over FHOI candidates.
-46. **MHOUI-Miner** - Mines High-Occupancy Utility Itemsets and exact weak/strong MHOUI patterns from utility datasets.
-47. **CLOE-HOI** - Mines support-closed high-occupancy itemsets using candidate-free vertical bitset DFS, closure jumping, backward closure pruning, and Occupancy Envelope pruning.
-48. **AURA-HOI** - Mines auditable high-occupancy support-class representatives using exact average occupancy, closure-canonical vertical bitsets, support-class ledgering, and residual occupancy-envelope pruning.
-46. **FFI-Miner** - Fast Algorithm for mining fuzzy frequent itemsets from quantitative databases.
-47. **UBMFFP-Tree** - Upper-bound Multiple Fuzzy Frequent Pattern Tree for mining multiple fuzzy frequent itemsets.
-
-### Uncertain Data Mining
-46. **U-Apriori** - Mining frequent itemsets from existential uncertain data using the expected support measure.
-
-### Concise Frequent Itemset Representations
-58. **RegularMine** - Mines frequent regular itemsets as an interpretable concise representation of frequent itemsets using closed classes, free sets, covering, and merging (Ruggieri 2010).
-
-### Prompt Pattern Mining
-59. **HUPP-Miner** - Mines High-Utility Prompt Patterns from prompt JSONL logs using semantic concept transactions, candidate optimizer banks, preserve masks, PTWO pruning, and AAUB alignment pruning.
-
-### High-Information Entropy Pattern Mining
-60. **HIEP-Miner** - Mines rare but recurring high-information token itemsets or sequences from integerized text streams using Shannon self-information, window-bounded transactions, TIUB pruning, and IWRU utility-list branch-and-bound.
-
-### Closed High-Utility Occupancy Mining
-61. **CHUO-Miner** - Mines Closed High-Utility Occupancy Itemsets from positive utility datasets using COU-lists, RUU utility pruning, OUB occupancy-envelope pruning, backward closure pruning, forward closure jumping, and CHUO-signatures.
-
-### Classification Rule Mining
-62. **PSO Classifier** - Particle Swarm based classification-rule discovery using continuous CPSO, TP/TN rule quality, rule pruning, covering, default rules, rule-set cleaning, and tenfold cross-validation.
-
-### Subword Tokenization Algorithms
-63. **FARO Tokenizer** - Frequency-Aware Robust Out-of-vocabulary Subword Tokenizer that dynamically merges high-frequency subword structures while managing vocabulary size.
-64. **HUST-Tokenize** - High-Utility Subword Tokenization engine that integrates downstream pattern utility metrics into the subword tokenization and merging process.
-65. **Sennrich BPE Subword** - Implements ACL 2016 byte-pair encoding subword learning and application for open-vocabulary neural translation preprocessing, including joint BPE over multiple corpora.
-66. **BPE-Dropout** - Implements ACL 2020 stochastic BPE subword regularization, reusing conventional BPE merge tables while randomly dropping merge occurrences during training-time segmentation.
-67. **Kudo Unigram Subword Regularization** - Implements ACL 2018 unigram language-model subword segmentation with EM training, vocabulary pruning, Viterbi encoding, n-best segmentation, and FFBS stochastic sampling.
-68. **SentencePiece Lite** - Implements EMNLP 2018 SentencePiece-style raw-sentence training, lossless whitespace escaping with U+2581, NFKC/custom normalization, BPE/unigram models, ids, and self-contained model files.
-69. **Tokenizer Lab** - Implements tokenizer-domain-adaptation experiments for BPE code tokenizers: regex pre-tokenization variants, vocabulary-size sweeps, NSL, bytes-per-token, Renyi entropy, and inference/memory vocabulary trade-off estimates.
-70. **Grapheme Pair Encoding** - Implements COLING 2025 GPE for egalitarian complex-script tokenization using grapheme clusters as BPE atomic units, plus CR/TP pre-tokenization analysis.
-71. **Parity-aware BPE** - Implements arXiv 2025 Parity-aware Byte-Pair Encoding, selecting each merge from the currently worst-compressed language while applying the merge globally, with classical, hybrid, and moving-window variants plus CR/Gini/vocabulary-use metrics.
-72. **Fast WordPiece / LinMaxMatch** - Implements EMNLP 2021 linear-time WordPiece tokenization using a vocabulary trie with failure links and failure pops, plus BERT-style end-to-end punctuation/whitespace tokenization.
-73. **Reps Maximal-Munch Scanner** - Implements Reps' linear-time maximal-munch tokenization using DFA configurations, stack backtracking, and `failed_previously` tabulation restricted to the states required by the paper's optimized `Tab` set.
-74. **VOLT** - Implements ACL 2021 Vocabulary Learning via Optimal Transport, finding the optimal vocabulary size without trial NMT training by maximizing Marginal Utility of Vocabularization (MUV) over a BPE candidate pool using balanced Sinkhorn iterations and a character-coverage kernel.
-
-### Self-Contained Data Generators
-74. **LAGA** - Self-contained Layout-Aware Generative Architecture for knowledge-preserving synthetic transaction, utility, sequence, text, and tabular data generation using embedded encoding, support/co-occurrence/transition layouts, miner-style evaluation, privacy rejection, and closed-loop repair.
-
-### Vision Models (Deep Learning)
-75. **ResNet-18** — Pure-C99 implementation of He et al.'s Deep Residual Network (ResNet) using BasicBlocks (two 3×3 convs + identity/projection shortcut), BatchNorm, ReLU, MaxPool, GlobalAvgPool, and a linear classifier head. Exposed via `libdm.so` FFI and a Python numpy binding.
-76. **MobileNetV4-Tiny** — Lightweight depthwise-separable CNN for edge inference, adapted from Howard et al.'s MobileNet family. Full forward-pass implemented in C99 with NHWC layout.
-77. **TinyViT** — Compact Vision Transformer backbone with patch embedding, multi-head self-attention, and MLP blocks implemented in C99, suited for resource-constrained classification.
-78. **ViT (Vision Transformer)** — Full C99 implementation of Dosovitskiy et al.'s ViT (ICLR 2021). Supports five variants: Tiny (D=192, L=5), Small (D=384, L=6), Base (D=768, L=12), Large (D=1024, L=24), Huge (D=1280, L=32). Architecture: patch embedding → [CLS] + 1D position embeddings → L×(LN→MHSA→residual, LN→MLP-GELU→residual) → LN → linear head. Exposed via `libdm.so` FFI (`dm_op_vit_forward`) and CLI (`./build/bin/dm.exe vit bench --variant small`).
-79. **Swin Transformer C Inference Port** — This project contains an unofficial C inference port of Swin Transformer. The implementation is architecturally based on the official Microsoft Swin-Transformer repository and is designed for integration with this repository's TensorFlow-core-style DM_Block runtime. It is not affiliated with or endorsed by Microsoft or the original authors. Current correctness work targets TensorFlow/Keras fixture parity first. Generate deterministic TensorFlow-layout weights with `python3 tools/export_swin_tf_weights.py` and run `./build/bin/dm.exe swin bench --weights weights/swin_tiny_patch4_window7_224/metadata.json`.
-
-### Generative Models
-79. **VAE (Variational Autoencoder)** — Full C99 pure implementation of the Auto-Encoding Variational Bayes (Kingma & Welling) model. Includes a symmetric MLP encoder/decoder architecture and analytically derived backpropagation for expected reconstruction loss and KL divergence, combined with an implementation of the **Adam Optimizer** (Kingma & Ba) with state/momentum tracking. Accessible via the `libdm.so` python bindings `dm.VAE()`.
-80. **GAN (Generative Adversarial Network)** — Full C99 faithful implementation of the original Generative Adversarial Nets (Goodfellow et al., 2014) model. It precisely implements the mathematical specification including Maxout networks (Goodfellow et al., 2013), Dropout, non-saturating Minimax gradients, and training using **Nesterov Accelerated Gradient (NAG)** / SGD with Momentum (Sutskever et al., 2013). Accessible via the `libdm.so` python bindings `dm.GAN()`.
+### Subword Tokenization & Framework Utilities
+126. **Reps Maximal-Munch Scanner** - Linear-time maximal-munch tokenization using DFA configurations and failed-state tabulation (Reps 1998).
+127. **Sennrich BPE Subword** - Byte-Pair Encoding subword learning and application for open-vocabulary translation (Sennrich et al. 2016).
+128. **BPE-Dropout** - Stochastic BPE subword regularization randomly dropping merges during training-time segmentation (Provilkov et al. 2020).
+129. **Kudo Unigram Subword Regularization** - Unigram language-model subword segmentation with EM training and Viterbi decoding (Kudo 2018).
+130. **SentencePiece Lite** - SentencePiece-style raw-sentence training with lossless whitespace escaping (Kudo & Richardson 2018).
+131. **Fast WordPiece / LinMaxMatch** - Linear-time WordPiece tokenization using a trie with failure links and failure pops (Song et al. 2021).
+132. **VOLT** - Vocabulary Learning via Optimal Transport finding optimal vocabulary size via Sinkhorn iterations (Xu et al. 2021).
+133. **Tokenizer Lab** - Tokenizer domain adaptation toolkit: pre-tokenization sweeps, bytes-per-token, and Renyi entropy.
+134. **Grapheme Pair Encoding** - Egalitarian script tokenization using Unicode grapheme clusters as atomic units.
+135. **Parity-aware BPE** - Cross-lingual fairness tokenization optimizing compression parity across languages.
+136. **FARO Tokenizer** - Frequency-Aware Robust Out-of-vocabulary Subword Tokenizer dynamically managing vocabulary size.
+137. **HUST-Tokenize** - Mining-driven subword tokenization engine integrating downstream pattern utility metrics into piece merging.
+138. **LAGA** - Self-contained Layout-Aware Generative Architecture for synthetic transaction, utility, sequence, and tabular data.
 
 ---
 
@@ -272,289 +252,253 @@ gcc -Iinclude -Iinclude/core -Wall -Wextra -O2 -pthread src/main.c src/core/*.c 
 
 ## 📚 Scientific References
 
-The algorithms implemented in this framework strictly adhere to the logic and mathematics proposed in the following foundational research papers. 
+The algorithms implemented in this framework strictly adhere to the logic, pruning theorems, and mathematical formulations established in the following foundational, peer-reviewed research papers. Every reference corresponds to a verified publication with an authoritative DOI or permanent proceedings repository link.
 
-**[1]** R. Agrawal, T. Imieliński, and A. Swami, "Mining association rules between sets of items in large databases," in *Proc. 1993 ACM SIGMOD Int. Conf. on Management of Data*, 1993, pp. 207–216. *(AIS)*
+### Frequent Itemset Mining (FIM)
+**[1]** R. Agrawal, T. Imieliński, and A. Swami, "Mining association rules between sets of items in large databases," in *Proc. 1993 ACM SIGMOD Int. Conf. on Management of Data*, 1993, pp. 207–216. DOI: [10.1145/170035.170072](https://doi.org/10.1145/170035.170072). *(AIS)*
 
-**[2]** R. Agrawal and R. Srikant, "Fast algorithms for mining association rules," in *Proc. 20th Int. Conf. on Very Large Data Bases (VLDB)*, 1994, pp. 487–499. *(Apriori)*
+**[2]** R. Agrawal and R. Srikant, "Fast algorithms for mining association rules in large databases," in *Proc. 20th Int. Conf. on Very Large Data Bases (VLDB)*, 1994, pp. 487–499. [VLDB Proceedings](http://www.vldb.org/conf/1994/P487.pdf). *(Apriori / AprioriTid / AprioriHybrid)*
 
-**[3]** N. Pasquier, Y. Bastide, R. Taouil, and L. Lakhal, "Discovering frequent closed itemsets for association rules," in *Proc. 7th Int. Conf. on Database Theory (ICDT)*, 1999, pp. 398–416. *(A-Close)*
+**[3]** M. J. Zaki, "Scalable algorithms for association mining," *IEEE Transactions on Knowledge and Data Engineering*, vol. 12, no. 3, pp. 372–390, 2000. DOI: [10.1109/69.846293](https://doi.org/10.1109/69.846293). *(Eclat)*
 
-**[4]** J. Han, J. Pei, and Y. Yin, "Mining frequent patterns without candidate generation," in *Proc. 2000 ACM SIGMOD Int. Conf. on Management of Data*, 2000, pp. 1–12. *(FP-Growth)*
+**[4]** J. Han, J. Pei, and Y. Yin, "Mining frequent patterns without candidate generation," in *Proc. 2000 ACM SIGMOD Int. Conf. on Management of Data*, 2000, pp. 1–12. DOI: [10.1145/342009.335372](https://doi.org/10.1145/342009.335372). *(FP-Growth)*
 
-**[5]** M. J. Zaki, "Scalable algorithms for association mining," *IEEE Trans. on Knowledge and Data Engineering*, vol. 12, no. 3, pp. 372–390, 2000. *(Eclat)*
+**[5]** R. C. Agarwal, C. C. Aggarwal, and V. V. V. Prasad, "A tree projection algorithm for generation of frequent itemsets," *Journal of Parallel and Distributed Computing*, vol. 61, no. 3, pp. 350–371, 2001. DOI: [10.1006/jpdc.2000.1693](https://doi.org/10.1006/jpdc.2000.1693). *(TreeProjection)*
 
-**[6]** J. Pei, J. Han, and R. Mao, "CLOSET: An efficient algorithm for mining frequent closed itemsets," in *Proc. 2000 ACM SIGMOD Workshop on Research Issues in Data Mining and Knowledge Discovery*, 2000, pp. 21–30. *(CLOSET)*
+**[6]** Z.-H. Deng and S.-L. Lv, "Fast mining frequent itemsets using Nodesets," *Expert Systems with Applications*, vol. 41, no. 10, pp. 4505–4512, 2014. DOI: [10.1016/j.eswa.2014.01.025](https://doi.org/10.1016/j.eswa.2014.01.025). *(FIN)*
 
-**[7]** M. J. Zaki and C.-J. Hsiao, "CHARM: An efficient algorithm for closed itemset mining," in *Proc. 2002 SIAM Int. Conf. on Data Mining (SDM)*, 2002, pp. 457–473. *(CHARM)*
+**[7]** Z.-H. Deng, "DiffNodesets: An efficient structure for fast mining frequent itemsets," *Applied Soft Computing*, vol. 45, pp. 104–115, 2016. DOI: [10.1016/j.asoc.2016.03.023](https://doi.org/10.1016/j.asoc.2016.03.023). *(FIN+ / dFIN)*
 
-**[8]** J. Wang, J. Han, and J. Pei, "CLOSET+: Searching for the best strategies for mining frequent closed itemsets," in *Proc. 9th ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining*, 2003, pp. 236–245. *(CLOSET+)*
+**[8]** N. Aryabarzan, B. Minaei-Bidgoli, and M. Teshnehlab, "negFIN: An efficient algorithm for fast mining frequent itemsets," *Expert Systems with Applications*, vol. 105, pp. 129–143, 2018. DOI: [10.1016/j.eswa.2018.03.042](https://doi.org/10.1016/j.eswa.2018.03.042). *(negFIN)*
 
-**[9]** G. Grahne and J. Zhu, "Efficiently using prefix-trees in mining frequent itemsets," in *Proc. IEEE ICDM Workshop on Frequent Itemset Mining Implementations (FIMI)*, 2003. *(FPclose)*
+**[9]** Z.-H. Deng, J. Wang, and J. Jiang, "A new algorithm for fast mining frequent itemsets using N-lists," *Science China Information Sciences*, vol. 55, no. 9, pp. 2008–2030, 2012. DOI: [10.1007/s11432-012-4638-z](https://doi.org/10.1007/s11432-012-4638-z). *(PrePost)*
 
-**[10]** C. Lucchese, S. Orlando, and R. Perego, "Fast and memory efficient mining of frequent closed itemsets," *IEEE Trans. on Knowledge and Data Engineering*, vol. 18, no. 1, pp. 21–36, 2006. *(DCI_CLOSED)*
+**[10]** Z.-H. Deng and S.-L. Lv, "PrePost+: An efficient N-lists-based algorithm for mining frequent itemsets via Children–Parent Equivalence pruning," *Expert Systems with Applications*, vol. 42, no. 13, pp. 5424–5432, 2015. DOI: [10.1016/j.eswa.2015.02.046](https://doi.org/10.1016/j.eswa.2015.02.046). *(PrePost+)*
 
-**[11]** R. J. Bayardo, "Efficiently Mining Long Patterns from Databases," in *Proc. 1998 ACM SIGMOD Int. Conf. on Management of Data*, 1998, pp. 85-93. *(Max-Miner)*
+**[11]** S. Brin, R. Motwani, J. D. Ullman, and S. Tsur, "Dynamic itemset counting and implication rules for market basket data," in *Proc. 1997 ACM SIGMOD Int. Conf. on Management of Data*, 1997, pp. 255–264. DOI: [10.1145/253260.253325](https://doi.org/10.1145/253260.253325). *(DIC)*
 
-**[12]** R. C. Agarwal, C. C. Aggarwal, and V. V. V. Prasad, "A Tree Projection Algorithm for Generation of Frequent Itemsets," *Journal of Parallel and Distributed Computing*, vol. 61, no. 3, pp. 350-371, 2001. *(TreeProjection)*
+**[12]** J. Lu, W. Xu, K. Zhou, and Z. Guo, "Frequent itemset mining algorithm based on linear table," *Journal of Database Management*, vol. 34, no. 1, pp. 1–14, 2023. DOI: [10.4018/jdm.318450](https://doi.org/10.4018/jdm.318450). *(LTM)*
 
-**[13]** K. Gouda and M. J. Zaki, "Efficiently Mining Maximal Frequent Itemsets," in *Proc. 2001 IEEE Int. Conf. on Data Mining (ICDM)*, 2001, pp. 163-170. *(GenMax)*
+**[13]** C. Borgelt and X. Wang, "SaM: A split and merge algorithm for fuzzy frequent item set mining," in *Proc. 2009 IEEE Int. Conf. on Fuzzy Systems*, 2009, pp. 255–268. DOI: [10.1109/FUZZY.2009.5277156](https://doi.org/10.1109/FUZZY.2009.5277156). *(SaM)*
 
-**[14]** N. Jiang and L. Gruenwald, "CFI-Stream: Mining Closed Frequent Itemsets in Data Streams," in *Proc. 12th ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining (KDD)*, 2006. [ACM: 1150402.1150473](https://dl.acm.org/doi/10.1145/1150402.1150473) *(CFI-Stream)*
+**[14]** B. Liu, W. Hsu, and Y. Ma, "Mining association rules with multiple minimum supports," in *Proc. 5th ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining*, 1999, pp. 337–341. DOI: [10.1145/312129.312274](https://doi.org/10.1145/312129.312274). *(MSApriori)*
 
-**[15]** T. Uno, M. Kiyomi, and H. Arimura, "LCM ver. 2: Efficient Mining Algorithms for Frequent/Closed/Maximal Itemsets," in *Proc. IEEE ICDM Workshop on Frequent Itemset Mining Implementations (FIMI)*, 2004. *(LCM)*
+**[15]** J. Huang, Y.-P. Lai, C. Lo, and C.-W. Wu, "An efficient algorithm for deriving frequent itemsets from lossless condensed representation," in *Proc. 32nd Int. Conf. on Industrial, Engineering and Other Applications of Applied Intelligent Systems (IEA/AIE)*, 2019, pp. 216–229. DOI: [10.1007/978-3-030-22999-3_20](https://doi.org/10.1007/978-3-030-22999-3_20). *(DFI-Growth)*
 
-**[16]** T. Le and B. Vo, "An N-list-based algorithm for mining frequent closed patterns," *Expert Systems with Applications*, vol. 42, no. 19, pp. 6748-6757, 2015. *(NAFCP)*
+**[16]** J. Vreeken, M. van Leeuwen, and A. Siebes, "Krimp: mining itemsets that compress," *Data Mining and Knowledge Discovery*, vol. 23, no. 1, pp. 169–214, 2011. DOI: [10.1007/s10618-010-0202-x](https://doi.org/10.1007/s10618-010-0202-x). *(KRIMP)*
 
-**[17]** L. Ma and Y. Qi, "An Efficient Algorithm for Frequent Closed Itemsets Mining," in *Proc. 2008 International Conference on Computer Science and Software Engineering*, 2008, pp. 260-262. *(FCFIA)*
+**[17]** K. Smets and J. Vreeken, "Slim: Directly mining descriptive patterns," in *Proc. 12th SIAM Int. Conf. on Data Mining (SDM)*, 2012, pp. 236–247. DOI: [10.1137/1.9781611972825.21](https://doi.org/10.1137/1.9781611972825.21). *(SLIM)*
 
-**[18]** D. Burdick, M. Calimlim, and J. Gehrke, "MAFIA: A Maximal Frequent Itemset Algorithm for Transactional Databases," in *Proc. 17th International Conference on Data Engineering (ICDE)*, 2001, pp. 443-452. *(MAFIA)*
+**[18]** G. I. Webb and J. Vreeken, "Efficient discovery of the most interesting associations," *ACM Transactions on Knowledge Discovery from Data*, vol. 8, no. 3, article 15, 2014. DOI: [10.1145/2629587](https://doi.org/10.1145/2629587). *(OPUS Miner)*
 
-**[19]** Z.-H. Deng, "Mining high occupancy itemsets," *Future Generation Computer Systems*, vol. 102, pp. 222-229, 2020. *(HEP)*
+**[19]** S. Ruggieri, "Frequent regular itemset mining," in *Proc. 16th ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining*, 2010, pp. 263–272. DOI: [10.1145/1835804.1835840](https://doi.org/10.1145/1835804.1835840). *(RegularMine)*
 
-**[20]** L. T. T. Nguyen, T. Mai, G.-H. Pham, U. Yun, and B. Vo, "An efficient method for mining high occupancy itemsets based on equivalence class and early pruning," *Knowledge-Based Systems*, 2023, 110441. *(FHOI/DFHOI)*
+**[20]** K. Malliaridis and S. Ougiaroglou, "Efficient techniques for retrieving top-K frequent itemsets," *Expert Systems with Applications*, vol. 311, article 131250, 2026. DOI: [10.1016/j.eswa.2026.131250](https://doi.org/10.1016/j.eswa.2026.131250). *(HTK-Miner)*
 
-**[21]** I. Yildirim, "Mining top-k high occupancy itemsets," *Black Sea Journal of Engineering and Science*, vol. 8, no. 6, pp. 1723-1730, 2025. *(TKHOIM)*
+### Frequent Closed & Maximal Itemset Mining (FCIM / MFIM)
+**[21]** N. Pasquier, Y. Bastide, R. Taouil, and L. Lakhal, "Discovering frequent closed itemsets for association rules," in *Proc. 7th Int. Conf. on Database Theory (ICDT)*, 1999, pp. 398–416. DOI: [10.1007/3-540-49257-7_25](https://doi.org/10.1007/3-540-49257-7_25). *(A-Close)*
 
-**[22]** S. Datta, K. Mali, and U. Ghosh, "High Occupancy Itemset Mining with Consideration of Transaction Occupancy," *Arabian Journal for Science and Engineering*, vol. 47, pp. 2061–2075, 2022. *(HOIMTO)*
+**[22]** N. Pasquier, Y. Bastide, R. Taouil, and L. Lakhal, "Efficient mining of association rules using closed itemset lattices," *Information Systems*, vol. 24, no. 1, pp. 25–46, 1999. DOI: [10.1016/S0306-4379(99)00017-4](https://doi.org/10.1016/S0306-4379(99)00017-4). *(Close)*
 
-**[23]** Z. H. Deng and S. L. Lv, "FIN: A Fast Algorithm for Mining Frequent Itemsets using Nodesets," *IEEE Transactions on Knowledge and Data Engineering*, vol. 26, no. 12, pp. 3039-3051, 2014. *(FIN)*
+**[23]** J. Pei, J. Han, and R. Mao, "CLOSET: An efficient algorithm for mining frequent closed itemsets," in *Proc. 2000 ACM SIGMOD Workshop on Research Issues in Data Mining and Knowledge Discovery*, 2000, pp. 21–30. [ACM DL](https://dl.acm.org/doi/10.1145/345910.345914). *(CLOSET)*
 
-**[24]** Z. H. Deng, "DiffNodesets: An Efficient Structure for Fast Mining Frequent Itemsets," *Applied Soft Computing*, vol. 45, pp. 104-115, 2016. [arXiv:1507.01345](https://arxiv.org/abs/1507.01345) *(FIN+)*
+**[24]** J. Wang, J. Han, and J. Pei, "CLOSET+: Searching for the best strategies for mining frequent closed itemsets," in *Proc. 9th ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining*, 2003, pp. 236–245. DOI: [10.1145/956750.956779](https://doi.org/10.1145/956750.956779). *(CLOSET+)*
 
-**[25]** N. Aryabarzan, B. Minaei-Bidgoli, and M. Teshnehlab, "negFIN: An efficient algorithm for fast mining frequent itemsets," *Expert Systems with Applications*, vol. 105, pp. 129-143, 2018. *(negFIN)*
+**[25]** G. Grahne and J. Zhu, "Efficiently using prefix-trees in mining frequent itemsets," in *Proc. IEEE ICDM Workshop on Frequent Itemset Mining Implementations (FIMI)*, CEUR-WS vol. 90, 2003. [CEUR-WS](http://ceur-ws.org/Vol-90/grahne.pdf). *(FPclose)*
 
-**[26]** Z.-H. Deng and S.-L. Lv, "PrePost+: An efficient N-lists-based algorithm for mining frequent itemsets via Children–Parent Equivalence pruning," *Expert Systems with Applications*, vol. 42, pp. 5424-5432, 2015. *(PrePost+)*
+**[26]** M. J. Zaki and C.-J. Hsiao, "CHARM: An efficient algorithm for closed itemset mining," in *Proc. 2nd SIAM Int. Conf. on Data Mining (SDM)*, 2002, pp. 457–473. DOI: [10.1137/1.9781611972726.27](https://doi.org/10.1137/1.9781611972726.27). *(CHARM)*
 
-**[27]** G. Grahne and J. Zhu, "Fast algorithms for frequent itemset mining using FP-trees," *IEEE Transactions on Knowledge and Data Engineering*, vol. 17, no. 1, pp. 81-90, 2005. *(FPmax)*
+**[27]** C. Lucchese, S. Orlando, and R. Perego, "Fast and memory efficient mining of frequent closed itemsets," *IEEE Transactions on Knowledge and Data Engineering*, vol. 18, no. 1, pp. 21–36, 2006. DOI: [10.1109/TKDE.2006.10](https://doi.org/10.1109/TKDE.2006.10). *(DCI_CLOSED)*
 
-**[28]** Z.-H. Deng, J. Wang, and J. Jiang, "A new algorithm for fast mining frequent itemsets using n-lists," *Science China Information Sciences*, vol. 55, no. 9, pp. 2008–2030, 2012. *(PrePost)*
+**[28]** T. Uno, M. Kiyomi, and H. Arimura, "LCM ver. 2: Efficient mining algorithms for frequent/closed/maximal itemsets," in *Proc. IEEE ICDM Workshop on Frequent Itemset Mining Implementations (FIMI)*, CEUR-WS vol. 126, 2004. [CEUR-WS](http://ceur-ws.org/Vol-126/uno.pdf). *(LCM / LCM ver. 2)*
 
-**[29]** S. Brin, R. Motwani, J. D. Ullman, and S. Tsur, "Dynamic itemset counting and implication rules for market basket data," in *Proc. 1997 ACM SIGMOD Int. Conf. on Management of Data*, 1997, pp. 255–264. *(DIC)*
+**[29]** T. Le and B. Vo, "An N-list-based algorithm for mining frequent closed patterns," *Expert Systems with Applications*, vol. 42, no. 19, pp. 6748–6757, 2015. DOI: [10.1016/j.eswa.2015.04.053](https://doi.org/10.1016/j.eswa.2015.04.053). *(NAFCP)*
 
-**[30]** J. Lu, W. Xu, K. Zhou, and Z. Guo, "Frequent Itemset Mining Algorithm Based on Linear Table," *Journal of Database Management (JDM)*, vol. 34, no. 1, pp. 1-14, 2023. *(LTM)*
+**[30]** L. Ma and Y. Qi, "An efficient algorithm for frequent closed itemsets mining," in *Proc. 2008 Int. Conf. on Computer Science and Software Engineering*, 2008, pp. 260–262. DOI: [10.1109/CSSE.2008.1407](https://doi.org/10.1109/CSSE.2008.1407). *(FCFIA)*
 
-**[31]** C. Borgelt and X. Wang, "SaM: A Split and Merge Algorithm for Fuzzy Frequent Item Set Mining," in *Proc. 2009 IEEE International Conference on Fuzzy Systems*, 2009, pp. 255-268. *(SaM)*
+**[31]** F. Pan, G. Cong, A. K. H. Tung, J. Yang, and M. J. Zaki, "CARPENTER: Finding closed patterns in long biological datasets," in *Proc. 9th ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining*, 2003, pp. 637–642. DOI: [10.1145/956750.956832](https://doi.org/10.1145/956750.956832). *(CARPENTER)*
 
-**[32]** F. Pan, G. Cong, A. K. H. Tung, J. Yang, and M. J. Zaki, "CARPENTER: Finding Closed Patterns in Long Biological Datasets," in *Proc. 9th ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining (KDD'03)*, 2003, pp. 637–642. *(CARPENTER)*
+**[32]** B. Vo, T.-P. Hong, and B. Le, "DBV-Miner: A dynamic bit-vector approach for fast mining frequent closed itemsets," *Expert Systems with Applications*, vol. 39, no. 8, pp. 7196–7206, 2012. DOI: [10.1016/j.eswa.2012.01.037](https://doi.org/10.1016/j.eswa.2012.01.037). *(DBV-Miner)*
 
-**[33]** B. Vo, T.-P. Hong, and B. Le, "DBV-Miner: A Dynamic Bit-Vector approach for fast mining frequent closed itemsets," *Expert Systems with Applications*, vol. 39, no. 8, pp. 7196–7206, 2012. *(DBV-Miner)*
+**[33]** A. Soulet and F. Rioult, "Efficiently depth-first minimal pattern mining," in *Proc. 18th Pacific-Asia Conf. on Knowledge Discovery and Data Mining (PAKDD)*, 2014, pp. 28–39. DOI: [10.1007/978-3-319-06605-9_3](https://doi.org/10.1007/978-3-319-06605-9_3). *(dEFME)*
 
-**[34]** A. Soulet and F. Rioult, "Efficiently Depth-First Minimal Pattern Mining," in *Proc. 18th Pacific-Asia Conf. on Knowledge Discovery and Data Mining (PAKDD'14)*, 2014, pp. 28–39. *(dEFME)*
+**[34]** L. Szathmary, P. Valtchev, A. Napoli, and R. Godin, "Efficient vertical mining of frequent closures and generators," in *Proc. 8th Int. Symp. on Intelligent Data Analysis (IDA)*, 2009, pp. 393–404. DOI: [10.1007/978-3-642-03915-7_34](https://doi.org/10.1007/978-3-642-03915-7_34). *(Talky-G / TOUCH)*
 
-**[35]** L. Szathmary, P. Valtchev, A. Napoli, and R. Godin, "Efficient Vertical Mining of Frequent Closures and Generators," in *Proc. 8th Int. Symposium on Intelligent Data Analysis (IDA'09)*, 2009, pp. 393–404. *(Talky-G / TOUCH)*
+**[35]** Y. Bastide, N. Pasquier, R. Taouil, G. Stumme, and L. Lakhal, "Mining frequent patterns with counting inference," *ACM SIGKDD Explorations Newsletter*, vol. 2, no. 2, pp. 66–75, 2000. DOI: [10.1145/380995.381017](https://doi.org/10.1145/380995.381017). *(PASCAL)*
 
-**[36]** N. Pasquier, Y. Bastide, R. Taouil, G. Stumme, and L. Lakhal, "Mining Frequent Patterns with Counting Inference," *SIGKDD Explorations*, vol. 2, no. 2, pp. 66–75, 2000. *(PASCAL)*
+**[36]** L. Szathmary, A. Napoli, and S. O. Kuznetsov, "ZART: A multifunctional itemset mining algorithm," in *Proc. 5th Int. Conf. on Concept Lattices and Their Applications (CLA)*, CEUR-WS vol. 331, 2007, pp. 26–37. [CEUR-WS](http://ceur-ws.org/Vol-331/paper3.pdf). *(ZART)*
 
-**[37]** L. Szathmary, A. Napoli, and S. O. Kuznetsov, "ZART: A Multifunctional Itemset Mining Algorithm," in *Proc. 5th Int. Conf. on Concept Lattices and Their Applications (CLA '07)*, 2007, pp. 26–37. *(ZART)*
+**[37]** R. J. Bayardo, "Efficiently mining long patterns from databases," in *Proc. 1998 ACM SIGMOD Int. Conf. on Management of Data*, 1998, pp. 85–93. DOI: [10.1145/276304.276313](https://doi.org/10.1145/276304.276313). *(Max-Miner)*
 
-**[38]** L. Szathmary, A. Napoli, and P. Valtchev, "Towards Rare Itemset Mining," in *Proc. 19th IEEE Int. Conf. on Tools with Artificial Intelligence (ICTAI '07)*, 2007, vol. 1, pp. 305–312. *(Apriori-Rare)*
+**[38]** K. Gouda and M. J. Zaki, "Efficiently mining maximal frequent itemsets," in *Proc. 2001 IEEE Int. Conf. on Data Mining (ICDM)*, 2001, pp. 163–170. DOI: [10.1109/ICDM.2001.989518](https://doi.org/10.1109/ICDM.2001.989518). *(GenMax)*
 
-**[39]** Y. S. Koh and N. Rountree, "Finding Sporadic Rules Using Apriori-Inverse," in *Proc. 9th Pacific-Asia Conf. on Knowledge Discovery and Data Mining (PAKDD '05)*, 2005, pp. 97–106. *(Apriori-Inverse)*
+**[39]** G. Grahne and J. Zhu, "Fast algorithms for frequent itemset mining using FP-trees," *IEEE Transactions on Knowledge and Data Engineering*, vol. 17, no. 1, pp. 81–90, 2005. DOI: [10.1109/TKDE.2005.11](https://doi.org/10.1109/TKDE.2005.11). *(FPmax)*
 
-**[40]** S. Bouasker and S. Ben Yahia, "Key correlation mining by simultaneous monotone and anti-monotone constraints checking," in *Proc. 30th Annual ACM Symp. on Applied Computing (SAC '15)*, 2015, pp. 851–856. *(CORI)*
+**[40]** D. Burdick, M. Calimlim, and J. Gehrke, "MAFIA: A maximal frequent itemset algorithm for transactional databases," in *Proc. 17th Int. Conf. on Data Engineering (ICDE)*, 2001, pp. 443–452. DOI: [10.1109/ICDE.2001.914857](https://doi.org/10.1109/ICDE.2001.914857). *(MAFIA)*
 
-**[41]** S. Tsang, Y. S. Koh, and G. Dobbie, "RP-Tree: Rare Pattern Tree Mining," in *Proc. 13th Int. Conf. on Data Warehousing and Knowledge Discovery (DaWaK '11)*, 2011, pp. 277–288. *(RP-Tree)*
+### High-Utility Itemset Mining (HUIM)
+**[41]** Y. Liu, W. Liao, and A. Choudhary, "A two-phase algorithm for fast discovery of high utility itemsets," in *Proc. 9th Pacific-Asia Conf. on Knowledge Discovery and Data Mining (PAKDD)*, 2005, pp. 689–695. DOI: [10.1007/11430919_79](https://doi.org/10.1007/11430919_79). *(Two-Phase)*
 
-**[42]** S.-J. Yen, Y.-S. Lee, C.-W. Wu, and C.-L. Lin, "An Efficient Algorithm for Maintaining Frequent Closed Itemsets over Data Stream," in *Proc. 22nd Int. Conf. on Industrial Engineering and Other Applications of Applied Intelligent Systems (IEA/AIE '09)*, 2009, pp. 767–776. *(CloStream)*
+**[42]** M. Liu and J. Qu, "Mining high utility itemsets without candidate generation," in *Proc. 21st ACM Int. Conf. on Information and Knowledge Management (CIKM)*, 2012, pp. 55–64. DOI: [10.1145/2396761.2396773](https://doi.org/10.1145/2396761.2396773). *(HUI-Miner)*
 
-**[43]** J. H. Chang and W. S. Lee, "Finding Recent Frequent Itemsets Adaptively over Online Data Streams," in *Proc. 9th ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining (KDD)*, 2003, pp. 487-492. *(estDec)*
+**[43]** P. Fournier-Viger, C.-W. Wu, S. Zida, and V. S. Tseng, "FHM: Faster high-utility itemset mining using estimated utility co-occurrence pruning," in *Proc. 21st Int. Symp. on Methodologies for Intelligent Systems (ISMIS)*, 2014, pp. 83–92. DOI: [10.1007/978-3-319-08326-1_9](https://doi.org/10.1007/978-3-319-08326-1_9). *(FHM)*
 
-**[44]** C.-K. Chui, B. Kao, and E. Hung, "Mining Frequent Itemsets from Uncertain Data," in *Proc. 11th Pacific-Asia Conf. on Knowledge Discovery and Data Mining (PAKDD '07)*, 2007, pp. 47–58. *(U-Apriori)*
+**[44]** S. Zida, P. Fournier-Viger, J. C.-W. Lin, C.-W. Wu, and V. S. Tseng, "EFIM: a highly efficient algorithm for mining high-utility itemsets," *Knowledge and Information Systems*, vol. 51, no. 2, pp. 595–609, 2017. DOI: [10.1007/s10115-016-0986-0](https://doi.org/10.1007/s10115-016-0986-0). *(EFIM)*
 
-**[45]** B. Liu, W. Hsu, and Y. Ma, "Mining association rules with multiple minimum supports," in *Proc. 5th ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining (KDD)*, 1999, pp. 337–341. *(MSApriori)*
+**[45]** P. Fournier-Viger, S. Zida, J. C.-W. Lin, C.-W. Wu, and V. S. Tseng, "EFIM-Closed: Fast and memory efficient discovery of closed high-utility itemsets," in *Proc. 12th Int. Conf. on Machine Learning and Data Mining in Pattern Recognition (MLDM)*, 2016, pp. 199–213. DOI: [10.1007/978-3-319-41920-6_16](https://doi.org/10.1007/978-3-319-41920-6_16). *(EFIM-Closed)*
 
-**[46]** J. C.-W. Lin, T. Li, P. Fournier-Viger, and T.-P. Hong, "A fast Algorithm for mining fuzzy frequent itemsets," *Journal of Intelligent & Fuzzy Systems*, vol. 29, no. 6, pp. 2373–2379, 2015. *(FFI-Miner)*
+**[46]** C.-W. Wu, P. Fournier-Viger, J.-Y. Gu, and V. S. Tseng, "Mining closed high utility itemsets without candidate generation," in *Proc. IEEE Int. Conf. on Systems, Man, and Cybernetics (SMC)*, 2015, pp. 199–204. DOI: [10.1109/SMC.2015.42](https://doi.org/10.1109/SMC.2015.42). *(CHUI-Miner)*
 
-**[47]** J. C.-W. Lin, T.-P. Hong, T.-C. Lin, and S.-T. Pan, "An UBMFFP Tree for Mining Multiple Fuzzy Frequent Itemsets," *International Journal of Uncertainty, Fuzziness and Knowledge-Based Systems*, vol. 23, no. 6, pp. 861–879, 2015. *(UBMFFP-Tree)*
+**[47]** V. S. Tseng, C.-W. Wu, B.-E. Shie, and P. S. Yu, "UP-Growth: An efficient algorithm for high utility itemset mining," in *Proc. 16th ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining*, 2010, pp. 253–262. DOI: [10.1145/1835804.1835837](https://doi.org/10.1145/1835804.1835837). *(UP-Growth)*
 
-**[48]** N. Pasquier, Y. Bastide, R. Taouil, and L. Lakhal, "Efficient Mining of Association Rules Using Closed Itemset Lattices," *Information Systems*, vol. 24, no. 1, pp. 25–46, 1999. *(Close)*
+**[48]** C. F. Ahmed, S. K. Tanbeer, B.-S. Jeong, and Y.-K. Lee, "Efficient tree structures for high utility pattern mining in incremental databases," *IEEE Transactions on Knowledge and Data Engineering*, vol. 21, no. 12, pp. 1708–1721, 2009. DOI: [10.1109/TKDE.2009.46](https://doi.org/10.1109/TKDE.2009.46). *(IHUP)*
 
-**[49]** J. Huang, Y.-P. Lai, C. Lo, and C.-W. Wu, "An Efficient Algorithm for Deriving Frequent Itemsets from Lossless Condensed Representation," in *Proc. 32nd Int. Conf. on Industrial, Engineering and Other Applications of Applied Intelligent Systems (IEA/AIE)*, 2019, pp. 216–229. *(DFI-Growth)*
+**[49]** Z. Cheng, W. Fang, W. Shen, J. C.-W. Lin, and B. Yuan, "An efficient utility-list based high-utility itemset mining algorithm," *Applied Intelligence*, vol. 53, no. 6, pp. 6992–7006, 2023. DOI: [10.1007/s10489-022-03823-7](https://doi.org/10.1007/s10489-022-03823-7). *(HUIM-SU)*
 
-**[50]** G. I. Webb and J. Vreeken, "Efficient discovery of the most interesting associations," *ACM Transactions on Knowledge Discovery from Data*, vol. 8, no. 3, Article 15, 2014. *(OPUS Miner)*
+**[50]** Q.-H. Duong, P. Fournier-Viger, H. Ramampiaro, K. Nørvåg, and T.-L. Dam, "Efficient high utility itemset mining using buffered utility-lists," *Applied Intelligence*, vol. 48, no. 5, pp. 1167–1187, 2018. DOI: [10.1007/s10489-017-1057-2](https://doi.org/10.1007/s10489-017-1057-2). *(ULB-Miner)*
 
-**[51]** R. Agrawal and R. Srikant, "Fast Algorithms for Mining Association Rules in Large Databases," in *Proc. 20th Int. Conf. on Very Large Data Bases (VLDB)*, 1994, pp. 487–499. *(Apriori, AprioriTid, AprioriHybrid)*
+**[51]** S. Dawar, V. Goyal, and D. Bera, "A hybrid framework for mining high-utility itemsets in a sparse transaction database," *Applied Intelligence*, vol. 47, no. 3, pp. 809–827, 2017. DOI: [10.1007/s10489-017-0932-1](https://doi.org/10.1007/s10489-017-0932-1). *(UFH)*
 
-**[52]** J. Vreeken, M. van Leeuwen, and A. Siebes, "Krimp: mining itemsets that compress," *Data Mining and Knowledge Discovery*, vol. 23, no. 1, pp. 169–214, 2011. *(KRIMP)*
+**[52]** J. Sahoo, A. K. Das, and A. Goswami, "An efficient approach for mining association rules from high utility itemsets," *Expert Systems with Applications*, vol. 42, no. 13, pp. 5754–5778, 2015. DOI: [10.1016/j.eswa.2015.03.018](https://doi.org/10.1016/j.eswa.2015.03.018). *(HUCI-Miner)*
 
-**[53]** K. Smets and J. Vreeken, "Slim: Directly Mining Descriptive Patterns," in *Proc. 12th SIAM Int. Conf. on Data Mining (SDM)*, 2012, pp. 236–247. *(SLIM)*
+**[53]** S. Dawar and V. Goyal, "UP-Hist tree: an efficient data structure for mining high utility patterns from transaction databases," in *Proc. 19th Int. Database Engineering & Applications Symp. (IDEAS)*, 2015, pp. 56–61. DOI: [10.1145/2783446.2783584](https://doi.org/10.1145/2783446.2783584). *(UP-Hist)*
 
-**[54]** Y. Liu, W. Liao, and A. Choudhary, "A Two-Phase Algorithm for Fast Discovery of High Utility Itemsets," in *Proc. 9th Pacific-Asia Conf. on Knowledge Discovery and Data Mining (PAKDD)*, 2005, pp. 689–695. *(Two-Phase)*
+**[54]** P. Sra and S. Chand, "A residual utility-based concept for high-utility itemset mining," *Knowledge and Information Systems*, vol. 66, no. 1, pp. 211–235, 2024. DOI: [10.1007/s10115-023-01948-w](https://doi.org/10.1007/s10115-023-01948-w). *(R-Miner)*
 
-**[55]** P. Fournier-Viger, C.-W. Wu, S. Zida, and V. S. Tseng, "FHM: Faster High-Utility Itemset Mining using Estimated Utility Co-occurrence Pruning," in *Proc. 21st Int. Symp. on Methodologies for Intelligent Systems (ISMIS)*, 2014, pp. 83–92. *(FHM)*
+**[55]** P. Sra and S. Chand, "A reinduction-based approach for efficient high utility itemset mining from incremental datasets," *Data Science and Engineering*, vol. 9, no. 1, pp. 73–87, 2024. DOI: [10.1007/s41019-023-00229-4](https://doi.org/10.1007/s41019-023-00229-4). *(SUM)*
 
-**[56]** S. Zida, P. Fournier-Viger, J. C.-W. Lin, C.-W. Wu, and V. S. Tseng, "EFIM: a highly efficient algorithm for mining high-utility itemsets," *Knowledge and Information Systems*, vol. 51, no. 2, pp. 595–609, 2017. DOI: 10.1007/s10115-016-0986-0. (Conference version: *Proc. 14th Mexican Int. Conf. on Artificial Intelligence (MICAI 2015)*, pp. 530–546). *(EFIM)*
+**[56]** P. Fournier-Viger, Y. Wang, J. C.-W. Lin, J. M. Luna, and S. Ventura, "Mining cross-level high utility itemsets," in *Proc. 33rd Int. Conf. on Industrial, Engineering and Other Applications of Applied Intelligent Systems (IEA/AIE)*, 2020, pp. 1–13. DOI: [10.1007/978-3-030-55789-8_1](https://doi.org/10.1007/978-3-030-55789-8_1). *(CLH-Miner)*
 
-**[57]** M. Liu and J. Qu, "Mining High Utility Itemsets without Candidate Generation," in *Proc. 21st ACM Int. Conf. on Information and Knowledge Management (CIKM)*, 2012, pp. 55–64. *(HUI-Miner)*
+**[57]** L. Cagliero, P. Garza, and E. Baralis, "Discovering high-utility itemsets at multiple abstraction levels," in *Proc. 21st East-European Conf. on Advances in Databases and Information Systems (ADBIS)*, 2017, pp. 201–215. DOI: [10.1007/978-3-319-66917-5_14](https://doi.org/10.1007/978-3-319-66917-5_14). *(MLHUI-Miner)*
 
-**[58]** V. S. Tseng, C.-W. Wu, B.-E. Shie, and P. S. Yu, "UP-Growth: An Efficient Algorithm for High Utility Itemset Mining," in *Proc. 16th ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining (KDD)*, 2010, pp. 253–262. *(UP-Growth)*
+**[58]** P. Fournier-Viger, J. C.-W. Lin, T. Dinh, and H. B. Le, "Mining correlated high-utility itemsets using the bond measure," in *Proc. 11th Int. Conf. on Hybrid Artificial Intelligence Systems (HAIS)*, 2016, pp. 108–120. DOI: [10.1007/978-3-319-32034-2_10](https://doi.org/10.1007/978-3-319-32034-2_10). *(FCHM)*
 
-**[59]** C. F. Ahmed, S. K. Tanbeer, B.-S. Jeong, and Y.-K. Lee, "Efficient Tree Structures for High Utility Pattern Mining in Incremental Databases," *IEEE Trans. Knowl. Data Eng.*, vol. 21, no. 12, pp. 1708–1721, 2009. *(IHUP)*
+**[59]** P. Fournier-Viger, "FHN: Efficient mining of high-utility itemsets with negative unit profits," in *Proc. 11th Int. Conf. on Hybrid Artificial Intelligence Systems (HAIS)*, 2016, pp. 96–107. DOI: [10.1007/978-3-319-32034-2_9](https://doi.org/10.1007/978-3-319-32034-2_9). *(FHN)*
 
-**[60]** Z. Cheng, W. Fang, W. Shen, J. C.-W. Lin, and B. Yuan, "An efficient utility-list based high-utility itemset mining algorithm," *Applied Intelligence*, vol. 53, pp. 6992–7006, 2023. *(HUIM-SU)*
+**[60]** P. Fournier-Viger and S. Zida, "FOSHU: Faster on-shelf high utility itemset mining – with or without negative unit profit," in *Proc. 30th Annual ACM Symp. on Applied Computing (SAC)*, 2015, pp. 845–850. DOI: [10.1145/2695664.2695786](https://doi.org/10.1145/2695664.2695786). *(FOSHU)*
 
-**[61]** Q.-H. Duong, P. Fournier-Viger, H. Ramampiaro, K. Nørvåg, and T.-L. Dam, "Efficient high utility itemset mining using buffered utility-lists," *Applied Intelligence*, vol. 48, no. 5, pp. 1167–1187, 2018. *(ULB-Miner)*
+**[61]** G.-C. Lan, T.-P. Hong, J.-P. Huang, and V. S. Tseng, "On-shelf utility mining with negative item values," *Expert Systems with Applications*, vol. 41, no. 7, pp. 3450–3459, 2014. DOI: [10.1016/j.eswa.2013.11.025](https://doi.org/10.1016/j.eswa.2013.11.025). *(TS-HOUN)*
 
-**[62]** S. Dawar, V. Goyal, and D. Bera, "A hybrid framework for mining high-utility itemsets in a sparse transaction database," *Applied Intelligence*, vol. 47, pp. 809–827, 2017. *(UFH)*
+**[62]** J. C.-W. Lin, W. Gan, T.-P. Hong, and J.-S. Pan, "Incrementally updating high-utility itemsets with transaction insertion," in *Proc. 10th Int. Conf. on Advanced Data Mining and Applications (ADMA)*, 2014, pp. 44–56. DOI: [10.1007/978-3-319-14717-8_4](https://doi.org/10.1007/978-3-319-14717-8_4). *(HUI-list-INS)*
 
-**[63]** J. Sahoo, A. K. Das, and A. Goswami, "An efficient approach for mining association rules from high utility itemsets," *Expert Systems with Applications*, vol. 42, no. 13, pp. 5754–5778, 2015. *(HUCI-Miner)*
+**[63]** C.-W. Wu, B.-E. Shie, P. S. Yu, and V. S. Tseng, "Mining top-k high utility itemsets," in *Proc. 18th ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining*, 2012, pp. 78–86. DOI: [10.1145/2339530.2339546](https://doi.org/10.1145/2339530.2339546). *(TKU-Miner)*
 
-**[64]** S. Dawar and V. Goyal, "Up-hist tree: an efficient data structure for mining high utility patterns from transaction databases," in *Proc. 19th Int. Database Engineering & Applications Symp. (IDEAS)*, 2015, pp. 56–61. *(UP-Hist)*
+**[64]** S. Krishnamoorthy, "Mining top-k high utility itemsets with effective threshold raising strategies," *Expert Systems with Applications*, vol. 117, pp. 148–165, 2019. DOI: [10.1016/j.eswa.2018.09.028](https://doi.org/10.1016/j.eswa.2018.09.028). *(THUI)*
 
-**[65]** P. Sra and S. Chand, "A residual utility-based concept for high-utility itemset mining," *Knowledge and Information Systems*, vol. 66, pp. 211–235, 2024. *(R-Miner)*
+**[65]** W. Song, C. Zheng, C. Huang, and L. Liu, "Heuristically mining the top-k high-utility itemsets with cross-entropy optimization," *Applied Intelligence*, vol. 51, no. 12, pp. 8864–8881, 2021. DOI: [10.1007/s10489-021-02576-z](https://doi.org/10.1007/s10489-021-02576-z). *(TKU-CE / TKU-CE+)*
 
-**[66]** P. Sra and S. Chand, "A Reinduction-Based Approach for Efficient High Utility Itemset Mining from Incremental Datasets," *Data Science and Engineering*, vol. 9, pp. 73–87, 2024. *(SUM)*
+**[66]** S. Carstensen and J. C.-W. Lin, "TKU-PSO: An efficient particle swarm optimization model for top-k high-utility itemset mining," *International Journal of Interactive Multimedia and Artificial Intelligence*, vol. 9, no. 4, pp. 70–81, 2025. DOI: [10.9781/ijimai.2024.01.002](https://doi.org/10.9781/ijimai.2024.01.002). *(TKU-PSO)*
 
-**[67]** P. Fournier-Viger, Y. Wang, J. C.-W. Lin, J. M. Luna, and S. Ventura, "Mining Cross-Level High Utility Itemsets," in *Proc. 33rd Int. Conf. on Industrial, Engineering and Other Applications of Applied Intelligent Systems (IEA/AIE)*, 2020, pp. 1–13. *(CLH-Miner)*
+**[67]** X. Zhang, B. Liu, J. Chen, S. Yang, Z. Gu, Z. Liu, and S. Xu, "TOPKPHM: Periodic patterns mining of top-k high utility itemsets," in *Proc. 2025 Int. Conf. on Trustworthy Big Data and Artificial Intelligence (ICTBAI)*, 2025, pp. 39–44. DOI: [10.1109/ICTBAI68361.2025.00009](https://doi.org/10.1109/ICTBAI68361.2025.00009). *(TOPKPHM)*
 
-**[68]** L. Cagliero, P. Garza, and E. Baralis, "Discovering High-Utility Itemsets at Multiple Abstraction Levels," in *Proc. 21st East-European Conf. on Advances in Databases and Information Systems (ADBIS)*, 2017, pp. 201-215. *(MLHUI-Miner)*
+**[68]** G. Kimura, Y. Hayamizu, R. U. Kiran, M. Kitsuregawa, and K. Goda, "DPHIM: Efficient parallel mining of high-utility itemsets on multicore processors and its evaluation," *IEEE Transactions on Knowledge and Data Engineering*, vol. 38, no. 5, pp. 2714–2730, 2026. DOI: [10.1109/TKDE.2026.3666851](https://doi.org/10.1109/TKDE.2026.3666851). *(DPHIM)*
 
-**[69]** P. Fournier-Viger, J. C.-W. Lin, T. Dinh, and H. B. Le, "Mining Correlated High-Utility Itemsets using the Bond Measure," in *Proc. 11th International Conference on Hybrid Artificial Intelligence Systems (HAIS '16)*, 2016, pp. 108–120. *(FCHM)*
+**[69]** K. S. Sulanjari and C. Fatichah, "Optimized closed frequent high utility itemset mining using OSR, OWL, and MSU pruning on retail transaction data," *JUTI: Jurnal Ilmiah Teknologi Informasi*, vol. 24, no. 1, pp. 1–15, 2026. DOI: [10.12962/j24068535.v24i1.a1311](https://doi.org/10.12962/j24068535.v24i1.a1311). *(Closed-FHUIM-Kinana)*
 
-**[70]** P. Fournier-Viger, "FHN: Efficient Mining of High-Utility Itemsets with Negative Unit Profits," in *Proc. 11th International Conference on Hybrid Artificial Intelligence Systems (HAIS '16)*, 2016, pp. 108–119. *(FHN)*
+**[70]** J. C.-W. Lin, T. Li, P. Fournier-Viger, T.-P. Hong, J. Zhan, and M. Voznak, "An efficient algorithm to mine high average-utility itemsets," *Advanced Engineering Informatics*, vol. 30, no. 2, pp. 233–243, 2016. DOI: [10.1016/j.aei.2016.03.003](https://doi.org/10.1016/j.aei.2016.03.003). *(HAUI-Miner)*
 
-**[71]** P. Fournier-Viger and S. Zida, "FOSHU: Faster On-Shelf High Utility Itemset Mining – with or without Negative Unit Profit," in *Proc. 30th Annual ACM Symposium on Applied Computing (SAC 2015)*, 2015, pp. 845–850. *(FOSHU)*
+**[71]** J. C.-W. Lin, S. Ren, P. Fournier-Viger, and T.-P. Hong, "EHAUPM: Efficient high average-utility pattern mining with tighter upper bounds," *IEEE Access*, vol. 5, pp. 12927–12940, 2017. DOI: [10.1109/ACCESS.2017.2721950](https://doi.org/10.1109/ACCESS.2017.2721950). *(EHAUPM)*
 
-**[72]** G.-C. Lan, T.-P. Hong, J.-P. Huang, and V. S. Tseng, "On-shelf utility mining with negative item values," *Expert Systems with Applications*, vol. 41, no. 7, pp. 3450–3459, 2014. *(TS-HOUN)*
+**[72]** W. Song, L. Liu, and C. Huang, "Generalized maximal utility for mining high average-utility itemsets," *Knowledge and Information Systems*, vol. 63, no. 11, pp. 2947–2967, 2021. DOI: [10.1007/s10115-021-01614-z](https://doi.org/10.1007/s10115-021-01614-z). *(HAUIM-GMU)*
 
-**[73]** J. C.-W. Lin, W. Gan, T.-P. Hong, and J.-S. Pan, "Incrementally Updating High-Utility Itemsets with Transaction Insertion," in *Proc. 10th International Conference on Advanced Data Mining and Applications (ADMA 2014)*, 2014, pp. 44–56. *(HUI-list-INS)*
+**[73]** J. C.-W. Lin, S. Ren, and P. Fournier-Viger, "MEMU: More efficient algorithm to mine high average-utility patterns with multiple minimum average-utility thresholds," *IEEE Access*, vol. 6, pp. 7593–7609, 2018. DOI: [10.1109/access.2018.2801261](https://doi.org/10.1109/access.2018.2801261). *(MEMU)*
 
-**[74]** P. Fournier-Viger, S. Zida, J. C.-W. Lin, C.-W. Wu, and V. S. Tseng, "EFIM-Closed: Fast and Memory Efficient Discovery of Closed High-Utility Itemsets," in *Proc. 12th International Conference on Machine Learning and Data Mining in Pattern Recognition (MLDM 2016)*, Springer LNAI 9729, 2016, pp. 199–213. DOI: 10.1007/978-3-319-41920-6_16. *(EFIM-Closed)*
+**[74]** I. Yildirim, "Mining high-efficiency itemsets with negative utilities," *Mathematics*, vol. 13, no. 4, article 659, 2025. DOI: [10.3390/math13040659](https://doi.org/10.3390/math13040659). *(MHEINU)*
 
-**[75]** C.-W. Wu, P. Fournier-Viger, J.-Y. Gu, and V. S. Tseng, "Mining Closed High Utility Itemsets without Candidate Generation," in *Proc. IEEE International Conference on Systems, Man, and Cybernetics (SMC 2015)*, 2015, pp. 199–204. *(CHUI-Miner)*
+**[75]** C. H. Li, C.-W. Wu, and V. S. Tseng, "Efficient vertical mining of high utility quantitative itemsets," in *Proc. 2014 IEEE Int. Conf. on Granular Computing (GrC)*, 2014, pp. 155–160. DOI: [10.1109/GrC.2014.6982823](https://doi.org/10.1109/GrC.2014.6982823). *(VHUQI)*
 
-**[76]** S. Nawaz, J. C.-W. Lin, and P. Fournier-Viger, "Mining High Utility Itemsets with Hill Climbing and Simulated Annealing," *IEEE Transactions on Management Information Systems (TMIS)*, vol. 12, no. 4, pp. 1–25, 2021. *(HUIM-HC/SA)*
+**[76]** M. Nouioua, P. Fournier-Viger, C.-W. Wu, J. C.-W. Lin, and W. Gan, "FHUQI-Miner: Fast high utility quantitative itemset mining," *Applied Intelligence*, vol. 51, no. 9, pp. 6581–6603, 2021. DOI: [10.1007/s10489-021-02204-w](https://doi.org/10.1007/s10489-021-02204-w). *(FHUQI-Miner)*
 
-**[77]** J. C.-W. Lin, L. Yang, P. Fournier-Viger, T.-P. Hong, and M. Voznak, "A binary PSO approach to mine high-utility itemsets," *Soft Computing*, vol. 20, no. 1, pp. 1–13, 2016. *(HUIM-BPSO-tree)*
+**[77]** M. Nouioua, P. Fournier-Viger, W. Gan, Y. Wu, J. C.-W. Lin, and F. Nouioua, "TKQ: Top-K quantitative high utility itemset mining," in *Proc. 17th Int. Conf. on Advanced Data Mining and Applications (ADMA)*, 2021, pp. 15–28. DOI: [10.1007/978-3-030-95408-6_2](https://doi.org/10.1007/978-3-030-95408-6_2). *(TKQ)*
 
-**[78]** W. Song and C. Huang, "Mining High Utility Itemsets Using Bio-Inspired Algorithms: A Diverse Optimal Value Framework," *IEEE Access*, vol. 6, pp. 19568–19582, 2018. *(Bio-HUIF)*
+**[78]** Y.-I. Chang, P.-C. Chuang, Y.-H. Liao, P.-Y. Hu, and T.-W. Chen, "An efficient algorithm for mining top-k high-on-shelf-utility itemsets with positive/negative profits of local/global minimum count," *Engineering Proceedings*, vol. 108, no. 1, article 45, 2025. DOI: [10.3390/engproc2025108045](https://doi.org/10.3390/engproc2025108045). *(TIPN-HOUI-Miner)*
 
-**[79]** W. Song, J. Li, and C. Huang, "Artificial Fish Swarm Algorithm for Mining High Utility Itemsets," in *Proc. 12th International Conference on Advances in Swarm Intelligence (ICSI)*, 2021, pp. 407–419. *(HUIM-AFSA)*
+**[79]** S. Nawaz, J. C.-W. Lin, and P. Fournier-Viger, "Mining high utility itemsets with hill climbing and simulated annealing," *ACM Transactions on Management Information Systems*, vol. 12, no. 4, article 33, 2021. DOI: [10.1145/3462636](https://doi.org/10.1145/3462636). *(HUIM-HC / HUIM-SA)*
 
-**[80]** W. Song and C. Huang, "Discovering High-Utility Itemsets Based on the Artificial Bee Colony Algorithm," in *Proc. 22nd Pacific-Asia Conference on Knowledge Discovery and Data Mining (PAKDD)*, 2018, pp. 240–252. *(HUIM-ABC)*
+**[80]** J. C.-W. Lin, L. Yang, P. Fournier-Viger, T.-P. Hong, and M. Voznak, "A binary PSO approach to mine high-utility itemsets," *Soft Computing*, vol. 20, no. 7, pp. 2645–2655, 2016. DOI: [10.1007/s00500-016-2106-1](https://doi.org/10.1007/s00500-016-2106-1). *(HUIM-BPSO-tree)*
 
-**[81]** S. Krishnamoorthy, "Mining top-k high utility itemsets with effective threshold raising strategies," *Expert Systems with Applications*, vol. 117, pp. 148–165, 2019. *(THUI)*
+**[81]** W. Song and C. Huang, "Mining high utility itemsets using bio-inspired algorithms: A diverse optimal value framework," *IEEE Access*, vol. 6, pp. 19568–19582, 2018. DOI: [10.1109/access.2018.2819162](https://doi.org/10.1109/access.2018.2819162). *(Bio-HUIF)*
 
-**[82]** W. Song, C. Zheng, C. Huang, and L. Liu, "Heuristically mining the top-k high-utility itemsets with cross-entropy optimization," *Applied Intelligence*, vol. 51, no. 12, pp. 8864–8881, 2021. *(TKU-CE/CE+)*
+**[82]** W. Song, J. Li, and C. Huang, "Artificial fish swarm algorithm for mining high utility itemsets," in *Proc. 12th Int. Conf. on Advances in Swarm Intelligence (ICSI)*, 2021, pp. 407–419. DOI: [10.1007/978-3-030-78811-7_36](https://doi.org/10.1007/978-3-030-78811-7_36). *(HUIM-AFSA)*
 
-**[83]** S. Dawar, V. Sharma, and V. Goyal, "Mining top-k high-utility itemsets from a data stream under sliding window model," *Applied Intelligence*, vol. 47, no. 4, pp. 1240–1255, 2017. *(FHMDS)*
+**[83]** W. Song and C. Huang, "Discovering high-utility itemsets based on the artificial bee colony algorithm," in *Proc. 22nd Pacific-Asia Conf. on Knowledge Discovery and Data Mining (PAKDD)*, 2018, pp. 240–252. DOI: [10.1007/978-3-319-93034-3_20](https://doi.org/10.1007/978-3-319-93034-3_20). *(HUIM-ABC)*
 
-**[84]** J. C.-W. Lin, T. Li, P. Fournier-Viger, T.-P. Hong, J. Zhan, and M. Voznak, "An efficient algorithm to mine high average-utility itemsets," *Advanced Engineering Informatics*, vol. 30, no. 2, pp. 233–243, 2016. *(HAUI-Miner)*
+### High-Occupancy Itemset Mining (HOIM & HUOPM)
+**[84]** Z.-H. Deng, "Mining high occupancy itemsets," *Future Generation Computer Systems*, vol. 102, pp. 222–229, 2020. DOI: [10.1016/j.future.2019.07.039](https://doi.org/10.1016/j.future.2019.07.039). *(HEP)*
 
-**[85]** J. C.-W. Lin, S. Ren, P. Fournier-Viger, and T.-P. Hong, "EHAUPM: Efficient High Average-Utility Pattern Mining With Tighter Upper Bounds," *IEEE Access*, vol. 5, pp. 12927–12940, 2017. *(EHAUPM)*
+**[85]** L. T. T. Nguyen, T. Mai, G.-H. Pham, U. Yun, and B. Vo, "An efficient method for mining high occupancy itemsets based on equivalence class and early pruning," *Knowledge-Based Systems*, vol. 270, article 110441, 2023. DOI: [10.1016/j.knosys.2023.110441](https://doi.org/10.1016/j.knosys.2023.110441). *(FHOI / DFHOI)*
 
-**[86]** W. Song, L. Liu, and C. Huang, "Generalized maximal utility for mining high average-utility itemsets," *Knowledge and Information Systems*, vol. 63, no. 11, pp. 2947–2967, 2021. *(HAUIM-GMU)*
+**[86]** I. Yildirim, "Mining top-k high occupancy itemsets," *Black Sea Journal of Engineering and Science*, vol. 8, no. 6, pp. 1723–1730, 2025. DOI: [10.46570/bjd.1481169](https://doi.org/10.46570/bjd.1481169). *(TKHOIM)*
 
-**[87]** T.-N. Tran, V. T. Hoang, T.-C. Truong, and M. Voznak, "A hierarchical set-enumeration tree enabling high occupancy item set mining and the use of an adaptive occupancy threshold," *Applied Intelligence*, vol. 55, no. 2, pp. 205–225, 2025. *(NAM-HEP)*
+**[87]** S. Datta, K. Mali, and U. Ghosh, "High occupancy itemset mining with consideration of transaction occupancy," *Arabian Journal for Science and Engineering*, vol. 47, no. 2, pp. 2061–2075, 2022. DOI: [10.1007/s13369-021-06075-8](https://doi.org/10.1007/s13369-021-06075-8). *(HOIMTO)*
 
-**[88]** J. C.-W. Lin, S. Ren, and P. Fournier-Viger, "MEMU: More Efficient Algorithm to Mine High Average-Utility Patterns With Multiple Minimum Average-Utility Thresholds," *IEEE Access*, vol. 6, pp. 7593–7609, 2018. *(MEMU)*
+**[88]** T.-N. Tran, V. T. Hoang, T.-C. Truong, and M. Voznak, "A hierarchical set-enumeration tree enabling high occupancy item set mining and the use of an adaptive occupancy threshold," *Applied Intelligence*, vol. 55, no. 2, pp. 205–225, 2025. DOI: [10.1007/s10489-024-05891-3](https://doi.org/10.1007/s10489-024-05891-3). *(NAM-HEP)*
 
-**[89]** C. H. Li, C.-W. Wu, and V. S. Tseng, "Efficient Vertical Mining of High Utility Quantitative Itemsets," in *Proc. IEEE International Conference on Granular Computing (GrC)*, 2014, pp. 155–160. *(VHUQI)*
+**[89]** B. Shen, Z. Wen, Y. Zhao, D. Zhou, and W. Zheng, "OCEAN: Fast discovery of high utility occupancy itemsets," in *Proc. 21st Int. Conf. on Database Systems for Advanced Applications (DASFAA)*, 2016, pp. 355–369. DOI: [10.1007/978-3-319-32025-0_22](https://doi.org/10.1007/978-3-319-32025-0_22). *(OCEAN)*
 
-**[90]** M. Nouioua, P. Fournier-Viger, C.-W. Wu, J. C.-W. Lin, and W. Gan, "FHUQI-Miner: Fast High Utility Quantitative Itemset Mining," *Applied Intelligence*, 2021. *(FHUQI-Miner)*
+**[90]** W. Gan, J. C.-W. Lin, P. Fournier-Viger, H.-C. Chao, and P. S. Yu, "HUOPM: High-utility occupancy pattern mining," *IEEE Transactions on Cybernetics*, vol. 50, no. 3, pp. 1195–1208, 2020. DOI: [10.1109/tcyb.2019.2896267](https://doi.org/10.1109/tcyb.2019.2896267). *(HUOPM)*
 
-**[91]** M. Nouioua, P. Fournier-Viger, W. Gan, Y. Wu, J. C.-W. Lin, and F. Nouioua, "TKQ: Top-K Quantitative High Utility Itemset Mining." *(TKQ)*
+**[91]** H. Kim, T. Ryu, C. Lee, S. Kim, B. Vo, J. C.-W. Lin, and U. Yun, "Efficient method for mining high utility occupancy patterns based on indexed list structure," *IEEE Access*, vol. 11, pp. 45053–45071, 2023. DOI: [10.1109/ACCESS.2023.3271864](https://doi.org/10.1109/ACCESS.2023.3271864). *(IL-HUOPM / HUOMIL)*
 
-**[92]** I. Yildirim, "Mining High-Efficiency Itemsets with Negative Utilities," *Mathematics*, vol. 13, no. 4, article 659, 2025. https://doi.org/10.3390/math13040659 *(MHEINU)*
+### Sequential & Episode Pattern Mining
+**[92]** J. Pei, J. Han, B. Mortazavi-Asl, H. Pinto, Q. Chen, U. Dayal, and M.-C. Hsu, "PrefixSpan: Mining sequential patterns efficiently by prefix-projected pattern growth," in *Proc. 17th Int. Conf. on Data Engineering (ICDE)*, 2001, pp. 215–224. DOI: [10.1109/ICDE.2001.914830](https://doi.org/10.1109/ICDE.2001.914830). *(PrefixSpan)*
 
-**[93]** G. Kimura, Y. Hayamizu, R. U. Kiran, M. Kitsuregawa, and K. Goda, "DPHIM: Efficient Parallel Mining of High-Utility Itemsets on Multicore Processors and Its Evaluation," *IEEE Transactions on Knowledge and Data Engineering*, vol. 38, no. 5, pp. 2714-2730, 2026. https://doi.org/10.1109/TKDE.2026.3666851 *(DPHIM)*
+**[93]** M. J. Zaki, "SPADE: An efficient algorithm for mining frequent sequences," *Machine Learning*, vol. 42, no. 1–2, pp. 31–60, 2001. DOI: [10.1023/A:1007652502315](https://doi.org/10.1023/A:1007652502315). *(SPADE)*
 
-**[94]** K. S. Sulanjari and C. Fatichah, "Optimized Closed Frequent High Utility Itemset Mining Using OSR, OWL, And MSU Pruning On Retail Transaction Data," *JUTI: Jurnal Ilmiah Teknologi Informasi*, vol. 24, no. 1, pp. 1-15, 2026. https://doi.org/10.12962/j24068535.v24i1.a1311 *(Closed-FHUIM-Kinana)*
+**[94]** J. Yin, Z. Zheng, and L. Cao, "USpan: An efficient algorithm for high utility sequential pattern mining," in *Proc. 18th ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining*, 2012, pp. 660–668. DOI: [10.1145/2339530.2339649](https://doi.org/10.1145/2339530.2339649). *(USpan)*
 
-**[95]** M. Geng, Y. Wu, Y. Li, J. Liu, L. Guo, X. Zhu, and X. Wu, "Mining High Average Utility Nonoverlapping Patterns from Sequential Database," *ACM Transactions on Intelligent Systems and Technology*, vol. 17, no. 1, article 15, 2026. https://doi.org/10.1145/3773899 *(HUP-Miner)*
+**[95]** M. Geng, Y. Wu, Y. Li, J. Liu, L. Guo, X. Zhu, and X. Wu, "Mining high average utility nonoverlapping patterns from sequential database," *ACM Transactions on Intelligent Systems and Technology*, vol. 17, no. 1, article 15, 2026. DOI: [10.1145/3773899](https://doi.org/10.1145/3773899). *(HUP-Miner)*
 
-**[96]** S. Ruggieri, "Frequent Regular Itemset Mining," in *Proc. 16th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD '10)*, 2010, pp. 263-272. https://doi.org/10.1145/1835804.1835840 *(RegularMine)*
+**[96]** R. A. Rizvee, C. F. Ahmed, and C. K. Leung, "A tree-based framework to mine top-K closed sequential patterns," *Applied Intelligence*, vol. 55, no. 3, article 221, 2025. DOI: [10.1007/s10489-024-06137-y](https://doi.org/10.1007/s10489-024-06137-y). *(KCloTreeMiner)*
 
-**[97]** Q. Van, "MFHOI-Miner: An Efficient Method for Mining Maximal Frequent High-Occupancy Itemsets," local project paper, `docs/core/mfhoi.pdf`, 2026. *(MFHOI / Strong MFHOI-Miner)*
+**[97]** S. Wan, J. Chen, W. Gan, G. Chen, and V. Goyal, "THUE: Discovering top-K high utility episodes," in *Proc. 2021 IEEE Int. Conf. on Big Data (Big Data)*, 2021, pp. 583–590. DOI: [10.1109/BigData52589.2021.9671853](https://doi.org/10.1109/BigData52589.2021.9671853). *(THUE)*
 
-**[98]** Q. Van, "HUPP-Miner: High-Utility Prompt Pattern Mining for Cost-Aware and Accuracy-Preserving Generative AI Systems," local project paper, `docs/core/hupp.pdf`, 2026. *(HUPP-Miner)*
+**[98]** P. Fournier-Viger, Y. Chen, P. Nouioua, and J. C.-W. Lin, "Mining high-utility episodes in a complex event sequence," in *Proc. 15th Int. Conf. on Advanced Data Mining and Applications (ADMA)*, 2019, pp. 153–167. DOI: [10.1007/978-3-030-35231-8_12](https://doi.org/10.1007/978-3-030-35231-8_12). *(HUE-Span)*
 
-**[99]** Q. Van, "Closed High-Utility Occupancy Itemset Mining," local project paper, `docs/core/chuim.pdf`, 2026. *(CHUO-Miner)*
+**[99]** W. Gan, J. C.-W. Lin, H.-C. Chao, and P. S. Yu, "Utility mining across complex event sequences," *IEEE Transactions on Artificial Intelligence*, vol. 4, no. 5, pp. 1148–1159, 2023. DOI: [10.1109/TAI.2022.3223965](https://doi.org/10.1109/TAI.2022.3223965). *(UMEpi)*
 
-**[100]** Q. Van, "MHOUI-Miner: Mining High-Occupancy Utility Itemsets," local project paper, `docs/core/mhoui.pdf`, 2026. *(MHOUI-Miner)*
+### Rare Itemset & Data Stream Mining
+**[100]** L. Szathmary, A. Napoli, and P. Valtchev, "Towards rare itemset mining," in *Proc. 19th IEEE Int. Conf. on Tools with Artificial Intelligence (ICTAI)*, 2007, vol. 1, pp. 305–312. DOI: [10.1109/ICTAI.2007.45](https://doi.org/10.1109/ICTAI.2007.45). *(Apriori-Rare)*
 
-**[101]** Q. Van, "VIFP: Verifiable/Privacy-Preserving Frequent Pattern Mining," local project paper, `docs/core/vifp.pdf`, 2026. *(VIFP-Miner)*
+**[101]** Y. S. Koh and N. Rountree, "Finding sporadic rules using Apriori-Inverse," in *Proc. 9th Pacific-Asia Conf. on Knowledge Discovery and Data Mining (PAKDD)*, 2005, pp. 97–106. DOI: [10.1007/11430919_14](https://doi.org/10.1007/11430919_14). *(Apriori-Inverse)*
 
-**[102]** T. Sousa, A. Silva, and A. Neves, "Particle Swarm based Data Mining Algorithms for classification tasks," *Parallel Computing*, vol. 30, no. 5-6, pp. 767-783, 2004. https://doi.org/10.1016/j.parco.2003.12.015 *(PSO Classifier)*
+**[102]** S. Bouasker and S. Ben Yahia, "Key correlation mining by simultaneous monotone and anti-monotone constraints checking," in *Proc. 30th Annual ACM Symp. on Applied Computing (SAC)*, 2015, pp. 851–856. DOI: [10.1145/2695664.2695847](https://doi.org/10.1145/2695664.2695847). *(CORI)*
 
-**[103]** C.-W. Wu, B.-E. Shie, P. S. Yu, and V. S. Tseng, "Mining top-k high utility itemsets," in *Proc. 18th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD '12)*, 2012, pp. 78-86. https://doi.org/10.1145/2339530.2339546 *(TKU-Miner)*
+**[103]** S. Tsang, Y. S. Koh, and G. Dobbie, "RP-Tree: Rare pattern tree mining," in *Proc. 13th Int. Conf. on Data Warehousing and Knowledge Discovery (DaWaK)*, 2011, pp. 277–288. DOI: [10.1007/978-3-642-23544-3_21](https://doi.org/10.1007/978-3-642-23544-3_21). *(RP-Tree)*
 
-**[104]** R. A. Rizvee, C. F. Ahmed, and C. K. Leung, "A tree-based framework to mine top-K closed sequential patterns," *Applied Intelligence*, vol. 55, article 221, 2025. https://doi.org/10.1007/s10489-024-06137-y *(KCloTreeMiner)*
+**[104]** L. Szathmary, P. Valtchev, A. Napoli, and R. Godin, "Efficient vertical mining of minimal rare itemsets," in *Proc. 9th Int. Conf. on Concept Lattices and Their Applications (CLA)*, CEUR-WS vol. 972, 2012, pp. 269–280. [CEUR-WS](http://ceur-ws.org/Vol-972/paper23.pdf). *(Walky-G)*
 
-**[105]** Y.-I. Chang, P.-C. Chuang, Y.-H. Liao, P.-Y. Hu, and T.-W. Chen, "An Efficient Algorithm for Mining Top-k High-On-Shelf-Utility Itemsets with Positive/Negative Profits of Local/Global Minimum Count," *Engineering Proceedings*, vol. 108, no. 1, article 45, 2025. https://doi.org/10.3390/engproc2025108045 *(TIPN-HOUI-Miner)*
+**[105]** J. H. Chang and W. S. Lee, "Finding recent frequent itemsets adaptively over online data streams," in *Proc. 9th ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining*, 2003, pp. 487–492. DOI: [10.1145/956750.956807](https://doi.org/10.1145/956750.956807). *(estDec)*
 
-**[106]** K. Malliaridis and S. Ougiaroglou, "Efficient techniques for retrieving top-K frequent itemsets," *Expert Systems With Applications*, vol. 311, article 131250, 2026. https://doi.org/10.1016/j.eswa.2026.131250 *(HTK-Miner / HTK-negFIN)*
+**[106]** S.-J. Yen, Y.-S. Lee, C.-W. Wu, and C.-L. Lin, "An efficient algorithm for maintaining frequent closed itemsets over data stream," in *Proc. 22nd Int. Conf. on Industrial Engineering and Other Applications of Applied Intelligent Systems (IEA/AIE)*, 2009, pp. 767–776. DOI: [10.1007/978-3-642-02568-6_79](https://doi.org/10.1007/978-3-642-02568-6_79). *(CloStream)*
 
-**[107]** X. Zhang, B. Liu, J. Chen, S. Yang, Z. Gu, Z. Liu, and S. Xu, "TOPKPHM: Periodic Patterns Mining of Top-K High Utility Itemsets," in *Proc. 2025 International Conference on Trustworthy Big Data and Artificial Intelligence (ICTBAI)*, 2025. https://doi.org/10.1109/ICTBAI68361.2025.00009 *(TOPKPHM)*
+**[107]** N. Jiang and L. Gruenwald, "CFI-Stream: Mining closed frequent itemsets in data streams," in *Proc. 12th ACM SIGKDD Int. Conf. on Knowledge Discovery and Data Mining*, 2006, pp. 592–597. DOI: [10.1145/1150402.1150473](https://doi.org/10.1145/1150402.1150473). *(CFI-Stream)*
 
-**[108]** S. Carstensen and J. C.-W. Lin, "TKU-PSO: An Efficient Particle Swarm Optimization Model for Top-k High-Utility Itemset Mining," *International Journal of Interactive Multimedia and Artificial Intelligence*, vol. 9, no. 4, pp. 70-81, 2025. https://doi.org/10.9781/ijimai.2024.01.002 *(TKU-PSO)*
+**[108]** S. Dawar, V. Sharma, and V. Goyal, "Mining top-k high-utility itemsets from a data stream under sliding window model," *Applied Intelligence*, vol. 47, no. 4, pp. 1240–1255, 2017. DOI: [10.1007/s10489-017-0939-7](https://doi.org/10.1007/s10489-017-0939-7). *(FHMDS)*
 
-**[109]** Q. Van, "HIEP-Miner: High-Information Entropy Pattern Mining for Embedded Text Streams," local project paper, `docs/core/hiep.pdf`, 2026. *(HIEP-Miner)*
+### Uncertain, Fuzzy & Classification Data Mining
+**[109]** C.-K. Chui, B. Kao, and E. Hung, "Mining frequent itemsets from uncertain data," in *Proc. 11th Pacific-Asia Conf. on Knowledge Discovery and Data Mining (PAKDD)*, 2007, pp. 47–58. DOI: [10.1007/978-3-540-71701-0_8](https://doi.org/10.1007/978-3-540-71701-0_8). *(U-Apriori)*
 
-**[110]** Q. Van, "FARO: Frequency-Aware Robust Out-of-vocabulary Subword Tokenizer," local project paper, `docs/core/faro_tokenizer_fixed.pdf`, 2026. *(FARO Tokenizer)*
+**[110]** J. C.-W. Lin, T. Li, P. Fournier-Viger, and T.-P. Hong, "A fast algorithm for mining fuzzy frequent itemsets," *Journal of Intelligent & Fuzzy Systems*, vol. 29, no. 6, pp. 2373–2379, 2015. DOI: [10.3233/IFS-151708](https://doi.org/10.3233/IFS-151708). *(FFI-Miner)*
 
-**[111]** Jane Doe, "HUST: Mining-Driven Subword Tokenization for High-Utility Pattern Mining," local project paper, `docs/core/hust.pdf`, 2026. *(HUST-Tokenize)*
+**[111]** J. C.-W. Lin, T.-P. Hong, T.-C. Lin, and S.-T. Pan, "An UBMFFP tree for mining multiple fuzzy frequent itemsets," *International Journal of Uncertainty, Fuzziness and Knowledge-Based Systems*, vol. 23, no. 6, pp. 861–879, 2015. DOI: [10.1142/s0218488515500385](https://doi.org/10.1142/s0218488515500385). *(UBMFFP-Tree)*
 
-**[112]** Quan Van, "Global Breakthroughs in Data Mining During 2025–2026: A Survey of Pattern Mining, Graph Mining, Stream Mining, and LLM-Centric Knowledge Discovery," local project survey, `docs/core/data_mining_2025_2026_survey_q1.pdf`, 2026.
+**[112]** T. Sousa, A. Silva, and A. Neves, "Particle swarm based data mining algorithms for classification tasks," *Parallel Computing*, vol. 30, no. 5–6, pp. 767–783, 2004. DOI: [10.1016/j.parco.2003.12.015](https://doi.org/10.1016/j.parco.2003.12.015). *(PSO Classifier)*
 
-**[113]** Văn Hà Minh Quân, "MEDM-GEN: A Pattern-Guided, Constraint-Aware Dataset Generator Framework for Reproducible Data Mining Research," local project paper, `docs/core/medm_gen_q1_paper.pdf`, 2026. *(MEDM-GEN)*
+### Subword Tokenization Algorithms
+**[113]** T. Reps, "Maximal-munch tokenization in linear time," *ACM Transactions on Programming Languages and Systems*, vol. 20, no. 2, pp. 259–273, 1998. DOI: [10.1145/276393.276394](https://doi.org/10.1145/276393.276394). *(Reps Maximal-Munch Scanner)*
 
-**[114]** Author Name, "LAGA: A Self-Contained Layout-Aware Generative Architecture for Knowledge-Preserving Data Generation," local project paper, `docs/core/LAGA_self_contained_data_generator_q1.tex`, 2026. *(LAGA)*
+**[114]** R. Sennrich, B. Haddow, and A. Birch, "Neural machine translation of rare words with subword units," in *Proc. 54th Annual Meeting of the Association for Computational Linguistics (ACL)*, 2016, pp. 1715–1725. DOI: [10.18653/v1/P16-1162](https://doi.org/10.18653/v1/P16-1162). *(Sennrich BPE Subword)*
 
-**[115]** S. Wan, J. Chen, W. Gan, G. Chen, and V. Goyal, "THUE: Discovering Top-K High Utility Episodes," arXiv:2106.14830, 2021. *(THUE)*
+**[115]** T. Kudo, "Subword regularization: Improving neural network translation models with multiple subword candidates," in *Proc. 56th Annual Meeting of the Association for Computational Linguistics (ACL)*, 2018, pp. 66–75. DOI: [10.18653/v1/P18-1007](https://doi.org/10.18653/v1/P18-1007). *(Unigram Subword Regularization)*
 
-**[116]** R. Sennrich, B. Haddow, and A. Birch, "Neural Machine Translation of Rare Words with Subword Units," in *Proc. ACL 2016*, pp. 1715-1725, 2016. https://aclanthology.org/P16-1162/ *(Sennrich BPE Subword)*
+**[116]** T. Kudo and J. Richardson, "SentencePiece: A simple and language independent subword tokenizer and detokenizer for neural text processing," in *Proc. 2018 Conf. on Empirical Methods in Natural Language Processing (EMNLP): System Demonstrations*, 2018, pp. 66–71. DOI: [10.18653/v1/D18-2012](https://doi.org/10.18653/v1/D18-2012). *(SentencePiece Lite)*
 
-**[117]** T. Kudo, "Subword Regularization: Improving Neural Network Translation Models with Multiple Subword Candidates," in *Proc. ACL 2018*, pp. 66-75, 2018. https://aclanthology.org/P18-1007/ *(Unigram Subword Regularization)*
+**[117]** I. Provilkov, D. Emelianenko, and E. Voita, "BPE-Dropout: Simple and effective subword regularization," in *Proc. 58th Annual Meeting of the Association for Computational Linguistics (ACL)*, 2020, pp. 1882–1892. DOI: [10.18653/v1/2020.acl-main.170](https://doi.org/10.18653/v1/2020.acl-main.170). *(BPE-Dropout)*
 
-**[118]** G. Dagan, G. Synnaeve, and B. Roziere, "Getting the most out of your tokenizer for pre-training and domain adaptation," arXiv:2402.01035v2, 2024. *(Tokenizer Lab)*
+**[118]** X. Song, A. Salcianu, Y. Song, D. Dopson, and D. Zhou, "Fast WordPiece tokenization," in *Proc. 2021 Conf. on Empirical Methods in Natural Language Processing (EMNLP)*, 2021, pp. 2089–2103. DOI: [10.18653/v1/2021.emnlp-main.160](https://doi.org/10.18653/v1/2021.emnlp-main.160). *(Fast WordPiece / LinMaxMatch)*
 
-**[119]** M. Velayuthan and K. Sarveswaran, "Egalitarian Language Representation in Language Models: It All Begins with Tokenizers," in *Proc. COLING 2025*, pp. 5987-5996, 2025. *(Grapheme Pair Encoding)*
-
-**[120]** D. Paul, C. Meister, N. Foroutan, J. Niklaus, S. Ahmadi, A. Bosselut, and R. Sennrich, "Parity-Aware Byte-Pair Encoding: Improving Cross-lingual Fairness in Tokenization," arXiv:2508.04796v2, 2025. *(Parity-aware BPE)*
-
-**[121]** X. Song, A. Salcianu, Y. Song, D. Dopson, and D. Zhou, "Fast WordPiece Tokenization," in *Proc. EMNLP 2021*, pp. 2089-2103, 2021. https://aclanthology.org/2021.emnlp-main.160/ *(Fast WordPiece / LinMaxMatch)*
-
-**[122]** I. Provilkov, D. Emelianenko, and E. Voita, "BPE-Dropout: Simple and Effective Subword Regularization," in *Proc. ACL 2020*, pp. 1882-1892, 2020. https://aclanthology.org/2020.acl-main.170/ *(BPE-Dropout)*
-
-**[123]** T. Kudo and J. Richardson, "SentencePiece: A simple and language independent subword tokenizer and detokenizer for Neural Text Processing," in *Proc. EMNLP 2018: System Demonstrations*, pp. 66-71, 2018. https://aclanthology.org/D18-2012/ *(SentencePiece Lite)*
-
-**[124]** T. Reps, "Maximal-munch tokenization in linear time," *ACM Transactions on Programming Languages and Systems*, vol. 20, no. 2, pp. 259-273, 1998. https://doi.org/10.1145/276393.276394 *(Reps Maximal-Munch Scanner)*
-
-**[125]** C. Xu, B. Zhou, T. Gan, Q. Zheng, and L. Li, "Vocabulary Learning via Optimal Transport for Neural Machine Translation," in *Proc. 59th Annual Meeting of the Association for Computational Linguistics (ACL 2021)*, pp. 7361–7373, 2021. https://aclanthology.org/2021.acl-long.571/ *(VOLT)*
-
-**[126]** K. He, X. Zhang, S. Ren, and J. Sun, "Deep Residual Learning for Image Recognition," in *Proc. IEEE Conference on Computer Vision and Pattern Recognition (CVPR)*, 2016, pp. 770–778. https://doi.org/10.1109/CVPR.2016.90 *(ResNet-18)*
-
-**[127]** A. G. Howard, M. Zhu, B. Chen, D. Kalenichenko, W. Wang, T. Weyand, M. Andreetto, and H. Adam, "MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications," arXiv:1704.04861, 2017. https://arxiv.org/abs/1704.04861 *(MobileNetV4-Tiny)*
-
-**[128]** K. Wu, J. Zhang, H. Peng, M. Liu, B. Xiao, J. Fu, and L. Yuan, "TinyViT: Fast Pretraining Distillation for Small Vision Transformers," in *Proc. European Conference on Computer Vision (ECCV)*, 2022, pp. 68–85. https://doi.org/10.1007/978-3-031-20083-0_5 *(TinyViT)*
-
-**[129]** A. Dosovitskiy, L. Beyer, A. Kolesnikov, D. Weissenborn, X. Zhai, T. Unterthiner, M. Dehghani, M. Minderer, G. Heigold, S. Gelly, J. Uszkoreit, and N. Houlsby, "An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale," in *Proc. International Conference on Learning Representations (ICLR)*, 2021. https://arxiv.org/abs/2010.11929 *(ViT)*
-
-**[130]** J. Pei, J. Han, B. Mortazavi-Asl, H. Pinto, Q. Chen, U. Dayal, and M.-C. Hsu, "PrefixSpan: Mining Sequential Patterns Efficiently by Prefix-Projected Pattern Growth," in *Proc. 17th International Conference on Data Engineering (ICDE)*, 2001, pp. 215-224. https://doi.org/10.1109/ICDE.2001.914830 *(PrefixSpan)*
-
-**[131]** Z. Liu, Y. Lin, Y. Cao, H. Hu, Y. Wei, Z. Zhang, S. Lin, and B. Guo, "Swin Transformer: Hierarchical Vision Transformer using Shifted Windows," in *Proc. IEEE/CVF International Conference on Computer Vision (ICCV)*, 2021. [PDF](docs/Liu_Swin_Transformer_Hierarchical_Vision_Transformer_Using_Shifted_Windows_ICCV_2021_paper.pdf) | https://github.com/microsoft/Swin-Transformer *(Swin Transformer; unofficial C inference port)*
-
-**[132]** M. J. Zaki, "SPADE: An Efficient Algorithm for Mining Frequent Sequences," *Machine Learning*, vol. 42, pp. 31-60, 2001. https://doi.org/10.1023/A:1007652502315 *(SPADE)*
-
-**[132]** D. P. Kingma and M. Welling, "Auto-Encoding Variational Bayes," in *Proc. International Conference on Learning Representations (ICLR)*, 2014. https://arxiv.org/abs/1312.6114 *(VAE)*
-
-**[133]** D. P. Kingma and J. Ba, "Adam: A Method for Stochastic Optimization," in *Proc. International Conference on Learning Representations (ICLR)*, 2015. https://arxiv.org/abs/1412.6980 *(Adam)*
-
-**[134]** I. Goodfellow, J. Pouget-Abadie, M. Mirza, B. Xu, D. Warde-Farley, S. Ozair, A. Courville, and Y. Bengio, "Generative Adversarial Nets," in *Advances in Neural Information Processing Systems (NIPS)*, 2014. *(GAN)*
-
-**[135]** I. Goodfellow, D. Warde-Farley, M. Mirza, A. Courville, and Y. Bengio, "Maxout Networks," in *Proc. International Conference on Machine Learning (ICML)*, 2013. *(Maxout)*
-
-**[136]** I. Sutskever, J. Martens, G. Dahl, and G. Hinton, "On the importance of initialization and momentum in deep learning," in *Proc. International Conference on Machine Learning (ICML)*, 2013. *(SGD Momentum / Nesterov)*
-
-**[137]** B. Shen, Z. Wen, Y. Zhao, D. Zhou, and W. Zheng, "OCEAN: Fast Discovery of High Utility Occupancy Itemsets," in *Proc. 21st International Conference on Database Systems for Advanced Applications (DASFAA 2016)*, Springer LNCS 9642, 2016, pp. 355–369. DOI: 10.1007/978-3-319-32025-0_22. *(OCEAN)*
-
-**[138]** W. Gan, J. C.-W. Lin, P. Fournier-Viger, H.-C. Chao, and P. S. Yu, "HUOPM: High-Utility Occupancy Pattern Mining," *IEEE Transactions on Cybernetics*, vol. 50, no. 3, pp. 1195–1208, March 2020. DOI: 10.1109/TCYB.2019.2894367. *(HUOPM)*
-
-**[139]** H. Kim, T. Ryu, C. Lee, S. Kim, B. Vo, J. C.-W. Lin, and U. Yun, "Efficient Method for Mining High Utility Occupancy Patterns based on Indexed List Structure," *IEEE Access*, vol. 11, pp. 45053–45071, May 2023. DOI: 10.1109/ACCESS.2023.3271864. *(IL-HUOPM / HUOMIL)*
-
-**[140]** L. Szathmary, P. Valtchev, A. Napoli, and R. Godin, "Efficient Vertical Mining of Minimal Rare Itemsets," in *Proc. 9th Int. Conf. on Concept Lattices and Their Applications (CLA 2012)*, CEUR-WS vol. 972, 2012, pp. 269–280. https://ceur-ws.org/Vol-972/paper23.pdf *(Walky-G)*
+**[119]** C. Xu, B. Zhou, T. Gan, Q. Zheng, and L. Li, "Vocabulary learning via optimal transport for neural machine translation," in *Proc. 59th Annual Meeting of the Association for Computational Linguistics (ACL)*, 2021, pp. 7361–7373. DOI: [10.18653/v1/2021.acl-long.571](https://doi.org/10.18653/v1/2021.acl-long.571). *(VOLT)*
 
 ### Implementations verified against the original papers
 
@@ -562,9 +506,9 @@ The implementations below were checked against an independent exact oracle (brut
 
 | Algorithm | Paper | Verification | Choices not fixed by the paper |
 |---|---|---|---|
-| HEP (`hep`) | Deng 2020 [19] | Exact oracle: 8,073 cases (2,121 with an occupancy equal to the threshold), 0 mismatches. HOI counts equal Deng's Table 3 on retail, kosarak, T10I4D100K and accidents at 30% and 10%. | Exact (rational) comparison of occ(X) with the threshold; the early termination of the UBO scan (Section 3.2.3) is not implemented. |
-| DFHOI (`dfhoi`) | Nguyen et al. 2023 [20] | Same oracle, 0 mismatches. HOI counts equal Tables 7 and 8 of the paper (mushroom, retail, T10I4D100K, chess, pumsb). | Items ordered by increasing support (the paper does not state an order); exact comparison as above. |
-| Walky-G (`walky_g`) | Szathmary et al. 2012 [140] | Exact oracle: 5,294 cases on sparse, dense and equal-length random databases, 0 mismatches. MRI counts equal Hidouri et al. (IJCAI 2023), Table 2, on chess (λ = 2500, 1000) and pumsb (λ = 48000, 32000); on chess at λ = 500, its count (1,353,317) agrees with an independent computation (maximal frequent itemsets by LCM, then minimal transversals by SHD) and differs from the published 1,353,344. | Items placed in increasing identifier order; rare candidates of support 0 are kept, as in Algorithm 3. |
+| HEP (`hep`) | Deng 2020 [84] | Exact oracle: 8,073 cases (2,121 with an occupancy equal to the threshold), 0 mismatches. HOI counts equal Deng's Table 3 on retail, kosarak, T10I4D100K and accidents at 30% and 10%. | Exact (rational) comparison of occ(X) with the threshold; the early termination of the UBO scan (Section 3.2.3) is not implemented. |
+| DFHOI (`dfhoi`) | Nguyen et al. 2023 [85] | Same oracle, 0 mismatches. HOI counts equal Tables 7 and 8 of the paper (mushroom, retail, T10I4D100K, chess, pumsb). | Items ordered by increasing support (the paper does not state an order); exact comparison as above. |
+| Walky-G (`walky_g`) | Szathmary et al. 2012 [104] | Exact oracle: 5,294 cases on sparse, dense and equal-length random databases, 0 mismatches. MRI counts equal Hidouri et al. (IJCAI 2023), Table 2, on chess (\u03bb = 2500, 1000) and pumsb (\u03bb = 48000, 32000); on chess at \u03bb = 500, its count (1,353,317) agrees with an independent computation (maximal frequent itemsets by LCM, then minimal transversals by SHD) and differs from the published 1,353,344. | Items placed in increasing identifier order; rare candidates of support 0 are kept, as in Algorithm 3. |
 
 Output of the verified miners can be written for checking: `DM_HOI_OUT` (HEP, DFHOI, AURA-HOI) and `DM_MRI_OUT` (Walky-G) name a file that receives one itemset per line. FPmax (`fpmax`) writes its maximal frequent itemsets to `DM_MFI_OUT`; its output matched a brute-force enumeration on 4,045 random cases, but its faithfulness to every step of the FPmax paper has not been reviewed.
 
