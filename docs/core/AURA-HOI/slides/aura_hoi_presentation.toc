@@ -1,0 +1,5 @@
+\beamer@sectionintoc {1}{Motivation \& Problem Formulation}{3}{0}{1}
+\beamer@sectionintoc {2}{The Length-Capped Residual Bound}{7}{0}{2}
+\beamer@sectionintoc {3}{Algorithmic Architecture \& Systems Design}{12}{0}{3}
+\beamer@sectionintoc {4}{Empirical Evaluation \& Experimental Audit}{15}{0}{4}
+\beamer@sectionintoc {5}{Conclusion \& Future Work}{21}{0}{5}

@@ -1,0 +1,20 @@
+\frametitle{The \AURA {} Algorithm: DFS with Equivalence Classes}
+\begin{algorithm}[H]
+    \caption{\AURA{} Recursive Mining Procedure}
+    \begin{algorithmic}[1]
+      \Procedure{MineSubtree}{$X, \operatorname{Candidates}, \alpha, \mathcal{D}$}
+        \State $L \gets |X| + |\operatorname{Candidates}|$
+        \State \Comment{\textbf{Rule 1: Length-Capped Residual Bound Check}}
+        \If{$\UBres(X, L, \mathcal{D}) < \alpha$} \Return \EndIf
+        \ForAll{$i \in \operatorname{Candidates}$}
+          \State $Y \gets X \cup \{i\}$; \quad $T(Y) \gets T(X) \cap T(i)$ \Comment{Bitset/TID-list Intersection}
+          \State \Comment{\textbf{Rule 2: Transaction-Length / Support Check}}
+          \If{$\supp(Y) / |\mathcal{D}| < \alpha$} \textbf{continue} \EndIf
+          \State \Comment{\textbf{Exact Evaluation \& Emission}}
+          \If{$\occ(Y) \ge \alpha$} \State \textbf{output} $Y$ \EndIf
+          \State $\operatorname{NewCand} \gets \{j \in \operatorname{Candidates} \mid j \succ i \text{ and } T(Y) \cap T(j) \neq \emptyset\}$
+          \State \Call{MineSubtree}{$Y, \operatorname{NewCand}, \alpha, \mathcal{D}$}
+        \EndFor
+      \EndProcedure
+    \end{algorithmic}
+  \end{algorithm}
