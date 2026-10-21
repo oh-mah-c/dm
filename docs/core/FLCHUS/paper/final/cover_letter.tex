@@ -1,0 +1,48 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[top=0.8in,bottom=0.8in,left=0.9in,right=0.9in]{geometry}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue!70!black,urlcolor=blue!70!black}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\newcommand{\journal}{Knowledge and Information Systems}
+
+\begin{document}
+
+\textbf{Quan Van} \hfill \today \\
+Independent Researcher, Ho Chi Minh City, Vietnam \\
+Email: \href{mailto:vanhaminhquan2406@gmail.com}{vanhaminhquan2406@gmail.com} \quad ORCID: \href{https://orcid.org/0009-0002-8222-0076}{0009-0002-8222-0076}
+
+\vspace{0.4em}
+\hrule
+\vspace{0.4em}
+
+To the Editors-in-Chief \\
+\textit{\journal}
+
+Dear Editors,
+
+I submit the manuscript \textbf{``FLCHUS-X: Cost-Aware Pruning for Mining Frequent Sequences with Low Average Cost and High Average Utility''} for consideration as a research article in \textit{\journal}.
+
+\textbf{Problem.} Truong et al.\ (Applied Intelligence 52, 2022) defined the problem of mining frequent sequences with a low average cost and a high average utility, where the cost and the utility of a sequence are maxima over its occurrences, and proposed the FLCHUSPM algorithm. Since neither measure is monotone, exact mining depends on bounds. In FLCHUSPM the cost enters the search only through a lower bound computed from the first occurrence of a sequence, which is used for depth pruning.
+
+\textbf{Contributions.}
+\begin{itemize}\setlength{\itemsep}{2pt}
+\item MLB, a lower bound on the average cost based on the cheapest occurrence of a sequence, with a proof that it is monotone for all super-sequences. The cost threshold can therefore take part in every pruning strategy: depth pruning, removal of items, filtering of co-occurrence maps and tightening of candidate sets.
+\item An analysis of the first-occurrence bound, showing with a four-sequence counterexample that it is not monotone for itemset extensions, so that pruning with it may discard valid patterns, and MDB, a bound for the subtree of a node, with a proof, that recovers most of its pruning power on dense data.
+\item FLCHUS-X, an algorithm built on these bounds with a proof that it returns exactly the set of patterns. Its output is identical to that of a brute-force implementation of the problem definition on 1,900 random databases, including databases built to stress the bounds. On six real sequence datasets it was 1.4 to 3.1 times faster than FLCHUSPM and 1.6 to 266 times faster than FLCHUSPM without its unsafe bound, with a similar memory usage. An ablation study reports, on each dataset, which component helps and which does not.
+\end{itemize}
+
+\textbf{Fit with the journal.} The manuscript contributes provably correct bounds and an exact algorithm for a utility-oriented sequential pattern mining task, together with a verification protocol for exact miners, which is within the scope of data mining and knowledge discovery covered by \textit{\journal}.
+
+\textbf{Declarations.} The manuscript is original, has not been published, and is not under consideration elsewhere. The research received no funding, and the author declares no competing interests.
+
+Sincerely, \\[0.3em]
+\textbf{Quan Van} \\
+Independent Researcher, Ho Chi Minh City, Vietnam
+
+\end{document}

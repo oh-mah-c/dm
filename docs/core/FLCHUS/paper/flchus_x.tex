@@ -7,6 +7,9 @@
 \usetikzlibrary{positioning,arrows.meta,shapes.geometric,fit,backgrounds,calc}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\usepackage{pgfplots}
+\usepgfplotslibrary{groupplots}
+\pgfplotsset{compat=1.18}
 \usepackage{hyperref}
 
 \newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
@@ -16,6 +19,7 @@
 \newcommand{\fub}{\ensuremath{\mathit{FUB}}}
 \newcommand{\flb}{\ensuremath{\mathit{Flb}}}
 \newcommand{\mlb}{\ensuremath{\mathit{MLB}}}
+\newcommand{\mdb}{\ensuremath{\mathit{MDB}}}
 \newcommand{\supp}{\ensuremath{\mathit{supp}}}
 \newcommand{\au}{\ensuremath{\mathit{au}}}
 \newcommand{\ac}{\ensuremath{\mathit{ac}}}
@@ -51,9 +55,12 @@ of a sequence, and proves that \mlb{} is monotone for all super-sequences. Conse
 can be used in the same pruning strategies as the support and the utility upper bound: depth
 pruning, removal of items, filtering of co-occurrence maps and tightening of the candidate item
 sets. The analysis also shows that the first-occurrence lower bound used in \FL{} is not monotone
-for itemset extensions, so that pruning with it is not safe in general. Based on these results,
-the \FX{} algorithm is presented. Its output was compared with a brute-force implementation of
-the problem definition on 1{,}500 random databases, with no difference. \todo{one sentence on runtime and memory after the benchmark}
+for itemset extensions, so that pruning with it is not safe in general; a second bound, \mdb,
+restricted to the subtree of a node, recovers most of its pruning power with a proof. Based on
+these results, the \FX{} algorithm is presented. Its output was identical to that of a
+brute-force implementation of the problem definition on 1{,}900 random databases. On six real
+sequence datasets, \FX{} was 1.4 to 3.1 times faster than \FL{} and 1.6 to 266 times faster
+than \FL{} without its unsafe bound, with a similar memory usage.
 \keywords{Sequential pattern mining \and High utility \and Cost \and Lower bound \and Pruning.}
 \end{abstract}
 
@@ -92,7 +99,9 @@ contributions:
   removing items, filtering the co-occurrence maps and tightening the candidate sets.
 \item It analyses the first-occurrence bound and shows, with a counterexample, that it is not
   monotone for i-extensions, so that it cannot be used safely for depth pruning
-  (Section~\ref{sec:flb}).
+  (Section~\ref{sec:flb}). It proposes \mdb, a lower bound valid for the subtree of a node, which
+  uses the most expensive occurrences ending at the positions where the subtree can extend
+  (Section~\ref{sec:mdb}).
 \item It presents the \FX{} algorithm, which extends the CUL structure with the cost of the
   cheapest occurrence and applies the new strategies (Section~\ref{sec:algo}).
 \item It reports an experimental evaluation of correctness against a brute-force oracle and of
@@ -356,6 +365,47 @@ The utilities of $\Psi'_2$ and $\Psi'_3$ become 29 and 27, and $\amub(\seq{a})$ 
 $\mlb(\seq{b \to d}) = (3 + 7)/2 = 5$ exceed \maxc, so $c, d \notin \mathit{sCMAP}(b)$.
 \end{example}
 
+\subsection{A cost bound for the subtree of a node}\label{sec:mdb}
+
+\mlb{} is valid for all super-sequences, but on long q-sequences where items repeat, the
+cheapest occurrence of a sequence can be much cheaper than the occurrences used by its
+extensions. Since $c(\beta,\Psi')$ is a \emph{maximum} over the occurrences of $\beta$, a
+stronger bound holds for the nodes of the subtree of $\alpha$. Let $c_e$ denote the maximum
+cost of the occurrences of $\alpha$ in $\Psi'$ that end at itemset $e$, and $e_1$ the first such
+end.
+
+\begin{definition}[MDB]
+For $\Psi' \in \rho(\alpha)$, let $\mathit{lb}_D(\alpha,\Psi')$ be the minimum of (i) $c_{e_1}$, if
+$\Psi'$ has an itemset after $e_1$, and (ii) the values $c_e$ for the ends $e$ whose itemset
+contains an item greater than the last item of $\alpha$; it is $+\infty$ if neither exists.
+$\mdb(\alpha)$ is the average of the $m$ smallest finite values $\mathit{lb}_D(\alpha,\Psi')$,
+and $+\infty$ if there are fewer than $m$ of them.
+\end{definition}
+
+\begin{proposition}\label{prop:mdb}
+For every node $\beta \ne \alpha$ of the subtree of $\alpha$ with $\supp(\beta) \ge m$,
+$\ac(\beta) \ge \mdb(\alpha)$.
+\end{proposition}
+\begin{proof}
+Let $\Psi' \in \rho(\beta)$ and $\beta'$ an occurrence of $\beta$ in $\Psi'$; the part of $\beta'$
+that matches $\alpha$ ends at some $e$. If the first extension step from $\alpha$ to $\beta$ is an
+s-extension, all other q-items of $\beta'$ lie after $e$; replacing the $\alpha$-part by the most
+expensive occurrence of $\alpha$ ending at $e_1 \le e$ gives an occurrence of $\beta$, so
+$c(\beta,\Psi') \ge c_{e_1}$, and an itemset follows $e_1$. If it is an i-extension, the other
+q-items of $\beta'$ at $e$ are greater than the last item of $\alpha$, and the others lie after
+$e$; replacing the $\alpha$-part by the most expensive occurrence of $\alpha$ ending at $e$ gives
+an occurrence of $\beta$, so $c(\beta,\Psi') \ge c_e$ for an end $e$ of type (ii). Hence
+$c(\beta,\Psi') \ge \mathit{lb}_D(\alpha,\Psi')$, which is finite, for every $\Psi' \in
+\rho(\beta)$, and the argument of Theorem~\ref{thm:mlb}(b) gives the result. \qed
+\end{proof}
+
+Since $c_e \ge \mathit{cm}_e$, $\mdb(\alpha) \ge \mlb(\alpha)$. For descendants that start with an
+s-extension, term (i) is the first-occurrence cost used by \flb{}; term (ii) is what makes the
+bound valid for i-extensions. \mdb{} holds only for the subtree, so it is used to stop the
+expansion of a node \emph{after} the node itself has been tested. In the toy QSDB,
+$\mdb(\seq{a}) = (1 + 2)/2 = 1.5$: in $\Psi'_1$ and $\Psi'_2$, $a$ ends at the itemset $(ab)$,
+where an i-extension with $b$ is possible.
+
 \begin{table}[t]
 \centering
 \caption{Pruning tests of \FL{} and \FX{} ($\checkmark$: used; $\times$: not used).}
@@ -368,6 +418,7 @@ Use & Test & Valid for & \FL{} & \FX{} \\
 Depth pruning & $\fub < \minu$ & forward ext. & $\checkmark$ & $\checkmark$ \\
 Depth pruning & $\flb > \maxc$ & \textcolor{badc}{no (Prop.~\ref{prop:cex})} & $\checkmark$ & $\times$ \\
 Depth pruning & $\mlb > \maxc$ & all super-seq. & $\times$ & $\checkmark$ \\
+Depth pruning (descendants) & $\mdb > \maxc$ & forward ext. & $\times$ & $\checkmark$ \\
 Width, items, CMAPs & $\supp < \mins$, $\amub < \minu$ & all super-seq. & $\checkmark$ & $\checkmark$ \\
 Width, items, CMAPs & $\mlb > \maxc$ & all super-seq. & $\times$ & $\checkmark$ \\
 Item removal to a fixpoint & -- & -- & $\times$ & $\checkmark$ \\
@@ -445,11 +496,12 @@ Algorithm~\ref{alg:fx} shows \FX{}. It first computes the CULs of the items and 
 with Corollary~\ref{cor:strategies}(2) until no item is removed (lines 1--5). It then builds the
 co-occurrence maps with the support, \amub{} and \mlb{} tests (line 6) and explores the prefix
 tree depth-first (procedure \textsc{Search}). For a node $\alpha$, it applies depth pruning with
-\fub{} and \mlb{} (line 9), outputs $\alpha$ if it is an FLCHU sequence (line 10), and builds
-the candidate sets of i- and s-extensions with the width tests (lines 11--16). The search
-space, the utility bounds and the tightening of candidate sets are those of \FL{}; the
-differences are the use of \mlb{} instead of \flb{}, the cost tests in lines 3, 6, 13 and 15,
-and the repetition of item removal.
+\fub{} and \mlb{} (line 9), outputs $\alpha$ if it is an FLCHU sequence (line 10), stops the
+expansion if $\mdb(\alpha) > \maxc$ (line 11), and builds the candidate sets of i- and
+s-extensions with the width tests (lines 12--17). The search space, the utility bounds and the
+tightening of candidate sets are those of \FL{}; the differences are the use of \mlb{} and
+\mdb{} instead of \flb{}, the cost tests in lines 3, 6, 14 and 16, and the repetition of item
+removal.
 
 \begin{algorithm}[t]
 \caption{\FX}\label{alg:fx}
@@ -467,6 +519,7 @@ and the repetition of item removal.
 \Procedure{Search}{$\alpha, I, S$}
   \If{$\fub(\alpha) < \minu \lor \mlb(\alpha) > \maxc$} \Return \EndIf
   \If{$\au(\alpha) \ge \minu \land \ac(\alpha) \le \maxc$} output $\alpha$ \EndIf
+  \If{$\mdb(\alpha) > \maxc$} \Return \EndIf
   \State $x \gets$ last item of $\alpha$; $I(\alpha) \gets \emptyset$; $S(\alpha) \gets \emptyset$
   \ForAll{$y \in I$, $y \succ x$, $y \in \mathit{iCMAP}(x)$}
     \If{$\supp(\alpha\diamond_i y) \ge \mins \land \amub(\alpha\diamond_i y) \ge \minu \land \mlb(\alpha\diamond_i y) \le \maxc$} $I(\alpha) \gets I(\alpha) \cup \{y\}$ \EndIf
@@ -488,8 +541,10 @@ Every output sequence satisfies the three conditions (line 10), with values comp
 from the CULs (Lemma~\ref{lem:cul} and \cite[Section~5.1]{truong2022}). Completeness: the
 search space is the prefix tree of all sequences over the items of $D'$; a subtree is pruned
 or an item is skipped only by a test that, by \cite[Theorems~1 and 3]{truong2022} for the
-support, \amub{} and \fub{}, and by Theorem~\ref{thm:mlb} and Corollary~\ref{cor:strategies}
-for \mlb{}, guarantees that the skipped sequences are not FLCHU sequences. \qed
+support, \amub{} and \fub{}, by Theorem~\ref{thm:mlb} and Corollary~\ref{cor:strategies}
+for \mlb{}, and by Proposition~\ref{prop:mdb} for \mdb{} (which is applied after the node itself
+is tested), guarantees that the skipped sequences are not FLCHU sequences. The values $c_e$
+and the ends needed by \mdb{} are available in the CUL. \qed
 \end{proof}
 
 \paragraph{Implementation details.} The bounds need the sum of the $m$ largest (or smallest)
@@ -561,7 +616,8 @@ number of tuples, and the measures of a node are computed in time linear in the 
 CUL; the selection of the $m$ extreme values takes linear expected time instead of
 $O(n \log n)$ for a sort over $n$ q-sequences. \FX{} adds one value per tuple
 ($\mathit{cm}_e$) to the CULs of \FL{}. Item removal is repeated at most $|A|$ times, each time with a scan of
-$D'$; in the experiments it converged in \todo{number of rounds} rounds.
+$D'$; on the six datasets of Section~\ref{sec:exp} it stopped after two rounds, the second
+removing no item.
 
 %=====================================================================
 \section{Experimental Evaluation}\label{sec:exp}
@@ -575,8 +631,12 @@ the published result, the CULs of all items of \cite[Fig.~1]{truong2022}, the pu
 co-occurrence maps, and the 14 nodes of \cite[Fig.~5]{truong2022}; the bound values agree
 except two \flb{} values of pruned nodes, for which the figure reports values equal to the \ac{}
 values of other nodes. Two algorithms are compared: \FL{}, and \FL{} without the \flb{}
-test (denoted \FL$^{-}$), which is sound and is the correct baseline. \todo{hardware and
-software environment}
+test (denoted \FL$^{-}$), which is sound and is the correct baseline. All programs are written in
+C, compiled with GCC~13.3.0 at \texttt{-O2}, and run single-threaded through the same standalone
+driver on an Intel Core i7-10700 (2.9\,GHz) with 31\,GiB of memory under Ubuntu~24.04.5. Each
+setting was run three times in sequence for every algorithm; the median time, from reading the
+input to the end of the search, and the peak resident memory measured by \texttt{/usr/bin/time}
+are reported. Runs were stopped after 300\,s.
 
 \subsection{Correctness}
 
@@ -599,13 +659,20 @@ Algorithm & Databases & FLCHU seq. & Differing & Missing & Extra & Values \\
 \FL$^{-}$ & 500 & 21{,}807 & 0 & 0 & 0 & 0 \\
 \FX{} & 500 & 21{,}807 & 0 & 0 & 0 & 0 \\
 \FX{} (second seed) & 1{,}000 & 53{,}439 & 0 & 0 & 0 & 0 \\
+\midrule
+\multicolumn{7}{@{}l}{\emph{Long q-sequences over 2--3 items (3--8 itemsets each)}} \\
+\FL{} & 400 & 591{,}101 & 1 & 3 & 0 & 0 \\
+\FX{} & 400 & 591{,}101 & 0 & 0 & 0 & 0 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The two databases where \FL{} differs both contain an i-extension whose prefix is pruned by
-\flb{} as in Proposition~\ref{prop:cex}; each of the three strategies of \FX{} was also
-disabled in turn, and the output was identical to the brute force in all 500 databases.
+The databases where \FL{} differs contain an i-extension whose prefix is pruned by \flb{} as in
+Proposition~\ref{prop:cex}. The second group of databases, with many repeated items, exercises
+the cases where the cheapest, first and most expensive occurrences differ, on which \mdb{}
+relies. Each of the four components of \FX{} (\mdb, cost-aware width pruning, repeated item
+removal, linear-time selection) was also disabled in turn, and the output was identical to the
+brute force in all 500 databases of the first seed.
 
 \subsection{Datasets}
 
@@ -638,15 +705,112 @@ BIBLE & 36{,}369 & 13{,}905 & 21.6 & (9; 100) \\
 
 \subsection{Runtime, memory and search space}
 
-\todo{Runtime and peak memory of \FL{}, \FL$^{-}$ and \FX{} when varying \mins{}, \minu{}
-and \maxc{} on each dataset (median of three runs, single thread, time limit), number of
-visited nodes and of constructed extensions.
-The benchmark has not been run yet; no performance result is claimed in this draft.}
+For each dataset, one of \mins, \minu{} and \maxc{} (in the percentage form of
+\cite{truong2022}) was varied while the two others kept a default value
+(Table~\ref{tab:runtime}); the values of a sweep go from easy to hard, and once an algorithm
+exceeded the time limit, the harder values of that sweep were not run for it. Over the 69
+settings, all algorithms that finished returned the same number of FLCHU sequences; in
+particular \FL{} missed no pattern on these datasets, so the unsafe pruning of
+Section~\ref{sec:flb} was only observed on the random databases of Table~\ref{tab:oracle}.
+
+\begin{table}[t]
+\centering
+\caption{Median runtime at the default setting (\mins\%, \minu\%, \maxc\%) of each dataset; TL:
+time limit of 300\,s exceeded.}
+\label{tab:runtime}
+\resizebox{\textwidth}{!}{\input{gen/runtime_table.tex}}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Range of the speed-up of \FX{} over the settings of each sweep, and number of settings
+solved within the time limit.}
+\label{tab:sweeps}
+\resizebox{\textwidth}{!}{\input{gen/sweeps_table.tex}}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{groupplot}[group style={group size=4 by 3, horizontal sep=0.95cm, vertical sep=1.4cm},
+  width=3.65cm, height=3.3cm, ymode=log, unbounded coords=jump, tick label style={font=\tiny},
+  label style={font=\scriptsize}, title style={font=\scriptsize, yshift=-1ex},
+  every axis plot/.append style={thick, mark size=1.3pt}]
+\input{gen/runtime_plots.tex}
+\end{groupplot}
+\end{tikzpicture}
+\caption{Median runtime (s, log scale) when varying \mins{} (harder to the right) and \maxc{}.
+Gray squares: \FL{}; red triangles: \FL$^{-}$; green circles: \FX{}. Missing points: time limit
+exceeded.}
+\label{fig:runtime}
+\end{figure}
+
+Table~\ref{tab:runtime}, Table~\ref{tab:sweeps} and Figure~\ref{fig:runtime} show the results.
+\FX{} was the fastest algorithm in every setting where an algorithm finished. Against the
+sound baseline \FL$^{-}$, the speed-up ranges from 1.6 to 266: without a valid cost bound,
+\FL$^{-}$ cannot exploit \maxc{}, and on BMS it exceeded the time limit in all settings. Against
+\FL{}, whose \flb{} test is not safe, \FX{} was 1.4 to 3.1 times faster, and the speed-up grew
+when \mins{} decreased on BMS and FIFA. On FIFA with $\mins = 5\%$, \FX{} was the only algorithm
+to finish. On BMS with $\maxc = 2\%$ the number of FLCHU sequences explodes and all algorithms
+exceeded the time limit.
+
+When \minu{} varies, the runtimes hardly change (Table~\ref{tab:sweeps}). The default values of
+\minu{} on BMS turned out to be below the average utility of almost all frequent sequences
+(71{,}918 sequences at every value), so a second sweep with larger values was run on BMS
+(Table~\ref{tab:bmsmu}); it was run separately, and its absolute times are about 25\% higher
+than in the main run for the same number of nodes, so only the ratios within it should be
+compared. The number of FLCHU sequences drops from 71{,}520 to 11 while the number of nodes
+visited by \FX{} stays at about 497{,}000: on these datasets the utility bounds \amub{} and
+\fub{} inherited from \FL{} prune almost nothing, and the pruning comes from the support and from
+the cost bounds.
+
+\begin{table}[t]
+\centering
+\caption{Second sweep of \minu{} on BMS ($\mins = 0.03\%$, $\maxc = 1\%$); median of three runs
+(min--max).}
+\label{tab:bmsmu}
+\begin{tabular}{@{}rrrrr@{}}
+\toprule
+\minu{} (\%) & \#FLCHUS & \FL{} (s) & \FX{} (s) & Speed-up \\
+\midrule
+0.5 & 71{,}520 & 57.5 (57--58) & 25.0 (25--25) & 2.30 \\
+0.75 & 66{,}882 & 60.2 (57--62) & 24.8 (25--25) & 2.43 \\
+1 & 55{,}350 & 59.6 (59--64) & 24.9 (25--25) & 2.39 \\
+1.25 & 6{,}449 & 59.7 (58--60) & 24.6 (25--25) & 2.43 \\
+1.5 & 11 & 58.4 (58--59) & 24.6 (25--25) & 2.37 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The peak memory of the algorithms was similar at the default settings, although the tuples of
+\FX{} store one more value: 4.8\,MB for \FL{} and 4.9\,MB for \FX{} on Snake, and 1\% to 5\% less
+for \FX{} on the five other datasets (for example 185 and 177\,MB on BIBLE, 164 and 158\,MB on
+FIFA).
 
 \subsection{Ablation study}
 
-\todo{Runtime of \FX{} with each of the three strategies disabled (cost-aware width pruning,
-repeated item removal, linear-time selection and early abandon).}
+Table~\ref{tab:ablation} reports the runtime of \FX{} at the default settings with one component
+disabled. Repeated item removal never removed an item after the first round, so disabling it does
+not change the search; the differences of up to 8\% in that column therefore indicate the
+variation of the measurements, and differences of this size elsewhere should not be
+interpreted. The components help on different datasets. \mdb{} is decisive on Snake, the dense
+dataset with long sequences (4.2 times slower without it), but makes \FX{} 5\% slower on BMS and
+17\% slower on FIFA, where it prunes little and its computation is not free. Cost-aware width
+pruning matters on BMS (1.7 times slower without it); on the other datasets its effect is within
+15\% in either direction.
+The linear-time selection and early abandon of joins, which do not change the search space but
+the cost per node, give the largest gain on SIGN, LEVIATHAN, BIBLE and FIFA (1.8 to 2.4 times).
+Part of the speed-up of \FX{} over \FL{} thus comes from this lower cost per node rather than
+from the new bounds; the bounds explain the gains on Snake and BMS and the settings solved
+only by \FX{}.
+
+\begin{table}[t]
+\centering
+\caption{Ablation: median runtime (s) of \FX{} at the default setting and with one component
+disabled (ratio to \FX{} in parentheses).}
+\label{tab:ablation}
+\resizebox{\textwidth}{!}{\input{gen/ablation_table.tex}}
+\end{table}
 
 %=====================================================================
 \section{Conclusion}\label{sec:concl}
@@ -659,8 +823,14 @@ also for removing items, filtering the co-occurrence maps and tightening the can
 analysis also showed that a bound based on the first occurrence is not monotone for
 i-extensions. The resulting algorithm, \FX{}, returned the same output as a brute-force
 implementation of the problem definition on all tested databases.
-\todo{summary of the performance results}. Future work includes tighter bounds that combine
-cost and utility, and the extension of \mlb{} to other cost-aware pattern mining tasks.
+A bound restricted to the subtree, \mdb{}, recovers on dense data the pruning that the
+first-occurrence bound offered without its unsafety. On six real datasets, \FX{} was 1.4 to 3.1
+times faster than \FL{} and up to 266 times faster than \FL{} without its unsafe bound, with a
+similar memory usage; the ablation shows that the components help on different kinds of data
+and that part of the gain comes from a lower cost per node. The experiments also show that the
+utility bounds inherited from \FL{} prune almost nothing on these datasets, so tighter utility
+bounds for this problem are a natural next step, as is the use of \mlb{} and \mdb{} in other
+pattern mining tasks whose measures are maxima over occurrences.
 
 \begin{thebibliography}{10}
 

@@ -102,4 +102,6 @@ Since c_e >= cm_e, lbD >= lbmin and MDB >= MLB.
 Relation to Flb: for s-extension descendants lbD equals the first-occurrence cost used by Flb
 (maximum at the first end); the i-extension term is what makes it sound.
 
-Verification (oracle_flchus.py): with MDB, 500 + 1,000 random QSDBs (seeds 7, 8), 0 differences.
+Verification (oracle_flchus.py): with MDB, 500 + 1,000 random QSDBs (seeds 7, 8) and 400 long
+repetitive QSDBs (LONG=1, seed 9), 0 differences; each component disabled in turn (DESC, COSTW,
+FIX, SEL), 500 QSDBs each, 0 differences (results/oracle_ablation_mdb.log).

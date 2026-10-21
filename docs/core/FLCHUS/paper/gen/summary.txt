@@ -1,0 +1,30 @@
+default Snake: FLCHUSPM=1.58 FLCHUSPM-=20.6 FLCHUS-X=0.73 patterns=851
+default BMS: FLCHUSPM=47.6 FLCHUSPM-=TL FLCHUS-X=20.8 patterns=71918
+default SIGN: FLCHUSPM=0.99 FLCHUSPM-=1.18 FLCHUS-X=0.40 patterns=6311
+default LEVIATHAN: FLCHUSPM=3.28 FLCHUSPM-=4.66 FLCHUS-X=1.99 patterns=2512
+default BIBLE: FLCHUSPM=4.73 FLCHUSPM-=5.15 FLCHUS-X=2.66 patterns=1293
+default FIFA: FLCHUSPM=115 FLCHUSPM-=143 FLCHUS-X=46.1 patterns=12584
+ablation Snake: X=0.73 X-noDESC=3.05 X-noCOSTW=0.68 X-noFIX=0.74 X-noSEL=1.53
+ablation BMS: X=20.8 X-noDESC=19.9 X-noCOSTW=35.5 X-noFIX=20.9 X-noSEL=25.6
+ablation SIGN: X=0.40 X-noDESC=0.41 X-noCOSTW=0.46 X-noFIX=0.43 X-noSEL=0.97
+ablation LEVIATHAN: X=1.99 X-noDESC=2.31 X-noCOSTW=2.08 X-noFIX=2.14 X-noSEL=3.50
+ablation BIBLE: X=2.66 X-noDESC=2.74 X-noCOSTW=2.79 X-noFIX=2.83 X-noSEL=4.97
+ablation FIFA: X=46.1 X-noDESC=39.5 X-noCOSTW=45.4 X-noFIX=42.5 X-noSEL=108
+sweep Snake ms: vsFL=2.0--2.4 vsFLminus=16.4--48.9 solved=[5, 5, 5] of 5
+sweep Snake mu: vsFL=2.1--2.1 vsFLminus=28.1--28.4 solved=[5, 5, 5] of 5
+sweep Snake mc: vsFL=1.9--2.9 vsFLminus=7.8--266.3 solved=[5, 5, 5] of 5
+sweep BMS ms: vsFL=1.9--2.9 vsFLminus=-- solved=[5, 0, 5] of 5
+sweep BMS mu: vsFL=2.2--2.3 vsFLminus=-- solved=[5, 0, 5] of 5
+sweep BMS mc: vsFL=1.7--2.1 vsFLminus=-- solved=[2, 0, 2] of 3
+sweep SIGN ms: vsFL=2.3--2.5 vsFLminus=2.5--3.2 solved=[5, 5, 5] of 5
+sweep SIGN mu: vsFL=2.2--2.4 vsFLminus=2.9--3.0 solved=[5, 5, 5] of 5
+sweep SIGN mc: vsFL=2.1--2.4 vsFLminus=2.1--4.6 solved=[4, 4, 4] of 4
+sweep LEVIATHAN ms: vsFL=1.5--1.7 vsFLminus=2.0--2.6 solved=[5, 5, 5] of 5
+sweep LEVIATHAN mu: vsFL=1.4--1.6 vsFLminus=2.0--2.3 solved=[5, 5, 5] of 5
+sweep LEVIATHAN mc: vsFL=1.4--1.6 vsFLminus=1.6--3.5 solved=[4, 4, 4] of 4
+sweep BIBLE ms: vsFL=1.6--1.8 vsFLminus=1.8--2.1 solved=[5, 5, 5] of 5
+sweep BIBLE mu: vsFL=1.4--1.7 vsFLminus=1.7--2.0 solved=[5, 5, 5] of 5
+sweep BIBLE mc: vsFL=1.5--1.7 vsFLminus=1.6--2.3 solved=[4, 4, 4] of 4
+sweep FIFA ms: vsFL=2.4--2.7 vsFLminus=2.6--3.1 solved=[4, 3, 5] of 5
+sweep FIFA mu: vsFL=2.5--2.5 vsFLminus=3.3--3.5 solved=[4, 4, 4] of 4
+sweep FIFA mc: vsFL=2.3--3.1 vsFLminus=2.4--8.0 solved=[3, 3, 3] of 3
