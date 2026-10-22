@@ -89,3 +89,7 @@ bin_tools/
 *.fls
 *.fdb_latexmk
 *.synctex.gz
+
+# Downloaded reference papers (do not track large PDFs)
+docs/core/Conditional_Astro_Anomaly_Mining/papers/
+docs/core/*/papers/

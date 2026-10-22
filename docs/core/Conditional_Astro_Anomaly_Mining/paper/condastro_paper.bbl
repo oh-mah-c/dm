@@ -1,0 +1,157 @@
+\begin{thebibliography}{19}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Aleo et~al.(2023)]{aleo2023yse}
+P.~D. Aleo et~al.
+\newblock The {Young Supernova Experiment Data Release 1 (YSE DR1)}: Light
+  curves and anomaly detection.
+\newblock \emph{The Astrophysical Journal Supplement Series}, 266\penalty0
+  (1):\penalty0 9, 2023.
+\newblock \doi{10.3847/1538-4365/ac9b20}.
+
+\bibitem[Baron(2019)]{baron2019critical}
+Dalya Baron.
+\newblock Machine learning in astronomy: a critical survey.
+\newblock \emph{Publications of the Astronomical Society of Australia},
+  36:\penalty0 e032, 2019.
+\newblock \doi{10.1017/pasa.2019.23}.
+
+\bibitem[Baron and Poznanski(2017)]{baron2017weirdest}
+Dalya Baron and Dovi Poznanski.
+\newblock The weirdest {SDSS} spectra: results from an unsupervised random
+  forest.
+\newblock \emph{Monthly Notices of the Royal Astronomical Society},
+  465\penalty0 (4):\penalty0 4530--4555, 2017.
+\newblock \doi{10.1093/mnras/stw3021}.
+
+\bibitem[{\v{C}}ubrilo et~al.(2024)]{cubrilo2024contrastive}
+M.~{\v{C}}ubrilo et~al.
+\newblock Contrastive learning for astronomical anomaly detection.
+\newblock \emph{Astronomy \& Astrophysics}, 683:\penalty0 A132, 2024.
+\newblock \doi{10.1051/0004-6361/202348006}.
+
+\bibitem[Duivesteijn et~al.(2016)Duivesteijn, Feelders, and
+  Knobbe]{duivesteijn2016emm}
+Wouter Duivesteijn, Ad~Feelders, and Arno Knobbe.
+\newblock Exceptional model mining.
+\newblock \emph{Data Mining and Knowledge Discovery}, 30\penalty0 (1):\penalty0
+  47--98, 2016.
+\newblock \doi{10.1007/s10618-015-0433-2}.
+
+\bibitem[Fournier-Viger et~al.(2019)Fournier-Viger, Lin, Kiran, Koh, and
+  Thomas]{fournierviger2017contrast}
+Philippe Fournier-Viger, Jerry Chun-Wei Lin, Rage~Uday Kiran, Yun~Sing Koh, and
+  Rado Thomas.
+\newblock A survey of contrast pattern mining.
+\newblock \emph{Applied Intelligence}, 49\penalty0 (4):\penalty0 1319--1343,
+  2019.
+\newblock \doi{10.1007/s10489-018-1327-x}.
+
+\bibitem[{Gaia Collaboration} et~al.(2023){Gaia Collaboration}, Vallenari,
+  et~al.]{gaiadr32023}
+{Gaia Collaboration}, A.~Vallenari, et~al.
+\newblock {Gaia Data Release 3}: Summary of the content and survey properties.
+\newblock \emph{Astronomy \& Astrophysics}, 674:\penalty0 A1, 2023.
+\newblock \doi{10.1051/0004-6361/202243940}.
+
+\bibitem[Giles and Walkowicz(2019)]{giles2019kepler}
+Dan Giles and Lucianne Walkowicz.
+\newblock A systematic machine learning search for anomalies in the {Kepler}
+  light curves.
+\newblock \emph{Monthly Notices of the Royal Astronomical Society},
+  484\penalty0 (1):\penalty0 834--849, 2019.
+\newblock \doi{10.1093/mnras/sty3460}.
+
+\bibitem[Ishida et~al.(2021)Ishida, de~Souza, Bassett,
+  et~al.]{ishida2021active}
+E.~E.~O. Ishida, R.~S. de~Souza, B.~A. Bassett, et~al.
+\newblock Active anomaly detection for astronomical transient surveys.
+\newblock \emph{Monthly Notices of the Royal Astronomical Society},
+  506\penalty0 (3):\penalty0 4475--4487, 2021.
+\newblock \doi{10.1093/mnras/stab1966}.
+
+\bibitem[Kennamer et~al.(2020)]{kennamer2020robust}
+N.~Kennamer et~al.
+\newblock Robust anomaly detection in the presence of noise.
+\newblock \emph{Monthly Notices of the Royal Astronomical Society},
+  499:\penalty0 4418--4431, 2020.
+\newblock \doi{10.1093/mnras/staa3042}.
+
+\bibitem[Lochner and Bassett(2021)]{lochner2021astronomaly}
+Michelle Lochner and Bruce~A. Bassett.
+\newblock Astronomaly: {A}n personalised active anomaly detection framework for
+  astronomical data.
+\newblock \emph{Astronomy and Computing}, 36:\penalty0 100481, 2021.
+\newblock \doi{10.1016/j.ascom.2021.100481}.
+
+\bibitem[Malanchev et~al.(2021)Malanchev, Pruzhinskaya, Korolev,
+  et~al.]{malanchev2021ztf}
+K.~L. Malanchev, M.~V. Pruzhinskaya, V.~V. Korolev, et~al.
+\newblock Anomaly detection in the {Zwicky Transient Facility} light curves:
+  active learning for discovery of exotic transients.
+\newblock \emph{Monthly Notices of the Royal Astronomical Society},
+  507\penalty0 (3):\penalty0 4108--4131, 2021.
+\newblock \doi{10.1093/mnras/stab2175}.
+
+\bibitem[Narayan et~al.(2018)Narayan, Villar, et~al.]{narayan2018ztf}
+Gautham Narayan, V.~Ashley Villar, et~al.
+\newblock Machine learning for the {Zwicky Transient Facility} alert stream.
+\newblock \emph{The Astrophysical Journal Supplement Series}, 236\penalty0
+  (1):\penalty0 9, 2018.
+\newblock \doi{10.3847/1538-4365/aab76e}.
+
+\bibitem[Peters et~al.(2016)Peters, B{\"u}hlmann, and
+  Meinshausen]{peters2016invariant}
+Jonas Peters, Peter B{\"u}hlmann, and Nicolai Meinshausen.
+\newblock Causal inference by using invariant prediction: identification and
+  confidence intervals.
+\newblock \emph{Journal of the Royal Statistical Society: Series B (Statistical
+  Methodology)}, 78\penalty0 (5):\penalty0 947--1012, 2016.
+\newblock \doi{10.1111/rssb.12167}.
+
+\bibitem[Prochaska et~al.(2019)]{prochaska2019gan}
+J.~Xavier Prochaska et~al.
+\newblock Fast and automated discovery of rare and anomalous astronomical
+  spectra with generative adversarial networks.
+\newblock \emph{The Astronomical Journal}, 158\penalty0 (6):\penalty0 224,
+  2019.
+\newblock \doi{10.3847/1538-3881/ab4e1a}.
+
+\bibitem[Pruzhinskaya et~al.(2019)Pruzhinskaya, Ishida, Novoliantsev,
+  et~al.]{pruzhinskaya2019anomaly}
+M.~V. Pruzhinskaya, E.~E.~O. Ishida, P.~E. Novoliantsev, et~al.
+\newblock Anomaly detection in astronomical catalogues with machine learning.
+\newblock \emph{Monthly Notices of the Royal Astronomical Society},
+  489\penalty0 (3):\penalty0 3591--3608, 2019.
+\newblock \doi{10.1093/mnras/stz2362}.
+
+\bibitem[Reis et~al.(2018)Reis, Baron, and Shahaf]{reis2018outlier}
+Itai Reis, Dalya Baron, and Sahar Shahaf.
+\newblock Detecting outlier spectra in the {Sloan Digital Sky Survey} with
+  unsupervised {Random Forests}.
+\newblock \emph{Monthly Notices of the Royal Astronomical Society},
+  476\penalty0 (2):\penalty0 2117--2136, 2018.
+\newblock \doi{10.1093/mnras/sty284}.
+
+\bibitem[Storey-Fisher et~al.(2024)Storey-Fisher, Huertas-Company,
+  et~al.]{storeyfisher2024generative}
+Samantha Storey-Fisher, Marc Huertas-Company, et~al.
+\newblock Anomaly detection in astronomical images with deep generative models.
+\newblock \emph{Monthly Notices of the Royal Astronomical Society},
+  527\penalty0 (4):\penalty0 11463--11478, 2024.
+\newblock \doi{10.1093/mnras/stad3902}.
+
+\bibitem[Villar et~al.(2020)]{villar2020vae}
+V.~Ashley Villar et~al.
+\newblock Supernova photometric classification in the era of large surveys:
+  Deep learning classification of {ZTF} transient light curves and anomaly
+  detection.
+\newblock \emph{The Astrophysical Journal}, 905\penalty0 (2):\penalty0 94,
+  2020.
+\newblock \doi{10.3847/1538-4357/abc69b}.
+
+\end{thebibliography}
